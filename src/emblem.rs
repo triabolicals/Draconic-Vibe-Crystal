@@ -5,9 +5,9 @@ use engage::{
     random::*,
     gamedata::{*, dispos::*},
 };
-use crate::random::*;
-use crate::deploy;
 use super::CONFIG;
+use crate::{utils::*, deploy};
+
 
 pub static mut RANDOMIZED_INDEX: [i32; 38] = [0; 38];
 pub static mut CURRENT_SEED: i32 = -1;

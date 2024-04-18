@@ -21,6 +21,7 @@ pub fn get_unit_rating(this: &Unit) -> i32 {
     for x in 1..8 { result += this.get_capability(x as i32, false);  }
     result
 }
+
 // Generating the list of equipable emblems
 pub fn get_emblem_list() -> Vec<&'static str> {
     let mut result: Vec<&str> = Vec::new();
@@ -43,6 +44,7 @@ pub fn emblem_selection_menu_enable(enabled: bool) {
 //Hook to function that creates the sortie deploy positions to do deployment stuff
 #[unity::hook("App", "MapDispos", "CreatePlayerTeam")]
 pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
+    println!("Deploy changed start");
     if GameVariableManager::get_bool("G_Random_Recruitment"){
         person::change_map_dispos();
     }
@@ -55,6 +57,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
     }
 
     call_original!(group, method_info);
+    println!("Deploy changed start 2");
     if !GameVariableManager::get_bool("G_Cleared_M003") {return; }
     let player_force = Force::get(ForceType::Player).unwrap();
 
@@ -64,6 +67,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
     let rng = Random::get_game();
     let config = CONFIG.lock().unwrap();
     config.save();
+
     unsafe {
         if absent_count == 0 || GameUserData::is_evil_map() { 
             unit_selection_menu_enable(true);
@@ -116,6 +120,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
         hero_unit.try_create_actor();
         if !GameUserData::is_encount_map() { hero_unit.set_status(20); }
         player_count = player_force.get_count();
+        //unit_update_actor(hero_unit,None);
 
         // Lowest Rating Deployment
         if config.deployment_type == 1 {
@@ -140,6 +145,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
                     let unit = move_unit.unwrap();
                     unit.transfer(0, true);
                     unit.try_create_actor();
+                   // unit_update_actor(unit, None);
                 }
                 player_count = player_force.get_count();
             }
@@ -158,6 +164,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
                     if index == value {
                         unit.transfer(0, true);
                         unit.try_create_actor();
+                   //     unit_update_actor(unit, None);
                         player_count = player_force.get_count();
                         break;
                     }
@@ -259,9 +266,7 @@ extern "C" fn deploy_create() -> &'static mut ConfigBasicMenuItem {
     ConfigBasicMenuItem::new_switch::<DeploymentMod>("Deployment Mode")
  } 
  #[no_mangle]
-extern "C" fn emblem_create() -> &'static mut ConfigBasicMenuItem { 
-    ConfigBasicMenuItem::new_switch::<EmblemMod>("Emblem Deployment Mode")
- } 
+extern "C" fn emblem_create() -> &'static mut ConfigBasicMenuItem {  ConfigBasicMenuItem::new_switch::<EmblemMod>("Emblem Deployment Mode") } 
 
  pub fn install_deployment() {
     cobapi::install_global_game_setting(deploy_create);
@@ -276,3 +281,6 @@ pub fn get_sortie_limit(method_info: OptionalMethod) -> i32;
 
 #[skyline::from_offset(0x01c54fa0)]
 pub fn force_get_unit_from_pid(pid: &Il2CppString, relay: bool, method_info: OptionalMethod) -> Option<&'static Unit>;
+
+#[skyline::from_offset(0x01a220b0)]
+pub fn unit_update_actor(this: &Unit, method_info: OptionalMethod);

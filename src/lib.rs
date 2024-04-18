@@ -1,4 +1,5 @@
 #![feature(lazy_cell, ptr_sub_ptr)]
+use unity::prelude::*;
 use cobapi::{Event, SystemEvent};
 use std::sync::{Mutex, LazyLock};
 use serde::{Deserialize, Serialize};
@@ -13,22 +14,34 @@ pub mod random;
 pub mod ironman;
 pub mod skill;
 pub mod grow;
-pub const VERSION: &str = "1.0.2";
+pub mod utils;
+pub mod bgm;
+pub mod autolevel;
+
+pub const VERSION: &str = "1.5.4";
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct DeploymentConfig {
+    add_new_settings: bool,
+    draconic_vibe_version: String,
     deployment_type: i32,
     emblem_deployment: i32,
     iron_man: bool,
     emblem_mode: i32,
     seed: u32,
     random_recruitment: bool,
-    random_job: bool,
+    random_job: i32,
+    random_enemy_job_rate: i32,
     random_skill: bool,
+    random_item: i32,
     random_grow: i32,
     random_god_mode: i32,
+    random_god_sync_mode: i32,
+    random_engage_weapon: bool,
+    random_map_bgm: bool,
+    revival_stone_rate: i32,
+    autolevel: bool,
 }
-
 impl DeploymentConfig {
     pub fn new() -> Self {
         let config_content = std::fs::read_to_string("sd:/engage/config/triabolical.toml");
@@ -42,8 +55,9 @@ impl DeploymentConfig {
                 config
             } else {
                 // This is mostly intended to create a new file if more items are added to the struct
-                println!("Triabolical Config: Config file could not be parsed, a default config file has been created.");
+                println!("Triabolical Config: Config file could not be parsed or new settings are added.\nNew default config file has been created.");
                 let config = DeploymentConfig::default();
+                config.save();
                 config
             }
         } else {
@@ -56,18 +70,34 @@ impl DeploymentConfig {
     }
     pub fn default() -> Self {
         let config = DeploymentConfig  {
+            add_new_settings: false,
+            draconic_vibe_version: VERSION.to_string(),
             deployment_type: 0,
             emblem_deployment: 0,
             iron_man: false,
             emblem_mode: 0,
             seed: 0,
             random_recruitment: false,
-            random_job: false,
+            random_job: 0,
+            random_enemy_job_rate: 50,
             random_skill: false,
+            random_item: 0,
             random_grow: 0,
             random_god_mode: 0,
+            random_god_sync_mode: 0,
+            random_engage_weapon: false,
+            random_map_bgm: false,
+            revival_stone_rate: 0,
+            autolevel: false,
         };
         config
+    }
+    fn correct_rates(&mut self) {
+        self.draconic_vibe_version = VERSION.to_string();
+        unsafe {
+            self.random_enemy_job_rate = clamp(self.random_enemy_job_rate, 0, 100, None);
+            self.revival_stone_rate = clamp(self.revival_stone_rate, 0, 100, None);
+        }
     }
     pub fn save(&self) {
         let out_toml = toml::to_string_pretty(&self).unwrap();
@@ -79,24 +109,34 @@ pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| Deployme
 extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
         match ev {
-            SystemEvent::LanguageChanged => {
-                skill::create_skill_pool();
-                unsafe {
-                    for i in 0..41 { 
-                        person::RAND_PERSONS[i as usize] = i; 
-                        person::RAND_PERSONS[41 + i as usize] = i; 
+            SystemEvent::ProcInstJump {proc, label } => {
+                if proc.name.is_some() { 
+                    //println!("Proc: {}, Hash {}, label {}", proc.name.unwrap().get_string().unwrap(), proc.hashcode, label);
+                 }
+                if proc.hashcode == -988690862 && *label == 0 {
+                    bgm::get_bgm_pool();
+                    skill::create_skill_pool();
+                    item::ENGAGE_ITEMS.lock().unwrap().intialize_list();
+                    unsafe {
+                        for i in 0..41 { 
+                            person::RAND_PERSONS[i as usize] = i; 
+                            person::RAND_PERSONS[41 + i as usize] = i; 
+                        }
                     }
                 }
-                
-            },
-            SystemEvent::ProcInstJump {proc, label } => {
-                if proc.name.is_some() {
-                   println!("Proc: {}, Hash {}, label {}", proc.name.unwrap().get_string().unwrap(), proc.hashcode, label);
+                if proc.hashcode == -339912801 && *label == 1 {
+                    CONFIG.lock().unwrap().correct_rates();
+                    CONFIG.lock().unwrap().save();
+                }
+                if proc.hashcode == -1912552174 && *label == 19 {
+                    CONFIG.lock().unwrap().correct_rates();
+                    CONFIG.lock().unwrap().save();
                 }
                 //Reset things
                 if proc.hashcode == -339912801 && *label == 2 { random::reset_gamedata(); }
                 // randomized stuff
                 if proc.hashcode == -1118443598 && *label == 0 { 
+                    random::skip_m000();
                     random::randomize_stuff(); 
                     ironman::ironman_code_edits();
                 }
@@ -108,11 +148,11 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                     }
                 }
                 // when map starts, iron code edits activate
-                if proc.hashcode == -339912801 && *label == 12 { ironman::ironman_code_edits(); }
-
-                if proc.hashcode == -881910643 {    //TalkSequence
-                    return;
+                if proc.hashcode == -339912801 && *label == 12 { 
+                    autolevel::calculate_player_cap();
+                    ironman::ironman_code_edits(); 
                 }
+                if proc.hashcode == -1624221522 && *label == 14 { bgm::randomize_bgm_map(); }
             }
             _ => {},
         }
@@ -126,17 +166,10 @@ pub fn main() {
     //Deployment
     cobapi::register_system_event_handler(initalize_random_persons);
     //skyline::install_hooks!( person::talk_hook, person::cmd_info_ctor_hook);
-    skyline::install_hooks!( ironman::set_tip_text, ironman::game_mode_bind, ironman::game_over_hook, ironman::set_last_save_data_info);
+    skyline::install_hooks!( skill::asset_table_setup_hook_2, ironman::set_tip_text, ironman::game_mode_bind, ironman::game_over_hook, ironman::set_last_save_data_info);
     skyline::install_hooks!( person:: mess_get_impl_hook, random::try_get_index, deploy::create_player_team, random::script_get_string, person::unit_create_impl_2_hook, person::create_from_dispos_hook); 
     random::install_vibe();
-    /*
-    deploy::install_deployment();
-    emblem::install_rng_emblems();
-    person::install_rng_person();
-    item::install_rnd_jobs();
-    skill::install_skill_rnd();
-    grow::install_rng_grow();
-    */
+
     std::panic::set_hook(Box::new(|info| {
         let location = info.location().unwrap();
         let msg = match info.payload().downcast_ref::<&'static str>() {
@@ -149,14 +182,17 @@ pub fn main() {
             },
         };
         let err_msg = format!(
-            "Plugin has panicked at '{}' with the following message:\n{}\0",
+            "Oh no! Plugin has panicked at '{}' with the following message:\n{}\0",
             location,
             msg
         );
         skyline::error::show_error(
-            4,
-            "Randomizer/Deployment Plugin has panicked! Please open the details and send a screenshot to the developer, then close the game.\n\0",
+            5,
+            "Draconic Vibe Crystal has panicked! Please open the details and send a screenshot to triabolical, then close the game.\n\0",
             err_msg.as_str(),
         );
     }));
 }
+
+#[skyline::from_offset(0x032dfb20)]
+pub fn clamp(value: i32, min: i32, max: i32, method_info: OptionalMethod) -> i32;
