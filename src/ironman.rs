@@ -59,7 +59,7 @@ pub fn game_over_hook(this: u64, method_info: OptionalMethod) {
 pub fn game_mode_bind(this: u64, proc: &mut ProcInst, method_info: OptionalMethod){
     call_original!(this, proc, method_info);
     if CONFIG.lock().unwrap().iron_man {
-        let config_menu = proc.child.cast_mut::<BasicMenu<BasicMenuItem>>();
+        let config_menu = proc.child.as_mut().unwrap().cast_mut::<BasicMenu<BasicMenuItem>>();
         config_menu.full_menu_item_list.items[1].get_class_mut().get_virtual_method_mut("GetName").map(|method| method.method_ptr = ironman_name as _);
         config_menu.full_menu_item_list.items[1].get_class_mut().get_virtual_method_mut("GetHelp").map(|method| method.method_ptr = ironman_help as _);
     }
@@ -190,7 +190,6 @@ pub struct UnitRecord {
             let name = Mess::get(unit.person.get_name().unwrap()).get_string().unwrap();
             let record = unit_get_record(unit, None);
             let dead_chapter = unit_record_get_dead_chapter(record, None);
-            let mut dead_chapter_name = "";
             if dead_chapter.is_some() {
                 println!("Dead Chapter for {}: {}", name, dead_chapter.unwrap().name.get_string().unwrap());
                 let dead_chapter_name  = chapter_get_name(dead_chapter.unwrap(), None).get_string().unwrap();
