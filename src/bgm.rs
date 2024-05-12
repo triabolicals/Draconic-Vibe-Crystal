@@ -68,8 +68,8 @@ impl ConfigBasicMenuItemSwitchMethods for RandomBGMMod {
         } else {return BasicMenuResult::new(); }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if CONFIG.lock().unwrap().random_map_bgm { this.help_text = "Map BGM will be randomized for each phase.".into(); }
-        else { this.help_text = "No changes to map BGM.".into(); }
+        if CONFIG.lock().unwrap().random_map_bgm { this.help_text = "Map BGM will be randomized for each phase. (Togglable)".into(); }
+        else { this.help_text = "No changes to map BGM. (Togglable)".into(); }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         if CONFIG.lock().unwrap().random_map_bgm { this.command_text = "Randomized".into();  }

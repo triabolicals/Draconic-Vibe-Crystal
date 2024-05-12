@@ -13,6 +13,7 @@ pub fn randomize_person_grow(){
     let person_list = PersonData::get_list_mut().unwrap();
     for x in 0..person_list.len() {
         let grow = person_list[x].get_grow();
+        if grow.is_zero() { continue; }
         for y in 0..11 {
             if grow[y as usize] > max[y as usize] { max[ y as usize ] = grow[y as usize]; }
             if grow[y as usize] < min[y as usize] { min[ y as usize] = grow[y as usize]; }
@@ -43,6 +44,7 @@ pub fn randomize_job_grow(){
 
     for x in 0..job_list.len() {
         let grow = job_list[x].get_diff_grow();
+        if grow.is_zero() { continue; } 
         for y in 0..11 {
             if grow[y as usize] > max[y as usize] { max[ y as usize ] = grow[y as usize]; }
             if grow[y as usize] < min[y as usize] { min[ y as usize] = grow[y as usize]; }

@@ -1,4 +1,5 @@
 use unity::prelude::*;
+use skyline::patching::Patch;
 use engage::{
     menu::{*, BasicMenuResult, config::{ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItem}},
     gamevariable::*,
@@ -6,15 +7,18 @@ use engage::{
     gameuserdata::*,
     proc::ProcInst,
     hub::access::*,
+    random::*,
     mess::*,
     gamedata::{*, skill::*, god::*, dispos::*},
     pad::Pad,
     util::get_instance,
 };
+use engage::gamedata::item::ItemData;
 use std::{fs, fs::File, io::Write};
-use crate::{deploy, person, emblem, item, skill, grow, ironman, utils::*};
+use crate::{deploy, person, emblem, item, skill, grow, utils::*};
 use super::{VERSION, CONFIG, DeploymentConfig};
 
+pub static mut LINKED: [i32; 20] = [-1; 20];
 pub static mut CURRENT_SEED: i32 = -1;
 pub fn write_seed_output_file() {
     let seed = GameVariableManager::get_number("G_Random_Seed");
@@ -178,14 +182,16 @@ pub fn write_seed_output_file() {
     }
     if GameVariableManager::get_number("G_Random_God_Mode") >= 2 {
         writeln!(&mut f, "\n--------------- Emblem Engage / Linked Engage Attack Randomization ---------------").unwrap();
-        for x in deploy::EMBLEM_GIDS { 
-            let line = god_engage_random_str(x);
+        for x in 0..20 {
+            let gid = format!("GID_{}", skill::EMBLEM_ASSET[x as usize]); 
+            let line = god_engage_random_str(&gid);
             writeln!(&mut f, "{}", line).unwrap();
         }
     }
     writeln!(&mut f, "\n--------------- Emblem Engrave Data ---------------").unwrap();
-    for x in deploy::EMBLEM_GIDS { 
-        let god = GodData::get(*x).unwrap();
+    for x in 0..20 {
+        let gid = format!("GID_{}", skill::EMBLEM_ASSET[x as usize]); 
+        let god = GodData::get(&gid).unwrap();
         let line = format!("* {} - \t{}: {}, {}: {}, {}: {}, {}: {}, {}: {}, {}: {}", 
         mess_get(god.mid), 
         get_stat_label(11), god.get_engrave_avoid(),  get_stat_label(12), god.get_engrave_critical(), get_stat_label(13), god.get_engrave_hit(), 
@@ -207,6 +213,7 @@ pub fn write_seed_output_file() {
         3 => { writeln!(&mut f, "* Emblem Sync Data: Stats / Sync Skills / Engage Skills").unwrap(); },
         _ => { writeln!(&mut f, "* Emblem Sync Data: No Randomization").unwrap(); },
     }
+    let mut index: usize = 0;
     for x in skill::EMBLEM_ASSET {
         if *x == "ディミトリ" { break; }
         let growth_id = format!("GGID_{}", x);
@@ -216,9 +223,14 @@ pub fn write_seed_output_file() {
         let god = GodData::get(*x).unwrap(); 
         let god_grow = GodGrowthData::try_get_from_god_data(god).unwrap();
         writeln!(&mut f, "\n*** {} Engage Skill: {}, Engage Atk/Link: {}\n", get_emblem_name(&god_id), get_skill_name(engage_skill), god_engage_random_str(&god_id)).unwrap();
+        let weapons_str = item::ENGAGE_ITEMS.lock().unwrap().print(index as i32, 0);
+        let weapons_str2 = item::ENGAGE_ITEMS.lock().unwrap().print(index as i32, 1);
+        let weapons_str3 = item::ENGAGE_ITEMS.lock().unwrap().print(index as i32, 2);
+        writeln!(&mut f, "\t* Engage Weapons 1: {}", weapons_str).unwrap();
+        writeln!(&mut f, "\t* Engage Weapons 2: {}", weapons_str2).unwrap();
+        writeln!(&mut f, "\t* Engage Weapons 3: {}\n", weapons_str3).unwrap();
         for y in 1..level_data.len() {
             writeln!(&mut f, "\t* {} Lv. {} Stats: {}", get_emblem_name(&god_id), y, stats_from_skill_array(level_data[y as usize].synchro_skills)).unwrap();
-            writeln!(&mut f, "\t* Weapon: {}", level_data[y as usize].aptitude.value);
             writeln!(&mut f, "\t\tSyncho Skills:  {}", skill_array_string(level_data[y as usize].synchro_skills)).unwrap();
             writeln!(&mut f, "\t\tEngaged Skills: {}", skill_array_string(level_data[y as usize].engaged_skills)).unwrap();
             if y-1 < god_grow.len() {
@@ -229,6 +241,7 @@ pub fn write_seed_output_file() {
             }
             writeln!(&mut f, "").unwrap();
         }
+        index += 1;
     }
     println!("Randomization Print to file");
 }
@@ -308,19 +321,23 @@ pub fn start_new_game(){
     skill::randomize_skills();
     grow::random_grow();
     skill::randomized_god_data();
+    randomize_engage_links();
     write_seed_output_file();
+
     unsafe { CURRENT_SEED = GameVariableManager::get_number("G_Random_Seed"); }
 }
 
 pub fn reset_gamedata() {
     println!("Resetting GameData");
-
+    ItemData::unload();
+    ItemData::load_data();
+    let items = ItemData::get_list_mut().unwrap();
+    unsafe { for j in 0..items.len() { item_on_complete(items[j], None); } }
     JobData::unload();
     JobData::load();
     let jobs = JobData::get_list_mut().unwrap();
-    // Fix the job style
     unsafe { for j in 0..jobs.len() { job_on_complete(jobs[j], None); } }
-
+    crate::asset::unlock_royal_classes();
     PersonData::unload();
     PersonData::load();
     
@@ -362,7 +379,14 @@ pub fn reset_gamedata() {
     skill::reset_skills();
     item::ENGAGE_ITEMS.lock().unwrap().reset();
     item::ENGAGE_ITEMS.lock().unwrap().commit();
-    unsafe { CURRENT_SEED = -1; }
+    //  Reset God Exp bypass check
+    Patch::in_text(0x01dc9f8c).bytes(&[0xb5, 0xd9, 0x15, 0x94]);
+
+    unsafe { CURRENT_SEED = -1; 
+        for x in 0..20 { 
+            LINKED[x as usize] = -1;
+        }
+    }
 }
 #[unity::from_offset("App", "HubFacilityData", "Load")]
 pub fn hub_facility_data_load(method_info: OptionalMethod);
@@ -398,8 +422,71 @@ pub fn randomize_stuff() {
             skill::randomize_skills();
             grow::random_grow();
             skill::randomized_god_data();
+            randomize_engage_links();
             write_seed_output_file();
+            if ( GameVariableManager::get_bool("G_Cleared_M002") && GameVariableManager::get_bool("G_Random_Job") && GameVariableManager::get_bool("G_Lueur_Random") ) && ( GameVariableManager::get_number("G_Liberation_Type") != 0 ) {
+                let liberation = ItemData::get_mut("IID_リベラシオン").unwrap();
+                let l_type = GameVariableManager::get_number("G_Liberation_Type") as u32;
+                liberation.kind = l_type;
+                if l_type == 4 {
+                    liberation.range_i = 2;
+                    liberation.range_o = 3;
+                    liberation.set_cannon_effect("弓砲台".into());
+                    liberation.on_complete();
+                    liberation.get_equip_skills().add_sid("SID_飛行特効",4, 0);
+                }
+                else if l_type == 5 || l_type == 6 {
+                    liberation.range_o = 2;
+                    liberation.range_i = 1;
+                    if l_type == 6 {
+                        liberation.set_cannon_effect("魔砲台炎".into());
+                        liberation.set_hit_effect( "エルファイアー".into());
+                        liberation.on_complete();
+                    }
+                    else { liberation.get_give_skills().add_sid("SID_毒",3, 0); }
+                }
+                else if l_type == 8 {
+                    liberation.get_equip_skills().add_sid("SID_気功",4, 0);
+                    liberation.get_equip_skills().add_sid("SID_２回行動",4,0);
+                }
+                else {
+                    liberation.range_i = 1;
+                    liberation.range_o = 1;
+                }
+            }
             CURRENT_SEED = GameVariableManager::get_number("G_Random_Seed");
+            if GameVariableManager::get_bool("G_Random_Job") && GameVariableManager::exist("G_Misercode_Type") {
+                let misercode = ItemData::get_mut("IID_ミセリコルデ").unwrap();
+                misercode.kind = GameVariableManager::get_number("G_Misercode_Type") as u32;
+                let misercode_type = GameVariableManager::get_number("G_Misercode_Type");
+                misercode.get_give_skills().clear();
+                misercode.get_equip_skills().clear();
+                if misercode_type == 4 {
+                    misercode.range_o = 2; misercode.range_i = 2;
+                    misercode.set_cannon_effect("弓砲台".into());
+                    misercode.on_complete();
+                    misercode.get_equip_skills().add_sid("SID_飛行特効",4, 0);
+                }
+                else if misercode_type == 5 || misercode_type == 6 {
+                    misercode.range_i = 1;
+                    misercode.range_o = 2;
+                    if misercode_type == 6 {
+                        misercode.set_cannon_effect("魔砲台炎".into());
+                        misercode.set_hit_effect( "オヴスキュリテ".into());
+                    }
+                    else { misercode.get_give_skills().add_sid("SID_毒",3, 0); }
+                    misercode.on_complete();
+                }   
+                else if misercode_type == 8 { 
+                    misercode.range_i = 1;
+                    misercode.range_o = 1;
+                    misercode.get_equip_skills().add_sid("SID_２回行動",4,0); 
+                }
+                else {
+                    misercode.range_i = 1;
+                    misercode.range_o = 2;
+                }
+            }
         }
     }
 }
@@ -411,26 +498,84 @@ fn god_engage_random_str(gid: &str) -> String {
         let engage_attack = Mess::get( SkillData::get( &god.get_engage_attack().get_string().unwrap() ).unwrap().name.unwrap() ).get_string().unwrap();
         let mut string = " ------  ".into();
         let mut string2 = "  ------ ".into();
-    
+        let mut string3 = " ------ ".into();
+        if god_data_get_engage_link(god, None).is_some() {
+            let sid = god_data_get_engage_link(god, None).unwrap();
+            string2 = Mess::get( SkillData::get(&sid.get_string().unwrap()).unwrap().name.unwrap()).get_string().unwrap();
+        }
         if god_data_get_link_gid(god, None).is_some() {
             let gid = god_data_get_link_gid(god, None).unwrap();
-            string = Mess::get( GodData::get(&gid.get_string().unwrap()).unwrap().mid).get_string().unwrap();
-            if god_data_get_engage_link(god, None).is_some() {
-                let sid = god_data_get_engage_link(god, None).unwrap();
-                string2 = Mess::get( SkillData::get(&sid.get_string().unwrap()).unwrap().name.unwrap()).get_string().unwrap();
+            string = Mess::get( GodData::get(&gid.get_string().unwrap()).unwrap().mid).get_string().unwrap(); 
+        }
+        if god_data_get_link(god, None).is_some(){
+            let pid = god_data_get_link(god, None).unwrap();
+            string3 = Mess::get( PersonData::get(&pid.get_string().unwrap()).unwrap().get_name().unwrap()).get_string().unwrap(); 
+        }
+        else {
+            let found = deploy::EMBLEM_GIDS.iter().position(|&r| r == gid); 
+            if found.is_some() {
+                if  LINKED[ found.unwrap() ] != -1 {
+                    let pid = person::PIDS[ LINKED[ found.unwrap() ] as usize ];
+                    string3 = Mess::get( PersonData::get(&pid).unwrap().get_name().unwrap()).get_string().unwrap(); 
+                }
             }
         }
-        return format!("* {}: {} / {} ({})", emblem_name, engage_attack, string2, string);
+        return format!("* {}: {} / {} ( {} | {} )", emblem_name, engage_attack, string2, string, string3);
     }
 }
 pub fn skip_m000(){
-    if GameUserData::get_chapter().cid.get_string().unwrap() == "CID_M000" {
-        GameVariableManager::set_bool("勝利".into(), true);
+    if GameUserData::get_chapter().cid.get_string().unwrap() == "CID_M000" {    GameVariableManager::set_bool("勝利".into(), true); }
+}
+
+pub fn randomize_engage_links() {
+    if !CONFIG.lock().unwrap().engage_link { return; }
+    let mut pid_set: [bool; 41] = [false; 41];
+    pid_set[0] = true;
+    let rng = Random::instantiate().unwrap();
+    let seed = GameVariableManager::get_number("G_Random_Seed") as u32;
+    rng.ctor(seed);
+    let dic = GodData::get_link_dictionary();
+    // God Exp bypass check
+    Patch::in_text(0x01dc9f8c).bytes(&[0x20, 0x00, 0x80, 0x52]);
+    unsafe {
+        let emblem_count;
+        let person_count;
+
+        if has_content(0, None) {         //DLC
+            emblem_count = 19;
+            person_count = 41;
+        }
+        else {
+            emblem_count = 12;
+            person_count = 36;
+        }
+        for x in 0..emblem_count {
+            let gid = format!("GID_{}", skill::EMBLEM_ASSET[x as usize]);
+            let god = GodData::get(&gid).unwrap();
+            let mut index: usize = rng.get_value(person_count as i32) as usize;
+            let mut pid = person::PIDS[index];
+            while pid_set[index] || GodData::try_get_link(PersonData::get(&pid).unwrap()).is_some()  {
+                index = rng.get_value(person_count as i32) as usize;
+                pid = person::PIDS[index];
+            }
+            LINKED[ x as usize ] = index as i32;
+            //god_data_set_link(god, person::PIDS[index].into(), None);
+            god.on_complete();
+            let person = PersonData::get(&pid).unwrap();
+            dic.add(person::PIDS[index].into(), god);
+            person.on_complete();
+            pid_set[index] = true;
+
+        }
     }
 }
 
+
 #[unity::from_offset("App", "JobData", "OnCompleted")]
 fn job_on_complete(this: &JobData, method_info: OptionalMethod);
+
+#[unity::from_offset("App", "ItemData", "OnCompleted")]
+fn item_on_complete(this: &ItemData, method_info: OptionalMethod);
 
 #[unity::from_offset("App", "ChapterData", "Load")]
 fn chapter_data_load(method_info: OptionalMethod);
@@ -440,6 +585,15 @@ fn person_data_on_complete_end(this: &PersonData, method_info: OptionalMethod);
 
 #[unity::from_offset("App", "GodData", "get_LinkGid")]
 fn god_data_get_link_gid(this: &GodData, method_info: OptionalMethod) -> Option<&'static Il2CppString>;
+
+#[unity::from_offset("App", "GodData", "OnBuild")]
+fn god_data_build(this: &GodData, method_info: OptionalMethod);
+
+#[unity::from_offset("App", "GodData", "get_Link")]
+fn god_data_get_link(this: &GodData, method_info: OptionalMethod) -> Option<&'static Il2CppString>;
+
+#[unity::from_offset("App", "GodData", "set_Link")]
+fn god_data_set_link(this: &GodData, value: &Il2CppString, method_info: OptionalMethod);
 
 #[unity::from_offset("App", "GodData", "get_EngageAttackLink")]
 fn god_data_get_engage_link(this: &GodData, method_info: OptionalMethod) -> Option<&'static Il2CppString>;
@@ -474,7 +628,7 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalMenu {
                 config_menu.full_menu_item_list.clear();
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<deploy::DeploymentMod>("Deployment Mode"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<deploy::EmblemMod>("Emblem Deployment Mode"));
-                config_menu.add_item(ConfigBasicMenuItem::new_switch::<ironman::IronmanMod>("Ironman Mode"));
+                //config_menu.add_item(ConfigBasicMenuItem::new_switch::<ironman::IronmanMod>("Ironman Mode"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::autolevel::AutolevelMod>("Level Scale Units")); 
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<person::RandomPersonMod>("Unit Recruitment Order"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<emblem::RandomEmblemMod>("Emblem Recruitment Order"));
@@ -485,6 +639,7 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalMenu {
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<skill::RandomGodMod>("Randomize Emblem Data"));       
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<skill::RandomSynchoMod>("Randomize Emblem Sync Data"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<item::RandomEngageWepMod>("Engage Items/Weapons"));
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<emblem::RandomEmblemLinkMod>("Engage+ Links"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::bgm::RandomBGMMod>("Randomize Map BGM")); 
                 BasicMenuResult::se_cursor()
             }   
@@ -495,5 +650,7 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalMenu {
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { this.command_text = "All will be Revealed".into(); }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { this.help_text = "Open up the Draconic Vibe Crystal settings.".into(); }
 }
-extern "C" fn vibe() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_command::<TriabolicalMenu>("Draconic Vibe Crystal") } 
+extern "C" fn vibe() -> &'static mut ConfigBasicMenuItem { 
+    let title = format!("Draconic Vibe Crystal {}", super::VERSION);
+    ConfigBasicMenuItem::new_command::<TriabolicalMenu>(title) } 
 pub fn install_vibe() { cobapi::install_global_game_setting(vibe); }

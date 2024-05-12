@@ -149,7 +149,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEmblemMod {
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         match CONFIG.lock().unwrap().emblem_mode {
-            1 => { this.help_text = "Emblem recruitment will be randomized".into(); },
+            1 => { this.help_text = "Emblem recruitment will be randomized.".into(); },
             2 => { this.help_text = "Emblem recruitment will be in reversed order".into(); },
             _ => { this.help_text = "Defaut recruitment order for emblems.".into(); },
         }
@@ -160,6 +160,28 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEmblemMod {
             2 => { this.command_text = "Reverse".into(); },
             _ => { this.command_text = "Standard".into(); },
         }
+    }
+}
+pub struct RandomEmblemLinkMod;
+impl ConfigBasicMenuItemSwitchMethods for RandomEmblemLinkMod {
+    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let result = ConfigBasicMenuItem::change_key_value_b(CONFIG.lock().unwrap().engage_link);
+        if CONFIG.lock().unwrap().engage_link != result {
+            CONFIG.lock().unwrap().engage_link = result;
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        } else {return BasicMenuResult::new(); }
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        if CONFIG.lock().unwrap().engage_link {  this.help_text = "Playable characters will be linked to emblems for Engage+. (Togglable)".into(); }
+        else { this.help_text = "Playable characters will not be linked to emblems.".into();  }
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        if CONFIG.lock().unwrap().engage_link { this.command_text = "Randomize Links".into(); }
+        else { this.command_text = "No Random Links".into(); }
     }
 }
 

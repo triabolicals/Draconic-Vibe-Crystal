@@ -102,9 +102,8 @@ pub fn get_emblem_name(key: &str) -> String {
 
 pub fn find_emblem_stat_bonus_index(stat: i32, priority: i32) -> i32 {
     let skill_list = SkillData::get_list().unwrap();
-    
     let mut index = -1;
-    for x in 60..120 {
+    for x in 60..140 {
         let skill = &skill_list[x as usize];
         if skill.get_flag() & 1 == 0 { continue; }  // must be hidden
         let enhance = skill.get_enchance_value();

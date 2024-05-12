@@ -11,36 +11,38 @@ pub mod emblem;
 pub mod item;
 pub mod person;
 pub mod random;
-pub mod ironman;
 pub mod skill;
 pub mod grow;
 pub mod utils;
 pub mod bgm;
 pub mod autolevel;
+pub mod asset;
 
-pub const VERSION: &str = "1.5.4";
+pub const VERSION: &str = "1.7.0";
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct DeploymentConfig {
     add_new_settings: bool,
     draconic_vibe_version: String,
+    seed: u32,
+    random_enemy_job_rate: i32,
+    random_enemy_skill_rate: i32,
+    revival_stone_rate: i32,
+    enemy_emblem_rate: i32,
+    random_map_bgm: bool,
+    engage_link: bool,
+    autolevel: bool,
     deployment_type: i32,
     emblem_deployment: i32,
-    iron_man: bool,
     emblem_mode: i32,
-    seed: u32,
     random_recruitment: bool,
     random_job: i32,
-    random_enemy_job_rate: i32,
     random_skill: bool,
     random_item: i32,
     random_grow: i32,
     random_god_mode: i32,
     random_god_sync_mode: i32,
     random_engage_weapon: bool,
-    random_map_bgm: bool,
-    revival_stone_rate: i32,
-    autolevel: bool,
 }
 impl DeploymentConfig {
     pub fn new() -> Self {
@@ -72,31 +74,35 @@ impl DeploymentConfig {
         let config = DeploymentConfig  {
             add_new_settings: false,
             draconic_vibe_version: VERSION.to_string(),
+            seed: 0,
+            random_enemy_job_rate: 50,
+            random_enemy_skill_rate: 50,
+            revival_stone_rate: 0,
+            enemy_emblem_rate: 0,
+            random_map_bgm: false,
+            engage_link: false,
+            autolevel: false,
             deployment_type: 0,
             emblem_deployment: 0,
-            iron_man: false,
             emblem_mode: 0,
-            seed: 0,
             random_recruitment: false,
             random_job: 0,
-            random_enemy_job_rate: 50,
             random_skill: false,
             random_item: 0,
             random_grow: 0,
             random_god_mode: 0,
             random_god_sync_mode: 0,
             random_engage_weapon: false,
-            random_map_bgm: false,
-            revival_stone_rate: 0,
-            autolevel: false,
         };
         config
     }
     fn correct_rates(&mut self) {
         self.draconic_vibe_version = VERSION.to_string();
         unsafe {
+            self.random_enemy_skill_rate = clamp(self.random_enemy_skill_rate, 0, 100, None);
             self.random_enemy_job_rate = clamp(self.random_enemy_job_rate, 0, 100, None);
-            self.revival_stone_rate = clamp(self.revival_stone_rate, 0, 100, None);
+            self.revival_stone_rate = clamp(self.revival_stone_rate, 0, 500, None);
+            self.enemy_emblem_rate = clamp(self.enemy_emblem_rate, 0, 100, None);
         }
     }
     pub fn save(&self) {
@@ -111,11 +117,13 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
         match ev {
             SystemEvent::ProcInstJump {proc, label } => {
                 if proc.name.is_some() { 
-                    //println!("Proc: {}, Hash {}, label {}", proc.name.unwrap().get_string().unwrap(), proc.hashcode, label);
-                 }
+                    println!("Proc: {}, Hash {}, label {}", proc.name.unwrap().get_string().unwrap(), proc.hashcode, label);
+                }
                 if proc.hashcode == -988690862 && *label == 0 {
                     bgm::get_bgm_pool();
+                    skill::print_bad_inherit_skill();
                     skill::create_skill_pool();
+                    asset::unlock_royal_classes();
                     item::ENGAGE_ITEMS.lock().unwrap().intialize_list();
                     unsafe {
                         for i in 0..41 { 
@@ -138,19 +146,17 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                 if proc.hashcode == -1118443598 && *label == 0 { 
                     random::skip_m000();
                     random::randomize_stuff(); 
-                    ironman::ironman_code_edits();
                 }
-                // Game start and classic mode with iron man = true
                 if proc.hashcode == -1912552174 && *label == 28 {
                     random::start_new_game(); 
-                    if GameUserData::get_game_mode() == GameMode::Classic && CONFIG.lock().unwrap().iron_man { 
-                        GameVariableManager::make_entry("G_Ironman", 1);
-                    }
+                   // if GameUserData::get_game_mode() == GameMode::Classic && CONFIG.lock().unwrap().iron_man { 
+                       // GameVariableManager::make_entry("G_Ironman", 1);
+                   // }
                 }
                 // when map starts, iron code edits activate
                 if proc.hashcode == -339912801 && *label == 12 { 
                     autolevel::calculate_player_cap();
-                    ironman::ironman_code_edits(); 
+                //  ironman::ironman_code_edits(); 
                 }
                 if proc.hashcode == -1624221522 && *label == 14 { bgm::randomize_bgm_map(); }
             }
@@ -163,11 +169,12 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
 
 #[skyline::main(name = "deployment")]
 pub fn main() {
+    let _ = std::fs::create_dir_all("sd:/Draconic Vibe Crystal/");
     //Deployment
     cobapi::register_system_event_handler(initalize_random_persons);
     //skyline::install_hooks!( person::talk_hook, person::cmd_info_ctor_hook);
-    skyline::install_hooks!( skill::asset_table_setup_hook_2, ironman::set_tip_text, ironman::game_mode_bind, ironman::game_over_hook, ironman::set_last_save_data_info);
-    skyline::install_hooks!( person:: mess_get_impl_hook, random::try_get_index, deploy::create_player_team, random::script_get_string, person::unit_create_impl_2_hook, person::create_from_dispos_hook); 
+    //skyline::install_hooks!( ironman::game_mode_bind, ironman::game_over_hook, ironman::set_last_save_data_info);
+    skyline::install_hooks!( asset::add_job_list_unit, person:: mess_get_impl_hook, random::try_get_index, deploy::create_player_team, random::script_get_string, person::unit_create_impl_2_hook, person::create_from_dispos_hook); 
     random::install_vibe();
 
     std::panic::set_hook(Box::new(|info| {
