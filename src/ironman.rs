@@ -1,72 +1,13 @@
-use unity::{
-    il2cpp::object::Array,
-    prelude::*,
-};
+use unity::prelude::*;
 use skyline::patching::Patch;
 use engage::{
-    gameuserglobaldata::*,
     gamevariable::*, 
-    gamedata::{dispos::*},
     menu::{
         BasicMenuResult,
         config::{ ConfigBasicMenuItem, ConfigBasicMenuItemSwitchMethods},
-        BasicMenu, BasicMenuItem,
     },
-    gamedata::unit::Unit,
-    mess::*,
-    force::*,
-    proc::ProcInst,
 };
 use crate::CONFIG;
-
-#[skyline::from_offset(0x01ec5190)]
-pub fn save_data_delete(path: &Il2CppString, method_info: OptionalMethod) -> i32;
-
-#[skyline::from_offset(0x02281490)]
-pub fn game_save_data_get_file_path(_type: i32, index: i32, method_info: OptionalMethod) -> &'static Il2CppString;
-
-#[unity::from_offset("App","SaveData", "IsExist")]
-pub fn save_data_is_exists(path: &Il2CppString, method_info: OptionalMethod ) -> bool;
-
-#[skyline::from_offset(0x02285890)]
-pub fn game_save_data_write(proc: u64, _type: i32, index: i32, m1: OptionalMethod, method_info: OptionalMethod);
-
-#[skyline::hook(offset=0x0251ba60)]
-pub fn set_last_save_data_info(this: &GameUserGlobalData, _type: i32, index: i32, method_info: OptionalMethod){
-    call_original!(this, _type, index, method_info);
-    println!("Set Last Save Data Info hook");
-    // marks the file as saved so when game over happens the game delete the file
-    if GameVariableManager::get_bool("G_Ironman") { 
-        GameVariableManager::make_entry("G_IronmanSaved", 1);
-    }
-}
-#[unity::hook("App", "MapSequence", "TryRestart")]
-pub fn game_over_hook(this: u64, method_info: OptionalMethod) {
-    // if ironman mode and save file is saved, delete the save file
-    println!("Game Over Hook");
-    if GameVariableManager::get_bool("G_Ironman") && CONFIG.lock().unwrap().iron_man {
-        if GameVariableManager::get_bool("G_IronmanSaved") && GameUserGlobalData::get_last_save_data_type() == 6 {
-            unsafe {
-                let path = game_save_data_get_file_path(6, GameUserGlobalData::get_last_save_data_index(), None);
-                if save_data_is_exists(path,None) { save_data_delete(path, None); }
-            }
-        }
-    }
-    else { call_original!(this, method_info); }
-}
-
-#[skyline::hook(offset=0x01fd9ca0)]
-pub fn game_mode_bind(this: u64, proc: &mut ProcInst, method_info: OptionalMethod){
-    call_original!(this, proc, method_info);
-    if CONFIG.lock().unwrap().iron_man {
-        let config_menu = proc.child.as_mut().unwrap().cast_mut::<BasicMenu<BasicMenuItem>>();
-        config_menu.full_menu_item_list.items[1].get_class_mut().get_virtual_method_mut("GetName").map(|method| method.method_ptr = ironman_name as _);
-        config_menu.full_menu_item_list.items[1].get_class_mut().get_virtual_method_mut("GetHelp").map(|method| method.method_ptr = ironman_help as _);
-    }
-}
-
-pub extern "C" fn ironman_name(_this: &mut BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString { "Ironman".into() }
-pub extern "C" fn ironman_help(_this: &mut BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString { "For the real Fire Emblem purists.\nSave file will be deleted upon a game over.".into() }
 
 pub fn ironman_code_edits(){
     //Code Edits to disable restart/reset/time crystal and forced bookmark if on ironman mode
@@ -142,80 +83,3 @@ impl ConfigBasicMenuItemSwitchMethods for IronmanMod {
         else { this.command_text = "Off".into(); }
     }
 }
-#[no_mangle]
-extern "C" fn ironman_create() -> &'static mut ConfigBasicMenuItem { 
-    ConfigBasicMenuItem::new_switch::<IronmanMod>("Ironman Mode")
- } 
- #[unity::class("TMPro", "TextMeshProUGUI")]
- pub struct TextMeshProUGUI {
- }
- 
- #[unity::class("App", "LoadingLogo")]
- pub struct LoadingLogo {
-    __: [u8; 0x60],
-    pub title_text: &'static mut TextMeshProUGUI,
-    pub tips_text: &'static mut TextMeshProUGUI,
- }
-
-
- impl TextMeshProUGUI {
-     pub fn set_text(&mut self, source_text: &Il2CppString, sync_text_input_box: bool) {
-         unsafe { tmptext_settext(self, source_text, sync_text_input_box, None) };
-     }
- }
- 
- #[skyline::from_offset(0x2837690)]
- fn tmptext_settext(this: &mut TextMeshProUGUI, source_text: &Il2CppString, sync_text_input_box: bool, method_info: OptionalMethod);
-
-#[unity::class("App", "UnitRecord")]
-pub struct UnitRecord {
-    pub values: &'static Array<i32>,
-}
-
- #[unity::hook("App", "LoadingLogo", "SetTipsData")]
- pub fn set_tip_text(this: &mut LoadingLogo, tips: u64, method_info: OptionalMethod){
-    let force = Force::get(ForceType::Dead);
-    println!("set_tip_text hook");
-    call_original!(this, tips, method_info);
-    if force.is_none() { return; }
-    let dead_force = force.unwrap();
-    let count = dead_force.get_count();
-    if count == 0 { return; }
-    let mut string_dead = format!("{} Dead Units", count);
-    this.title_text.set_text( format!("{} Dead Units", count).into(), true);
-    let mut force_iter = Force::iter(dead_force);
-    let mut unit_count = 0;
-    while let Some(unit) = force_iter.next() {
-        unsafe {
-            let name = Mess::get(unit.person.get_name().unwrap()).get_string().unwrap();
-            let record = unit_get_record(unit, None);
-            let dead_chapter = unit_record_get_dead_chapter(record, None);
-            if dead_chapter.is_some() {
-                println!("Dead Chapter for {}: {}", name, dead_chapter.unwrap().name.get_string().unwrap());
-                let dead_chapter_name  = chapter_get_name(dead_chapter.unwrap(), None).get_string().unwrap();
-                let prefix = Mess::get(format!("{}_PREFIX", dead_chapter.unwrap().name.get_string().unwrap())).get_string().unwrap();
-                if unit_count != 0 { string_dead = format!("{}\n{} in {}: {}", string_dead, name, prefix, dead_chapter_name);}
-                else { string_dead = format!("{} in {}: {}", name, prefix, dead_chapter_name); }
-            }
-            else {
-                if unit_count != 0 {
-                    if unit_count % 2 == 0 { format!("{} \n {}", string_dead, name); }
-                    else { string_dead = format!("{} - {}", string_dead, name); }
-                }
-                else {
-                    string_dead = name;
-                }
-            }
-            unit_count += 1;
-        }
-    }
-    this.tips_text.set_text(string_dead.into(), true);
- }
- #[skyline::from_offset(0x01a57fb0)]
- fn unit_get_record(this: &Unit, method_info: OptionalMethod) -> &UnitRecord;
-
- #[skyline::from_offset(0x01c57f30)]
- fn unit_record_get_dead_chapter(this: &UnitRecord, method_info: OptionalMethod) -> Option<&'static ChapterData>;
-
- #[skyline::from_offset(0x02af9a40)]
- fn chapter_get_name(this: &ChapterData,method_info: OptionalMethod) -> &'static Il2CppString;

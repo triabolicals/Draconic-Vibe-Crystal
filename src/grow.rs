@@ -13,6 +13,7 @@ pub fn randomize_person_grow(){
     let person_list = PersonData::get_list_mut().unwrap();
     for x in 0..person_list.len() {
         let grow = person_list[x].get_grow();
+        if grow.is_zero() { continue; }
         for y in 0..11 {
             if grow[y as usize] > max[y as usize] { max[ y as usize ] = grow[y as usize]; }
             if grow[y as usize] < min[y as usize] { min[ y as usize] = grow[y as usize]; }
@@ -31,7 +32,10 @@ pub fn randomize_person_grow(){
         if grow.is_zero() { continue; } 
         for y in 0..11 {
             let v = rng.get_min_max(min[y as usize] as i32, max[y as usize] as i32) as u8;
-            grow[y as usize] = v*5;
+            if person_list[x].get_asset_force() != 0 {
+                grow[y as usize] = (v+2)*5;
+            }
+            else { grow[y as usize] = v*5; }
         }
     }
 }
@@ -43,6 +47,7 @@ pub fn randomize_job_grow(){
 
     for x in 0..job_list.len() {
         let grow = job_list[x].get_diff_grow();
+        if grow.is_zero() { continue; } 
         for y in 0..11 {
             if grow[y as usize] > max[y as usize] { max[ y as usize ] = grow[y as usize]; }
             if grow[y as usize] < min[y as usize] { min[ y as usize] = grow[y as usize]; }
@@ -60,7 +65,7 @@ pub fn randomize_job_grow(){
         if grow.is_zero() { continue; } 
         for y in 0..11 {
             let v = rng.get_min_max(min[y as usize] as i32, (max[y as usize]) as i32) as i8;
-            grow[y as usize] = v*5;
+            grow[y as usize] = (v+1)*5;
         }
     }
 }

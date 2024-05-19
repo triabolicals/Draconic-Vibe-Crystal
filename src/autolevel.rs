@@ -5,11 +5,14 @@ use engage::{
     gameuserdata::*,
     force::*,
     mess::*,
-    gamedata::{unit::*, dispos::ChapterData, person::*, job::*, *},
+    gamedata::{unit::*, dispos::ChapterData, *},
 };
+use engage::gamedata::dispos::DisposData;
 use super::CONFIG;
 use crate::utils::*;
 
+pub const EMBLEMS: &[&str] = &[ "GID_M010_敵リン", "GID_M007_敵ルキナ", "GID_M014_敵ベレト", "GID_M024_敵マルス", "GID_M017_敵シグルド", "GID_M017_敵セリカ", "GID_M019_敵ミカヤ", "GID_M019_敵ロイ", "GID_M017_敵リーフ", "GID_E006_敵エーデルガルト", "GID_E006_敵クロム", "GID_E006_敵カミラ", "GID_E006_敵セネリオ", "GID_E006_敵ヴェロニカ", "GID_E006_敵ヘクトル", "GID_E006_敵チキ"];
+pub const ENGAGE: &[&str] = &[ "AI_AT_EngageAttack", "AI_AT_EngageAttack", "AI_AT_EngageDance", "AI_AT_EngageAttack", "AI_AT_EngagePierce", "AI_AT_EngageAttack", "AI_AT_AttackToHeal", "AI_AT_EngageAttack", "AI_AT_EngageAttackNoGuard", "AI_AT_EngageClassPresident", "AI_AT_EngageAttack", "AI_AT_EngageCamilla", "AI_AT_EngageAttack", "AI_AT_EngageSummon", "AI_AT_EngageWait", "AI_AT_EngageBlessPerson"];
 pub enum CapabilityType {
     Hp = 0,
     Str = 1,
@@ -161,6 +164,7 @@ pub fn get_number_main_chapters_completed() -> i32 {
 
 pub fn auto_level_unit(unit: &mut Unit){
     if !GameVariableManager::get_bool( "G_Cleared_M006") { return; } 
+    if GameUserData::is_evil_map() { return; }
     unsafe{
         let diff = GameUserData::get_difficulty(false);
         let player = unit.person.get_asset_force() == 0;
@@ -211,9 +215,7 @@ pub fn calculate_average_level(sortie_count: i32) -> i32 {
     let mut sum = 0;
     let count;
     if sortie_count == 0 { count = 10; }
-    else {
-        count = sortie_count;
-    }
+    else { count = sortie_count; }
     for _x in 0..sortie_count {
         let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
         index = 0;
@@ -253,8 +255,8 @@ impl ConfigBasicMenuItemSwitchMethods for AutolevelMod {
         } else {return BasicMenuResult::new(); }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if CONFIG.lock().unwrap().autolevel { this.help_text = "Recruited units and enemies will be scaled to army's power.".into(); }
-        else { this.help_text = "No changes to recruited and enemy unit's stats and levels.".into(); }
+        if CONFIG.lock().unwrap().autolevel { this.help_text = "Units/enemies will be scaled to army's power. (Togglable)".into(); }
+        else { this.help_text = "No changes to recruited/enemy unit's stats and levels. (Togglable)".into(); }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         if CONFIG.lock().unwrap().autolevel { this.command_text = "On".into();  }
@@ -270,6 +272,78 @@ pub fn get_average_level(difficulty: i32, sortie_count: i32, method_info: Option
 #[skyline::from_offset(0x024f2c10)]
 pub fn get_sortie_unit_count(method_info: OptionalMethod) -> i32;
 
-pub fn str_start_with(this: &Il2CppString, value: &str) -> bool {
-    unsafe { string_start_with(this, value.into(), None) }
+pub fn str_start_with(this: &Il2CppString, value: &str) -> bool { unsafe { string_start_with(this, value.into(), None) } }
+
+#[skyline::from_offset(0x023349c0)]
+pub fn god_pool_create(data: &GodData, method_info: OptionalMethod) -> &'static GodUnit;
+
+#[unity::from_offset("App", "Unit", "TryConnectGodUnit")]
+pub fn unit_connect_god_unit(this: &Unit, god_unit: &GodUnit, method_info: OptionalMethod) -> &'static GodUnit;
+
+pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
+    // triabolical config check
+    println!("Attempting to equip emblems for enemies");
+
+    unsafe {
+        let jobname = unit.person.get_job().unwrap().name.get_string().unwrap();
+
+        if emblem >= EMBLEMS.len() { return false; }
+        if GodData::get(EMBLEMS[emblem].into()).is_none() { return false; }
+        let job = unit.get_job();
+        if job.name.get_string().unwrap() == "MJID_Emblem" || jobname == "MJID_Emblem" { return false; }
+        if job.get_sort() == 9999 { return false;}
+        //Prevents Wyrms/Wolves from getting emblems
+        if jobname == "JID_異形飛竜" ||jobname  == "JID_幻影飛竜" {  return false; } //Wyverns
+        if jobname  == "JID_異形竜" || jobname == "JID_幻影竜" {  return false; } //Wyrms
+        if job.parent.index < 10 { return false; }
+        if ( job.get_flag().value == 0 && job.jid.get_string().unwrap() != "JID_蛮族" ) || job.get_flag().value == 8 { return false; }
+        let style_name = job.get_job_style();
+
+        if style_name.is_some() {
+                // Not Flying or Armored or wolf knight for Bow/Magic Emblems
+            let god_data = GodData::get(EMBLEMS[emblem].into()).unwrap();
+
+            if style_name.unwrap().get_string().unwrap() == "飛行スタイ ル" || style_name.unwrap().get_string().unwrap() == "重装スタイル" || job.jid.get_string().unwrap() == "JID_ウルフナイト" {
+                match emblem {
+                    0 | 1 | 5 | 6 | 11 | 12 | 13 => { return false; }
+                    _ => { 
+                        let god_unit = god_pool_create(god_data, None);
+                        unit_connect_god_unit(unit, god_unit, None);
+                        return true;
+                    }
+                }
+            }
+            else {
+                let god_unit = god_pool_create(god_data, None);
+                unit_connect_god_unit(unit, god_unit, None);
+                return true;
+            }
+        }
+    }
+    return false; 
+}
+#[unity::class("App", "UnitAI")]
+pub struct UnitAI {}
+
+#[skyline::from_offset(0x01a522a0)]
+pub fn get_unit_ai(this: &Unit, method_info: OptionalMethod) -> &'static UnitAI;
+
+#[unity::from_offset("App", "Unit", "SetDisposAi")]
+pub fn set_unit_ai_dispos(this: &Unit, data: &DisposData, method_info: OptionalMethod);
+
+pub fn adjust_emblem_unit_ai(unit: &Unit, data: &DisposData, emblem_index: usize){
+    //
+    println!("Attempting to change AI");
+    unsafe {
+        let diff = GameUserData::get_difficulty(false);
+        data.set_ai_attack_name(ENGAGE[emblem_index].into());
+        if diff == 2 { data.set_ai_attack_value("2,2".into()); }
+        else { data.set_ai_attack_value("3,3".into()); }
+        if EMBLEMS[emblem_index] == "GID_M017_敵カムイ" { data.set_ai_attack_value("255, 255, 3, 3".into());  }
+
+        set_unit_ai_dispos(unit, data, None);
+
+    }
+
+
 }

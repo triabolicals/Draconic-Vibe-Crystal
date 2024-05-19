@@ -9,6 +9,9 @@ use engage::{
     force::*,
     gamedata::unit::*,
 };
+use engage::gamedata::skill::SkillData;
+use engage::gamedata::item::ItemData;
+use engage::gamedata::Gamedata;
 use super::CONFIG;
 use crate::person;
 use crate::item;
@@ -42,11 +45,14 @@ pub fn emblem_selection_menu_enable(enabled: bool) {
     else { Patch::in_text(0x01d76fb8).bytes(&[0x88, 0x00, 0x80, 0x52]).unwrap(); }
 }
 //Hook to function that creates the sortie deploy positions to do deployment stuff
+
+
 #[unity::hook("App", "MapDispos", "CreatePlayerTeam")]
 pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
+    //check_terrain();
     println!("Deploy changed start");
     if GameVariableManager::get_bool("G_Random_Recruitment"){
-        person::change_map_dispos();
+        //person::change_map_dispos();
     }
     let absent_force = Force::get(ForceType::Absent).unwrap();
     if GameVariableManager::get_bool("G_Random_Job") && !GameVariableManager::get_bool("G_Lueur_Random") {
@@ -55,9 +61,51 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
         GameVariableManager::set_bool("G_Lueur_Random", true);
         person::adjust_unit_items(hero_unit);
     }
+    // Liberation Weapon Change
+    if ( GameVariableManager::get_bool("G_Random_Job") && GameVariableManager::get_bool("G_Lueur_Random") ) && ( GameVariableManager::get_bool("G_Cleared_M002") && GameVariableManager::get_number("G_Liberation_Type") == 0 ) {
+        let hero_unit = absent_force.get_hero_unit();
+        let kinds = hero_unit.get_job().get_equippable_item_kinds();
+
+        let mut liberation_type = 1; //Sword
+        for i in 0..kinds.len() {
+            if kinds[i] == 7 || kinds[i] >= 9 {
+                continue;
+            }
+            if kinds[i] == 0 { continue; }
+            liberation_type = kinds[i];
+        }
+        let liberation = ItemData::get_mut("IID_リベラシオン").unwrap();
+        liberation.kind = liberation_type as u32;
+        if liberation_type == 4 {
+            liberation.range_o = 3;
+            liberation.range_i = 2;
+            liberation.set_cannon_effect("弓砲台".into());
+            liberation.on_complete();
+            liberation.get_equip_skills().add_skill(SkillData::get("SID_飛行特効").unwrap(),4, 0);
+        }
+        else if liberation_type == 5 || liberation_type == 6 {
+            liberation.range_i = 1;
+            liberation.range_o = 2;
+            if liberation_type == 6 {
+                liberation.set_cannon_effect("魔砲台炎".into());
+                liberation.set_hit_effect( "エルファイアー".into());
+                liberation.on_complete();
+            }
+            else { liberation.get_give_skills().add_sid("SID_毒",4, 0); }
+        }
+        else if liberation_type == 8 {
+            liberation.get_equip_skills().add_sid("SID_気功",4, 0);
+            liberation.get_equip_skills().add_sid("SID_２回行動",4,0);
+        }
+        else {
+            liberation.range_i = 1;
+            liberation.range_o = 1;
+        }
+        GameVariableManager::make_entry("G_Liberation_Type", liberation_type);
+        GameVariableManager::set_number("G_Liberation_Type", liberation_type);
+    }
 
     call_original!(group, method_info);
-    println!("Deploy changed start 2");
     if !GameVariableManager::get_bool("G_Cleared_M003") {return; }
     let player_force = Force::get(ForceType::Player).unwrap();
 
@@ -218,9 +266,9 @@ impl ConfigBasicMenuItemSwitchMethods for DeploymentMod {
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         match CONFIG.lock().unwrap().deployment_type {
-            1 => { this.help_text ="Lowest rating units will be deployed.".into(); },
-            2 => { this.help_text = "Units will be deployed at random.".into(); }
-            _ => { this.help_text = "Normal Deployment".into(); },
+            1 => { this.help_text ="Lowest rating units will be deployed. (Togglable)".into(); },
+            2 => { this.help_text = "Units will be deployed at random. (Togglable)".into(); }
+            _ => { this.help_text = "Normal Deployment (Togglable)".into(); },
         }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
@@ -247,9 +295,9 @@ impl ConfigBasicMenuItemSwitchMethods for EmblemMod {
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         match CONFIG.lock().unwrap().emblem_deployment {
-            1 => { this.help_text = "Emblems will be randomized onto deployed units.".into();  }
-            2 => { this.help_text = "Emblems will not be equipped onto units.".into(); }
-            _ => { this.help_text = "Emblems are freely selectable in battle preperations.".into(); }
+            1 => { this.help_text = "Emblems will be randomized onto deployed units. (Togglable)".into();  }
+            2 => { this.help_text = "Emblems will not be equipped onto units. (Togglable)".into(); }
+            _ => { this.help_text = "Emblems are freely selectable in battle preperations. (Togglable)".into(); }
         }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
@@ -260,18 +308,6 @@ impl ConfigBasicMenuItemSwitchMethods for EmblemMod {
         }
     }
 }
-
-#[no_mangle]
-extern "C" fn deploy_create() -> &'static mut ConfigBasicMenuItem { 
-    ConfigBasicMenuItem::new_switch::<DeploymentMod>("Deployment Mode")
- } 
- #[no_mangle]
-extern "C" fn emblem_create() -> &'static mut ConfigBasicMenuItem {  ConfigBasicMenuItem::new_switch::<EmblemMod>("Emblem Deployment Mode") } 
-
- pub fn install_deployment() {
-    cobapi::install_global_game_setting(deploy_create);
-    cobapi::install_global_game_setting(emblem_create);
- }
 
 #[skyline::from_offset(0x01c616f0)]
 pub fn remove_all_rings(this: u64, method_info: OptionalMethod);
@@ -284,3 +320,54 @@ pub fn force_get_unit_from_pid(pid: &Il2CppString, relay: bool, method_info: Opt
 
 #[skyline::from_offset(0x01a220b0)]
 pub fn unit_update_actor(this: &Unit, method_info: OptionalMethod);
+/* 
+#[unity::class("App", "MapTerrain")]
+pub struct MapTerrain {
+    _super: u64,
+    pub x: i32,
+    pub z: i32,
+    pub width: i32,
+    pub height: i32,
+    layers: u64,
+    overlaps: u64,
+    pub terrains: &'static Array<&'static Il2CppString>, 
+}
+#[unity::from_offset("App", "MapSetting", "get_MapTerrain")]
+pub fn get_map_terrain(method_info: OptionalMethod) -> Option<&'static MapTerrain>;
+
+use std::fs::File;
+use unity::il2cpp::object::Array;
+use std::io::Write;
+#[unity::class("App", "TerrainData")]
+pub struct TerrainData {}
+impl Gamedata for TerrainData  {}
+
+pub fn check_terrain() {
+    unsafe {
+        let terrain = get_map_terrain(None);
+        if terrain.is_none() { return; }
+        let map_terrain = terrain.unwrap();
+        let cid = GameUserData::get_chapter().cid.get_string().unwrap();
+        let filename = format!("sd:/Draconic Vibe Crystal/{} Terrain.txt", cid);
+        let mut f = File::options().create(true).write(true).truncate(true).open(filename).unwrap();
+        writeln!(&mut f, "Width {}", map_terrain.width).unwrap();
+        writeln!(&mut f, "Height {}\n", map_terrain.height).unwrap();
+        let start_x = map_terrain.x;
+        let end_x = map_terrain.width;
+        let start_z = map_terrain.z;
+        let end_z = map_terrain.height;
+        for z in start_z..end_z {
+            let mut z_line = "".to_string();
+            for x in start_x..end_x {
+                let index: usize = ( x + 32 * z ) as usize;
+                let tid = map_terrain.terrains[ index ];
+                if TerrainData::get(&tid.get_string().unwrap()).is_some() {
+                    z_line = format!("{}\t{}", z_line, TerrainData::get_index(tid));
+                }
+                else { z_line = format!("{}\t{}", z_line, -1); }
+            }
+            writeln!(&mut f, "{}", z_line).unwrap();
+        }
+    }
+}
+*/

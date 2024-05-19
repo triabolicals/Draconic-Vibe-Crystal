@@ -5,13 +5,15 @@ use engage::{
     gamevariable::*,
     gameuserdata::*,
     random::*,
-    gamedata::{*, unit::*, skill::SkillData, item::*, god::*},
+    gamedata::{*, unit::*, item::*, god::*},
 };
 use std::sync::Mutex;
 use super::CONFIG;
 use crate::{skill::EMBLEM_ASSET,person};
 
-pub static ENGAGE_ITEMS: Mutex<EngageItemList> = Mutex::new(EngageItemList{ item_list: Vec::new(), god_items_list: Vec::new(), engage_weapon: [2, 6, 66, 64, 2, 31, 18, 18, 10, 2, 514, 6, 28, 512, 14, 64, 64, 72, 66], });
+// Contains methods of random items, engage items, and jobs
+
+pub static ENGAGE_ITEMS: Mutex<EngageItemList> = Mutex::new(EngageItemList{ item_list: Vec::new(), god_items_list: Vec::new(), engage_weapon: [2, 6, 66, 64, 2, 31, 18, 18, 10, 2, 514, 6, 28, 512, 14, 64, 64, 72, 66, 258, 0], });
 
 const BLACKLIST_ITEMS: [&str; 25] = [
     "IID_マスタープルフ", "IID_リベラシオン改", "IID_リベラシオン改_ノーマル",
@@ -23,6 +25,7 @@ const BLACKLIST_ITEMS: [&str; 25] = [
 pub struct GodStyleItems {
     pub items: [i32; 27],
 }
+const STYLE: [&str;9] = ["Default", "Cooperation", "Horse", "Covert", "Heavy", "Fly", "Magic","Prana", "Dragon"];
 impl GodStyleItems {
     fn new() -> Self { Self { items: [-1; 27], } }
 }
@@ -38,10 +41,14 @@ pub struct EngageItem {
     pub replaced_index: i32,
     pub reverse_index: i32,
     pub in_used: bool,
+    // Stuff for text replacement
+    pub original_emblem: i32,
+    pub new_emblem: i32,
+    pub miid: String,
 }
 
 impl EngageItem {
-    fn new(itemdata_index: i32, god: i32, not_weapon: bool, bow: bool, first: bool) -> Self {
+    fn new(itemdata_index: i32, god: i32, not_weapon: bool, bow: bool, first: bool, emblem_index: i32) -> Self {
         Self {
             item_index: itemdata_index, 
             god_index: god, 
@@ -52,6 +59,9 @@ impl EngageItem {
             replaced_index: -1, 
             reverse_index: -1,
             in_used: false, 
+            original_emblem: emblem_index,
+            new_emblem: -1,
+            miid: "".to_string(),
         }
     }
 }
@@ -59,60 +69,98 @@ impl EngageItem {
 pub struct EngageItemList {
     pub item_list: Vec<EngageItem>,
     pub god_items_list: Vec<GodStyleItems>,
-    pub engage_weapon: [i32; 19],
+    pub engage_weapon: [i32; 21],
 }
 
 impl EngageItemList {
-    pub fn add_list(&mut self, item: &ItemData, god: i32, is_first: bool) {
+    pub fn add_list(&mut self, item: &ItemData, god: i32, is_first: bool, emblem_index: i32) {
         let index = item.parent.index;
         let found = self.item_list.iter_mut().find(|x| x.item_index == index);
         if found.is_some() { return; } 
         let weapon;
-        let is_bow =  ( item.kind == 4 );
+        let is_bow = item.kind == 4 ;
         if item.kind == 7 || item.kind >= 9  { weapon = false; }
         else { weapon = true; }
-        self.item_list.push(EngageItem::new(index, god, weapon, is_bow, is_first));
-
+        let mut new_item = EngageItem::new(index, god, weapon, is_bow, is_first, emblem_index);
+        new_item.miid = item.help.get_string().unwrap();
+        self.item_list.push(new_item);
     }
+    pub fn bow_randomization(&mut self, rng: &Random) {
+        // find all emblems that have astra storm as an engage attack 
+        let s_list = &mut self.item_list;
+        let mut bow_weapons: Vec<(usize,bool)> = Vec::new();
+        for x in 0..s_list.len() { if s_list[x].is_bow { bow_weapons.push( (x, false) ); }  }
+
+        let list_size = bow_weapons.len();
+        println!("{} Engage Bows", list_size);
+
+        for x in 0..20 {
+            let gid = format!("GID_{}", EMBLEM_ASSET[x]);
+            let god = GodData::get(&gid).unwrap();
+            if god.get_engage_attack().get_string().unwrap() == "SID_リンエンゲージ技" {
+                let starting_index = s_list.iter().position(|r| r.god_index == ( x as i32 ) ).unwrap();
+                let mut index = rng.get_value(list_size as i32) as usize;
+
+                while bow_weapons[index].1 { index = rng.get_value(list_size as i32) as usize; }
+                bow_weapons[index].1 = true;
+
+                s_list[starting_index].replaced_index = bow_weapons[index].0 as i32;
+                s_list[ bow_weapons[index].0 ].in_used = true;
+                s_list[ bow_weapons[index].0 ].reverse_index = starting_index as i32;
+                s_list[ bow_weapons[index].0 ].new_emblem = s_list[starting_index].original_emblem;
+            }
+            if god.get_engage_attack_link().is_none() { continue; }
+
+            if god.get_engage_attack_link().unwrap().get_string().unwrap() == "SID_リンエンゲージ技" {
+                let starting_index = s_list.iter().position(|r| r.god_index == ( x as i32 ) && !r.is_first_item).unwrap();
+                let mut index = rng.get_value(list_size as i32) as usize;
+
+                while bow_weapons[index].1 { index = rng.get_value(list_size as i32) as usize; }
+                bow_weapons[index].1 = true;
+                s_list[starting_index].replaced_index = bow_weapons[index].0 as i32;
+
+                s_list[ bow_weapons[index].0 ].in_used = true;
+                s_list[ bow_weapons[index].0 ].reverse_index = starting_index as i32;
+                s_list[ bow_weapons[index].0 ].new_emblem = s_list[starting_index].original_emblem;
+            }
+        }
+    }
+
+
     // Get all engage items from GodGrowthData.LevelData
     pub fn intialize_list(&mut self){
         if self.item_list.len() != 0 { return; }
-        for x in 0..19 {
+        for x in 0..20 {
             let mut style = GodStyleItems::new();
-            if x == 13 { 
-                self.god_items_list.push(style);
-                continue; 
-            }    // ignore Tiki
             let growth_id = format!("GGID_{}", EMBLEM_ASSET[x]);
             let level_data = GodGrowthData::get_level_data(&growth_id).unwrap();
+            for z in 0..9 {
+                if level_data[0].style_items.items[z].len() >= 1 { style.items[z as usize] = level_data[0].style_items.items[z][0].parent.index; }
+                if level_data[0].style_items.items[z].len() >= 2 { style.items[9+z as usize] = level_data[0].style_items.items[z][1].parent.index; }
+                if level_data[0].style_items.items[z].len() >= 3 { style.items[18+z as usize] = level_data[0].style_items.items[z][2].parent.index; }
+            }
+            self.god_items_list.push(style);
+            if x == 13 { continue; }  //  Ignore adding Tiki items into the randomization pool
             for y in 1..level_data.len() {
                 let is_first = y < 10;
                 for z in 0..9 {
-                    if level_data[y].style_names.items[z].len() != 0 {
-                        for aa in 0..level_data[y].style_names.items[z].len() {
-                            self.add_list(&level_data[y].style_names.items[z][aa], x as i32, is_first);
+                    if level_data[y].style_items.items[z].len() != 0 {
+                        for aa in 0..level_data[y].style_items.items[z].len() {
+                            if x == 9 { //Byleth
+                                if z < 2 && is_first { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, is_first, x as i32); }
+                                else { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, false, x as i32); }
+                            }
+                            else { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, is_first, x as i32); }
                         }
                     }
                 }
             }
-            for z in 0..9 {
-                if level_data[1].style_names.items[z].len() >= 1 {
-                    style.items[z as usize] = level_data[1].style_names.items[z][0].parent.index;
-                }
-                if level_data[10].style_names.items[z].len() >= 2 {
-                    style.items[9+z as usize] = level_data[10].style_names.items[z][1].parent.index;
-                }
-                if level_data[0].style_names.items[z].len() >= 3 {
-                    style.items[18+z as usize] = level_data[0].style_names.items[z][2].parent.index;
-                }
-            }
-            self.god_items_list.push(style);
         }
     }
     pub fn randomize_list(&mut self, rng: &Random){
         let list_size = self.item_list.len() as i32;
-        let s_list = &mut self.item_list;
-        for x in 0..19 {
+        let item_list = ItemData::get_list().unwrap();
+        for x in 0..20 {
             if x == 13 { continue; }      // ignore Tiki
             let gid = format!("GID_{}", EMBLEM_ASSET[x]);
             let god = GodData::get(&gid).unwrap();
@@ -127,32 +175,48 @@ impl EngageItemList {
                 non_weapons = can_equip_non_weapons(&god.get_engage_attack().get_string().unwrap());
             }
             for y in 0..list_size {
-                if s_list[y as usize].god_index < x.try_into().unwrap() { continue; }
-                else if s_list[y as usize].god_index > x.try_into().unwrap() { break; }
-                s_list[y as usize].god_can_bow = can_bow;
-                s_list[y as usize].god_can_weapon = non_weapons;
+                if  self.item_list[y as usize].god_index < x.try_into().unwrap() { continue; }
+                else if  self.item_list[y as usize].god_index > x.try_into().unwrap() { break; }
+                self.item_list[y as usize].god_can_bow = can_bow;
+                self.item_list[y as usize].god_can_weapon = non_weapons;
             }
         }
-        for x in 0..list_size {
-            println!("{}, weapon: {}, is_bow: {}, is_firs_item: {}, god_can bow {}, god_can_weapon {}", x, s_list[x as usize].weapon, s_list[x as usize].is_bow,s_list[x as usize].is_first_item, s_list[x as usize].god_can_bow, s_list[x as usize].god_can_weapon);
-        }
+        self.bow_randomization(rng);
+        let s_list = &mut self.item_list;
         for x in 0..list_size {
             let mut index = rng.get_value(list_size) as usize;
+            //Randomization of Engage Items
+            let mut count = 0;
+            if s_list[x as usize].replaced_index != -1 { 
+                println!("Engage Item Swap: {} to {}, {} -> {}", x, 
+                    index, Mess::get(item_list[ s_list[x as usize].item_index as usize].name).get_string().unwrap(), 
+                    Mess::get(item_list[ s_list[index].item_index as usize].name).get_string().unwrap() );
+                continue; 
+            } //Already Randomized
             loop {
-                if s_list[index].in_used { index = rng.get_value(list_size) as usize; }
-                if s_list[index].is_bow && !s_list[x as usize].god_can_bow { index = rng.get_value(list_size) as usize; }
+                count += 1;
+                if count == 50 { break;}
+                if s_list[index].in_used { index = rng.get_value(list_size) as usize; continue; }
+                if s_list[index].is_bow && !s_list[x as usize].god_can_bow { 
+                    // If not the first engage item, then able to use a bow
+                    if !s_list[x as usize].is_first_item { break; }
+                    else { index = rng.get_value(list_size) as usize;  continue;  }
+                }
                 if s_list[index].is_bow && s_list[x as usize].god_can_bow { break; }
                 if !s_list[index].weapon {
-                    if s_list[x as usize].is_first_item && s_list[x as usize].god_can_weapon  { break; }
-                    else if !s_list[x as usize].is_first_item { break; }
+                    if s_list[x as usize].is_first_item { index = rng.get_value(list_size) as usize; continue; }
+                    else if s_list[x as usize].god_can_weapon { break; }
                 }
                 if s_list[index].weapon { break;}
                 index = rng.get_value(list_size) as usize;
             }
-            println!("Item Index {} -> {}", x, index);
+            println!("Engage Item Swap: {} to {}, {} -> {}", x, index, 
+            Mess::get(item_list[ s_list[x as usize].item_index as usize].name).get_string().unwrap(),
+            Mess::get(item_list[ s_list[index].item_index as usize].name).get_string().unwrap() );
             s_list[x as usize].replaced_index = index as i32;
             s_list[index].in_used = true;
             s_list[index].reverse_index = x as i32;
+            s_list[index].new_emblem = s_list[x as usize].original_emblem;
         }
     }
     pub fn reset(&mut self){
@@ -163,7 +227,7 @@ impl EngageItemList {
             s_list[x as usize].replaced_index = -1;
             s_list[x as usize].reverse_index = -1;
         }
-        self.engage_weapon = [2, 6, 66, 64, 2, 31, 18, 18, 10, 2, 514, 6, 28, 512, 14, 64, 64, 72, 66];
+        self.engage_weapon = [2, 6, 66, 64, 2, 31, 18, 18, 10, 2, 514, 6, 28, 512, 14, 64, 64, 72, 66, 258, 0];
     }
     pub fn get_replacement(&self, item_index: i32) -> &'static ItemData {
         let item_list = ItemData::get_list().unwrap();
@@ -178,13 +242,20 @@ impl EngageItemList {
         }
         else { return &item_list[item_index as usize]; }
     }
+    pub fn get_replacement_iid(&self, iid: &'static Il2CppString) -> &'static Il2CppString {
+        let item = ItemData::get(&iid.get_string().unwrap());
+        if item.is_none() { return iid; }
+        let item_index = item.unwrap().parent.index; 
+        let replacement_item = self.get_replacement(item_index);
+        return replacement_item.iid;
+    }
     pub fn add_weapon_flag(&mut self, god_index: i32, item: &ItemData){
         if item.kind == 0 { return; }
         if item.kind == 7 || item.kind >= 9 { return; }
         self.engage_weapon[god_index as usize] = self.engage_weapon[god_index as usize] | ( 1 << item.kind );
     }
     pub fn commit(&mut self){
-        for x in 0..19 {
+        for x in 0..20 {
             if x == 13 { 
                 self.engage_weapon[13] = 512;
                 continue; 
@@ -192,32 +263,58 @@ impl EngageItemList {
             self.engage_weapon[x as usize] = 0;
             let growth_id = format!("GGID_{}", EMBLEM_ASSET[x]);
             let level_data = GodGrowthData::get_level_data(&growth_id).unwrap();
-            for y in 0..level_data.len() { level_data[y].style_names.clear();  }
+            for y in 0..level_data.len() { level_data[y].style_items.clear();  }
             for z in 0..9 {
                 let index = self.god_items_list[x as usize].items[z as usize];
                 if index != -1 {
                     let item = self.get_replacement(index);
-                    for y in 0..level_data.len() { level_data[y].style_names.add_item(z, item); }
+                    for y in 0..level_data.len() { level_data[y].style_items.add_item(z, item); }
                     self.add_weapon_flag(x as i32, item);
                 }
                 let index2 = self.god_items_list[x as usize].items[9+z as usize];
                 if index2 != -1 {
                     let item2 = self.get_replacement(index2);
-                    for y in 10..15 { level_data[y].style_names.add_item(z, item2); }
-                    level_data[0].style_names.add_item(z, item2);
+                    for y in 10..level_data.len() { level_data[y].style_items.add_item(z, item2); }
+                    level_data[0].style_items.add_item(z, item2);
                     self.add_weapon_flag(x as i32, item2);
                 }
-                let index3 = self.god_items_list[x as usize].items[18+z as usize];
-                if index3 != -1 {
-                    let item3 = self.get_replacement(index2);
-                    for y in 15..level_data.len() { level_data[y].style_names.add_item(z, item3); }
-                    level_data[0].style_names.add_item(z, item3);
+                let index_3 = self.god_items_list[x as usize].items[18+z as usize];
+                if index_3 != -1 {
+                    let item3 = self.get_replacement(index_3);
+                    for y in 15..level_data.len() { level_data[y].style_items.add_item(z, item3); }
+                    level_data[0].style_items.add_item(z, item3);
                     self.add_weapon_flag(x as i32, item3);
                 }
             }
         }
     }
+    pub fn print(&self, emblem: i32, level: i32) -> String {
+        let mut out = "".to_string();
+        let mut unique_items: Vec<(i32,i32)> = Vec::new();
+        let start;
+        let end;
+        if level == 0 { start = 0; end = 9;  }
+        else if level == 1 { start = 9; end = 18; }
+        else { start = 18; end = 27; }
+        for i in start..end {
+            let item_i = self.god_items_list[emblem as usize].items[i as usize];
+            if unique_items.iter().find(|x| item_i == x.0).is_none() {
+                unique_items.push( (item_i, i % 9) );
+            }
+        }
+        for x in unique_items {
+            if x.0 == -1 { continue; }
+            let item = self.get_replacement(x.0);
+            if x.1 == 0 { out = format!("{} {}", out, Mess::get(item.name).get_string().unwrap()); }
+            else {
+                let style_name = Mess::get(&format!("MBSID_{}", STYLE[x.1 as usize])).get_string().unwrap();
+                out = format!("{} {} ({})", out, Mess::get(item.name).get_string().unwrap(), style_name);
+            }
+        }
+        return out;
+    }
 }
+
 pub fn can_engage_bow(engage_atk: &String) -> bool {
     if engage_atk == "SID_マルスエンゲージ技" { return false; }
     if engage_atk == "SID_シグルドエンゲージ技" { return false; }
@@ -229,6 +326,7 @@ pub fn can_engage_bow(engage_atk: &String) -> bool {
     if engage_atk == "SID_ヘクトルエンゲージ技" || engage_atk == "SID_ヘクトルエンゲージ技＋" { return false; }
     if engage_atk == "SID_クロムエンゲージ技" || engage_atk == "SID_クロムエンゲージ技＋" {return false;}
     if engage_atk == "SID_カミラエンゲージ技" || engage_atk == "SID_カミラエンゲージ技＋" { return false;}
+    if engage_atk == "SID_リュールエンゲージ技" || engage_atk == "SID_リュールエンゲージ技共同" { return false;}
     return true;
 }
 pub fn can_equip_non_weapons(engage_atk: &String) -> bool {
@@ -242,8 +340,11 @@ pub fn can_equip_non_weapons(engage_atk: &String) -> bool {
     if engage_atk == "SID_クロムエンゲージ技" || engage_atk == "SID_クロムエンゲージ技＋" {return false;}
     if engage_atk == "SID_カミラエンゲージ技" || engage_atk == "SID_カミラエンゲージ技＋" { return false;}
     if engage_atk == "SID_ヘクトルエンゲージ技" || engage_atk == "SID_ヘクトルエンゲージ技＋" { return false; }
+    if engage_atk == "SID_リュールエンゲージ技" || engage_atk == "SID_リュールエンゲージ技共同" { return false;}
     return true;
 }
+
+// Item Randomization and replacement
 pub fn is_smash(item: &UnitItem) -> bool {
     let e_skills = item.get_equipped_skills();
     if e_skills.is_some() { return e_skills.unwrap().find_sid("SID_スマッシュ".into()).is_some();  }
@@ -299,7 +400,6 @@ pub fn is_effective_weapon(item: &UnitItem) -> bool {
 }
 
 pub fn replace_weapon(item: &UnitItem, weapon_mask: i32, max_rank: i32) {
-
     println!("Replace item {}, weapon mask {}, max level {}", item.item.name.get_string().unwrap(), weapon_mask, max_rank);
     let kind = item.item.get_kind();
     let mut level = item.item.get_weapon_level();
@@ -444,8 +544,8 @@ pub fn adjust_staffs(unit: &Unit) {
         dispose_staves(unit.item_list);
         if job.is_low() {
             if job.jid.get_string().unwrap() == "JID_スレイプニル下級" {    //Fracture for Wing Tamer Hortensia
-                  unit.item_list.add_item_no_duplicate(ItemData::get("IID_コラプス").unwrap()); 
-             }
+                unit.item_list.add_item_no_duplicate(ItemData::get("IID_コラプス").unwrap()); 
+            }
             if unit.level < 10 { // Heal
                 unit.item_list.add_item_no_duplicate(ItemData::get("IID_ライブ").unwrap()); 
             }
@@ -470,17 +570,38 @@ pub fn adjust_staffs(unit: &Unit) {
                 unit.item_list.add_item_no_duplicate(ItemData::get("IID_リブロー").unwrap());  // physic for the rest of staffers instead
             }
         }
+        if unit.person.get_asset_force() != 0 {
+            let rng = Random::get_game();
+            let value = rng.get_value(100);
+            if value < 30 {
+                if GameVariableManager::get_bool("G_Cleared_M019") {
+                    if job.get_max_weapon_level(7) >= 4 {
+                        unit.item_list.add_item_no_duplicate(ItemData::get("IID_ドロー").unwrap()); //Entrap
+                    }
+                    else {  unit.item_list.add_item_no_duplicate(ItemData::get("IID_フリーズ").unwrap());  } // Freeze
+                }
+                else if GameVariableManager::get_bool("G_Cleared_M009") {
+                    unit.item_list.add_item_no_duplicate(ItemData::get("IID_フリーズ").unwrap());   // Freeze
+                }
+                else { unit.item_list.add_item_no_duplicate(ItemData::get("IID_コラプス").unwrap());   }    // Fracture
+            }
+            else if value < 60 {
+                if GameVariableManager::get_bool("G_Cleared_S006") || GameVariableManager::get_bool("G_Cleared_M018") { unit.item_list.add_item_no_duplicate(ItemData::get("IID_ワープ").unwrap()); }  //Warp  
+                else { unit.item_list.add_item_no_duplicate(ItemData::get("IID_サイレス").unwrap()); }  //Silence
+            }
+        }
     }
-    let name = unit.person.get_name().unwrap().get_string().unwrap();
-    if name == "MPID_Veyre"  {
+    let pid = unit.person.pid.get_string().unwrap();
+    if pid == "PID_ヴェイル" {
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_オヴスキュリテ").unwrap()); 
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_ミセリコルデ").unwrap());
+        magic_dagger_weapon_change(unit.get_job());
     }
-    if name == "MPID_El" {
+    if pid == "PID_エル" {
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_邪竜石").unwrap()); 
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_邪竜石_騎馬特効").unwrap()); 
     }
-    if name == "MPID_Rafale" {
+    if pid == "PID_ラファール" {
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_邪竜石").unwrap()); 
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_邪竜石_騎馬特効").unwrap()); 
     }
@@ -509,9 +630,10 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
         let job = &job_list[index as usize];
         if job.jid.get_string().unwrap() == "JID_マージカノン" { continue;}
         let job_flags = job.get_flag();
-        if job_flags.value == 0 { continue; }
+        if ( job_flags.value & 16 != 0 ) && is_female { continue; }
         if job_flags.value & 1 == 0 && job_flags.value & 2 == 0 { count += 1; continue;}
-        if (job_flags.value & 1 == 1 && job_flags.value & 2 == 0) && index % 3 == 0 { 
+        if job_flags.value == 0 { continue;}
+        if job_flags.value & 1 == 1 && job_flags.value & 2 == 0 { 
             if !is_high {
                 if index % 4 == 0 {                 
                     if unit.person.get_job().unwrap().get_flag().value & 2 == 0 && unit.person.get_job().unwrap().is_low() {
@@ -531,7 +653,6 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
                 unit.set_hp(unit.get_capability(0, true));
                 unit.set_weapon_mask_from_person();
                 person::fixed_unit_weapon_mask(unit);
-                
                 return;
             }
             else { 
@@ -570,18 +691,22 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
             unit.set_level(unit_level); 
             unit.set_internal_level(internal_level);
         }
-        println!("{} changed to {} from {} in {} steps (Lv {}/{})", unit.person.get_name().unwrap().get_string().unwrap(), job.name.get_string().unwrap(),  unit.get_job().name.get_string().unwrap(), count, unit.level, unit.internal_level);
+        println!("{} changed to {} from {} in {} steps (Lv {}/{})", 
+            unit.person.get_name().unwrap().get_string().unwrap(), 
+            job.name.get_string().unwrap(),  
+            unit.get_job().name.get_string().unwrap(), count, unit.level, unit.internal_level);
+
         unit.set_hp(unit.get_capability(0, true));
-        //unit.set_weapon_mask_from_person();
         person::fixed_unit_weapon_mask(unit);
 
         return;
     }
 }
 pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
-    if unit.get_job().get_flag().value == 0 || unit.get_job().get_flag().value == 1 {
-        return false;
-    }
+    let current_job = unit.get_job();
+    let current_flags = current_job.get_flag().value;
+    if current_flags == 0 || current_job.parent.index < 10 { return false; }  // If 
+    if current_job.name.get_string().unwrap() == "MJID_Emblem" { return false; }
     let rng = Random::get_game();
     let job_count = JobData::get_count();
     let is_female = unit.person.get_gender() == 2;
@@ -594,11 +719,11 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
     let internal_level = unit.internal_level as i32;
     let has_emblem = unit.get_god_unit().is_some() || ( GameUserData::get_chapter().cid.get_string().unwrap() != "CID_M011" );
     loop {
-        let index = rng.get_value(2*job_count);
-        if index >= job_count { continue; }
+        let index = rng.get_value(job_count);
         let job = &job_list[index as usize];
         let job_flags = job.get_flag();
         let jid = job.jid.get_string().unwrap();
+        if ( job_flags.value & 16 != 0 ) && is_female { continue; }
         if job_flags.value <= 1 { continue; }
         if (job_flags.value & 4 == 4 ) && !is_female {  continue; } 
         if jid == "JID_異形飛竜" || jid == "JID_幻影飛竜" { continue; } //Wyverns
@@ -614,19 +739,15 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
             continue;
         }
         unit.class_change(job);
-        if job.move_type != 3 && is_flying {
-            unsafe {
-                let skill = &SkillData::get("SID_天駆").unwrap();
-                if !person::unit_add_private_skill(unit, skill, None) { continue; }
-                if job.move_type == 2 {
-                    person::unit_add_private_skill(unit, SkillData::get("SID_移動－１").unwrap(), None);
-                    person::unit_add_private_skill(unit, SkillData::get("SID_移動－３").unwrap(), None);
-                }
-                else {
-                    person::unit_add_private_skill(unit, SkillData::get("SID_移動－２").unwrap(), None);
-                }
-            }
+        println!("Person #{}: {}:  Class Change to #{} {}", unit.person.parent.index, Mess::get(unit.person.get_name().unwrap()).get_string().unwrap(), job.parent.index, Mess::get(job.name).get_string().unwrap());
 
+        if job.move_type != 3 && is_flying {
+            if !unit.private_skill.add_sid("SID_天駆", 10, 0)  { continue; }
+            if job.move_type == 2 {
+                unit.private_skill.add_sid("SID_移動－１", 10, 0); 
+                unit.private_skill.add_sid("SID_移動－３", 10, 0);
+            }
+            else { unit.private_skill.add_sid("SID_移動－２", 10, 0); }
         }
         if unit_level > 20 && job.is_high() { 
             unit.set_level(unit_level - 20); 
@@ -641,9 +762,7 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
             unit.set_internal_level(internal_level);
         }
         unit.set_hp(unit.get_capability(0, true));
-        //unit.set_weapon_mask_from_person();
         person::fixed_unit_weapon_mask(unit);
-
         return true;
     }
 }
@@ -654,90 +773,206 @@ pub fn random_items_drops(unit: &Unit){
         if item.is_some() {
             let u_item = &mut item.unwrap();
             if u_item.is_drop() && !u_item.is_equip() { 
-                let new_item = get_random_item(u_item.item.iid);
+                let new_item = get_random_item(u_item.item.iid, false);
                 u_item.ctor_str(&new_item.get_string().unwrap());
                 u_item.flags = 2;
             }
         }
     }
 }
-pub fn get_random_item(item: &'static Il2CppString) -> &'static Il2CppString {
-    println!("Random Item Called");
+fn magic_dagger_weapon_change(veyle_job: &JobData){
+    // Change Veyle's Dagger to whatever class weapon she has. (low class only)
+    if veyle_job.is_high() { 
+        GameVariableManager::make_entry("G_Misercode_Type", 5); 
+        GameVariableManager::set_number("G_Misercode_Type", 5);
+        return; 
+    }
+    let kinds = veyle_job.get_equippable_item_kinds();
+    let mut misercode_type = 5; //Dagger
+    for i in 0..kinds.len() {
+        if kinds[i] == 7 || kinds[i] >= 9 { continue; }
+        if kinds[i] == 0 { continue; }
+        misercode_type = kinds[i];
+    }
+    let misercode = ItemData::get_mut("IID_ミセリコルデ").unwrap();
+    misercode.kind = misercode_type as u32;
+    misercode.get_give_skills().clear();
+    misercode.get_equip_skills().clear();
+    if misercode_type == 4 {
+        misercode.range_o = 2; misercode.range_i = 2;
+        misercode.set_cannon_effect("弓砲台".into());
+        misercode.on_complete();
+        misercode.get_equip_skills().add_sid("SID_飛行特効",4, 0);
+    }
+    else if misercode_type == 5 || misercode_type == 6 {
+        misercode.range_i = 1; misercode.range_o = 2;
+        if misercode_type == 6 {
+            misercode.set_cannon_effect("魔砲台炎".into());
+            misercode.set_hit_effect( "オヴスキュリテ".into());
+        }
+        else if misercode_type == 5 { misercode.get_give_skills().add_sid("SID_毒",3, 0); }
+        misercode.on_complete();
+    }
+    else if misercode_type == 8 {  misercode.get_equip_skills().add_sid("SID_２回行動",4,0); }
+    else {
+        misercode.range_i = 1;
+        misercode.range_o = 2;
+    }
+    GameVariableManager::make_entry("G_Misercode_Type", misercode_type);
+    GameVariableManager::set_number("G_Misercode_Type", misercode_type);
+}
+
+// For item replacement
+pub fn get_random_item(item: &'static Il2CppString, allow_rare: bool) -> &'static Il2CppString {
     let item_list = ItemData::get_list().unwrap();
     let rng = Random::get_game();
     let item_check = ItemData::get(&item.get_string().unwrap());
     // if Item is rare
     if item_check.is_some() {
-        unsafe {
-            let flag = item_data_flag(item_check.unwrap(), None).value;
-            if flag & 1 == 1 { return item;  }
-            let iid = item_check.unwrap().iid.get_string().unwrap();
-            if BLACKLIST_ITEMS.iter().find(|x| **x == iid).is_some() { return item; }
-        }
+        let flag = item_check.unwrap().get_flag().value;
+        if flag & 1 == 1 { return item;  }
+        let iid = item_check.unwrap().iid.get_string().unwrap();
+        if BLACKLIST_ITEMS.iter().find(|x| **x == iid).is_some() { return item; }
     }
-    else {
-        return item;
-    }
+    else { return item; }
     let item_list_size = item_list.len();
-    unsafe {
-        loop {
-            let item_index = rng.get_value( item_list_size as i32 ) as usize;
-            let random_item = &item_list[item_index];
-            let item_flag = item_data_flag(random_item, None).value;
-            let mut skip = false;
-            let iid = random_item.iid.get_string().unwrap();
-            if BLACKLIST_ITEMS.iter().find(|x| **x == iid).is_some() { continue; }
-            if !has_name(random_item) { continue; }
-            if item_data_is_unknown(random_item, None) { continue; }
-            if item_data_is_inventory(random_item, None) { continue; }
-            if item_data_is_material(random_item, None) { continue; }
-            if item_flag & 16777216 != 0 { continue; } //Bless
-            if item_flag & 33554432 != 0 { continue; } //Breath
-            if item_flag & 67108864 != 0 { continue; }  //Dragon
-            if item_flag & 134217728 != 0 { continue; } //Bullet
-            if item_flag & 131072 != 0 { continue; } // Bento
-            if item_flag & 32768 != 0 { continue; } // AI 
-            for y in 0..8 {
-                if y == 2 { continue; }
-                if item_flag & (1 << y ) != 0 {
-                    skip = true;
-                    break;
+    loop {
+        let item_index = rng.get_value( item_list_size as i32 ) as usize;
+        let random_item = &item_list[item_index];
+        let item_flag = random_item.get_flag().value;
+        let mut skip = false;
+        let iid = random_item.iid.get_string().unwrap();
+        if BLACKLIST_ITEMS.iter().find(|x| **x == iid).is_some() { continue; }
+        if !has_name(random_item, true) { continue; }
+        if random_item.is_unknown() || random_item.is_inventory() || random_item.is_material() { continue; }
+        if crate::utils::str_contains(random_item.name, "MIID_Ring") { continue; }
+        if item_flag & 16777216 != 0 { continue; } //Bless
+        if item_flag & 33554432 != 0 { continue; } //Breath
+        if item_flag & 67108864 != 0 { continue; }  //Dragon
+        if item_flag & 134217728 != 0 { continue; } //Bullet
+        if item_flag & 131072 != 0 { continue; } // Bento
+        if item_flag & 32768 != 0 { continue; } // AI 
+        for y in 0..8 {
+            if y == 2 { continue; }
+            if y == 0 && allow_rare { continue; }
+            if item_flag & (1 << y ) != 0 {                
+                skip = true;
+                break;
+            }
+        }
+        if !skip { return random_item.iid; }
+    }
+}
+pub fn get_random_gift_item(include_rare: bool) -> &'static Il2CppString {
+    let item_list = ItemData::get_list().unwrap();
+    let rng = Random::get_game();
+    let item_list_size = item_list.len() as i32;
+    loop {
+        let item_index = rng.get_value( item_list_size ) as usize;
+        let random_item = &item_list[item_index];
+        let item_flag = random_item.get_flag().value;
+        let mut skip = false;
+        let iid = random_item.iid.get_string().unwrap();
+        if crate::utils::str_contains(random_item.name, "MIID_Ring") {  //BondRing Mod Removal
+            continue;
+        }
+        if BLACKLIST_ITEMS.iter().find(|x| **x == iid).is_some() { continue; }
+        if !has_name(random_item, true) { continue; }
+        if random_item.is_unknown() { continue; }
+        if random_item.usetype >= 32 && random_item.usetype <= 39 { continue; }
+        if random_item.usetype == 0 && ( random_item.kind != 17 && random_item.kind != 18 ){ continue; }    //Not Bond/Money
+        if item_flag & 16777216 != 0 { continue; } //Bless
+        if item_flag & 33554432 != 0 { continue; } //Breath
+        if item_flag & 67108864 != 0 { continue; }  //Dragon
+        if item_flag & 131072 != 0 { continue; }    //Bento
+        if item_flag & 134217728 != 0 { continue; } //Bullet
+        if item_flag & 32768 != 0 { continue; } // AI 
+        for y in 0..8 {
+            if y == 2 { continue; }
+            if y == 0 && include_rare { continue; }
+            if item_flag & (1 << y ) != 0 {
+                skip = true;
+                break;
+            }
+        }
+        if !skip { return random_item.iid;  }
+    }
+}
+
+fn has_name(this: &ItemData, include_money: bool) -> bool {
+    unsafe {  if crate::utils::is_null_empty(this.name, None) { return false;  }  }
+    let item_name = Mess::get(this.name ).get_string().unwrap();
+    if item_name.len() != 0 { return true }
+    else if include_money {
+        return this.kind == 17 || this.kind == 18  ;    // If Money or bond
+    }
+    return false; 
+}
+
+pub fn randomize_well_rewards() {
+    if GameVariableManager::get_number("G_Random_Item") == 0  { return; }
+    if CONFIG.lock().unwrap().random_gift_items != 0 {
+        let rare_item = CONFIG.lock().unwrap().random_gift_items == 2;
+        let rlist = RewardData::get_list_mut().unwrap();
+        for x in 0..rlist.len() {
+            for y in 0..rlist[x].len() {
+                let iid = rlist[x][y].iid;
+                let price = ItemData::get(&iid.get_string().unwrap()).unwrap().price;
+                let mut new_iid = get_random_gift_item(rare_item);  
+                let mut new_price = ItemData::get(&new_iid.get_string().unwrap()).unwrap().price;
+                let mut count = 0;
+                while new_price > 3*price && count < 50  {
+                    new_iid = get_random_gift_item(rare_item); 
+                    new_price = ItemData::get(&new_iid.get_string().unwrap()).unwrap().price;
+                    count += 1;
                 }
-            }
-            if !skip {
-                return random_item.iid;
+                rlist[x][y].set_iid(new_iid);  
             }
         }
     }
-}
-#[unity::class("App", "ItemDataFlag")]
-pub struct ItemDataFlag {
-    pub value: i32,
-}
-fn has_name(this: &ItemData) -> bool {
-    unsafe {
-        let name = item_data_get_name(this, None);
-        if name.is_some() {
-            let item_name = Mess::get( name.unwrap() ).get_string().unwrap();
-            return item_name.len() != 0;
+    let well_reward_list = ["アイテム交換_期待度１", "アイテム交換_期待度２", "アイテム交換_期待度３", "アイテム交換_期待度４", "アイテム交換_期待度５" ];
+    for x in well_reward_list {
+        let well_list = RewardData::try_get_mut(x);
+        if well_list.is_none() { continue; }
+        let well_items = well_list.unwrap();
+        let mut in_set: [bool; 1000] = [false; 1000];
+        for y in 0..well_items.len() {
+            let iid = well_items[y as usize].iid;
+            let price = ItemData::get(&iid.get_string().unwrap()).unwrap().price;
+            let mut new_price; 
+            let mut item_index;
+            let mut new_iid; 
+            let curent_reward = &well_items[y as usize];
+            let mut count = 0;
+            loop {
+                new_iid = get_random_gift_item(true); 
+                new_price = ItemData::get(&new_iid.get_string().unwrap()).unwrap().price;
+                item_index = ItemData::get(&new_iid.get_string().unwrap()).unwrap().parent.index;
+                if new_price > 3*price { count += 1; continue; }
+                if count < 50 && in_set[item_index as usize] { count += 1; continue; }
+                if count >= 50 { break; }
+                if !in_set[item_index as usize] { break; }
+            }
+            let new_reward = RewardData::instantiate().unwrap();
+            new_reward.ctor();
+            new_reward.set_iid(new_iid);
+            let new_item = ItemData::get(&new_iid.get_string().unwrap()).unwrap();
+            if new_item.get_flag().value & 1 != 0 || ( new_item.kind == 18 || new_item.kind == 17 ) {   // If rare or money / bond
+                new_reward.ratio = 2.5;
+                new_reward.min = 2.5;
+                new_reward.max = 2.5;
+            }
+            else {
+                new_reward.ratio = 1.5*curent_reward.ratio;
+                new_reward.min = 1.5*curent_reward.min;
+                new_reward.max = 1.5*curent_reward.max;
+            }
+            well_items.add(new_reward);
+            in_set[item_index as usize] = true; 
         }
-        else { return false; }
     }
+    println!("Complete Randomization of Gift/Well Items");
 }
-#[unity::from_offset("App", "ItemData", "get_Help")]
-pub fn item_data_get_name(this: &ItemData, method_info: OptionalMethod) -> Option<&'static Il2CppString>;
-
-#[unity::from_offset("App", "ItemData", "get_Flag")]
-pub fn item_data_flag(this: &ItemData, method_info: OptionalMethod) -> &'static ItemDataFlag;
-
-#[unity::from_offset("App", "ItemData", "IsInventory")]
-pub fn item_data_is_inventory(this: &ItemData, method_info: OptionalMethod) -> bool;
-
-#[unity::from_offset("App", "ItemData", "IsMaterial")]
-pub fn item_data_is_material(this: &ItemData, method_info: OptionalMethod) -> bool;
-
-#[unity::from_offset("App", "ItemData", "IsUnknown")]
-pub fn item_data_is_unknown(this: &ItemData, method_info: OptionalMethod) -> bool;
 
 pub struct RandomJobMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomJobMod {
@@ -796,6 +1031,33 @@ impl ConfigBasicMenuItemSwitchMethods for RandomItemMod {
     }
 }
 
+pub struct RandomGiftMod;
+impl ConfigBasicMenuItemSwitchMethods for RandomGiftMod {
+    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().random_gift_items, 0, 2, 1);
+        if CONFIG.lock().unwrap().random_gift_items != result {
+            CONFIG.lock().unwrap().random_gift_items  = result;
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        } else {return BasicMenuResult::new(); }
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let selection = CONFIG.lock().unwrap().random_gift_items;
+        if selection == 1 {  this.help_text = "No rare items will be included when randomizing gift item lists. (Toggle)".into(); }
+        else if selection == 2 {  this.help_text = "Rare items will be included when randomizing gift item lists. (Toggle)".into(); } 
+        else { this.help_text = "No randomization done to gift items. (Toggle)".into(); }
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let selection = CONFIG.lock().unwrap().random_gift_items;
+        if selection == 1 { this.command_text = "No Rare Items".into(); }
+        else if selection == 2 { this.command_text = "With Rare Items".into(); }
+        else { this.command_text = "No Randomization".into(); }
+    }
+}
+
 pub struct RandomEngageWepMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomEngageWepMod {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
@@ -818,9 +1080,3 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEngageWepMod {
         else { this.command_text = "No Randomization".into(); }
     }
 }
-
-
-#[no_mangle]
-extern "C" fn job_rnd() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_switch::<RandomJobMod>("Random Classes") } 
-
-pub fn install_rnd_jobs() { cobapi::install_global_game_setting(job_rnd); }
