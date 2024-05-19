@@ -5,7 +5,7 @@ use engage::{
     gameuserdata::*,
     force::*,
     mess::*,
-    gamedata::{unit::*, dispos::ChapterData, person::*, job::*, *},
+    gamedata::{unit::*, dispos::ChapterData, *},
 };
 use engage::gamedata::dispos::DisposData;
 use super::CONFIG;
@@ -293,6 +293,9 @@ pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
         if job.name.get_string().unwrap() == "MJID_Emblem" || jobname == "MJID_Emblem" { return false; }
         if job.get_sort() == 9999 { return false;}
         //Prevents Wyrms/Wolves from getting emblems
+        if jobname == "JID_異形飛竜" ||jobname  == "JID_幻影飛竜" {  return false; } //Wyverns
+        if jobname  == "JID_異形竜" || jobname == "JID_幻影竜" {  return false; } //Wyrms
+        if job.parent.index < 10 { return false; }
         if ( job.get_flag().value == 0 && job.jid.get_string().unwrap() != "JID_蛮族" ) || job.get_flag().value == 8 { return false; }
         let style_name = job.get_job_style();
 
@@ -300,7 +303,7 @@ pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
                 // Not Flying or Armored or wolf knight for Bow/Magic Emblems
             let god_data = GodData::get(EMBLEMS[emblem].into()).unwrap();
 
-            if style_name.unwrap().get_string().unwrap() == "飛行スタイル" || style_name.unwrap().get_string().unwrap() == "重装スタイル" || job.jid.get_string().unwrap() == "JID_ウルフナイト" {
+            if style_name.unwrap().get_string().unwrap() == "飛行スタイ ル" || style_name.unwrap().get_string().unwrap() == "重装スタイル" || job.jid.get_string().unwrap() == "JID_ウルフナイト" {
                 match emblem {
                     0 | 1 | 5 | 6 | 11 | 12 | 13 => { return false; }
                     _ => { 

@@ -32,7 +32,10 @@ pub fn randomize_person_grow(){
         if grow.is_zero() { continue; } 
         for y in 0..11 {
             let v = rng.get_min_max(min[y as usize] as i32, max[y as usize] as i32) as u8;
-            grow[y as usize] = v*5;
+            if person_list[x].get_asset_force() != 0 {
+                grow[y as usize] = (v+2)*5;
+            }
+            else { grow[y as usize] = v*5; }
         }
     }
 }
@@ -62,7 +65,7 @@ pub fn randomize_job_grow(){
         if grow.is_zero() { continue; } 
         for y in 0..11 {
             let v = rng.get_min_max(min[y as usize] as i32, (max[y as usize]) as i32) as i8;
-            grow[y as usize] = v*5;
+            grow[y as usize] = (v+1)*5;
         }
     }
 }

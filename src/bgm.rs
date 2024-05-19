@@ -4,15 +4,13 @@ use engage::{
         BasicMenuResult, 
         config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}
     },
-    mess::*,
-    gamevariable::*,
     gameuserdata::*,
     random::*,
     gamedata::*,
 };
 use engage::gamedata::dispos::ChapterData;
 use std::sync::Mutex;
-use super::{CONFIG, DeploymentConfig};
+use super::CONFIG;
 static BGM_POOL: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 #[unity::class("App", "MusicData")]
@@ -34,7 +32,6 @@ pub fn get_bgm_pool() {
     for x in 0..music_list.len() {
         if music_list[x].is_change == false { continue; }
         BGM_POOL.lock().unwrap().push(music_list[x].event_name.get_string().unwrap());
-       // println!("BGM: {} Added: {}.", music_list[x].event_name.get_string().unwrap(), Mess::get(music_list[x].name).get_string().unwrap());
     }
 }
 pub fn randomize_bgm_map() {

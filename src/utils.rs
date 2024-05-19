@@ -3,8 +3,9 @@ use engage::{
     random::*,
     force::*,
     mess::*,
-    gamedata::{*, skill::*, god::*},
+    gamedata::{*, skill::*},
 };
+use skyline::patching::Patch;
 use crate::skill::STAT_BONUS;
 
 // Getting Player's name for file name
@@ -185,7 +186,6 @@ pub fn get_stat_label(index: usize) -> String {
     }
 }
 
-
 pub fn get_person_growth_line(person: &PersonData) -> String {
     let pid = person.pid.get_string().unwrap();
     let mut name = " -- ".to_string();
@@ -195,6 +195,26 @@ pub fn get_person_growth_line(person: &PersonData) -> String {
     Mess::get("MID_SYS_HP").get_string().unwrap(), grow[0], Mess::get("MID_SYS_Str").get_string().unwrap(), grow[1], Mess::get("MID_SYS_Mag").get_string().unwrap(), grow[6], 
     Mess::get("MID_SYS_Tec").get_string().unwrap(), grow[2], Mess::get("MID_SYS_Spd").get_string().unwrap(), grow[3], Mess::get("MID_SYS_Lck").get_string().unwrap(), grow[4],
     Mess::get("MID_SYS_Def").get_string().unwrap(), grow[5], Mess::get("MID_SYS_Res").get_string().unwrap(), grow[7], Mess::get("MID_SYS_Phy").get_string().unwrap(), grow[8]);
+}
+
+pub fn mov_1(address: usize){
+    let _ = Patch::in_text(address).bytes(&[0x20,0x00, 0x80, 0x52]).unwrap();
+}
+
+pub fn return_true(address: usize){
+    let _ = Patch::in_text(address).bytes(&[0x20,0x00, 0x80, 0x52]).unwrap();
+    let _ = Patch::in_text(address+0x4).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
+ }
+
+pub fn dlc_check() -> bool {
+    unsafe {
+        if has_content(0, None) {
+            mov_1(0x0253d7c0);
+            mov_1(0x0253d8b0);
+            return true;
+        }
+            return false;
+    }
 }
 //
 // Unity Functions from Engage

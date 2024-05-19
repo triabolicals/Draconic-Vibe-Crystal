@@ -3,8 +3,6 @@ use unity::prelude::*;
 use cobapi::{Event, SystemEvent};
 use std::sync::{Mutex, LazyLock};
 use serde::{Deserialize, Serialize};
-use engage::gameuserdata::*;
-use engage::gamevariable::GameVariableManager;
 
 pub mod deploy;
 pub mod emblem;
@@ -17,8 +15,10 @@ pub mod utils;
 pub mod bgm;
 pub mod autolevel;
 pub mod asset;
+pub mod shop;
+pub mod ironman;
 
-pub const VERSION: &str = "1.7.0";
+pub const VERSION: &str = "1.8.3";
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct DeploymentConfig {
@@ -30,8 +30,13 @@ pub struct DeploymentConfig {
     revival_stone_rate: i32,
     enemy_emblem_rate: i32,
     random_map_bgm: bool,
+    bond_ring_skill_s_rate: i32,
+    bond_ring_skill_a_rate: i32,
+    bond_ring_skill_b_rate: i32,
+    bond_ring_skill_c_rate: i32,
     engage_link: bool,
     autolevel: bool,
+    iron_man: bool,
     deployment_type: i32,
     emblem_deployment: i32,
     emblem_mode: i32,
@@ -43,7 +48,10 @@ pub struct DeploymentConfig {
     random_god_mode: i32,
     random_god_sync_mode: i32,
     random_engage_weapon: bool,
+    random_gift_items: i32,
+    random_shop_items: bool,
 }
+
 impl DeploymentConfig {
     pub fn new() -> Self {
         let config_content = std::fs::read_to_string("sd:/engage/config/triabolical.toml");
@@ -80,8 +88,13 @@ impl DeploymentConfig {
             revival_stone_rate: 0,
             enemy_emblem_rate: 0,
             random_map_bgm: false,
+            bond_ring_skill_s_rate: 100,
+            bond_ring_skill_a_rate: 25,
+            bond_ring_skill_b_rate: 10,
+            bond_ring_skill_c_rate: 5,
             engage_link: false,
             autolevel: false,
+            iron_man: false,
             deployment_type: 0,
             emblem_deployment: 0,
             emblem_mode: 0,
@@ -93,6 +106,8 @@ impl DeploymentConfig {
             random_god_mode: 0,
             random_god_sync_mode: 0,
             random_engage_weapon: false,
+            random_gift_items: 0,
+            random_shop_items: false,
         };
         config
     }
@@ -102,8 +117,14 @@ impl DeploymentConfig {
             self.random_enemy_skill_rate = clamp(self.random_enemy_skill_rate, 0, 100, None);
             self.random_enemy_job_rate = clamp(self.random_enemy_job_rate, 0, 100, None);
             self.revival_stone_rate = clamp(self.revival_stone_rate, 0, 500, None);
-            self.enemy_emblem_rate = clamp(self.enemy_emblem_rate, 0, 100, None);
+            self.bond_ring_skill_s_rate = clamp(self.bond_ring_skill_s_rate, 0, 100, None);
+            self.bond_ring_skill_a_rate = clamp(self.bond_ring_skill_a_rate, 0, 100, None);
+            self.bond_ring_skill_b_rate = clamp(self.bond_ring_skill_b_rate, 0, 100, None);
+            self.bond_ring_skill_c_rate = clamp(self.bond_ring_skill_c_rate, 0, 100, None);
         }
+    }
+    pub fn get_bond_ring_rates(&self) -> [i32; 4] {
+        return [self.bond_ring_skill_s_rate, self.bond_ring_skill_a_rate, self.bond_ring_skill_b_rate, self.bond_ring_skill_c_rate ];
     }
     pub fn save(&self) {
         let out_toml = toml::to_string_pretty(&self).unwrap();
@@ -120,8 +141,10 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                     println!("Proc: {}, Hash {}, label {}", proc.name.unwrap().get_string().unwrap(), proc.hashcode, label);
                 }
                 if proc.hashcode == -988690862 && *label == 0 {
+                    //asset::get_job_assets();
+                    utils::dlc_check();
+                    person::get_playable_list();
                     bgm::get_bgm_pool();
-                    skill::print_bad_inherit_skill();
                     skill::create_skill_pool();
                     asset::unlock_royal_classes();
                     item::ENGAGE_ITEMS.lock().unwrap().intialize_list();
@@ -144,19 +167,15 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                 if proc.hashcode == -339912801 && *label == 2 { random::reset_gamedata(); }
                 // randomized stuff
                 if proc.hashcode == -1118443598 && *label == 0 { 
-                    random::skip_m000();
                     random::randomize_stuff(); 
                 }
                 if proc.hashcode == -1912552174 && *label == 28 {
                     random::start_new_game(); 
-                   // if GameUserData::get_game_mode() == GameMode::Classic && CONFIG.lock().unwrap().iron_man { 
-                       // GameVariableManager::make_entry("G_Ironman", 1);
-                   // }
                 }
                 // when map starts, iron code edits activate
                 if proc.hashcode == -339912801 && *label == 12 { 
-                    autolevel::calculate_player_cap();
-                //  ironman::ironman_code_edits(); 
+                    ironman::ironman_code_edits();
+                    autolevel::calculate_player_cap(); 
                 }
                 if proc.hashcode == -1624221522 && *label == 14 { bgm::randomize_bgm_map(); }
             }
@@ -165,7 +184,6 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
     } 
     else {  println!("We received a missing event, and we don't care!"); }
 }
-
 
 #[skyline::main(name = "deployment")]
 pub fn main() {

@@ -52,7 +52,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
     //check_terrain();
     println!("Deploy changed start");
     if GameVariableManager::get_bool("G_Random_Recruitment"){
-        person::change_map_dispos();
+        //person::change_map_dispos();
     }
     let absent_force = Force::get(ForceType::Absent).unwrap();
     if GameVariableManager::get_bool("G_Random_Job") && !GameVariableManager::get_bool("G_Lueur_Random") {
@@ -61,6 +61,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
         GameVariableManager::set_bool("G_Lueur_Random", true);
         person::adjust_unit_items(hero_unit);
     }
+    // Liberation Weapon Change
     if ( GameVariableManager::get_bool("G_Random_Job") && GameVariableManager::get_bool("G_Lueur_Random") ) && ( GameVariableManager::get_bool("G_Cleared_M002") && GameVariableManager::get_number("G_Liberation_Type") == 0 ) {
         let hero_unit = absent_force.get_hero_unit();
         let kinds = hero_unit.get_job().get_equippable_item_kinds();
@@ -100,7 +101,6 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
             liberation.range_i = 1;
             liberation.range_o = 1;
         }
-
         GameVariableManager::make_entry("G_Liberation_Type", liberation_type);
         GameVariableManager::set_number("G_Liberation_Type", liberation_type);
     }
@@ -309,18 +309,6 @@ impl ConfigBasicMenuItemSwitchMethods for EmblemMod {
     }
 }
 
-#[no_mangle]
-extern "C" fn deploy_create() -> &'static mut ConfigBasicMenuItem { 
-    ConfigBasicMenuItem::new_switch::<DeploymentMod>("Deployment Mode")
- } 
- #[no_mangle]
-extern "C" fn emblem_create() -> &'static mut ConfigBasicMenuItem {  ConfigBasicMenuItem::new_switch::<EmblemMod>("Emblem Deployment Mode") } 
-
- pub fn install_deployment() {
-    cobapi::install_global_game_setting(deploy_create);
-    cobapi::install_global_game_setting(emblem_create);
- }
-
 #[skyline::from_offset(0x01c616f0)]
 pub fn remove_all_rings(this: u64, method_info: OptionalMethod);
 
@@ -332,7 +320,7 @@ pub fn force_get_unit_from_pid(pid: &Il2CppString, relay: bool, method_info: Opt
 
 #[skyline::from_offset(0x01a220b0)]
 pub fn unit_update_actor(this: &Unit, method_info: OptionalMethod);
-
+/* 
 #[unity::class("App", "MapTerrain")]
 pub struct MapTerrain {
     _super: u64,
@@ -348,7 +336,6 @@ pub struct MapTerrain {
 pub fn get_map_terrain(method_info: OptionalMethod) -> Option<&'static MapTerrain>;
 
 use std::fs::File;
-use std::sync::Mutex;
 use unity::il2cpp::object::Array;
 use std::io::Write;
 #[unity::class("App", "TerrainData")]
@@ -381,7 +368,6 @@ pub fn check_terrain() {
             }
             writeln!(&mut f, "{}", z_line).unwrap();
         }
-
-    
     }
 }
+*/
