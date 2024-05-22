@@ -9,16 +9,16 @@ use engage::{
     hub::access::*,
     random::*,
     mess::*,
-    gamedata::{*, skill::*, item::*, dispos::*, unit::*},
+    gamedata::{*, item::*, skill::SkillData, dispos::*, unit::*},
 };
-
-use crate::{emblem::*, skill::{EIRIKA_INDEX}, utils::*, deploy, item, autolevel::*};
+use crate::{
+    enums::*,
+    emblem::{*, emblem_item::ENGAGE_ITEMS, emblem_skill::EIRIKA_INDEX}, 
+    utils::*, item, autolevel::*,
+};
 use super::CONFIG;
 pub static mut RAND_PERSONS: [i32; 82] = [0; 82];
 
-pub const PIDS : &[&str] = &["PID_リュール", "PID_ヴァンドレ", "PID_クラン", "PID_フラン", "PID_アルフレッド", "PID_エーティエ", "PID_ブシュロン", "PID_セリーヌ", "PID_クロエ", "PID_ルイ", "PID_ユナカ", "PID_スタルーク", "PID_シトリニカ", "PID_ラピス", "PID_ディアマンド", "PID_アンバー", "PID_ジェーデ", "PID_アイビー", "PID_カゲツ", "PID_ゼルコバ", "PID_フォガート", "PID_パンドロ", "PID_ボネ", "PID_ミスティラ", "PID_パネトネ", "PID_メリン", "PID_オルテンシア", "PID_セアダス", "PID_ロサード", "PID_ゴルドマリー", "PID_リンデン", "PID_ザフィーア", "PID_ヴェイル", "PID_モーヴ", "PID_アンナ", "PID_ジャン", "PID_エル", "PID_ラファール", "PID_セレスティア", "PID_グレゴリー", "PID_マデリーン"];
-const RECRUIT_CID : [&str; 41] = ["M001", "M001", "M002", "M002", "M003", "M003", "M003", "M004", "M004", "M004", "M006", "M007", "M007", "M007", "M008", "M008", "M009", "M011", "M011", "M011", "M012", "M012", "M012", "M013", "M013", "M013", "M014", "M015", "M016", "M016", "M018", "M019", "M022", "M021", "S002", "S001", "E006", "E006", "E006", "E006", "E006"];
-pub const RINGS: [&str; 19] = ["Marth", "Siglud", "Celica", "Micaiah", "Roy", "Leaf", "Lucina", "Lin", "Ike", "Byleth", "Kamui", "Eirik", "Edelgard", "Tiki", "Hector", "Veronica", "Senerio", "Camilla", "Chrom" ];
 pub static mut SET: i32 = 0;
 use std::sync::Mutex;
 pub static PLAYABLE: Mutex<Vec<i32>> = Mutex::new(Vec::new());
@@ -122,47 +122,19 @@ pub fn find_pid_replacement(pid: &String, reverse: bool) -> Option<&str>{
         let index: usize;
         if reverse { index = found_pid.unwrap() + 41; }
         else { index = found_pid.unwrap(); }
-        unsafe {
-            return Some(PIDS[ RAND_PERSONS [ index ] as usize ]); 
-        }
-
+        unsafe { return Some(PIDS[ RAND_PERSONS [ index ] as usize ]);  }
     }
-    let found_gid = deploy::EMBLEM_GIDS.iter().position(|&x| x == *pid);
+    let found_gid = EMBLEM_GIDS.iter().position(|&x| x == *pid);
     if found_gid.is_some() {
         let index: usize;
         if reverse { index = found_gid.unwrap() + 19; }
         else { index = found_gid.unwrap(); }
-        unsafe {
-            return Some(deploy::EMBLEM_GIDS[ RANDOMIZED_INDEX [ index as usize] as usize ]);
-        }
-
+        unsafe { return Some(EMBLEM_GIDS[ RANDOMIZED_INDEX [ index as usize] as usize ]); }
     }
     return None;
-    /* 
-    for z in PIDS { // Vander
-        if *z == pid {
-            unsafe {
-                if reverse { return Some(PIDS[ RAND_PERSONS [ index + 41 ] as usize ]); }
-                else { return Some(PIDS[ RAND_PERSONS [ index ] as usize ]); }
-            }
-        }
-        index += 1;
-    }
-    index = 0;
-    for z in deploy::EMBLEM_GIDS {
-        if *z == pid {
-            unsafe {
-                if reverse { return Some(deploy::EMBLEM_GIDS [ RANDOMIZED_INDEX [ index + 19] as usize ]); }
-                else { return Some(deploy::EMBLEM_GIDS[ RANDOMIZED_INDEX [ index as usize] as usize ]); }
-            }
-        }
-        index += 1;
-    }
-    return None; */
 }
-pub fn pid_to_mpid(pid: &String) -> String {
-    return PersonData::get(&pid).unwrap().get_name().unwrap().get_string().unwrap();
-}
+pub fn pid_to_mpid(pid: &String) -> String { return PersonData::get(&pid).unwrap().get_name().unwrap().get_string().unwrap(); }
+
 pub fn change_hub_dispos(revert: bool) {
     let t_list = HubDisposData::get_array_mut().expect("Me");
     for x in 0..t_list.len() {
@@ -258,9 +230,7 @@ fn unit_pool_get_hero(replay :bool, method_info: OptionalMethod) -> Option<&'sta
 pub fn lueur_on_map() -> bool {
     unsafe {
         let lueur_unit = unit_pool_get_hero(true, None);
-        if lueur_unit.is_none() {
-            return false;
-        }
+        if lueur_unit.is_none() { return false;  }
         return  lueur_unit.unwrap().force.unwrap().force_type < 3 ;
     }
 }
@@ -344,21 +314,21 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
                     //let target_level = current_level;
                     let level = current_level - 20;
                     let new_job = &new_person.get_job().unwrap().get_high_jobs()[0];
-                    this.set_job(new_job);
                     this.auto_grow_capability( level, current_level);
                     call_original!(this, method_info);
+                    this.class_change(new_job);
                     this.set_level( level );
                     this.set_internal_level( 20 );
                 }
                 else if is_new_low && !new_person.get_job().unwrap().has_high() {   // special -> special
-                    this.set_job(new_person.get_job().unwrap());
+                    this.class_change(new_person.get_job().unwrap());
                     this.auto_grow_capability( current_level, current_level);
                     call_original!(this, method_info);
                     this.set_level( current_level );
                     this.set_internal_level( 0 );
                 }
                 else {  // special -> high
-                    this.set_job(new_person.get_job().unwrap());
+                    this.class_change(new_person.get_job().unwrap());
                     this.auto_grow_capability( current_level-20, current_level);
                     call_original!(this, method_info);
                     this.set_level( current_level - 20 );
@@ -366,7 +336,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
                 }
             }
             if is_new_low { // base or special class lvl < 20 -> base class
-                this.set_job(new_person.get_job().unwrap());
+                this.class_change(new_person.get_job().unwrap());
                 this.auto_grow_capability( current_level, current_level);
                 call_original!(this, method_info);
                 this.set_level( current_level );
@@ -374,13 +344,14 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             }
             else {
                 let new_job_list = new_person.get_job().unwrap().get_low_jobs();
+                this.auto_grow_capability(current_level, current_level);
                 if new_job_list.len() == 3 {
                     let index = get_low_class_index(new_person);
-                    this.set_job(&new_job_list[index as usize]);
+                    this.class_change(&new_job_list[index as usize]);
                 }
-                else if new_job_list.len() == 0 { this.set_job(JobData::get("JID_ソードファイター").unwrap()); }    // if promoted class doesn't have a low class, change to sword fighter
-                else {  this.set_job(&new_job_list[0]); }
-                this.auto_grow_capability(current_level, current_level);
+                else if new_job_list.len() == 0 { this.class_change(JobData::get("JID_ソードファイター").unwrap()); }    // if promoted class doesn't have a low class, change to sword fighter
+                else {  this.class_change(&new_job_list[0]); }
+
                 call_original!(this, method_info);
                 this.set_level(current_level);
                 this.set_internal_level(0);
@@ -390,15 +361,15 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             if is_new_low { // new unit has a base class
                 if new_person.get_job().unwrap().has_high() {   // base class -> 1st promoted class
                     let new_high_jobs = new_person.get_job().unwrap().get_high_jobs();
-                    if new_high_jobs.len() == 0 { this.set_job(JobData::get("JID_ソードマスター").unwrap());  } // if no high class, change to Swordmaster
-                    else { this.set_job(&new_high_jobs[0]); }
+                    if new_high_jobs.len() == 0 { this.class_change(JobData::get("JID_ソードマスター").unwrap());  } // if no high class, change to Swordmaster
+                    else { this.class_change(&new_high_jobs[0]); }
                     this.auto_grow_capability(current_level, current_level + 20);
                     call_original!(this, method_info);
                     this.set_level(current_level);
                     this.set_internal_level(current_internal_level);
                 }
                 else { // Promoted -> Special
-                    this.set_job(new_person.get_job().unwrap());
+                    this.class_change(new_person.get_job().unwrap());
                     let total_level = current_internal_level + current_level;
                     this.auto_grow_capability(total_level, 20+current_level);
                     call_original!(this, method_info);
@@ -408,7 +379,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
                 }
             }
             else {  // Promoted -> Promoted
-                this.set_job(new_person.get_job().unwrap());
+                this.class_change(new_person.get_job().unwrap());
                 this.auto_grow_capability(current_level, current_level + 20);
                 call_original!(this, method_info);
                 this.set_level(current_level);
@@ -427,19 +398,22 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
 }
  #[unity::hook("App", "Unit", "CreateFromDispos")]
  pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_info: OptionalMethod) {
-        // Changing Emblems
+ // Changing Emblems
     if data.gid.is_some() && GameVariableManager::get_number("G_Random_God_Mode") != 0 {
-        let string = format!("G_R_{}", data.gid.unwrap().get_string().unwrap());
-        let new_gid = GameVariableManager::get_string(&string);
-        data.set_gid(new_gid);
+        let string = data.gid.unwrap().get_string().unwrap();
+        if EMBLEM_GIDS.iter().position(|x| *x == string).is_some() {
+            let new_string = format!("G_R_{}", string);
+            let new_gid = GameVariableManager::get_string(&new_string);
+            data.set_gid(new_gid);
+        }
     }
-        // Changing Person AI
+// Changing Person AI
     if GameVariableManager::get_bool("G_Random_Recruitment") {
         if data.ai_action_value.is_some() {
             let string = data.ai_action_value.unwrap().get_string().unwrap();
             let found = PIDS.iter().position(|x| *x == string);
             if found.is_some() {
-                let new_string = format!("G_R_{}", data.get_gid().get_string().unwrap());
+                let new_string = format!("G_R_{}", string);
                 let new_pid = GameVariableManager::get_string(&new_string);
                 data.ai_action_value = Some(new_pid);
             }
@@ -448,7 +422,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             let string = data.ai_mind_value.unwrap().get_string().unwrap();
             let found = PIDS.iter().position(|x| *x == string);
             if found.is_some() {
-                let new_string = format!("G_R_{}", data.get_gid().get_string().unwrap());
+                let new_string = format!("G_R_{}", string);
                 let new_pid = GameVariableManager::get_string(&new_string);
                 data.ai_mind_value = Some(new_pid);
             }
@@ -457,16 +431,16 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             let string = data.ai_move_value.unwrap().get_string().unwrap();
             let found = PIDS.iter().position(|x| *x == string);
             if found.is_some() {
-                let new_string = format!("G_R_{}", data.get_gid().get_string().unwrap());
+                let new_string = format!("G_R_{}", string);
                 let new_pid = GameVariableManager::get_string(&new_string);
                 data.ai_move_value = Some(new_pid);
             }
         }
         if data.ai_attack_value.is_some() {
-            let string = data.ai_move_value.unwrap().get_string().unwrap();
+            let string = data.ai_attack_value.unwrap().get_string().unwrap();
             let found = PIDS.iter().position(|x| *x == string);
             if found.is_some() {
-                let new_string = format!("G_R_{}", data.get_gid().get_string().unwrap());
+                let new_string = format!("G_R_{}", string);
                 let new_pid = GameVariableManager::get_string(&new_string);
                 data.ai_attack_value = Some(new_pid);
             }
@@ -509,8 +483,10 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
                 let mut count = 0;
                 while !valid_skill && count < 5 {
                     let skill = crate::skill::get_random_skill(diff, rng);
-                    valid_skill = this.private_skill.add_skill(skill, 10, 0); 
-                    count += 1;
+                    if !has_skill(this, skill) {
+                        valid_skill = this.private_skill.add_skill(skill, 10, 0); 
+                        count += 1;
+                    }
                 }
             }
         }
@@ -678,12 +654,6 @@ pub fn adjust_unit_items(unit: &Unit) {
 #[unity::from_offset("App", "Unit", "UpdateStateWithAutoEquip")]
 pub fn unit_update_auto_equip(this: &Unit, method_info: OptionalMethod);
 
-#[skyline::from_offset(0x01a37990)]
-pub fn unit_add_private_skill(this: &Unit, skill: &SkillData, method_info: OptionalMethod) -> bool;
-
-#[skyline::from_offset(0x01a35f80)]
-pub fn unit_add_equip_skill(this: &Unit, skill: &SkillData, method_info: OptionalMethod) -> bool;
-
 #[skyline::from_offset(0x01f25ec0)]
 fn get_bmap_size(this: &PersonData, method_info: OptionalMethod) -> u8;
 
@@ -720,7 +690,7 @@ pub fn mess_get_impl_hook(label: Option<&Il2CppString>, is_replaced: bool, metho
         if label.is_some() {
             let mess_label = label.unwrap().get_string().unwrap();
             if mess_label == "MSID_H_EirikEngage" {
-                let eirika_replacement = GodData::get( deploy::EMBLEM_GIDS[ EIRIKA_INDEX ] ).unwrap().mid;
+                let eirika_replacement = GodData::get( EMBLEM_GIDS[ EIRIKA_INDEX ] ).unwrap().mid;
                 return replace_str(result, Mess::get("MGID_Eirik"), Mess::get(eirika_replacement), None);
             }
             if mess_label == "MID_RULE_M006_LOSE" {
@@ -742,13 +712,13 @@ pub fn mess_get_impl_hook(label: Option<&Il2CppString>, is_replaced: bool, metho
                 }
             }
             if string_start_with(label.unwrap(), "MIID_H_".into(), None) && GameVariableManager::get_bool("G_Random_Engage_Weps") {
-                let found = item::ENGAGE_ITEMS.lock().unwrap().item_list.iter().position(|x| x.miid == mess_label);
+                let found = ENGAGE_ITEMS.lock().unwrap().item_list.iter().position(|x| x.miid == mess_label);
                 if found.is_some() {
-                    let new_emblem = item::ENGAGE_ITEMS.lock().unwrap().item_list[found.unwrap()].new_emblem;
-                    let old_emblem = item::ENGAGE_ITEMS.lock().unwrap().item_list[found.unwrap()].original_emblem;
+                    let new_emblem = ENGAGE_ITEMS.lock().unwrap().item_list[found.unwrap()].new_emblem;
+                    let old_emblem = ENGAGE_ITEMS.lock().unwrap().item_list[found.unwrap()].original_emblem;
                     if new_emblem == -1 { return result; }
-                    let emblem_name = Mess::get( GodData::get(&format!("GID_{}", crate::skill::EMBLEM_ASSET[old_emblem as usize])).unwrap().mid);
-                    let new_emblem_name = Mess::get( GodData::get(&format!("GID_{}", crate::skill::EMBLEM_ASSET[new_emblem as usize])).unwrap().mid);
+                    let emblem_name = Mess::get( GodData::get(&format!("GID_{}", EMBLEM_ASSET[old_emblem as usize])).unwrap().mid);
+                    let new_emblem_name = Mess::get( GodData::get(&format!("GID_{}", EMBLEM_ASSET[new_emblem as usize])).unwrap().mid);
                     return replace_str(result, emblem_name, new_emblem_name, None);
                 }
                 return result;
@@ -767,4 +737,8 @@ pub fn mess_get_impl_hook(label: Option<&Il2CppString>, is_replaced: bool, metho
         }
     }
     return result;
+}
+
+fn has_skill(this: &Unit, skill: &SkillData) -> bool {
+    return this.mask_skill.unwrap().find_sid(skill.sid).is_some() | this.private_skill.find_sid(skill.sid).is_some()| this.equip_skill.find_sid(skill.sid).is_some();
 }

@@ -7,16 +7,10 @@ use engage::{
     menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}},
     godpool::*,
     force::*,
-    gamedata::unit::*,
+    gamedata::{skill::SkillData, item::ItemData, *, unit::*},
 };
-use engage::gamedata::skill::SkillData;
-use engage::gamedata::item::ItemData;
-use engage::gamedata::Gamedata;
 use super::CONFIG;
-use crate::person;
-use crate::item;
-pub const EMBLEM_GIDS: &[&str] = &["GID_マルス", "GID_シグルド", "GID_セリカ", "GID_ミカヤ", "GID_ロイ", "GID_リーフ", "GID_ルキナ", "GID_リン", "GID_アイク", "GID_ベレト", "GID_カムイ", "GID_エイリーク", "GID_エーデルガルト", "GID_チキ", "GID_ヘクトル", "GID_ヴェロニカ", "GID_セネリオ", "GID_カミラ", "GID_クロム"];
-
+use crate::{enums::*, person, item};
 
 // Calculate the unit's displayed rating 
 pub fn get_unit_rating(this: &Unit) -> i32 {
@@ -52,7 +46,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
     //check_terrain();
     println!("Deploy changed start");
     if GameVariableManager::get_bool("G_Random_Recruitment"){
-        //person::change_map_dispos();
+        person::change_map_dispos();
     }
     let absent_force = Force::get(ForceType::Absent).unwrap();
     if GameVariableManager::get_bool("G_Random_Job") && !GameVariableManager::get_bool("G_Lueur_Random") {

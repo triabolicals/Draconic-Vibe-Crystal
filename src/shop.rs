@@ -6,11 +6,10 @@ use engage::{
     gamedata::{*, item::*},
 };
 pub static mut SHOP_SET: bool = false;
-use super::CONFIG;
+use super::{utils::*, CONFIG};
 
 pub struct ShopRandomizer {
     pub pool: Vec<RandomItem>,
-    pub size: i32,
 }
 pub struct RandomItem {
     pub index: i32,
@@ -19,15 +18,11 @@ pub struct RandomItem {
 }
 impl RandomItem {
     pub fn new(item_index: i32, inf: bool, in_used: bool) -> Self {
-        Self {
-            index: item_index,
-            is_inf: inf,
-            used: in_used,
-        }
+        Self { index: item_index, is_inf: inf, used: in_used,  }
     }
 }
 impl ShopRandomizer {
-    pub fn new() -> Self {  Self { pool: Vec::new(), size: 0, } }
+    pub fn new() -> Self {  Self { pool: Vec::new(), } }
     pub fn reset(&mut self) {
         for x in &mut self.pool {
             if !x.is_inf { x.used = false; }
@@ -41,22 +36,17 @@ impl ShopRandomizer {
             item.is_inf = is_inf;
             item.used = true;
         }
-        else {
-            self.pool.push(RandomItem::new(index, is_inf, true));
-            self.size += 1;
-        }
-    
+        else { self.pool.push(RandomItem::new(index, is_inf, true)); }
     }
     pub fn add_list(&mut self, item: &ItemData){
         if self.pool.iter().find(|&x| x.index == item.parent.index).is_none() {
             self.pool.push(RandomItem::new(item.parent.index, false, false));
-            self.size += 1;
         }
     }
     pub fn get_random(&mut self, rng: &Random) -> &'static ItemData {
-        let mut index = rng.get_value(self.size);
+        let mut index = rng.get_value(self.pool.len() as i32 );
         while self.pool[index as usize].used || self.pool[index as usize].is_inf {
-            index = rng.get_value(self.size);
+            index = rng.get_value(self.pool.len() as i32 );
         }
         self.pool[index as usize].used = true;
         return ItemData::try_index_get( self.pool[index as usize].index).unwrap();
@@ -65,7 +55,6 @@ impl ShopRandomizer {
 
 trait ShopData: Il2CppClassData + Sized {
     fn register() {
-        println!("{} Register",  Self::class().get_name());
         let mut method = Self::class().get_methods().iter().find(|method| method.get_name() == Some(String::from("Regist")));
         if method.is_none() {
             method = Self::class()._1.parent.get_methods().iter().find(|method| method.get_name() == Some(String::from("Regist")));
@@ -78,7 +67,6 @@ trait ShopData: Il2CppClassData + Sized {
         regist(method.unwrap());
     }
     fn ctor(&self) {
-        println!("{} ctor",  Self::class().get_name());
         let method = Self::class().get_methods().iter().find(|method| method.get_name() == Some(String::from(".ctor")));
         if method.is_none() { return; }
         let ctor = unsafe {
@@ -128,12 +116,14 @@ pub fn reset_shopdata(){
     FleaMarketData::unload();
     FleaMarketData::load();
     unsafe { SHOP_SET = false; }
+    HubRandomSet::unload();
+    HubRandomSet::load();
 }
 
 pub fn randomize_shop_data() {
     let seed;
     if GameVariableManager::exist("G_Random_Shop_Items") {
-        seed = GameVariableManager::get_number("G_Random_Shop_Items") as u32;;
+        seed = GameVariableManager::get_number("G_Random_Shop_Items") as u32;
     }
     else if CONFIG.lock().unwrap().random_shop_items {
         seed = crate::utils::get_random_number_for_seed();
@@ -150,7 +140,6 @@ pub fn randomize_shop_data() {
     let mut ishop_rzr = ShopRandomizer::new();
     let mut wshop_rzr = ShopRandomizer::new();
     let mut fm_rzr = ShopRandomizer::new();
-
     let item_list = ItemData::get_list().unwrap();
     for x in 0..item_list.len() {
         let item = &item_list[x];
@@ -290,6 +279,68 @@ impl ConfigBasicMenuItemSwitchMethods for RandomShopMod {
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let selection = CONFIG.lock().unwrap().random_shop_items;
         if selection { this.command_text = "Random Shop Items".into(); }
-        else { this.command_text = "Default Shop Item".into(); }
+        else { this.command_text = "Default Shop Items".into(); }
+    }
+}
+
+#[unity::class("App", "HubRandomSet")]
+pub struct HubRandomSet {
+    pub parent: StructDataArrayFields,
+    pub iid: &'static Il2CppString,
+    pub rate: i32,
+    pub count: i32,
+}
+
+impl GamedataArray for HubRandomSet {}
+impl ShopData for HubRandomSet {}
+
+pub fn randomize_hub_random_items(){
+    if GameVariableManager::get_number("G_Random_Item") == 0  { return; }
+    let hublist = HubRandomSet::get_list_mut().unwrap();
+    for x in 0..hublist.len() {
+        let list = &mut hublist[x]; 
+        for y in 0..list.len() {
+            if str_contains(list.parent.list[y].iid, "PID_") { break; } //Person
+            let iid = list.parent.list[y].iid.get_string().unwrap(); 
+            if iid == "IID_てつの晶石" || iid == "IID_はがねの晶石" || iid == "IID_ぎんの晶石" { // Ore Check
+                continue; 
+            }
+            if str_contains(list.parent.list[y].iid, "IID_") || iid == "なし" {
+                list.parent.list[y].iid = crate::item::random_item(2, false);
+            }
+        }
+    }
+}
+
+pub struct RandomHubItemMod;
+impl ConfigBasicMenuItemSwitchMethods for RandomHubItemMod {
+    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().exploration_items, 0, 3, 1);
+        if CONFIG.lock().unwrap().exploration_items != result {
+            CONFIG.lock().unwrap().exploration_items = result;
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        } else {return BasicMenuResult::new(); }
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let selection = CONFIG.lock().unwrap().exploration_items;
+        match selection {
+            1 => { this.help_text = "Excludes gift items from exploration. (Togglable)".into(); }
+            2 => { this.help_text = "Excludes food items from exploration. (Togglable)".into();}
+            3 => { this.help_text = "Excludes gift and food items from exploration. (Togglable)".into();}
+            _ => { this.help_text = "Exploration items includes both gift and food items. (Togglable)".into();}
+        }
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let selection = CONFIG.lock().unwrap().exploration_items;
+        match selection {
+            1 => { this.command_text = "No Gift".into(); }
+            2 => { this.command_text = "No Food".into();}
+            3 => { this.command_text  = "No Gift/Food".into();}
+            _ => { this.command_text  = "Default".into();}
+        }
     }
 }

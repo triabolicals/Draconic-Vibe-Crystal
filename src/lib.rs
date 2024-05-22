@@ -3,6 +3,7 @@ use unity::prelude::*;
 use cobapi::{Event, SystemEvent};
 use std::sync::{Mutex, LazyLock};
 use serde::{Deserialize, Serialize};
+use skyline::patching::Patch;
 
 pub mod deploy;
 pub mod emblem;
@@ -17,8 +18,9 @@ pub mod autolevel;
 pub mod asset;
 pub mod shop;
 pub mod ironman;
+pub mod enums;
 
-pub const VERSION: &str = "1.8.3";
+pub const VERSION: &str = "1.9.0";
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct DeploymentConfig {
@@ -34,7 +36,10 @@ pub struct DeploymentConfig {
     bond_ring_skill_a_rate: i32,
     bond_ring_skill_b_rate: i32,
     bond_ring_skill_c_rate: i32,
+    engrave_lower_score: i32,
+    engrave_upper_score: i32,
     engage_link: bool,
+    exploration_items: i32,
     autolevel: bool,
     iron_man: bool,
     deployment_type: i32,
@@ -86,14 +91,17 @@ impl DeploymentConfig {
             random_enemy_job_rate: 50,
             random_enemy_skill_rate: 50,
             revival_stone_rate: 0,
-            enemy_emblem_rate: 0,
+            enemy_emblem_rate: 0, 
             random_map_bgm: false,
             bond_ring_skill_s_rate: 100,
             bond_ring_skill_a_rate: 25,
             bond_ring_skill_b_rate: 10,
             bond_ring_skill_c_rate: 5,
+            engrave_lower_score: -40,
+            engrave_upper_score: 40,
             engage_link: false,
             autolevel: false,
+            exploration_items: 0,
             iron_man: false,
             deployment_type: 0,
             emblem_deployment: 0,
@@ -123,6 +131,36 @@ impl DeploymentConfig {
             self.bond_ring_skill_c_rate = clamp(self.bond_ring_skill_c_rate, 0, 100, None);
         }
     }
+    pub fn get_engrave_limits(&mut self) -> (i32, i32, bool) {
+        // auto correct 
+        let a = clamp_value(self.engrave_lower_score, -100, 100);
+        let b = clamp_value(self.engrave_upper_score, -100, 100);
+        self.engrave_lower_score = a;
+        self.engrave_upper_score = b;
+        if a == b {
+            self.save();
+            return (0, 0, false);
+        }
+        else if a < b {
+            if b-a < 30 {  
+                self.engrave_lower_score = clamp_value(b-30, -100, 100);
+                self.engrave_upper_score = b;
+            }
+        }
+        else {
+            if a-b < 30 {
+                self.engrave_lower_score = clamp_value(a-30, -100, 100);
+                self.engrave_upper_score = a;
+            }
+            else {
+                self.engrave_lower_score = b;
+                self.engrave_upper_score = a;
+            }
+        }
+        self.save();
+        println!("Engage Lower {}, Higher {}", self.engrave_lower_score, self.engrave_upper_score);
+        return (self.engrave_lower_score, self.engrave_upper_score, true);
+    }   
     pub fn get_bond_ring_rates(&self) -> [i32; 4] {
         return [self.bond_ring_skill_s_rate, self.bond_ring_skill_a_rate, self.bond_ring_skill_b_rate, self.bond_ring_skill_c_rate ];
     }
@@ -141,13 +179,14 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                     println!("Proc: {}, Hash {}, label {}", proc.name.unwrap().get_string().unwrap(), proc.hashcode, label);
                 }
                 if proc.hashcode == -988690862 && *label == 0 {
-                    //asset::get_job_assets();
+                    enums::generate_black_list();
+                    item::create_item_pool();
                     utils::dlc_check();
                     person::get_playable_list();
                     bgm::get_bgm_pool();
                     skill::create_skill_pool();
                     asset::unlock_royal_classes();
-                    item::ENGAGE_ITEMS.lock().unwrap().intialize_list();
+                    emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().intialize_list();
                     unsafe {
                         for i in 0..41 { 
                             person::RAND_PERSONS[i as usize] = i; 
@@ -175,6 +214,7 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                 // when map starts, iron code edits activate
                 if proc.hashcode == -339912801 && *label == 12 { 
                     ironman::ironman_code_edits();
+                    shop::randomize_hub_random_items();
                     autolevel::calculate_player_cap(); 
                 }
                 if proc.hashcode == -1624221522 && *label == 14 { bgm::randomize_bgm_map(); }
@@ -190,9 +230,18 @@ pub fn main() {
     let _ = std::fs::create_dir_all("sd:/Draconic Vibe Crystal/");
     //Deployment
     cobapi::register_system_event_handler(initalize_random_persons);
-    //skyline::install_hooks!( person::talk_hook, person::cmd_info_ctor_hook);
-    //skyline::install_hooks!( ironman::game_mode_bind, ironman::game_over_hook, ironman::set_last_save_data_info);
-    skyline::install_hooks!( asset::add_job_list_unit, person:: mess_get_impl_hook, random::try_get_index, deploy::create_player_team, random::script_get_string, person::unit_create_impl_2_hook, person::create_from_dispos_hook); 
+    skyline::install_hooks!( 
+        //emblem::emblem_skill::item_add_hook,
+        asset::add_job_list_unit, 
+        person::mess_get_impl_hook, 
+        random::try_get_index, 
+        deploy::create_player_team, 
+        random::script_get_string,
+        person::unit_create_impl_2_hook, 
+        person::create_from_dispos_hook
+    ); 
+    // Fixes the emblem weapons arena issue
+    Patch::in_text(0x01ca9afc).nop().unwrap();
     random::install_vibe();
 
     std::panic::set_hook(Box::new(|info| {
@@ -207,7 +256,8 @@ pub fn main() {
             },
         };
         let err_msg = format!(
-            "Oh no! Plugin has panicked at '{}' with the following message:\n{}\0",
+            "Draconic Vibe Crystal {} has panicked at '{}' with the following message:\n{}\0",
+            VERSION,
             location,
             msg
         );
@@ -218,6 +268,8 @@ pub fn main() {
         );
     }));
 }
-
+fn clamp_value(v: i32, min: i32, max: i32) -> i32 {
+    unsafe { clamp(v, min, max, None)  }
+}
 #[skyline::from_offset(0x032dfb20)]
 pub fn clamp(value: i32, min: i32, max: i32, method_info: OptionalMethod) -> i32;

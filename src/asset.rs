@@ -62,9 +62,6 @@ pub struct AssetTable {
 }
 impl Gamedata for AssetTable {}
 
-#[unity::from_offset("App", "UnitEdit", "IsEnable")]
-pub fn unit_edit_is_enable(this: &UnitEdit, method_info: OptionalMethod) -> bool;
-
 //Unlock royal classes if asset table entry is found
 pub fn unlock_royal_classes(){
     let list = AssetTable::get_list().unwrap();
@@ -74,7 +71,7 @@ pub fn unlock_royal_classes(){
         let job = current_job.jid.get_string().unwrap();
         let flag = current_job.get_flag();
         if flag.value & 1 == 0 {continue; }    // If not reclassable, skip
-        if flag.value & 2 != 0 {continue;} // If already reclassable by everyone, skip
+        if flag.value & 2 != 0 {continue; } // If already reclassable by everyone, skip
         for x in 0..list.len(){
                 //Search all assettable entries
             let asset_entry = &list[x];
@@ -104,7 +101,15 @@ pub fn unlock_royal_classes(){
 #[unity::class("App", "ClassChange.ChangeJobData")]
 pub struct ChangeJobData {
     pub job: &'static JobData,
-    junk: [u8; 0x38],
+    pub job_weapon_mask: &'static WeaponMask,
+    pub original_job_weapon_mask: &'static WeaponMask,
+    pub proof_type: i32, 
+    __: i32,
+    pub cost_level: &'static Il2CppString,
+    pub is_enough_level: bool,
+    pub junk: [u8; 7],
+    pub cost_weapon_mask: &'static WeaponMask,
+    pub equippable_weapon_mask: &'static WeaponMask,
     pub enough_item: bool,
     pub is_gender: bool,
     pub is_default_job: bool,
@@ -115,26 +120,31 @@ pub struct ChangeJobData {
 pub fn add_job_list_unit(this: &mut ChangeJobData, unit: &Unit, method_info: OptionalMethod) -> bool {
     let result = call_original!(this, unit, method_info);
     if this.job.get_flag().value & 16 != 0 {
-        unsafe {
-            let gender; 
-            if unit_edit_is_enable(unit.edit, None) { gender = unit.edit.gender; }  // Alear
-            else { gender = unit.person.get_gender(); } // Everyone Else 
-            if gender == 2 {  
+        let gender; 
+        if unit.edit.is_enabled() { gender = unit.edit.gender; }  // Alear
+        else { gender = unit.person.get_gender(); } // Everyone Else 
+        if gender == 2 {  
+            this.is_gender = false;
+            return false; 
+        }
+        else {
+            //Male in male only (with female animations)
+            if unit.person.get_flag().value & 32 != 0 { 
                 this.is_gender = false;
                 return false; 
             }
-            else {
-                 //Male in male only (with female animations)
-                if unit.person.get_flag().value & 32 != 0 { 
-                    this.is_gender = false;
-                    return false; 
-                }
-                return result;
-            }
         }
+        return result;
     }
     if unit.person.get_flag().value & 32 != 0 && this.job.get_flag().value & 4 != 0 {
-        if unit.person.get_gender() == 1 { return result; } 
+        if unit.person.get_gender() == 1 { 
+            this.is_gender = true;
+            let job_wm = this.job_weapon_mask.value;
+            if unit.aptitude.value & job_wm == job_wm && (this.is_enough_level && this.enough_item ) {
+                return true;
+            }
+            return result; 
+        } 
         else { 
             this.is_gender = false; 
             return false; 

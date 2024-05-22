@@ -22,7 +22,6 @@ pub fn randomize_person_grow(){
     for y in 0..11 {
         max[y as usize] = max[y as usize] / 5;
         min[y as usize] = min[y as usize] / 5;
-        println!("Person Stat {}: min {}, max {}", y, min[y as usize], max[y as usize]);
     }
     let rng = Random::instantiate().unwrap();
     let seed = GameVariableManager::get_number("G_Random_Seed") as u32;
@@ -79,9 +78,6 @@ pub fn random_grow(){
     }
     else if grow_mode == 2 { randomize_job_grow(); }
     else if grow_mode == 1 { randomize_person_grow(); }
-    else {
-        return;
-    }
 }
 
 pub struct RandomGrowMod;
@@ -114,7 +110,3 @@ impl ConfigBasicMenuItemSwitchMethods for RandomGrowMod {
         }
     }
 }
-
-#[no_mangle]
-extern "C" fn grow_rnd() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_switch::<RandomGrowMod>("Random Growth Mode") } 
-pub fn install_rng_grow() { cobapi::install_global_game_setting(*&grow_rnd ); }

@@ -9,13 +9,14 @@ use engage::{
     hub::access::*,
     random::*,
     mess::*,
-    gamedata::{*, item::RewardData, skill::*, god::*, dispos::*},
+    gamedata::{*, item::RewardData, skill::*, item::*, god::*, dispos::*},
     pad::Pad,
     util::get_instance,
 };
-use engage::gamedata::item::ItemData;
 use std::{fs, fs::File, io::Write};
-use crate::{deploy, person, emblem, item, skill, grow, utils::*};
+use crate::{enums::*, deploy, person, emblem, item, skill, grow, utils::*};
+use crate::emblem::emblem_item::ENGAGE_ITEMS;
+
 use super::{VERSION, CONFIG, DeploymentConfig};
 
 pub static mut LINKED: [i32; 20] = [-1; 20];
@@ -58,7 +59,7 @@ pub fn write_seed_output_file() {
     if GameVariableManager::get_bool("G_Random_Recruitment") {
         writeln!(&mut f, "\n--------------- Person Recruitment Order Randomization ---------------").unwrap();
         let mut count = 0;
-        for x in person::PIDS{
+        for x in PIDS{
             let string = format!("G_R_{}", x);
             let name1 = Mess::get( PersonData::get(x).unwrap().get_name().unwrap() ).get_string().unwrap();
             let new_pid = GameVariableManager::get_string(&string);
@@ -73,7 +74,7 @@ pub fn write_seed_output_file() {
     if emblem_mode != 0 {
         writeln!(&mut f, "\n-------------- Emblems Recruitment Order Randomization ---------------").unwrap();
         let mut count = 0;
-        for x in deploy::EMBLEM_GIDS { 
+        for x in EMBLEM_GIDS { 
             let string = format!("G_R_{}", x);
             let name1 = Mess::get( GodData::get(x).unwrap().mid ).get_string().unwrap();
             let new_gid = GameVariableManager::get_string(&string);
@@ -216,14 +217,14 @@ pub fn write_seed_output_file() {
     if GameVariableManager::get_number("G_Random_God_Mode") >= 2 {
         writeln!(&mut f, "\n--------------- Emblem Engage / Linked Engage Attack Randomization ---------------").unwrap();
         for x in 0..20 {
-            let gid = format!("GID_{}", skill::EMBLEM_ASSET[x as usize]); 
+            let gid = format!("GID_{}", EMBLEM_ASSET[x as usize]); 
             let line = god_engage_random_str(&gid);
             writeln!(&mut f, "{}", line).unwrap();
         }
     }
     writeln!(&mut f, "\n--------------- Emblem Engrave Data ---------------").unwrap();
     for x in 0..20 {
-        let gid = format!("GID_{}", skill::EMBLEM_ASSET[x as usize]); 
+        let gid = format!("GID_{}", EMBLEM_ASSET[x as usize]); 
         let god = GodData::get(&gid).unwrap();
         let line = format!("* {} - \t{}: {}, {}: {}, {}: {}, {}: {}, {}: {}, {}: {}", 
         mess_get(god.mid), 
@@ -247,20 +248,20 @@ pub fn write_seed_output_file() {
         _ => { writeln!(&mut f, "* Emblem Sync Data: No Randomization").unwrap(); },
     }
     let mut index: usize = 0;
-    for x in skill::EMBLEM_ASSET {
-        if *x == "ディミトリ" { break; }
+    for x in EMBLEM_ASSET {
+        if x == "ディミトリ" { break; }
         let growth_id = format!("GGID_{}", x);
         let level_data = GodGrowthData::get_level_data(&growth_id).unwrap();
         let god_id = format!("GID_{}", x);
         let engage_skill = level_data[0].engage_skills.list.item[0].get_skill().unwrap();
-        let god = GodData::get(*x).unwrap(); 
+        let god = GodData::get(x).unwrap(); 
         let god_grow = GodGrowthData::try_get_from_god_data(god).unwrap();
         writeln!(&mut f, "\n*** {} Engage Skill: {}, Engage Atk/Link: {}\n", get_emblem_name(&god_id), get_skill_name(engage_skill), god_engage_random_str(&god_id)).unwrap();
-        let weapons_str = item::ENGAGE_ITEMS.lock().unwrap().print(index as i32, 0);
+        let weapons_str = ENGAGE_ITEMS.lock().unwrap().print(index as i32, 0);
         writeln!(&mut f, "\t* Engage Weapons 1: {}", weapons_str).unwrap();
-        let weapons_str2 = item::ENGAGE_ITEMS.lock().unwrap().print(index as i32, 1);
+        let weapons_str2 = ENGAGE_ITEMS.lock().unwrap().print(index as i32, 1);
         writeln!(&mut f, "\t* Engage Weapons 2: {}", weapons_str2).unwrap();
-        let weapons_str3 = item::ENGAGE_ITEMS.lock().unwrap().print(index as i32, 2);
+        let weapons_str3 = ENGAGE_ITEMS.lock().unwrap().print(index as i32, 2);
         writeln!(&mut f, "\t* Engage Weapons 3: {}\n", weapons_str3).unwrap();
         for y in 1..level_data.len() {
             writeln!(&mut f, "\t* {} Lv. {} Stats: {}", get_emblem_name(&god_id), y, stats_from_skill_array(level_data[y as usize].synchro_skills)).unwrap();
@@ -359,7 +360,7 @@ pub fn start_new_game(){
     skill::reset_skills();
     skill::randomize_skills();
     grow::random_grow();
-    skill::randomized_god_data();
+    crate::emblem::emblem_skill::randomized_god_data();
     randomize_engage_links();
     item::randomize_well_rewards();
     write_seed_output_file();
@@ -424,8 +425,8 @@ pub fn reset_gamedata() {
     ChapterData::unload();
     ChapterData::load_data();
 
-    item::ENGAGE_ITEMS.lock().unwrap().reset();
-    item::ENGAGE_ITEMS.lock().unwrap().commit();
+    ENGAGE_ITEMS.lock().unwrap().reset();
+    ENGAGE_ITEMS.lock().unwrap().commit();
 
     //  Reset God Exp bypass check
     Patch::in_text(0x01dc9f8c).bytes(&[0xb5, 0xd9, 0x15, 0x94]).unwrap();
@@ -469,11 +470,12 @@ pub fn randomize_stuff() {
             person::randomize_person();
             skill::randomize_skills();
             grow::random_grow();
-            skill::randomized_god_data();
+            crate::emblem::emblem_skill::randomized_god_data();
             randomize_engage_links();
             item::randomize_well_rewards();
             write_seed_output_file();
-            if ( GameVariableManager::get_bool("G_Cleared_M002") && GameVariableManager::get_bool("G_Random_Job") && GameVariableManager::get_bool("G_Lueur_Random") ) && ( GameVariableManager::get_number("G_Liberation_Type") != 0 ) {
+            if ( GameVariableManager::get_bool("G_Cleared_M002") && GameVariableManager::get_bool("G_Random_Job") && 
+                GameVariableManager::get_bool("G_Lueur_Random") ) && ( GameVariableManager::get_number("G_Liberation_Type") != 0 ) {
                 let liberation = ItemData::get_mut("IID_リベラシオン").unwrap();
                 let l_type = GameVariableManager::get_number("G_Liberation_Type") as u32;
                 liberation.kind = l_type;
@@ -560,11 +562,11 @@ fn god_engage_random_str(gid: &str) -> String {
         string3 = Mess::get( PersonData::get(&pid.get_string().unwrap()).unwrap().get_name().unwrap()).get_string().unwrap(); 
     }
     else {
-        let found = deploy::EMBLEM_GIDS.iter().position(|&r| r == gid); 
+        let found = EMBLEM_GIDS.iter().position(|&r| r == gid); 
         if found.is_some() {
             unsafe {
                 if LINKED[ found.unwrap() ] != -1 {
-                    let pid = person::PIDS[ LINKED[ found.unwrap() ] as usize ];
+                    let pid = PIDS[ LINKED[ found.unwrap() ] as usize ];
                     string3 = Mess::get( PersonData::get(&pid).unwrap().get_name().unwrap()).get_string().unwrap(); 
                 }
             }
@@ -595,18 +597,18 @@ pub fn randomize_engage_links() {
             person_count = 36;
         }
         for x in 0..emblem_count {
-            let gid = format!("GID_{}", skill::EMBLEM_ASSET[x as usize]);
+            let gid = format!("GID_{}", EMBLEM_ASSET[x as usize]);
             let god = GodData::get(&gid).unwrap();
             let mut index: usize = rng.get_value(person_count as i32) as usize;
-            let mut pid = person::PIDS[index];
+            let mut pid = PIDS[index];
             while pid_set[index] || GodData::try_get_link(PersonData::get(&pid).unwrap()).is_some()  {
                 index = rng.get_value(person_count as i32) as usize;
-                pid = person::PIDS[index];
+                pid = PIDS[index];
             }
             LINKED[ x as usize ] = index as i32;
             god.on_complete();
             let person = PersonData::get(&pid).unwrap();
-            dic.add(person::PIDS[index].into(), god);
+            dic.add(PIDS[index].into(), god);
             person.on_complete();
             pid_set[index] = true;
 
@@ -649,10 +651,11 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalMenu {
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<skill::RandomSkillMod>("Randomize Skills"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<item::RandomItemMod>("Randomize Obtained Items"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<item::RandomGiftMod>("Reward/Gift Item Settings"));
-                config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::shop::RandomShopMod>("Shop Settings"));
-                config_menu.add_item(ConfigBasicMenuItem::new_switch::<skill::RandomGodMod>("Randomize Emblem Data"));       
-                config_menu.add_item(ConfigBasicMenuItem::new_switch::<skill::RandomSynchoMod>("Randomize Emblem Sync Data"));
-                config_menu.add_item(ConfigBasicMenuItem::new_switch::<item::RandomEngageWepMod>("Engage Items/Weapons"));
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::shop::RandomShopMod>("Shop Setting"));
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::shop::RandomHubItemMod>("Exploration Items"));
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<emblem::RandomGodMod>("Randomize Emblem Data"));       
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<emblem::RandomSynchoMod>("Randomize Emblem Sync Data"));
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<emblem::RandomEngageWepMod>("Engage Items/Weapons"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<emblem::RandomEmblemLinkMod>("Engage+ Links"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::bgm::RandomBGMMod>("Randomize Map BGM")); 
                 BasicMenuResult::se_cursor()

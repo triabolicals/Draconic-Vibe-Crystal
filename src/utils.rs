@@ -3,10 +3,10 @@ use engage::{
     random::*,
     force::*,
     mess::*,
-    gamedata::{*, skill::*},
+    gamedata::{*, item::*, skill::*},
 };
 use skyline::patching::Patch;
-use crate::skill::STAT_BONUS;
+use crate::emblem::emblem_skill::STAT_BONUS;
 
 // Getting Player's name for file name
 pub fn get_player_name() -> String {
@@ -33,6 +33,19 @@ pub fn get_person_name(person: &PersonData) -> String {
 pub fn get_skill_name(skill: &SkillData) -> String {
     if skill.name.is_some() { return format!("{} ({})", mess_get(skill.name.unwrap()), skill.sid.get_string().unwrap()); }
     else {  return format!(" --- ({})", skill.sid.get_string().unwrap()); }
+}
+pub fn get_item_name(skill: &ItemData) -> String {
+    unsafe {  
+        if is_null_empty(skill.name, None) { 
+            return format!(" --- ({})", skill.iid.get_string().unwrap()); 
+        }
+    }
+    
+    let item_name = Mess::get(skill.name ).get_string().unwrap();
+    if item_name.len() != 0 { return format!("{} ({})", item_name, skill.iid.get_string().unwrap()); }
+    else {
+        return format!(" --- ({})", skill.iid.get_string().unwrap());
+    }
 }
 
 pub fn sid_array_string(sids: &Array<&Il2CppString> ) -> String {
