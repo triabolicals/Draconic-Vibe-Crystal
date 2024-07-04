@@ -1,15 +1,24 @@
 use unity::prelude::*;
+use skyline::patching::Patch;
 use engage::{
     menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}},
     gamevariable::*,
     gameuserdata::*,
     force::*,
     mess::*,
-    gamedata::{unit::*, dispos::ChapterData, *},
+    proc::ProcInst,
+    random::*,
+    gamedata::{unit::*, dispos::ChapterData, skill::*, *},
 };
+use unity::system::Dictionary;
 use engage::gamedata::dispos::DisposData;
+use engage::gamedata::item::ItemData;
+use engage::gamedata::god::RingData;
+use unity::system::List;
+use engage::godpool::GodPool;
 use super::CONFIG;
 use crate::utils::*;
+use crate::enums::*;
 
 pub const EMBLEMS: &[&str] = &[ "GID_M010_敵リン", "GID_M007_敵ルキナ", "GID_M014_敵ベレト", "GID_M024_敵マルス", "GID_M017_敵シグルド", "GID_M017_敵セリカ", "GID_M019_敵ミカヤ", "GID_M019_敵ロイ", "GID_M017_敵リーフ", "GID_E006_敵エーデルガルト", "GID_E006_敵クロム", "GID_E006_敵カミラ", "GID_E006_敵セネリオ", "GID_E006_敵ヴェロニカ", "GID_E006_敵ヘクトル", "GID_E006_敵チキ"];
 pub const ENGAGE: &[&str] = &[ "AI_AT_EngageAttack", "AI_AT_EngageAttack", "AI_AT_EngageDance", "AI_AT_EngageAttack", "AI_AT_EngagePierce", "AI_AT_EngageAttack", "AI_AT_AttackToHeal", "AI_AT_EngageAttack", "AI_AT_EngageAttackNoGuard", "AI_AT_EngageClassPresident", "AI_AT_EngageAttack", "AI_AT_EngageCamilla", "AI_AT_EngageAttack", "AI_AT_EngageSummon", "AI_AT_EngageWait", "AI_AT_EngageBlessPerson"];
@@ -50,7 +59,7 @@ pub fn calculate_player_cap() -> i32 {
     let mut unit_name: [&Il2CppString; 10] = [" N/A".into(); 10];
     GameVariableManager::make_entry_norewind("G_Player_Rating_Average", 0);
     for force in 0..max_cap.len() {
-        let force_type: [ForceType; 4] = [ForceType::Player, ForceType::Absent, ForceType::Dead, ForceType::Lost];
+        let force_type: [ForceType; 7] = [ForceType::Player, ForceType::Absent, ForceType::Dead, ForceType::Lost, ForceType::Enemy, ForceType::Ally, ForceType::Temporary];
         for ff in force_type {
             let force_iter = Force::iter(Force::get(ff).unwrap());
             let i: usize = force.into();
@@ -60,13 +69,13 @@ pub fn calculate_player_cap() -> i32 {
                 if force == 0 {
                     if max_cap[i] < cur {
                         max_cap[i] = cur;
-                        unit_name[i] = unit.person.name; 
+                        unit_name[i] = unit.person.name.unwrap();
                     }
                 }
                 else {
                     if max_cap[i] < cur && cur < max_cap[i-1] {
                         max_cap[i] = cur;
-                        unit_name[i] = unit.person.name; 
+                        unit_name[i] = unit.person.name.unwrap();
                     }
                 }
             }
@@ -82,6 +91,33 @@ pub fn calculate_player_cap() -> i32 {
     println!("{} unit Average is {}", count_average, average);
     GameVariableManager::set_number("G_Player_Rating_Average", average);
     average
+}
+
+#[skyline::from_offset(0x01a3c3b0)]
+fn unit_learn_job_skill(this: &Unit, job: &JobData, method_info: OptionalMethod) -> Option<&'static SkillData>;
+#[skyline::from_offset(0x01a3c290)]
+fn unit_learn_job(this: &Unit, method_info: OptionalMethod) -> Option<&'static SkillData>; 
+#[unity::from_offset("App", "Unit", "set_LearnedJobSkill")]
+fn unit_set_learned_job_skill(this: &Unit, value: Option<&SkillData>, method_info: OptionalMethod);
+
+pub fn update_learn_skills() {
+    let force_type: [ForceType; 7] = [ForceType::Player, ForceType::Absent, ForceType::Dead, ForceType::Lost, ForceType::Enemy, ForceType::Ally, ForceType::Temporary];
+    for ff in force_type {
+        let force_iter = Force::iter(Force::get(ff).unwrap());
+        for unit in force_iter {
+            unit_update_learn_skill(unit);
+        }
+    }
+}
+
+pub fn unit_update_learn_skill(unit: &Unit) {
+    unsafe {
+        if unit.learned_job_skill.is_some() { unit_set_learned_job_skill(unit, None, None); 
+            let skill = unit_learn_job_skill(unit, unit.job, None);
+            if skill.is_some() { unit_set_learned_job_skill(unit, skill, None); }
+        }
+        else { unit_learn_job(unit, None); }
+    }
 }
 
 pub fn unit_cap_total(this: &Unit, with_hp: bool) -> i32 {
@@ -272,6 +308,13 @@ pub fn get_average_level(difficulty: i32, sortie_count: i32, method_info: Option
 #[skyline::from_offset(0x024f2c10)]
 pub fn get_sortie_unit_count(method_info: OptionalMethod) -> i32;
 
+pub fn get_difficulty_adjusted_average_level() -> i32 {
+    unsafe {
+        if get_sortie_unit_count(None) == 0 { return get_average_level(1, 8, None); }
+        else { return get_average_level(1, get_sortie_unit_count(None), None); }
+    }
+}
+
 pub fn str_start_with(this: &Il2CppString, value: &str) -> bool { unsafe { string_start_with(this, value.into(), None) } }
 
 #[skyline::from_offset(0x023349c0)]
@@ -286,7 +329,6 @@ pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
 
     unsafe {
         let jobname = unit.person.get_job().unwrap().name.get_string().unwrap();
-
         if emblem >= EMBLEMS.len() { return false; }
         if GodData::get(EMBLEMS[emblem].into()).is_none() { return false; }
         let job = unit.get_job();
@@ -340,10 +382,6 @@ pub fn adjust_emblem_unit_ai(unit: &Unit, data: &DisposData, emblem_index: usize
         if diff == 2 { data.set_ai_attack_value("2,2".into()); }
         else { data.set_ai_attack_value("3,3".into()); }
         if EMBLEMS[emblem_index] == "GID_M017_敵カムイ" { data.set_ai_attack_value("255, 255, 3, 3".into());  }
-
         set_unit_ai_dispos(unit, data, None);
-
     }
-
-
 }

@@ -24,8 +24,13 @@ impl RandomItem {
 impl ShopRandomizer {
     pub fn new() -> Self {  Self { pool: Vec::new(), } }
     pub fn reset(&mut self) {
-        for x in &mut self.pool {
-            if !x.is_inf { x.used = false; }
+        let length = self.pool.len();
+        for x in 0..length {
+            let entry = &mut self.pool[x];
+            if !entry.is_inf { entry.used = false; }
+            if ItemData::try_index_get(entry.index).unwrap().usetype == 7 { entry.used = true;  }
+            if ItemData::try_index_get(entry.index).unwrap().usetype == 13 { entry.used = true;  }
+            if ItemData::try_index_get(entry.index).unwrap().usetype == 21 { entry.used = true;   }
         }
     }
     pub fn flag_item(&mut self, iid: &Il2CppString, is_inf: bool) {
@@ -158,14 +163,19 @@ pub fn randomize_shop_data() {
             continue; 
         } 
         if item.usetype == 0 {
-            if item.kind >= 14 || item.kind <= 16 { fm_rzr.add_list(item); }   
+            if item.kind >= 14 && item.kind <= 16 { 
+                fm_rzr.add_list(item);
+                ishop_rzr.add_list(item);
+                continue; 
+            } 
+            if item.kind >= 17 { fm_rzr.add_list(item); continue; }
+            ishop_rzr.add_list(item);
             continue;
         }
         ishop_rzr.add_list(item);
     }
     let shop_list = ItemShopData::get_list_mut().unwrap();
     let length = shop_list.len();
-
 // ItemShop Random Item Additions
     // Getting inf stock items first to remove them from the list
     for x in 0..length  {
@@ -191,9 +201,10 @@ pub fn randomize_shop_data() {
             new_data.iid = item.iid;
             match item.usetype {
                 5|6|7|15|18|21|27 => { new_data.stock = 1; }
-                8|9|11|23|24 => { new_data.stock = 1 + rng.get_value(3); }
-                _ => { new_data.stock = 1 + rng.get_value(5); }
+                8|9|11|13|23|24 => { new_data.stock = 2 + rng.get_value(3); }
+                _ => { new_data.stock = 3 + rng.get_value(5); }
             }
+            if new_data.stock < 0 { new_data.stock = 1; }
             slist.add(new_data);
         }
     }
@@ -305,7 +316,7 @@ pub fn randomize_hub_random_items(){
             if iid == "IID_てつの晶石" || iid == "IID_はがねの晶石" || iid == "IID_ぎんの晶石" { // Ore Check
                 continue; 
             }
-            if str_contains(list.parent.list[y].iid, "IID_") || iid == "なし" {
+            if str_contains(list.parent.list[y].iid, "IID_") {
                 list.parent.list[y].iid = crate::item::random_item(2, false);
             }
         }

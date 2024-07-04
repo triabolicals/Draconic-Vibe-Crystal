@@ -21,6 +21,20 @@ use super::{VERSION, CONFIG, DeploymentConfig};
 
 pub static mut LINKED: [i32; 20] = [-1; 20];
 pub static mut CURRENT_SEED: i32 = -1;
+
+pub fn tutorial_check(){
+    let list = GameVariableManager::find_starts_with("G_解説_");
+    for i in 0..list.len() {
+        let string = list[i].get_string().unwrap();
+        if string == "G_解説_TUTID_クラスチェンジ" {
+            GameVariableManager::set_bool(&string, true);
+            return;
+        }
+        GameVariableManager::set_bool(&string, true);
+
+    }
+}
+
 pub fn write_seed_output_file() {
     let seed = GameVariableManager::get_number("G_Random_Seed");
     let _ = fs::create_dir_all("sd:/Draconic Vibe Crystal/");
@@ -28,6 +42,7 @@ pub fn write_seed_output_file() {
     let mut f = File::options().create(true).write(true).truncate(true).open(filename).unwrap();
     writeln!(&mut f, "------------- Triabolical Randomization Settings - Version {} -------------", VERSION).unwrap();
     if GameVariableManager::get_bool("G_Ironman") { writeln!(&mut f, "* Ironman Mode").unwrap(); }
+    if GameVariableManager::get_number("G_Continuous") != 0 { writeln!(&mut f, "* Continuious Mode").unwrap(); }
     writeln!(&mut f, "* Seed: {}", seed).unwrap();
     writeln!(&mut f, "* Random Recruitment: {}", GameVariableManager::get_bool("G_Random_Recruitment")).unwrap();
     let emblem_mode =  GameVariableManager::get_number("G_Emblem_Mode");
@@ -197,6 +212,7 @@ pub fn write_seed_output_file() {
             writeln!(&mut f, "* {} ({})\t {}", name, sid, personal).unwrap();
         }
     }
+    /*
     if GameVariableManager::get_number("G_Random_Item") != 0 {
         writeln!(&mut f, "\n--------------- Well Item Exchange: Item / Rate ---------------").unwrap();
         let reward_list = ["アイテム交換_期待度１", "アイテム交換_期待度２", "アイテム交換_期待度３", "アイテム交換_期待度４", "アイテム交換_期待度５" ];
@@ -214,6 +230,7 @@ pub fn write_seed_output_file() {
             count += 1;
         }
     }
+    */
     if GameVariableManager::get_number("G_Random_God_Mode") >= 2 {
         writeln!(&mut f, "\n--------------- Emblem Engage / Linked Engage Attack Randomization ---------------").unwrap();
         for x in 0..20 {
@@ -291,6 +308,7 @@ pub fn write_seed_output_file() {
         if string_start_with(result_string, "GID_".into(), None) {
             if GameVariableManager::get_number("G_Emblem_Mode") == 0 { return result; }
             if GameUserData::get_chapter().cid.get_string().unwrap() == "CID_M026" { return result; } //Do not shuffle emblems in endgame
+            if crate::utils::str_contains(GameUserData::get_chapter().cid, "CID_S0") { return result; }
             let gid = result_string.get_string().unwrap();
             let string = format!("G_R_{}", gid);
             let new_gid = GameVariableManager::get_string(&string);
@@ -342,6 +360,7 @@ pub fn start_new_game(){
         GameVariableManager::make_entry("G_Ironman", 1);
         crate::ironman::ironman_code_edits();
     }
+    GameVariableManager::make_entry("G_Continuous", CONFIG.lock().unwrap().continuous);
     crate::shop::randomize_shop_data();
     if seed == 0 {  GameVariableManager::make_entry("G_Random_Seed", get_random_number_for_seed() as i32); }
     else { GameVariableManager::make_entry("G_Random_Seed", CONFIG.lock().unwrap().seed as i32); }
@@ -360,6 +379,7 @@ pub fn start_new_game(){
     skill::reset_skills();
     skill::randomize_skills();
     grow::random_grow();
+    tutorial_check();
     crate::emblem::emblem_skill::randomized_god_data();
     randomize_engage_links();
     item::randomize_well_rewards();
@@ -368,6 +388,9 @@ pub fn start_new_game(){
     GameVariableManager::set_bool("G_Cleared_M000", true);
     GameUserData::set_chapter(m001);
     unsafe { CURRENT_SEED = GameVariableManager::get_number("G_Random_Seed"); }
+    if CONFIG.lock().unwrap().random_job != 0 {
+        crate::asset::unlock_royal_classes();
+    }
 }
 
 pub fn reset_gamedata() {
@@ -384,7 +407,6 @@ pub fn reset_gamedata() {
     let jobs = JobData::get_list_mut().unwrap();
     for j in 0..jobs.len() { jobs[j].on_completed(); } 
 
-    crate::asset::unlock_royal_classes();
     PersonData::unload();
     PersonData::load();
 
@@ -428,14 +450,13 @@ pub fn reset_gamedata() {
     ENGAGE_ITEMS.lock().unwrap().reset();
     ENGAGE_ITEMS.lock().unwrap().commit();
 
-    //  Reset God Exp bypass check
-    Patch::in_text(0x01dc9f8c).bytes(&[0xb5, 0xd9, 0x15, 0x94]).unwrap();
-
+    Patch::in_text(0x01dc9f8c).bytes(&[0xb5, 0xd9, 0x15, 0x94]).unwrap();   //  Reset God Exp bypass check for Engage+ Links
+    Patch::in_text(0x01a39fe4).bytes(&[0x68,0x00, 0x00, 0xb4]).unwrap();    // Reset SP = EXP 
+    Patch::in_text(0x01d76320).bytes(&[0xfd, 0x7b, 0xbd, 0xa9]).unwrap();   // Revert Back menu item in Sortie
+    Patch::in_text(0x01d76324).bytes(&[0xf6, 0x57, 0x01, 0xa9]).unwrap(); 
     unsafe {
         CURRENT_SEED = -1; 
-        for x in 0..20 { 
-            LINKED[x as usize] = -1;
-        }
+        for x in 0..20 {  LINKED[x as usize] = -1; }
     }
 }
 
@@ -462,12 +483,15 @@ pub fn randomize_stuff() {
             if CONFIG.lock().unwrap().random_engage_weapon { GameVariableManager::make_entry("G_Random_Engage_Weps", 1); }
         }
     }
+    tutorial_check();
     unsafe {
         if GameVariableManager::get_number("G_Random_Seed") != CURRENT_SEED  {
+            if GameVariableManager::get_bool("G_Random_Job") {  crate::asset::unlock_royal_classes(); }
             println!("Randomized Stuff with Save File Seed {}", GameVariableManager::get_number("G_Random_Seed"));
             crate::shop::randomize_shop_data();
             emblem::randomize_emblems();
             person::randomize_person();
+            //crate::asset::adjust_person_faces();
             skill::randomize_skills();
             grow::random_grow();
             crate::emblem::emblem_skill::randomized_god_data();
@@ -539,6 +563,7 @@ pub fn randomize_stuff() {
                 }
             }
         }
+
     }
 }
 
@@ -611,7 +636,6 @@ pub fn randomize_engage_links() {
             dic.add(PIDS[index].into(), god);
             person.on_complete();
             pid_set[index] = true;
-
         }
     }
 }
@@ -640,6 +664,7 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalMenu {
 
                 config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose as _).unwrap();
                 config_menu.full_menu_item_list.clear();
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::continuous::ContiniousMode>("Continuous Mode"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<deploy::DeploymentMod>("Deployment Mode"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<deploy::EmblemMod>("Emblem Deployment Mode"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::ironman::IronmanMod>("Ironman Mode"));

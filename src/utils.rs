@@ -218,17 +218,28 @@ pub fn return_true(address: usize){
     let _ = Patch::in_text(address).bytes(&[0x20,0x00, 0x80, 0x52]).unwrap();
     let _ = Patch::in_text(address+0x4).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
  }
+ pub fn return_4(address: usize){
+    let _ = Patch::in_text(address).bytes(&[0x80,0x00, 0x80, 0x52]).unwrap();
+    let _ = Patch::in_text(address+0x4).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
+ }
 
 pub fn dlc_check() -> bool {
     unsafe {
         if has_content(0, None) {
-            mov_1(0x0253d7c0);
-            mov_1(0x0253d8b0);
+            //mov_1(0x0253d7c0);
+            //mov_1(0x0253d8b0);
             return true;
         }
             return false;
     }
+    
 }
+pub fn clamp_value(v: i32, min: i32, max: i32) -> i32 {
+    unsafe { clamp(v, min, max, None)  }
+}
+#[skyline::from_offset(0x032dfb20)]
+pub fn clamp(value: i32, min: i32, max: i32, method_info: OptionalMethod) -> i32;
+
 //
 // Unity Functions from Engage
 //DLC Check 

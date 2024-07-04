@@ -40,14 +40,57 @@ pub fn emblem_selection_menu_enable(enabled: bool) {
 }
 //Hook to function that creates the sortie deploy positions to do deployment stuff
 
+pub fn get_emblem_paralogue_level() {
+    let cid = GameUserData::get_chapter().get_prefixless_cid();
+    let mut emblem_index = 0;
+    let new_emblem_index;
+    // Find indices
+    GameVariableManager::make_entry("G_Paralogue_Level", 0);
+    GameVariableManager::set_number("G_Paralogue_Level", 0);
+    loop {
+        if crate::utils::str_contains(cid, EMBELM_PARA[emblem_index as usize]) {
+            unsafe {
+                let found = crate::emblem::RANDOMIZED_INDEX.iter().position(|y| *y == emblem_index);
+                if found.is_some() { 
+                    new_emblem_index = found.unwrap(); 
+                    break;
+                }
+                else { return; }
+            }
+        }
+        else {
+            emblem_index += 1;
+        }
+        if emblem_index >= 12 { return; }
+    }
+    let level_difference;
+    if new_emblem_index >= 12 {
+        let party_average = crate::autolevel::get_difficulty_adjusted_average_level();
+        println!("Party Average: {}", party_average);
+        level_difference = party_average - 2 - PARA_LEVEL[emblem_index as usize];
+        if level_difference >= 0 {
+            GameVariableManager::set_number("G_Paralogue_Level", 0);
+        }
+        else {
+            GameVariableManager::set_number("G_Paralogue_Level", level_difference);
+        }
+
+    }
+    else {
+        level_difference = PARA_LEVEL[ new_emblem_index as usize ] - PARA_LEVEL[emblem_index as usize];
+        GameVariableManager::set_number("G_Paralogue_Level", level_difference);
+    }
+    println!("Paralogue Level Difference: {} | {}", level_difference, GameVariableManager::get_number("G_Paralogue_Level"));
+}
+
 
 #[unity::hook("App", "MapDispos", "CreatePlayerTeam")]
 pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
     //check_terrain();
-    println!("Deploy changed start");
     if GameVariableManager::get_bool("G_Random_Recruitment"){
         person::change_map_dispos();
     }
+
     let absent_force = Force::get(ForceType::Absent).unwrap();
     if GameVariableManager::get_bool("G_Random_Job") && !GameVariableManager::get_bool("G_Lueur_Random") {
         let hero_unit = absent_force.get_hero_unit();
@@ -100,6 +143,10 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
     }
 
     call_original!(group, method_info);
+
+    if crate::utils::str_contains(GameUserData::get_chapter().cid, "CID_S0") && GameVariableManager::get_number("G_Emblem_Mode") != 0 {
+        get_emblem_paralogue_level();
+    }
     if !GameVariableManager::get_bool("G_Cleared_M003") {return; }
     let player_force = Force::get(ForceType::Player).unwrap();
 

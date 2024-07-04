@@ -36,11 +36,13 @@ pub fn get_bgm_pool() {
 }
 pub fn randomize_bgm_map() {
     if !CONFIG.lock().unwrap().random_map_bgm { return; }
+    if GameUserData::is_encount_map() { return; }
     let rng = Random::get_game();
     let size = BGM_POOL.lock().unwrap().len() as i32;
     let string1 = (&BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize]).into();
     let string2 = (&BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize]).into();
     let string3 = (&BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize]).into();
+
     let chapter = GameUserData::get_chapter();
     unsafe {
         set_phase_bgm(string1, string2, string3, None);

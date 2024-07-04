@@ -7,6 +7,7 @@ use engage::{
 };
 use super::CONFIG;
 use crate::{utils::*, enums::*};
+use std::sync::Mutex;
 
 pub mod emblem_skill;
 pub mod emblem_item;
@@ -14,6 +15,7 @@ pub mod emblem_item;
 pub static mut RANDOMIZED_INDEX: [i32; 38] = [0; 38];
 pub static mut CURRENT_SEED: i32 = -1;
 
+pub static RECOMMENED_LVL: Mutex<[u8; 12]> = Mutex::new([0; 12]);
 pub fn emblem_gmap_spot_adjust(){
     if GameVariableManager::get_number("G_Emblem_Mode") == 0 { return; }
     unsafe {
@@ -50,8 +52,54 @@ pub fn emblem_gmap_spot_adjust(){
                 println!("Paralogue CID_{}: {} is unlocked by G_Cleared_{}: {}", cid, GameVariableManager::get_number(&gmap_spot_flag), unlock_cid, GameVariableManager::get_bool(&unlock_flag) );
             }
         }
+        for x in 0..12 {
+            let cid_index = RANDOMIZED_INDEX [ x as usize];
+            let chapter = ChapterData::get_mut(&format!("CID_{}", EMBELM_PARA[cid_index as usize]));
+            if chapter.is_none() { continue; }  //Edelgard 
+            if cid_index < 12 {
+                chapter.unwrap().set_recommended_level( RECOMMENED_LVL.lock().unwrap()[x as usize]);
+                println!("{} set to Level {}", EMBELM_PARA[cid_index as usize], EMBELM_PARA[x as usize] );
+            }
+            else {
+                let chapter2 = ChapterData::get_mut(&format!("CID_{}", EMBELM_PARA[x as usize]));
+                let average = crate::autolevel::get_difficulty_adjusted_average_level() as u8;
+                if chapter2.is_none() { continue; }
+                if average >= RECOMMENED_LVL.lock().unwrap()[x as usize] {
+                    chapter2.unwrap().set_recommended_level(RECOMMENED_LVL.lock().unwrap()[x as usize]);
+                    println!("{} set to Level {}", EMBELM_PARA[x as usize], RECOMMENED_LVL.lock().unwrap()[x as usize]);
+                }
+                else {
+                    chapter2.unwrap().set_recommended_level(average);
+                    println!("{} set to Level {}", EMBELM_PARA[x as usize], average);
+                }
+            }
+        }
+        for x in 12..19 {
+            let cid_index = RANDOMIZED_INDEX [ x as usize];
+            let chapter = ChapterData::get_mut(&format!("CID_{}", EMBELM_PARA[cid_index as usize]));
+            if chapter.is_none() { continue; } 
+            if cid_index < 12 {
+                let average = crate::autolevel::get_difficulty_adjusted_average_level() as u8;
+                if average >= RECOMMENED_LVL.lock().unwrap()[cid_index as usize] {
+                    chapter.unwrap().set_recommended_level(  RECOMMENED_LVL.lock().unwrap()[cid_index as usize] );
+                    println!("{} - {} set to Level {}", x, EMBELM_PARA[cid_index as usize],  RECOMMENED_LVL.lock().unwrap()[cid_index as usize]);
+                }
+                else {
+                    chapter.unwrap().set_recommended_level(average);
+                    println!("{} - {} set to Level {}", x, EMBELM_PARA[cid_index as usize], average);
+                }
+            }
+        }
     }
 }
+pub fn get_recommended_paralogue_levels() {
+    for x in 0..12 {
+        let cid = format!("CID_{}", EMBELM_PARA[x]);
+        let level = ChapterData::get(&cid).unwrap().get_recommended_level();
+        RECOMMENED_LVL.lock().unwrap()[x] = level;
+    }
+}
+
 pub fn randomize_emblems() {
     unsafe { 
         for i in 0..19 { 
@@ -79,7 +127,7 @@ pub fn randomize_emblems() {
             }
         }
     }
-    if GameVariableManager::get_number("G_Emblem_Mode") == 0 {         println!("Emblem mode: 0"); return; }
+    if GameVariableManager::get_number("G_Emblem_Mode") == 0 { return; }
     else if GameVariableManager::get_number("G_Emblem_Mode") == 1 {
         unsafe {
             println!("Emblem mode: 1");
@@ -114,6 +162,7 @@ pub fn randomize_emblems() {
                 }
             }
         }
+        set_m022_emblem_assets();
     }
     else if GameVariableManager::get_number("G_Emblem_Mode") == 2 {
         unsafe { 
@@ -130,9 +179,40 @@ pub fn randomize_emblems() {
                 }
             }
         }
+        set_m022_emblem_assets();
     }
 }
-
+pub fn set_m022_emblem_assets() {
+    for x in 1..12 {
+        let pid = format!("PID_M022_紋章士_{}", EMBLEM_ASSET[x]);
+        let person = PersonData::get_mut(&pid).unwrap();
+        let replacement_gid = GameVariableManager::get_string(&format!("G_R_GID_{}", EMBLEM_ASSET[x])).get_string().unwrap();
+        let mut index = x;
+        for y in 0..19 {
+            if EMBLEM_GIDS[y] == replacement_gid {
+                index = y;
+                break;
+            } 
+        }
+        let jid = format!("JID_紋章士_{}", EMBLEM_ASSET[index]);
+        let mut mpid = format!("MPID_{}", RINGS[index]);
+        let job = JobData::get(&jid).unwrap();
+        let icon_name;
+        let gender;
+        if job.unit_icon_id_m.is_some() {
+            gender = 1;
+            icon_name = job.unit_icon_id_m.unwrap();
+        }
+        else {
+            gender = 2;
+            icon_name = job.unit_icon_id_f.unwrap();
+        }
+        //person.unit_icon_id = Some(icon_name);
+        person.gender = gender;
+        person.name = Some(mpid.into());
+        person.jid = Some(jid.into());
+    }
+}
 pub struct RandomEmblemMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomEmblemMod {
     fn init_content(_this: &mut ConfigBasicMenuItem){}

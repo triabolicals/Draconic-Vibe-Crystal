@@ -6,6 +6,7 @@ use engage::{
     mess::*,
     gamedata::{*, skill::*, GodData, god::*},
 };
+
 use std::sync::Mutex;
 use super::CONFIG;
 use crate::{enums::*, person, utils::*};
@@ -48,7 +49,7 @@ pub fn print_bad_inherit_skill() {
     for x in 0..skill_list.len() {
         let skill = &skill_list[x];
         let flag = skill.get_flag();
-        if ( skill.get_inheritance_cost() != 0 && skill.get_inheritance_sort() == 0 ) &&  ( flag & 1 == 0 ) { // ( flag & 1 == 0 ) {
+        if ( skill.get_inheritance_cost() != 0 && skill.get_inheritance_sort() == 0 ) &&  ( flag & 1 == 0 ) { 
             if inherit_from_gods.iter().find(|index| x == **index).is_none() {
                 skill.set_inherit_cost(0);
             }

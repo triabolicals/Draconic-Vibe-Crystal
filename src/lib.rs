@@ -4,7 +4,9 @@ use cobapi::{Event, SystemEvent};
 use std::sync::{Mutex, LazyLock};
 use serde::{Deserialize, Serialize};
 use skyline::patching::Patch;
-
+use engage::gamedata::PersonData;
+use engage::gamedata::Gamedata;
+use engage::gamedata::JobData;
 pub mod deploy;
 pub mod emblem;
 pub mod item;
@@ -19,8 +21,9 @@ pub mod asset;
 pub mod shop;
 pub mod ironman;
 pub mod enums;
+pub mod continuous;
 
-pub const VERSION: &str = "1.9.0";
+pub const VERSION: &str = "1.10.3";
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct DeploymentConfig {
@@ -40,11 +43,13 @@ pub struct DeploymentConfig {
     engrave_upper_score: i32,
     engage_link: bool,
     exploration_items: i32,
+    replaced_item_price: i32,
     autolevel: bool,
     iron_man: bool,
     deployment_type: i32,
     emblem_deployment: i32,
     emblem_mode: i32,
+    continuous: i32,
     random_recruitment: bool,
     random_job: i32,
     random_skill: bool,
@@ -55,6 +60,16 @@ pub struct DeploymentConfig {
     random_engage_weapon: bool,
     random_gift_items: i32,
     random_shop_items: bool,
+}
+
+fn disable_support_restriction() {
+    let replace = &[0x1f, 0x25, 0x00, 0x71];
+    Patch::in_text(0x0209950C).bytes(replace).unwrap();
+    Patch::in_text(0x020994E0).bytes(replace).unwrap();
+    Patch::in_text(0x02099538).bytes(replace).unwrap();
+    Patch::in_text(0x01a2a7c0).bytes(&[0xe1,0x0e,0x80,0x12]).unwrap();
+    Patch::in_text(0x01a2a7c4).bytes(&[0x02,0x0f,0x80,0x52]).unwrap();
+    Patch::in_text(0x01fdea34).bytes(&[0x01,0x04,0x80, 0x52]).unwrap();
 }
 
 impl DeploymentConfig {
@@ -102,10 +117,12 @@ impl DeploymentConfig {
             engage_link: false,
             autolevel: false,
             exploration_items: 0,
+            replaced_item_price: 75,
             iron_man: false,
             deployment_type: 0,
             emblem_deployment: 0,
             emblem_mode: 0,
+            continuous: 0,
             random_recruitment: false,
             random_job: 0,
             random_skill: false,
@@ -121,20 +138,19 @@ impl DeploymentConfig {
     }
     fn correct_rates(&mut self) {
         self.draconic_vibe_version = VERSION.to_string();
-        unsafe {
-            self.random_enemy_skill_rate = clamp(self.random_enemy_skill_rate, 0, 100, None);
-            self.random_enemy_job_rate = clamp(self.random_enemy_job_rate, 0, 100, None);
-            self.revival_stone_rate = clamp(self.revival_stone_rate, 0, 500, None);
-            self.bond_ring_skill_s_rate = clamp(self.bond_ring_skill_s_rate, 0, 100, None);
-            self.bond_ring_skill_a_rate = clamp(self.bond_ring_skill_a_rate, 0, 100, None);
-            self.bond_ring_skill_b_rate = clamp(self.bond_ring_skill_b_rate, 0, 100, None);
-            self.bond_ring_skill_c_rate = clamp(self.bond_ring_skill_c_rate, 0, 100, None);
-        }
+            self.random_enemy_skill_rate = crate::utils::clamp_value(self.random_enemy_skill_rate, 0, 100);
+            self.random_enemy_job_rate = crate::utils::clamp_value(self.random_enemy_job_rate, 0, 100);
+            self.replaced_item_price = crate::utils::clamp_value(self.replaced_item_price, 0, 100);
+            self.revival_stone_rate = crate::utils::clamp_value(self.revival_stone_rate, 0, 500);
+            self.bond_ring_skill_s_rate = crate::utils::clamp_value(self.bond_ring_skill_s_rate, 0, 100);
+            self.bond_ring_skill_a_rate = crate::utils::clamp_value(self.bond_ring_skill_a_rate, 0, 100);
+            self.bond_ring_skill_b_rate = crate::utils::clamp_value(self.bond_ring_skill_b_rate, 0, 100);
+            self.bond_ring_skill_c_rate = crate::utils::clamp_value(self.bond_ring_skill_c_rate, 0, 100);
     }
     pub fn get_engrave_limits(&mut self) -> (i32, i32, bool) {
         // auto correct 
-        let a = clamp_value(self.engrave_lower_score, -100, 100);
-        let b = clamp_value(self.engrave_upper_score, -100, 100);
+        let a = crate::utils::clamp_value(self.engrave_lower_score, -100, 100);
+        let b = crate::utils::clamp_value(self.engrave_upper_score, -100, 100);
         self.engrave_lower_score = a;
         self.engrave_upper_score = b;
         if a == b {
@@ -143,13 +159,13 @@ impl DeploymentConfig {
         }
         else if a < b {
             if b-a < 30 {  
-                self.engrave_lower_score = clamp_value(b-30, -100, 100);
+                self.engrave_lower_score = crate::utils::clamp_value(b-30, -100, 100);
                 self.engrave_upper_score = b;
             }
         }
         else {
             if a-b < 30 {
-                self.engrave_lower_score = clamp_value(a-30, -100, 100);
+                self.engrave_lower_score = crate::utils::clamp_value(a-30, -100, 100);
                 self.engrave_upper_score = a;
             }
             else {
@@ -171,6 +187,24 @@ impl DeploymentConfig {
 }
 pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| DeploymentConfig::new().into() );
 
+pub fn set_personal_caps(){
+    let persons = PersonData::get_list_mut().expect("triabolical is 'None'");
+    let jobs = JobData::get_list_mut().expect("triabolical2 is 'None'");
+    let mut is_max_limit = false;
+    for x in 0..jobs.len() {
+        let cap = jobs[x].get_limit();
+        if cap[1] >= 127 {
+            is_max_limit = true; 
+            break;
+        }
+    }
+    if !is_max_limit { return; }
+    for x in 0..persons.len() {
+        let personal_limits = persons[x].get_limit();
+        for y in 0..11 { personal_limits[y] = 0; } 
+    }
+}
+
 extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
         match ev {
@@ -178,14 +212,21 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                 if proc.name.is_some() { 
                     println!("Proc: {}, Hash {}, label {}", proc.name.unwrap().get_string().unwrap(), proc.hashcode, label);
                 }
+                if proc.hashcode == 1650205480 && *label == 17 {
+                    person::m011_ivy_recruitment_check();
+                    continuous::continous_mode_post_battle_stuff(proc); 
+                    continuous::update_ignots();
+                }
                 if proc.hashcode == -988690862 && *label == 0 {
                     enums::generate_black_list();
+                    //continuous::do_custom_call();
+                    //crate::autolevel::do_continious_mode();
+                    emblem::get_recommended_paralogue_levels();
                     item::create_item_pool();
                     utils::dlc_check();
                     person::get_playable_list();
                     bgm::get_bgm_pool();
                     skill::create_skill_pool();
-                    asset::unlock_royal_classes();
                     emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().intialize_list();
                     unsafe {
                         for i in 0..41 { 
@@ -193,6 +234,7 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                             person::RAND_PERSONS[41 + i as usize] = i; 
                         }
                     }
+                    set_personal_caps();
                 }
                 if proc.hashcode == -339912801 && *label == 1 {
                     CONFIG.lock().unwrap().correct_rates();
@@ -206,7 +248,11 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                 if proc.hashcode == -339912801 && *label == 2 { random::reset_gamedata(); }
                 // randomized stuff
                 if proc.hashcode == -1118443598 && *label == 0 { 
+                    continuous::do_continious_mode();
                     random::randomize_stuff(); 
+                    autolevel::update_learn_skills();
+                    continuous::update_next_chapter();
+                    set_personal_caps();
                 }
                 if proc.hashcode == -1912552174 && *label == 28 {
                     random::start_new_game(); 
@@ -216,6 +262,7 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                     ironman::ironman_code_edits();
                     shop::randomize_hub_random_items();
                     autolevel::calculate_player_cap(); 
+                    continuous::update_bonds();
                 }
                 if proc.hashcode == -1624221522 && *label == 14 { bgm::randomize_bgm_map(); }
             }
@@ -236,14 +283,19 @@ pub fn main() {
         person::mess_get_impl_hook, 
         random::try_get_index, 
         deploy::create_player_team, 
+        //continuous::update_unit_data,
+        //continuous::r_call_unit_selection,
         random::script_get_string,
         person::unit_create_impl_2_hook, 
-        person::create_from_dispos_hook
+        person::create_from_dispos_hook,
+        asset::asset_table_result_setup_hook,
     ); 
     // Fixes the emblem weapons arena issue
     Patch::in_text(0x01ca9afc).nop().unwrap();
     random::install_vibe();
-
+    disable_support_restriction();
+    // 68 00 00 b4  revert back to normal sp = exp
+    Patch::in_text(0x01a39fe4).nop().unwrap();
     std::panic::set_hook(Box::new(|info| {
         let location = info.location().unwrap();
         let msg = match info.payload().downcast_ref::<&'static str>() {
@@ -268,8 +320,3 @@ pub fn main() {
         );
     }));
 }
-fn clamp_value(v: i32, min: i32, max: i32) -> i32 {
-    unsafe { clamp(v, min, max, None)  }
-}
-#[skyline::from_offset(0x032dfb20)]
-pub fn clamp(value: i32, min: i32, max: i32, method_info: OptionalMethod) -> i32;

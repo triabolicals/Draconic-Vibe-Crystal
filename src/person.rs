@@ -141,6 +141,9 @@ pub fn change_hub_dispos(revert: bool) {
         for y in 0..t_list[x].len() {
             let aid = t_list[x][y].get_aid();
             if aid.is_some() { 
+                if str_contains(aid.unwrap(), "GID_") && str_contains(t_list[x][y].parent.array_name, "Fld_S0") {
+                    continue; 
+                }
                 let pid = aid.unwrap().get_string().unwrap();
                 let new_pid = find_pid_replacement(&pid, revert);
                 if new_pid.is_some() { 
@@ -227,6 +230,15 @@ pub fn is_player_unit(person: &PersonData) -> bool {
 #[unity::from_offset("App", "UnitPool", "GetHero")]
 fn unit_pool_get_hero(replay :bool, method_info: OptionalMethod) -> Option<&'static Unit>;
 
+// Handle the case of Chapter 11 ends with not escape
+pub fn m011_ivy_recruitment_check(){
+    if !GameVariableManager::get_bool("G_Random_Recruitment") { return; }
+    if GameUserData::get_chapter().cid.get_string().unwrap() == "CID_M011" && lueur_on_map() {
+        GameVariableManager::make_entry("MapRecruit", 1);
+        GameVariableManager::set_bool("MapRecruit", true);
+    }
+}
+
 pub fn lueur_on_map() -> bool {
     unsafe {
         let lueur_unit = unit_pool_get_hero(true, None);
@@ -273,7 +285,8 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         let mut person = this.get_person();
         let mut new_person = switch_person(person);
          // Hub & Kizuna: person is already the correct person or MapSequence and Alear is not on the Map (Chapter 11)
-        if ( GameUserData::get_sequence() == 5  ||  GameUserData::get_sequence() == 4 ) || (GameUserData::get_sequence() == 3 && !lueur_on_map() )  { 
+        if ( GameUserData::get_sequence() == 5  ||  GameUserData::get_sequence() == 4 ) || 
+            (GameUserData::get_sequence() == 3 && ( GameVariableManager::get_bool("MapRecruit") || !lueur_on_map() ) )  { 
             println!("Hub/Kizuna Recruitment");
             new_person = this.get_person();
             this.set_person( switch_person_reverse(person) );
@@ -367,6 +380,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
                     call_original!(this, method_info);
                     this.set_level(current_level);
                     this.set_internal_level(current_internal_level);
+                    println!("Promoted Unit -> Base Unit");
                 }
                 else { // Promoted -> Special
                     this.class_change(new_person.get_job().unwrap());
@@ -376,6 +390,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
                     this.set_level(total_level);
                     this.set_internal_level(0);
                     this.set_level( ( person.get_level() + person.get_internal_level() as u8 ).into() );
+                    println!("Promoted Unit -> Special Unit");
                 }
             }
             else {  // Promoted -> Promoted
@@ -450,6 +465,9 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     if this.person.get_asset_force() != 0 && !GameUserData::is_evil_map() {
         *CONFIG.lock().unwrap() =  crate::DeploymentConfig::new();
         let rng = Random::get_game();
+        if str_contains(GameUserData::get_chapter().cid, "CID_S0") && GameVariableManager::get_number("G_Emblem_Mode") != 0 {
+            emblem_paralogue_level_adjustment(this);
+        } 
         if CONFIG.lock().unwrap().autolevel { auto_level_unit(this); }
         if GameVariableManager::get_number("G_Random_Job") >= 2 {
             let rng_rate = CONFIG.lock().unwrap().random_enemy_job_rate;
@@ -507,6 +525,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             item::unit_change_to_random_class(this);
             fixed_unit_weapon_mask(this);
         }
+        println!("CreateFromDispos Adjust Unit Items for {}", Mess::get(this.person.get_name().unwrap()).get_string().unwrap());
         adjust_unit_items(this); 
     }
  }
@@ -514,14 +533,20 @@ fn adjust_unit_ai(unit: &Unit, data: &mut DisposData) {
     let job = unit.get_job();
     let m022 = GameUserData::get_chapter().cid.get_string().unwrap() == "CID_M022";
     // Dancer
-    if job.jid.get_string().unwrap() == "JID_ダンサー" {
+    let jid = job.jid.get_string().unwrap();
+    let old_ai_names: [&Il2CppString; 4] = [data.ai_action_name, data.ai_mind_name, data.ai_attack_name, data.ai_move_name];
+    let old_ai_values: [Option<&Il2CppString>; 4] = [data.ai_action_value, data.ai_mind_value, data.ai_attack_value, data.ai_move_value];
+    if jid == "JID_ダンサー" {
         data.ai_mind_name = "AI_MI_Irregular".into();
         data.ai_action_name = "AI_AC_Everytime".into();
+    }
+    if jid == "JID_エンチャント" {
+        data.ai_attack_name = "AI_AT_Enchant".into();
+        data.ai_attack_value = Some("".into());
     }
     // staff user, Chapter 22 needs to use Force due to Green Emblem Allies
     else if job.get_weapon_mask().value & ( 1 << 7 ) != 0 {
         if unit.item_list.has_item_iid("IID_ワープ") {
-            data.ai_action_name = "AI_AC_Everytime".into();
             data.ai_attack_name = "AI_AT_RodWarp".into();
             data.ai_attack_value = Some("1, 1".into());
             data.ai_move_name = "AI_MV_WeakEnemy".into();
@@ -532,11 +557,7 @@ fn adjust_unit_ai(unit: &Unit, data: &mut DisposData) {
                 data.ai_attack_name = "AI_AT_Interference".into();
                 data.ai_move_name =  "AI_MV_WeakEnemy".into();
             }
-            if str_contains(data.ai_action_name, "AI_AC_TurnAttackRange") {
-                data.ai_action_name =  "AI_AC_InterferenceRange".into();
-                data.ai_action_value =  Some("".into());
-            }
-            else {
+            if str_contains(data.ai_action_name, "AI_AC_AttackRange") {
                 data.ai_action_name =  "AI_AC_InterferenceRange".into();
                 data.ai_action_value =  Some("".into());
             }
@@ -549,7 +570,8 @@ fn adjust_unit_ai(unit: &Unit, data: &mut DisposData) {
             }
         }
         else {
-            data.ai_action_name =  "AI_AC_Everytime".into();
+            data.ai_attack_name =  "AI_AT_Attack".into();
+            data.ai_attack_value = None;
             data.ai_move_name =  "AI_MV_WeakEnemy".into();
         }
     }
@@ -564,13 +586,39 @@ fn adjust_unit_ai(unit: &Unit, data: &mut DisposData) {
             else {  data.ai_attack_name = "AI_AT_Attack".into(); }
         }
         if str_contains(data.ai_move_name, "Heal") {  data.ai_move_name = "AI_MV_WeakEnemy".into(); }
+        // No offensive staffs
+        if str_contains(data.ai_action_name, "Interference") || str_contains(data.ai_attack_name, "Interference") {
+            data.ai_action_name =  "AI_AC_Everytime".into();
+            data.ai_action_value = None;
+            if m022 { data.ai_attack_name = "AI_AT_ForceOnly".into(); }
+            else {  data.ai_attack_name = "AI_AT_Attack".into(); }
+            data.ai_attack_value = None;
+            data.ai_move_name =  "AI_MV_WeakEnemy".into();
+        }
+        if str_contains(data.ai_attack_name, "RodWarp") { 
+            if m022 { data.ai_attack_name = "AI_AT_ForceOnly".into(); }
+            else {  data.ai_attack_name = "AI_AT_Attack".into(); }
+            data.ai_attack_value = None;
+        }
     }
     if m022 {
         data.ai_move_name = "AI_MV_ForceOnly".into();
         data.ai_move_value = Some("FORCE_PLAYER".into());
         data.ai_attack_value = Some("FORCE_PLAYER".into());
     }
+    if data.get_flag().value & 16 != 0 ||  str_contains(old_ai_names[0], "Turn") { 
+        data.ai_action_name = old_ai_names[0]; 
+        data.ai_action_value = old_ai_values[0];
+    }
     unsafe { unit_set_dispos_ai(unit, data, None); }
+    data.ai_action_name = old_ai_names[0];
+    data.ai_mind_name = old_ai_names[1];
+    data.ai_attack_name = old_ai_names[2];
+    data.ai_move_name = old_ai_names[3];
+    data.ai_action_value = old_ai_values[0];
+    data.ai_mind_value = old_ai_values[1];
+    data.ai_attack_value = old_ai_values[2];
+    data.ai_move_value = old_ai_values[3];
 }
 
 pub fn adjust_unit_items(unit: &Unit) {
@@ -690,7 +738,8 @@ pub fn mess_get_impl_hook(label: Option<&Il2CppString>, is_replaced: bool, metho
         if label.is_some() {
             let mess_label = label.unwrap().get_string().unwrap();
             if mess_label == "MSID_H_EirikEngage" {
-                let eirika_replacement = GodData::get( EMBLEM_GIDS[ EIRIKA_INDEX ] ).unwrap().mid;
+                let gid = format!("GID_{}", EMBLEM_ASSET[ EIRIKA_INDEX]);
+                let eirika_replacement = GodData::get( &gid ).unwrap().mid;
                 return replace_str(result, Mess::get("MGID_Eirik"), Mess::get(eirika_replacement), None);
             }
             if mess_label == "MID_RULE_M006_LOSE" {
@@ -741,4 +790,44 @@ pub fn mess_get_impl_hook(label: Option<&Il2CppString>, is_replaced: bool, metho
 
 fn has_skill(this: &Unit, skill: &SkillData) -> bool {
     return this.mask_skill.unwrap().find_sid(skill.sid).is_some() | this.private_skill.find_sid(skill.sid).is_some()| this.equip_skill.find_sid(skill.sid).is_some();
+}
+pub fn has_sid(this: &Unit, sid: &str) -> bool {
+    return this.mask_skill.unwrap().find_sid(sid.into()).is_some() | this.private_skill.find_sid(sid.into()).is_some()| this.equip_skill.find_sid(sid.into()).is_some();
+}
+
+pub fn emblem_paralogue_level_adjustment(this: &Unit){
+    let level_difference = GameVariableManager::get_number("G_Paralogue_Level");
+    if level_difference == 0 { return; }
+    if level_difference < 0 {
+        let old_level = this.level as i32;
+        let level;
+        if this.level == 1 { level = 2; }
+        else { level = this.level as i32 ;  }
+        let mut count = 0;
+        let count_max = -1*(level_difference + level_difference / 3 );
+        loop {
+            this.level_down();
+            this.set_level(level);
+            count += 1;
+            if count == count_max { break; }
+        }
+        if old_level + level_difference <= 0 { this.set_level(1); }
+        else { this.set_level( (old_level + level_difference) as i32)}
+    }
+    else {
+        let mut count = 0;
+        loop {
+            this.level_up(3);
+            count += 1;
+            if count == level_difference { break; }
+        }
+        let job_max_level = this.job.max_level as i32; 
+        let level = this.level as i32; 
+        if level > job_max_level {
+            let new_internal_level = this.internal_level as i32 + job_max_level - level; 
+            this.set_level(job_max_level);
+            this.set_internal_level(new_internal_level);
+        }
+    }
+    this.set_hp(this.get_capability(0, true));
 }
