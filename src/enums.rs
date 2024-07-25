@@ -9,12 +9,15 @@ use crate::skill::SkillIndex;
 pub static SKILL_BLACK_LIST: Mutex<Vec<String>> = Mutex::new(Vec::new()); 
 pub static ITEM_BLACK_LIST: Mutex<Vec<String>> = Mutex::new(Vec::new());
 pub static PERSONAL_BLIST: Mutex<Vec<String>> = Mutex::new(Vec::new());
-pub static mut ENGAGE_CHAOS: bool = false;
-pub static mut SYNC_CHAOS: bool = false;
+pub static SET_RECRUITMENT: Mutex<Vec<(i32, i32, bool)>> = Mutex::new(Vec::new());
+pub static mut UNIT_RANDOM: bool = false;
+pub static mut EMBLEM_RANDOM: bool = false;
+pub static mut LUEUR_CHANGE: bool = false; 
 pub const PIDS: [&str; 41] = ["PID_リュール", "PID_ヴァンドレ", "PID_クラン", "PID_フラン", "PID_アルフレッド", "PID_エーティエ", "PID_ブシュロン", "PID_セリーヌ", "PID_クロエ", "PID_ルイ", "PID_ユナカ", "PID_スタルーク", "PID_シトリニカ", "PID_ラピス", "PID_ディアマンド", "PID_アンバー", "PID_ジェーデ", "PID_アイビー", "PID_カゲツ", "PID_ゼルコバ", "PID_フォガート", "PID_パンドロ", "PID_ボネ", "PID_ミスティラ", "PID_パネトネ", "PID_メリン", "PID_オルテンシア", "PID_セアダス", "PID_ロサード", "PID_ゴルドマリー", "PID_リンデン", "PID_ザフィーア", "PID_ヴェイル", "PID_モーヴ", "PID_アンナ", "PID_ジャン", "PID_エル", "PID_ラファール", "PID_セレスティア", "PID_グレゴリー", "PID_マデリーン"];
 pub const RECRUIT_CID : [&str; 41] = ["M001", "M001", "M002", "M002", "M003", "M003", "M003", "M004", "M004", "M004", "M006", "M007", "M007", "M007", "M008", "M008", "M009", "M011", "M011", "M011", "M012", "M012", "M012", "M013", "M013", "M013", "M014", "M015", "M016", "M016", "M018", "M019", "M022", "M021", "S002", "S001", "E006", "E006", "E006", "E006", "E006"];
 
 // Emblem and Emblem SKill Related
+pub const RR_ORDER: [u8; 41] = [32, 33, 31, 30, 29, 28, 27, 26, 25, 24, 22, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 34, 10, 35, 9, 8, 7, 6, 5, 4, 3, 2, 0, 1, 21, 23, 36, 37, 38, 39, 40];
 pub const EMBLEM_ASSET: [&str; 22] = ["マルス", "シグルド", "セリカ", "ミカヤ", "ロイ", "リーフ", "ルキナ", "リン", "アイク", "ベレト", "カムイ", "エイリーク", "エーデルガルト", "チキ", "ヘクトル", "ヴェロニカ", "セネリオ", "カミラ", "クロム", "リュール", "ディミトリ", "クロード"];
 pub const EIRIKA_TWIN_SKILLS: [&str; 12] = [ "SID_月の腕輪", "SID_太陽の腕輪", "SID_日月の腕輪", "SID_優風", "SID_勇空", "SID_蒼穹", "SID_月の腕輪＋", "SID_太陽の腕輪＋", "SID_日月の腕輪＋", "SID_優風＋", "SID_勇空＋", "SID_蒼穹＋" ];
 pub const EMBLEM_GIDS: &[&str] = &["GID_マルス", "GID_シグルド", "GID_セリカ", "GID_ミカヤ", "GID_ロイ", "GID_リーフ", "GID_ルキナ", "GID_リン", "GID_アイク", "GID_ベレト", "GID_カムイ", "GID_エイリーク", "GID_エーデルガルト", "GID_チキ", "GID_ヘクトル", "GID_ヴェロニカ", "GID_セネリオ", "GID_カミラ", "GID_クロム"];
@@ -22,6 +25,7 @@ pub const RINGS: [&str; 19] = ["Marth", "Siglud", "Celica", "Micaiah", "Roy", "L
 pub const EMBELM_PARA: [&str; 19] = ["S014", "S009", "S013", "S011", "S012", "S010", "S003", "S004", "S005", "S006", "S007", "S008", "G007", "G001", "G002", "G003", "G004", "G005", "G006"];
 pub const UNLOCK_PARA: [&str; 19] = ["M022", "M017", "M020", "M019", "M019", "M017", "M011", "M012", "M013", "M014", "M015", "M016", "", "G001", "G002", "G003", "G004", "G005", "G006"];
 pub const PARA_LEVEL: [i32; 19] = [35, 28, 32, 28, 31, 30, 21, 22, 25, 28, 26, 29, -1, -1, -1, -1, -1, -1, -1];
+pub const ENGAGE_ATK_AI: [&str; 9] = ["AI_AT_EngageAttack","AI_AT_EngagePierce", "AI_AT_EngageVision", "AI_AT_EngageDance", "AI_AT_EngageOverlap", "AI_AT_EngageBless", "AI_AT_EngageWaitGaze", "AI_AT_EngageSummon", "AI_AT_EngageCamilla"];
 // Items
 pub const BLACKLIST_ITEMS: [&str; 25] = [
     "IID_マスタープルフ", "IID_リベラシオン改", "IID_リベラシオン改_ノーマル",
@@ -71,7 +75,31 @@ fn is_valid_skill(sid: &str ) -> bool {
     }
     return !skip;
 }
+fn is_valid_person(pid: &str) -> i32 {
+    let mut out = 0;
+    for x in PIDS {
+        if pid == x { return out; } // by pid
+        let person = PersonData::get(x).unwrap();
+        let mpid = person.get_name().unwrap();
+        if crate::utils::str_contains(mpid, pid) { return out; }  // by mpid
+        if crate::utils::str_contains(Mess::get(mpid), pid) { return out; } //by mpid value
+        out += 1;
+    }
+    return -1;
+}
+fn is_valid_emblem(gid: &str) -> i32 {
+    let mut out = 0;
+    for x in EMBLEM_GIDS {
+        if gid == *x { return out; } // by gid
+        let god = GodData::get(x).unwrap();
+        let mpid = god.mid;
+        if crate::utils::str_contains(mpid, gid) { return out; }  // by mid
+        if crate::utils::str_contains(Mess::get(mpid), gid) { return out; } // by mpid value
+        out += 1;
+    }
+    return -1;
 
+}
 fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where P: AsRef<Path>, {
     let file = File::open(filename)?;
@@ -82,110 +110,96 @@ pub fn generate_black_list() {
     for x in BLACKLIST_SKILL { SKILL_BLACK_LIST.lock().unwrap().push(x.to_string()); }
     for x in BLACKLIST_ITEMS { ITEM_BLACK_LIST.lock().unwrap().push(x.to_string()); }
     for x in PERSONAL_BLACK_LIST { PERSONAL_BLIST.lock().unwrap().push(x.to_string()); }
-
     if let Ok(lines) = read_lines("sd:/engage/config/DVC_List.txt") {
         println!("Reading from sd:/engage/config/DVC_List.txt");
         for line in lines.flatten() {
             let spilt: Vec<_> = line.split_whitespace().collect();
             if spilt.len() > 1 {
-                let mut case = 0;
                 if spilt[0] == "*" || spilt[0] == "--" { continue; }    // comments
-                if spilt[0] == "remove_personal_skill" { case = 1; } // personal
-                else if spilt[0] == "add_engage_skill" { case = 2; }    // engage skill pool
-                else if spilt[0] == "add_sync_skill" {case = 3; }
-                else if spilt[0] == "remove_item" || spilt[0] == "remove_skill" { case = 0; }
-                else if spilt[0] == "remove" { case = 0; }
-                if case == 0 {
-                    for z in 0..spilt.len() {
-                        if spilt[z].contains("SID_") {
+                match spilt[0] {
+                    "remove_skill" => { 
+                        for z in 1..spilt.len() {
                             let skill = SkillData::get(&spilt[z]);
-                            if skill.is_some() {
-                                let sk = skill.unwrap();
-                                if SKILL_BLACK_LIST.lock().unwrap().iter().find(|x| **x == spilt[z]).is_none(){
-                                    println!("Added General Skill Blacklist #{}: {}", sk.parent.index, crate::utils::get_skill_name(sk));
-                                    SKILL_BLACK_LIST.lock().unwrap().push(spilt[z].to_string());
-                                }
-                            } 
-                        }
-                        else if spilt[z].contains("IID_") {
-                            let item = ItemData::get(&spilt[z]);
-                            if item.is_some() {
-                                let it = item.unwrap();
-                                if ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == spilt[z]).is_none() {
-                                    println!("Added General Item Blacklist #{}: {}", it.parent.index, crate::utils::get_item_name(it));
-                                    ITEM_BLACK_LIST.lock().unwrap().push(spilt[z].to_string());
-                                }
+                            if skill.is_none() { continue; }
+                            let sk = skill.unwrap();
+                            if SKILL_BLACK_LIST.lock().unwrap().iter().find(|x| **x == spilt[z]).is_none(){
+                                println!("Added General Skill Blacklist #{}: {}", sk.parent.index, crate::utils::get_skill_name(sk));
+                                SKILL_BLACK_LIST.lock().unwrap().push(spilt[z].to_string());
                             }
                         }
-                    }
-                }
-                else if case == 1 {
-                    for z in 1..spilt.len() {
-                        if spilt[z].contains("SID_") {
+                    },
+                    "remove_personal_skill" => { 
+                        for z in 1..spilt.len() {
                             let skill = SkillData::get(&spilt[z]);
-                            if skill.is_some() {
-                                let sk = skill.unwrap();
-                                if PERSONAL_BLIST.lock().unwrap().iter().find(|x| **x == spilt[z]).is_none() && SKILL_BLACK_LIST.lock().unwrap().iter().find(|x| **x == spilt[z]).is_none() {
-                                    println!("Added to Personal Skill Blacklist #{}: {}", sk.parent.index, crate::utils::get_skill_name(sk));
-                                    PERSONAL_BLIST.lock().unwrap().push(spilt[z].to_string());
-                                }
+                            if skill.is_none() { continue; }
+                            let sk = skill.unwrap();
+                            if PERSONAL_BLIST.lock().unwrap().iter().find(|x| **x == spilt[z]).is_none() && SKILL_BLACK_LIST.lock().unwrap().iter().find(|x| **x == spilt[z]).is_none() {
+                                println!("Added to Personal Skill Blacklist #{}: {}", sk.parent.index, crate::utils::get_skill_name(sk));
+                                PERSONAL_BLIST.lock().unwrap().push(spilt[z].to_string());
+                            } 
+                        }
+                     },
+                    "add_engage_skill" => {                    
+                        for z in 1..spilt.len() {
+                            if is_valid_skill(spilt[z]){
+                                let skill = SkillData::get(&spilt[z]).unwrap();
+                                crate::emblem::emblem_skill::ENGAGE_SKILLS.lock().unwrap().push(SkillIndex::new(skill.parent.index));
+                                println!("Added to Engage Skill Pool: #{} {}", skill.parent.index, crate::utils::get_skill_name(skill));
                             }
                         } 
-                    }
-                }
-                else if case == 2 {
-                    if spilt[1] == "chaos" {
-                        unsafe { ENGAGE_CHAOS = true; }
-                        continue;
-                    }
-                    else {
+                    },
+                    "add_sync_skill" => { 
                         for z in 1..spilt.len() {
-                            if spilt[z].contains("SID_") {
-                                if is_valid_skill(spilt[z]){
-                                    let skill = SkillData::get(&spilt[z]).unwrap();
-                                    crate::emblem::emblem_skill::ENGAGE_SKILLS.lock().unwrap().push(SkillIndex::new(skill.parent.index));
-                                    println!("Added to Engage Skill Pool: #{} {}", skill.parent.index, crate::utils::get_skill_name(skill));
-                                }
-                            } 
+                            if is_valid_skill(spilt[z]){
+                                let skill = SkillData::get(&spilt[z]).unwrap();
+                                crate::emblem::emblem_skill::SYNCHO_RANDOM_LIST.lock().unwrap().add_by_sid(&spilt[z], true);
+                                println!("Added to Sync Skill Pool: #{} {}", skill.parent.index, crate::utils::get_skill_name(skill));
+                            }
                         }
-                    }
-                }
-                else if case == 3 {
-                    if spilt[1] == "chaos" {
-                        unsafe { SYNC_CHAOS = true; }
-                        continue;
-                    }
-                    else {
+                    },
+                    "remove_item" => {                     
                         for z in 1..spilt.len() {
-                            if spilt[z].contains("SID_") {
-                                if is_valid_skill(spilt[z]){
-                                    let skill = SkillData::get(&spilt[z]).unwrap();
-                                    crate::emblem::emblem_skill::SYNCHO_RANDOM_LIST.lock().unwrap().add_by_sid(&spilt[z]);
-                                    println!("Added to Sync Skill Pool: #{} {}", skill.parent.index, crate::utils::get_skill_name(skill));
-                                }
-                            } 
+                            let item = ItemData::get(&spilt[z]);
+                            if item.is_none() { continue; }
+                            let it = item.unwrap();
+                            if ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == spilt[z]).is_none() {
+                                println!("Added General Item Blacklist #{}: {}", it.parent.index, crate::utils::get_item_name(it));
+                                ITEM_BLACK_LIST.lock().unwrap().push(spilt[z].to_string());
+                            }
                         }
-                    }
-                }
-            }
-            else if line.contains("SID_") {
-                let skill = SkillData::get(&line);
-                if skill.is_some() {
-                    let sk = skill.unwrap();
-                    if SKILL_BLACK_LIST.lock().unwrap().iter().find(|x| **x == line).is_none(){
-                        println!("Added General Skill Blacklist #{}: {}", sk.parent.index, crate::utils::get_skill_name(sk));
-                        SKILL_BLACK_LIST.lock().unwrap().push(line.clone());
-                    }
-                }
-            } 
-            else if line.contains("IID_") {
-                let item = ItemData::get(&line);
-                if item.is_some() {
-                    let it = item.unwrap();
-                    if ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == line).is_none() {
-                        println!("Added General Item Blacklist #{}: {}", it.parent.index, crate::utils::get_item_name(it));
-                        ITEM_BLACK_LIST.lock().unwrap().push(line.clone());
-                    }
+                    },
+                    "unit_swap" => {
+                        if spilt.len() < 3 { 
+                            if spilt[1] == "random" {  unsafe { UNIT_RANDOM = true; } }
+                            continue;
+                        }
+                        if spilt[1] == "random" {  unsafe { UNIT_RANDOM = true; } continue; }
+                        let person_index = is_valid_person(spilt[1]);
+                        if person_index == -1 { continue; }
+                        let new_person_index = is_valid_person(spilt[2]);
+                        if person_index == 0 && new_person_index > 35 { continue; }
+                        if ( person_index == 1 || person_index == 2 || person_index == 3 ) && 
+                           ( new_person_index == 2 || new_person_index == 3 || new_person_index == 1 ) 
+                            && (new_person_index != person_index) { continue; }
+                        if ( person_index >= 36 || new_person_index >= 36 ) && !crate::utils::dlc_check() { continue; }
+                        SET_RECRUITMENT.lock().unwrap().push( (person_index, new_person_index, false));
+                        println!("Unit {} is swapped with Unit {}", person_index, new_person_index);
+                    },
+                    "emblem_swap" => {
+                        if spilt.len() < 3 { 
+                            if spilt[1] == "random" {  unsafe { EMBLEM_RANDOM = true; } }
+                            continue;
+                        }
+                        if spilt[1] == "random" {  unsafe { EMBLEM_RANDOM = true; } continue; }
+                        let emblem_index = is_valid_emblem(spilt[1]);
+                        if emblem_index == -1 { continue; }
+                        let new_emblem_index = is_valid_emblem(spilt[2]);
+                        if new_emblem_index == -1 { continue; }
+                        if ( emblem_index >= 12 || new_emblem_index >= 12 ) && !crate::utils::dlc_check() { continue; }
+                        SET_RECRUITMENT.lock().unwrap().push( (emblem_index, new_emblem_index, true));
+                        println!("Emblem {} is swapped with Emblem {}", emblem_index, new_emblem_index);
+                    },
+                    _ => { },
                 }
             }
         }

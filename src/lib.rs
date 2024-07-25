@@ -1,12 +1,9 @@
 #![feature(lazy_cell, ptr_sub_ptr)]
-use unity::prelude::*;
 use cobapi::{Event, SystemEvent};
 use std::sync::{Mutex, LazyLock};
 use serde::{Deserialize, Serialize};
 use skyline::patching::Patch;
-use engage::gamedata::PersonData;
-use engage::gamedata::Gamedata;
-use engage::gamedata::JobData;
+use engage::gamedata::*;
 pub mod deploy;
 pub mod emblem;
 pub mod item;
@@ -22,12 +19,13 @@ pub mod shop;
 pub mod ironman;
 pub mod enums;
 pub mod continuous;
+pub mod message;
 
-pub const VERSION: &str = "1.10.3";
+pub const VERSION: &str = "Pre-2.0.0";
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct DeploymentConfig {
-    add_new_settings: bool,
+    randomized: bool,
     draconic_vibe_version: String,
     seed: u32,
     random_enemy_job_rate: i32,
@@ -39,6 +37,7 @@ pub struct DeploymentConfig {
     bond_ring_skill_a_rate: i32,
     bond_ring_skill_b_rate: i32,
     bond_ring_skill_c_rate: i32,
+    engrave_settings: i32,
     engrave_lower_score: i32,
     engrave_upper_score: i32,
     engage_link: bool,
@@ -50,16 +49,18 @@ pub struct DeploymentConfig {
     emblem_deployment: i32,
     emblem_mode: i32,
     continuous: i32,
-    random_recruitment: bool,
+    random_recruitment: i32,
     random_job: i32,
     random_skill: bool,
     random_item: i32,
     random_grow: i32,
     random_god_mode: i32,
     random_god_sync_mode: i32,
+    emblem_skill_chaos: i32,
     random_engage_weapon: bool,
     random_gift_items: i32,
     random_shop_items: bool,
+    random_battle_styles: bool,
 }
 
 fn disable_support_restriction() {
@@ -71,7 +72,6 @@ fn disable_support_restriction() {
     Patch::in_text(0x01a2a7c4).bytes(&[0x02,0x0f,0x80,0x52]).unwrap();
     Patch::in_text(0x01fdea34).bytes(&[0x01,0x04,0x80, 0x52]).unwrap();
 }
-
 impl DeploymentConfig {
     pub fn new() -> Self {
         let config_content = std::fs::read_to_string("sd:/engage/config/triabolical.toml");
@@ -100,7 +100,7 @@ impl DeploymentConfig {
     }
     pub fn default() -> Self {
         let config = DeploymentConfig  {
-            add_new_settings: false,
+            randomized: true,
             draconic_vibe_version: VERSION.to_string(),
             seed: 0,
             random_enemy_job_rate: 50,
@@ -112,8 +112,9 @@ impl DeploymentConfig {
             bond_ring_skill_a_rate: 25,
             bond_ring_skill_b_rate: 10,
             bond_ring_skill_c_rate: 5,
-            engrave_lower_score: -40,
-            engrave_upper_score: 40,
+            engrave_settings: 0,
+            engrave_lower_score: -10,
+            engrave_upper_score: 30,
             engage_link: false,
             autolevel: false,
             exploration_items: 0,
@@ -123,16 +124,18 @@ impl DeploymentConfig {
             emblem_deployment: 0,
             emblem_mode: 0,
             continuous: 0,
-            random_recruitment: false,
+            random_recruitment: 0,
             random_job: 0,
             random_skill: false,
             random_item: 0,
             random_grow: 0,
             random_god_mode: 0,
             random_god_sync_mode: 0,
+            emblem_skill_chaos: 0,
             random_engage_weapon: false,
             random_gift_items: 0,
             random_shop_items: false,
+            random_battle_styles: false,
         };
         config
     }
@@ -141,7 +144,7 @@ impl DeploymentConfig {
             self.random_enemy_skill_rate = crate::utils::clamp_value(self.random_enemy_skill_rate, 0, 100);
             self.random_enemy_job_rate = crate::utils::clamp_value(self.random_enemy_job_rate, 0, 100);
             self.replaced_item_price = crate::utils::clamp_value(self.replaced_item_price, 0, 100);
-            self.revival_stone_rate = crate::utils::clamp_value(self.revival_stone_rate, 0, 500);
+            self.revival_stone_rate = crate::utils::clamp_value(self.revival_stone_rate, 0, 100);
             self.bond_ring_skill_s_rate = crate::utils::clamp_value(self.bond_ring_skill_s_rate, 0, 100);
             self.bond_ring_skill_a_rate = crate::utils::clamp_value(self.bond_ring_skill_a_rate, 0, 100);
             self.bond_ring_skill_b_rate = crate::utils::clamp_value(self.bond_ring_skill_b_rate, 0, 100);
@@ -177,9 +180,7 @@ impl DeploymentConfig {
         println!("Engage Lower {}, Higher {}", self.engrave_lower_score, self.engrave_upper_score);
         return (self.engrave_lower_score, self.engrave_upper_score, true);
     }   
-    pub fn get_bond_ring_rates(&self) -> [i32; 4] {
-        return [self.bond_ring_skill_s_rate, self.bond_ring_skill_a_rate, self.bond_ring_skill_b_rate, self.bond_ring_skill_c_rate ];
-    }
+    pub fn get_bond_ring_rates(&self) -> [i32; 4] { return [self.bond_ring_skill_s_rate, self.bond_ring_skill_a_rate, self.bond_ring_skill_b_rate, self.bond_ring_skill_c_rate ]; }
     pub fn save(&self) {
         let out_toml = toml::to_string_pretty(&self).unwrap();
         std::fs::write("sd:/engage/config/triabolical.toml", out_toml).expect("should be able to write to write default configuration");
@@ -209,31 +210,24 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
         match ev {
             SystemEvent::ProcInstJump {proc, label } => {
-                if proc.name.is_some() { 
-                    println!("Proc: {}, Hash {}, label {}", proc.name.unwrap().get_string().unwrap(), proc.hashcode, label);
-                }
-                if proc.hashcode == 1650205480 && *label == 17 {
+                if proc.name.is_some() {  println!("Proc: {}, Hash {}, label {}", proc.name.unwrap().get_string().unwrap(), proc.hashcode, label); }
+                if proc.hashcode == 1650205480 && *label == 17 {    // map ending
                     person::m011_ivy_recruitment_check();
                     continuous::continous_mode_post_battle_stuff(proc); 
                     continuous::update_ignots();
+                    deploy::unit_status();
                 }
-                if proc.hashcode == -988690862 && *label == 0 {
+                if proc.hashcode == -988690862 && *label == 0 { // On Initial Title Screen Load
+                    message::replace_hub_fxn();
                     enums::generate_black_list();
-                    //continuous::do_custom_call();
-                    //crate::autolevel::do_continious_mode();
                     emblem::get_recommended_paralogue_levels();
+                    asset::add_animation_unique_classes();
                     item::create_item_pool();
-                    utils::dlc_check();
                     person::get_playable_list();
                     bgm::get_bgm_pool();
                     skill::create_skill_pool();
+                    emblem::get_engrave_stats();
                     emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().intialize_list();
-                    unsafe {
-                        for i in 0..41 { 
-                            person::RAND_PERSONS[i as usize] = i; 
-                            person::RAND_PERSONS[41 + i as usize] = i; 
-                        }
-                    }
                     set_personal_caps();
                 }
                 if proc.hashcode == -339912801 && *label == 1 {
@@ -253,18 +247,22 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                     autolevel::update_learn_skills();
                     continuous::update_next_chapter();
                     set_personal_caps();
+                    ironman::ironman_code_edits();
+                    deploy::unit_status();
                 }
-                if proc.hashcode == -1912552174 && *label == 28 {
-                    random::start_new_game(); 
-                }
+                if proc.hashcode == -1912552174 && *label == 28 { random::start_new_game();  }
                 // when map starts, iron code edits activate
                 if proc.hashcode == -339912801 && *label == 12 { 
                     ironman::ironman_code_edits();
                     shop::randomize_hub_random_items();
                     autolevel::calculate_player_cap(); 
                     continuous::update_bonds();
+                    unsafe { crate::enums::LUEUR_CHANGE = true; }
                 }
-                if proc.hashcode == -1624221522 && *label == 14 { bgm::randomize_bgm_map(); }
+                if proc.hashcode == -1624221522 && *label == 14 { // sortie sequence ends
+                    bgm::randomize_bgm_map(); 
+                    deploy::adjust_map_inspectors();
+                }
             }
             _ => {},
         }
@@ -272,30 +270,24 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
     else {  println!("We received a missing event, and we don't care!"); }
 }
 
-#[skyline::main(name = "deployment")]
+#[skyline::main(name = "vibe")]
 pub fn main() {
     let _ = std::fs::create_dir_all("sd:/Draconic Vibe Crystal/");
-    //Deployment
     cobapi::register_system_event_handler(initalize_random_persons);
     skyline::install_hooks!( 
-        //emblem::emblem_skill::item_add_hook,
         asset::add_job_list_unit, 
-        person::mess_get_impl_hook, 
         random::try_get_index, 
         deploy::create_player_team, 
-        //continuous::update_unit_data,
-        //continuous::r_call_unit_selection,
-        random::script_get_string,
+        message::script_get_string,
         person::unit_create_impl_2_hook, 
         person::create_from_dispos_hook,
         asset::asset_table_result_setup_hook,
+        message::mess_get_impl_hook, 
     ); 
     // Fixes the emblem weapons arena issue
     Patch::in_text(0x01ca9afc).nop().unwrap();
     random::install_vibe();
     disable_support_restriction();
-    // 68 00 00 b4  revert back to normal sp = exp
-    Patch::in_text(0x01a39fe4).nop().unwrap();
     std::panic::set_hook(Box::new(|info| {
         let location = info.location().unwrap();
         let msg = match info.payload().downcast_ref::<&'static str>() {

@@ -75,7 +75,7 @@ impl ConfigBasicMenuItemSwitchMethods for IronmanMod {
         } else {return BasicMenuResult::new(); }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if CONFIG.lock().unwrap().iron_man { this.help_text = "New game saves will be marked as 'Ironman'".into();  }
+        if CONFIG.lock().unwrap().iron_man { this.help_text = "Disables Draconic Time Crystal and bookmarks.".into();  }
         else { this.help_text = "Disables Ironman mode.".into(); }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){

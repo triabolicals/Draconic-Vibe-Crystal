@@ -1,4 +1,4 @@
-use unity::prelude::*;
+use unity::{il2cpp::class::Il2CppRGCTXData, prelude::*};
 use skyline::patching::Patch;
 use engage::random::Random;
 use engage::{
@@ -7,26 +7,54 @@ use engage::{
     menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}},
     godpool::*,
     force::*,
-    gamedata::{skill::SkillData, item::ItemData, *, unit::*},
+    script::*,
+    singleton::SingletonClass,
+    gamedata::{*, GodData, unit::*},
 };
+use unity::system::List;
+use unity::il2cpp::object::Array;
 use super::CONFIG;
+use crate::person::lueur_on_map;
 use crate::{enums::*, person, item};
 
 // Calculate the unit's displayed rating 
 pub fn get_unit_rating(this: &Unit) -> i32 {
     let mut result: i32 = 0;
-    for x in 1..8 { result += this.get_capability(x as i32, false);  }
+    for x in 1..9 { result += this.get_capability(x as i32, false);  }
     result
 }
+pub fn unit_status() {
+    let player_force = Force::get(ForceType::Player).unwrap();
+    let mut force_iter = Force::iter(player_force);
+    while let Some(unit) = force_iter.next() {
+        println!("Player Status of {}: {}", unit.person.get_name().unwrap().get_string().unwrap(), unit.status.value);
+    }
+    let absent_force = Force::get(ForceType::Absent).unwrap();
+    let mut force_iter = Force::iter(absent_force );
+    while let Some(unit) = force_iter.next() {
+        println!("Absent Status of {}: {}", unit.person.get_name().unwrap().get_string().unwrap(), unit.status.value);
+    }
+    let dead_force = Force::get(ForceType::Dead).unwrap();
+    let mut force_iter = Force::iter( dead_force  );
+    let emblem_lueur = GodPool::try_get_gid("GID_リュール", false);
+    let has_emblem_lueur = emblem_lueur.is_some();
+    while let Some(unit) = force_iter.next() {
+        println!("Dead Status of {}: {}", unit.person.get_name().unwrap().get_string().unwrap(), unit.status.value);
+        if unit.person.pid.get_string().unwrap() == "PID_リュール" && has_emblem_lueur {
+            let god_lueur = GodData::get("GID_リュール").unwrap();
+            if god_lueur.get_flag().value & -2147483648 != 0 {
+                god_lueur.get_flag().value -= -2147483648;
+            }
+        }
+    }
 
+ }
 // Generating the list of equipable emblems
 pub fn get_emblem_list() -> Vec<&'static str> {
     let mut result: Vec<&str> = Vec::new();
     for x in EMBLEM_GIDS {
         let god_unit = GodPool::try_get_gid(x, true);
-        if god_unit.is_some() {
-            if !god_unit.unwrap().get_escape() { result.push(x); }
-        }
+        if god_unit.is_some() { if !god_unit.unwrap().get_escape() { result.push(x); } }
     }
     result
 }
@@ -47,20 +75,17 @@ pub fn get_emblem_paralogue_level() {
     // Find indices
     GameVariableManager::make_entry("G_Paralogue_Level", 0);
     GameVariableManager::set_number("G_Paralogue_Level", 0);
+    if !crate::utils::can_rand() { return; }
     loop {
         if crate::utils::str_contains(cid, EMBELM_PARA[emblem_index as usize]) {
-            unsafe {
-                let found = crate::emblem::RANDOMIZED_INDEX.iter().position(|y| *y == emblem_index);
-                if found.is_some() { 
-                    new_emblem_index = found.unwrap(); 
-                    break;
-                }
-                else { return; }
+            let found = person::pid_to_index(&EMBLEM_GIDS[emblem_index as usize].to_string(), false);
+            if found != -1 { 
+                new_emblem_index = found; 
+                break;
             }
+            else { return; }
         }
-        else {
-            emblem_index += 1;
-        }
+        else { emblem_index += 1; }
         if emblem_index >= 12 { return; }
     }
     let level_difference;
@@ -68,12 +93,8 @@ pub fn get_emblem_paralogue_level() {
         let party_average = crate::autolevel::get_difficulty_adjusted_average_level();
         println!("Party Average: {}", party_average);
         level_difference = party_average - 2 - PARA_LEVEL[emblem_index as usize];
-        if level_difference >= 0 {
-            GameVariableManager::set_number("G_Paralogue_Level", 0);
-        }
-        else {
-            GameVariableManager::set_number("G_Paralogue_Level", level_difference);
-        }
+        if level_difference >= 0 { GameVariableManager::set_number("G_Paralogue_Level", 0); }
+        else { GameVariableManager::set_number("G_Paralogue_Level", level_difference); }
 
     }
     else {
@@ -86,115 +107,54 @@ pub fn get_emblem_paralogue_level() {
 
 #[unity::hook("App", "MapDispos", "CreatePlayerTeam")]
 pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
-    //check_terrain();
-    if GameVariableManager::get_bool("G_Random_Recruitment"){
-        person::change_map_dispos();
-    }
-
     let absent_force = Force::get(ForceType::Absent).unwrap();
-    if GameVariableManager::get_bool("G_Random_Job") && !GameVariableManager::get_bool("G_Lueur_Random") {
-        let hero_unit = absent_force.get_hero_unit();
-        item::unit_change_to_random_class(hero_unit);
-        GameVariableManager::set_bool("G_Lueur_Random", true);
-        person::adjust_unit_items(hero_unit);
+    let hero_unit = absent_force.get_hero_unit();
+    if GameVariableManager::get_number("G_DeploymentMode") == 3 {
+        if GameUserData::get_status().value & 64 != 0 { GameUserData::get_status().value -= 64;  }  //Disables Continuous Flag 
     }
-    // Liberation Weapon Change
-    if ( GameVariableManager::get_bool("G_Random_Job") && GameVariableManager::get_bool("G_Lueur_Random") ) && ( GameVariableManager::get_bool("G_Cleared_M002") && GameVariableManager::get_number("G_Liberation_Type") == 0 ) {
-        let hero_unit = absent_force.get_hero_unit();
-        let kinds = hero_unit.get_job().get_equippable_item_kinds();
-
-        let mut liberation_type = 1; //Sword
-        for i in 0..kinds.len() {
-            if kinds[i] == 7 || kinds[i] >= 9 {
-                continue;
-            }
-            if kinds[i] == 0 { continue; }
-            liberation_type = kinds[i];
+    if crate::utils::can_rand() {  
+        if GameVariableManager::get_number("G_Random_Recruitment") != 0 { person::change_map_dispos(); }
+        let random_job =  GameVariableManager::get_number("G_Random_Job") == 1 || GameVariableManager::get_number("G_Random_Job") == 3;
+        if random_job && !GameVariableManager::get_bool("G_Lueur_Random") {
+            item::unit_change_to_random_class(hero_unit);
+            GameVariableManager::set_bool("G_Lueur_Random", true);
+            person::adjust_unit_items(hero_unit);
         }
-        let liberation = ItemData::get_mut("IID_リベラシオン").unwrap();
-        liberation.kind = liberation_type as u32;
-        if liberation_type == 4 {
-            liberation.range_o = 3;
-            liberation.range_i = 2;
-            liberation.set_cannon_effect("弓砲台".into());
-            liberation.on_complete();
-            liberation.get_equip_skills().add_skill(SkillData::get("SID_飛行特効").unwrap(),4, 0);
-        }
-        else if liberation_type == 5 || liberation_type == 6 {
-            liberation.range_i = 1;
-            liberation.range_o = 2;
-            if liberation_type == 6 {
-                liberation.set_cannon_effect("魔砲台炎".into());
-                liberation.set_hit_effect( "エルファイアー".into());
-                liberation.on_complete();
-            }
-            else { liberation.get_give_skills().add_sid("SID_毒",4, 0); }
-        }
-        else if liberation_type == 8 {
-            liberation.get_equip_skills().add_sid("SID_気功",4, 0);
-            liberation.get_equip_skills().add_sid("SID_２回行動",4,0);
-        }
-        else {
-            liberation.range_i = 1;
-            liberation.range_o = 1;
-        }
-        GameVariableManager::make_entry("G_Liberation_Type", liberation_type);
-        GameVariableManager::set_number("G_Liberation_Type", liberation_type);
+        // Liberation Weapon Change
+        crate::item::change_liberation_type();
     }
-
     call_original!(group, method_info);
-
-    if crate::utils::str_contains(GameUserData::get_chapter().cid, "CID_S0") && GameVariableManager::get_number("G_Emblem_Mode") != 0 {
-        get_emblem_paralogue_level();
-    }
+    if crate::utils::str_contains(GameUserData::get_chapter().cid, "CID_S0") && GameVariableManager::get_number("G_Emblem_Mode") != 0 { get_emblem_paralogue_level(); }
     if !GameVariableManager::get_bool("G_Cleared_M003") {return; }
     let player_force = Force::get(ForceType::Player).unwrap();
-
     let max_player = player_force.get_count();
     let mut player_count;
     let absent_count = absent_force.get_count();
     let rng = Random::get_game();
-    let config = CONFIG.lock().unwrap();
-    config.save();
 
+    if GameVariableManager::get_number("G_DeploymentMode") == 3 && !GameUserData::is_encount_map() { 
+        if hero_unit.status.value & 20 != 0 { hero_unit.status.value -= 20; }
+        hero_unit.status.value = hero_unit.status.value | 1073741832;
+        if GameVariableManager::get_number("G_EmblemDeployMode")!= 0 {
+            emblem_selection_menu_enable(false);
+            unsafe {remove_all_rings(0, None); }
+        }
+        return;
+    }
     unsafe {
         if absent_count == 0 || GameUserData::is_evil_map() { 
             unit_selection_menu_enable(true);
             emblem_selection_menu_enable(true);
             if GameUserData::is_evil_map() { return; }
         }
-        if config.emblem_deployment != 0 && config.deployment_type == 0 {
+        if GameVariableManager::get_number("G_EmblemDeployMode")!= 0 && GameVariableManager::get_number("G_DeploymentMode")  == 0 {
             unit_selection_menu_enable(true);
             emblem_selection_menu_enable(false);
             remove_all_rings(0, None);
-            if config.emblem_deployment == 2 {
-                return;
-            }
-            let emblem_list = get_emblem_list();
-            let mut emblem_count = emblem_list.len();
-            let mut set_emblems: [bool; 20] = [false; 20];
-            if emblem_count > max_player as usize {
-                emblem_count = max_player as usize;
-            }
-            let mut current_emblem_count = 0;
-            let mut force_iter = Force::iter(player_force);
-            while let Some(unit) = force_iter.next() {
-                let mut value = rng.get_value(emblem_list.len() as i32) as usize;
-                while set_emblems[value] == true {
-                    value = rng.get_value(emblem_list.len() as i32) as usize;
-                }
-                let god_unit = GodPool::try_get_gid(emblem_list[value], true).unwrap();
-                unit.set_god_unit(god_unit);
-                current_emblem_count += 1;
-                set_emblems[value] = true;
-                if current_emblem_count == emblem_count {  
-                    break;
-                } 
-            }
             return;
         }
         //Normal Deployment
-        if config.deployment_type == 0 || absent_count == 0 {
+        if GameVariableManager::get_number("G_DeploymentMode")  == 0 || absent_count == 0 {
             unit_selection_menu_enable(true);
             return;
         } 
@@ -202,17 +162,14 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
         player_force.transfer(3, true);
 
         //Transfer Dead
-        if config.deployment_type != 0 { Force::get(ForceType::Dead).unwrap().transfer(3, true); }
-
+        if GameVariableManager::get_number("G_DeploymentMode")  == 1 || GameVariableManager::get_number("G_DeploymentMode")  == 2 { Force::get(ForceType::Dead).unwrap().transfer(3, true); }
         let hero_unit = absent_force.get_hero_unit();
         hero_unit.transfer(0, true);
         hero_unit.try_create_actor();
-        if !GameUserData::is_encount_map() { hero_unit.set_status(20); }
+        if !GameUserData::is_encount_map() && GameVariableManager::get_number("G_DeploymentMode") != 3 { hero_unit.set_status(20); }   
         player_count = player_force.get_count();
-        //unit_update_actor(hero_unit,None);
-
         // Lowest Rating Deployment
-        if config.deployment_type == 1 {
+        if GameVariableManager::get_number("G_DeploymentMode") == 1 {
             unit_selection_menu_enable(false);
             emblem_selection_menu_enable(true);
             while player_count < max_player {
@@ -234,16 +191,14 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
                     let unit = move_unit.unwrap();
                     unit.transfer(0, true);
                     unit.try_create_actor();
-                   // unit_update_actor(unit, None);
                 }
                 player_count = player_force.get_count();
             }
         }
         // Random Deployment
-        else if config.deployment_type == 2  {
+        else if GameVariableManager::get_number("G_DeploymentMode") == 2  {
             unit_selection_menu_enable(false);
             emblem_selection_menu_enable(true);
-
             while player_count < max_player {
                 let rng_range = absent_force.get_count();
                 let mut index = 0;
@@ -253,7 +208,6 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
                     if index == value {
                         unit.transfer(0, true);
                         unit.try_create_actor();
-                   //     unit_update_actor(unit, None);
                         player_count = player_force.get_count();
                         break;
                     }
@@ -261,34 +215,6 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
                 }
             }
         }
-        // Random Emblems
-        if config.emblem_deployment != 0  {
-            emblem_selection_menu_enable(false);
-            remove_all_rings(0, None);
-            if config.emblem_deployment == 2 {
-                return;
-            }
-            let emblem_list = get_emblem_list();
-            let mut emblem_count = emblem_list.len();
-            let mut set_emblems: [bool; 20] = [false; 20];
-            if emblem_count > max_player as usize {
-                emblem_count = max_player as usize;
-            }
-            let mut current_emblem_count = 0;
-            let mut force_iter = Force::iter(player_force);
-            while let Some(unit) = force_iter.next() {
-                let mut value = rng.get_value(emblem_list.len() as i32) as usize;
-                while set_emblems[value] == true {
-                    value = rng.get_value(emblem_list.len() as i32) as usize;
-                }
-                let god_unit = GodPool::try_get_gid(emblem_list[value], true).unwrap();
-                unit.set_god_unit(god_unit);
-                current_emblem_count += 1;
-                set_emblems[value] = true;
-                if current_emblem_count == emblem_count { break; } 
-            }
-        }
-        else { let _ = Patch::in_text(0x01d77028).bytes(&[0xc0, 0x00, 0x00, 0x36]);}
     }
 }
 // Global Menu Stuff
@@ -296,9 +222,13 @@ pub struct DeploymentMod;
 impl ConfigBasicMenuItemSwitchMethods for DeploymentMod {
     fn init_content(_this: &mut ConfigBasicMenuItem){ }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().deployment_type, 0, 2, 1);
-        if CONFIG.lock().unwrap().deployment_type != result {
-            CONFIG.lock().unwrap().deployment_type = result;
+        let value = 
+            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().deployment_type }
+            else { GameVariableManager::get_number("G_DeploymentMode") };
+        let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
+        if value != result {
+            if GameUserData::get_sequence() == 0 {  CONFIG.lock().unwrap().deployment_type = result; }
+            else {  GameVariableManager::set_number("G_DeploymentMode", result); } 
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -306,18 +236,26 @@ impl ConfigBasicMenuItemSwitchMethods for DeploymentMod {
         } else { return BasicMenuResult::new(); }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        match CONFIG.lock().unwrap().deployment_type {
-            1 => { this.help_text ="Lowest rating units will be deployed. (Togglable)".into(); },
-            2 => { this.help_text = "Units will be deployed at random. (Togglable)".into(); }
-            _ => { this.help_text = "Normal Deployment (Togglable)".into(); },
-        }
+        let deploy_type =   
+            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().deployment_type }
+            else { GameVariableManager::get_number("G_DeploymentMode") };
+        this.help_text = match deploy_type {
+            1 => {"Lowest rating units will be deployed." },
+            2 => {"Units will be deployed at random." }
+            3 => {"No forced deployment restrictions."},
+            _ => { "Normal Deployment"},
+        }.into();
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        match CONFIG.lock().unwrap().deployment_type {
-            1 => { this.command_text = "Lowest Rating".into(); },
-            2 => { this.command_text = "Random".into(); },
-            _ => { this.command_text = "Default".into(); },
-        }
+        let deploy_type =   
+            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().deployment_type }
+            else { GameVariableManager::get_number("G_DeploymentMode") };
+        this.command_text = match deploy_type { 
+            1 => { "Lowest Rating" },
+            2 => { "Random" },
+            3 => { "Free"},
+            _ => { "Default" },
+        }.into();
     }
 }
 
@@ -325,28 +263,39 @@ pub struct EmblemMod;
 impl ConfigBasicMenuItemSwitchMethods for EmblemMod {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().emblem_deployment, 0, 2, 1);
-        if CONFIG.lock().unwrap().emblem_deployment != result {
-            CONFIG.lock().unwrap().emblem_deployment = result;
+        let value = 
+            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().emblem_deployment }
+            else { GameVariableManager::get_number("G_EmblemDeployMode") };
+        let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 2, 1);
+        if value != result {
+            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().emblem_deployment = result; }
+            else { GameVariableManager::set_number("G_EmblemDeployMode", result) };
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
             return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
+        }
+        return BasicMenuResult::new();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        match CONFIG.lock().unwrap().emblem_deployment {
-            1 => { this.help_text = "Emblems will be randomized onto deployed units. (Togglable)".into();  }
-            2 => { this.help_text = "Emblems will not be equipped onto units. (Togglable)".into(); }
-            _ => { this.help_text = "Emblems are freely selectable in battle preperations. (Togglable)".into(); }
-        }
+        let emblem_deployment = 
+            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().emblem_deployment }
+            else { GameVariableManager::get_number("G_EmblemDeployMode") };
+        this.help_text = match emblem_deployment {
+            1 => { "Emblems will be randomized onto deployed units. (Togglable)" },
+            2 => { "Emblems will not be equipped onto units. (Togglable)" },
+            _ => { "Emblems are freely selectable in battle preperations. (Togglable)"},
+        }.into();
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        match CONFIG.lock().unwrap().emblem_deployment {
-            1 => { this.command_text = "Random".into();  }
-            2 => { this.command_text = "None".into(); }
-            _ => { this.command_text = "Default".into(); }
-        }
+        let emblem_deployment = 
+            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().emblem_deployment }
+            else { GameVariableManager::get_number("G_EmblemDeployMode") };
+        this.command_text = match emblem_deployment { 
+            1 => { "Random Emblems" },
+            2 => { "No Emblems" },
+            _ => { "Default"},
+        }.into();
     }
 }
 
@@ -357,58 +306,85 @@ pub fn remove_all_rings(this: u64, method_info: OptionalMethod);
 pub fn get_sortie_limit(method_info: OptionalMethod) -> i32;
 
 #[skyline::from_offset(0x01c54fa0)]
-pub fn force_get_unit_from_pid(pid: &Il2CppString, relay: bool, method_info: OptionalMethod) -> Option<&'static Unit>;
+pub fn force_get_unit_from_pid(pid: &Il2CppString, relay: bool, method_info: OptionalMethod) -> Option<&'static mut Unit>;
 
-#[skyline::from_offset(0x01a220b0)]
-pub fn unit_update_actor(this: &Unit, method_info: OptionalMethod);
-/* 
-#[unity::class("App", "MapTerrain")]
-pub struct MapTerrain {
-    _super: u64,
-    pub x: i32,
-    pub z: i32,
-    pub width: i32,
-    pub height: i32,
-    layers: u64,
-    overlaps: u64,
-    pub terrains: &'static Array<&'static Il2CppString>, 
+#[unity::class("App", "MapInspectors")]
+pub struct MapInspectors {
+    parent: [u8; 0x10],
+    pub inspectors: &'static mut List<MapInspector>,
+    pub kind_inspectors: &'static mut Array<&'static mut List<MapInspector>>,
 }
-#[unity::from_offset("App", "MapSetting", "get_MapTerrain")]
-pub fn get_map_terrain(method_info: OptionalMethod) -> Option<&'static MapTerrain>;
 
-use std::fs::File;
-use unity::il2cpp::object::Array;
-use std::io::Write;
-#[unity::class("App", "TerrainData")]
-pub struct TerrainData {}
-impl Gamedata for TerrainData  {}
-
-pub fn check_terrain() {
-    unsafe {
-        let terrain = get_map_terrain(None);
-        if terrain.is_none() { return; }
-        let map_terrain = terrain.unwrap();
-        let cid = GameUserData::get_chapter().cid.get_string().unwrap();
-        let filename = format!("sd:/Draconic Vibe Crystal/{} Terrain.txt", cid);
-        let mut f = File::options().create(true).write(true).truncate(true).open(filename).unwrap();
-        writeln!(&mut f, "Width {}", map_terrain.width).unwrap();
-        writeln!(&mut f, "Height {}\n", map_terrain.height).unwrap();
-        let start_x = map_terrain.x;
-        let end_x = map_terrain.width;
-        let start_z = map_terrain.z;
-        let end_z = map_terrain.height;
-        for z in start_z..end_z {
-            let mut z_line = "".to_string();
-            for x in start_x..end_x {
-                let index: usize = ( x + 32 * z ) as usize;
-                let tid = map_terrain.terrains[ index ];
-                if TerrainData::get(&tid.get_string().unwrap()).is_some() {
-                    z_line = format!("{}\t{}", z_line, TerrainData::get_index(tid));
-                }
-                else { z_line = format!("{}\t{}", z_line, -1); }
-            }
-            writeln!(&mut f, "{}", z_line).unwrap();
-        }
+#[unity::class("App", "MapInspector")]
+pub struct MapInspector {
+    pub kind: i32,
+    __: i32,
+    pub  m_condition: &'static DynValue,
+    pub function: &'static DynValue,
+    pub arg: &'static Array<&'static DynValue>,
+    pub var1: i32,
+    pub var2: i32,
+    pub var3: i32,
+    pub var4: i32,
+    pub var5: i32,
+    pub var6: i32,
+}
+impl MapInspectors {
+    fn get_instance() -> &'static mut MapInspectors {
+        let idk = get_generic_class!(SingletonClass<MapInspectors>).unwrap();
+        let pointer = unsafe { &*(idk.rgctx_data as *const Il2CppRGCTXData as *const u8 as *const [&'static MethodInfo; 6]) };
+        let get_instance =
+            unsafe { std::mem::transmute::<_, extern "C" fn(OptionalMethod) -> &'static mut MapInspectors>(pointer[5].method_ptr) };
+        get_instance(Some(&pointer[5]))
     }
 }
-*/
+
+pub fn adjust_map_inspectors() {
+    if GameVariableManager::get_number("G_EmblemDeployMode") == 2  {
+        emblem_selection_menu_enable(false);
+        unsafe { remove_all_rings(0, None); }
+    }
+    else if GameVariableManager::get_number("G_EmblemDeployMode") == 1 {
+        unsafe { remove_all_rings(0, None); }
+        let emblem_list = get_emblem_list();
+        let mut emblem_count = emblem_list.len();
+        let mut set_emblems: [bool; 20] = [false; 20];
+        let player_force = Force::get(ForceType::Player).unwrap();
+        let max_player = player_force.get_count();
+        if emblem_count > max_player as usize { emblem_count = max_player as usize; }
+        let mut current_emblem_count = 0;
+        let mut force_iter = Force::iter(player_force);
+        let rng = Random::get_game();
+        while let Some(unit) = force_iter.next() {
+            let mut value = rng.get_value(emblem_list.len() as i32) as usize;
+            while set_emblems[value] == true { value = rng.get_value(emblem_list.len() as i32) as usize;  }
+            let god_unit = GodPool::try_get_gid(emblem_list[value], true).unwrap();
+            unit.set_god_unit(god_unit);
+            current_emblem_count += 1;
+            set_emblems[value] = true;
+            if current_emblem_count == emblem_count { break; } 
+        }
+    }
+    else { Patch::in_text(0x01d77028).bytes(&[0xc0, 0x00, 0x00, 0x36]).unwrap();}
+
+    if lueur_on_map() && GameVariableManager::get_number("G_DeploymentMode") == 3 { return; } // if alear is on map don't change anything 
+    let inspectors = MapInspectors::get_instance();
+    for x in 0..inspectors.inspectors.len() {
+        let kind = inspectors.inspectors[x].kind;
+        if kind == 9 {
+            if inspectors.inspectors[x].var6 == 1 { inspectors.inspectors[x].var6 = -1; }
+        }
+        if kind == 18 || kind == 19 {
+            if inspectors.inspectors[x].var1 == 1 { inspectors.inspectors[x].var1 = -1; } //new_person_index; }
+        }
+    }
+    for x in 0..inspectors.kind_inspectors[9].len() {
+        if inspectors.kind_inspectors[9].items[x as usize].var6 == 1 { inspectors.kind_inspectors[9].items[x as usize].var6 = -1; }
+    }
+    for x in 0..inspectors.kind_inspectors[18].len() {
+        if inspectors.kind_inspectors[18].items[x as usize].var1 == 1 { inspectors.kind_inspectors[18].items[x as usize].var1 = -1; }
+    }
+    for x in 0..inspectors.kind_inspectors[19].len() {
+        if inspectors.kind_inspectors[19].items[x as usize].var1 == 1 { inspectors.kind_inspectors[19].items[x as usize].var1 = -1; }
+    }
+}

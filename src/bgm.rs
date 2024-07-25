@@ -4,6 +4,7 @@ use engage::{
         BasicMenuResult, 
         config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}
     },
+    gamevariable::GameVariableManager,
     gameuserdata::*,
     random::*,
     gamedata::*,
@@ -35,7 +36,9 @@ pub fn get_bgm_pool() {
     }
 }
 pub fn randomize_bgm_map() {
-    if !CONFIG.lock().unwrap().random_map_bgm { return; }
+    if GameVariableManager::get_number("G_EXP_TYPE") > 3 {  GameVariableManager::set_bool("勝利".into(), true); }
+    if !crate::utils::can_rand() { return; }
+    if !GameVariableManager::get_bool("G_RandomBGM") { return; }
     if GameUserData::is_encount_map() { return; }
     let rng = Random::get_game();
     let size = BGM_POOL.lock().unwrap().len() as i32;
@@ -57,22 +60,30 @@ pub struct RandomBGMMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomBGMMod {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_b(CONFIG.lock().unwrap().random_map_bgm);
-        if CONFIG.lock().unwrap().random_map_bgm != result {
-            CONFIG.lock().unwrap().random_map_bgm = result;
+        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_map_bgm } 
+                    else { GameVariableManager::get_bool("G_RandomBGM") };
+        let result = ConfigBasicMenuItem::change_key_value_b(value);
+        if value != result {
+            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_map_bgm = result; }
+            else { GameVariableManager::set_bool("G_RandomBGM", result);  }
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
             return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
+        }
+        return BasicMenuResult::new();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if CONFIG.lock().unwrap().random_map_bgm { this.help_text = "Map BGM will be randomized for each phase. (Togglable)".into(); }
-        else { this.help_text = "No changes to map BGM. (Togglable)".into(); }
+        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_map_bgm } 
+                    else { GameVariableManager::get_bool("G_RandomBGM") };
+        this.help_text = if value { "Map BGM will be randomized for each phase. (Togglable)" }
+                         else { "No changes to map BGM. (Togglable)"}.into();
     }
+
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if CONFIG.lock().unwrap().random_map_bgm { this.command_text = "Randomized".into();  }
-        else { this.command_text = "Normal".into(); }
+        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_map_bgm } 
+                    else { GameVariableManager::get_bool("G_RandomBGM") };
+        this.command_text = if value { "Random BGM" } else { "Default BGM" }.into();
     }
 }
 

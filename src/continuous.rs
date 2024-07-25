@@ -1,4 +1,4 @@
-use unity::prelude::*;
+use unity::{system::{Dictionary, List}, prelude::*};
 use skyline::patching::Patch;
 use engage::{
     menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}},
@@ -8,14 +8,9 @@ use engage::{
     mess::*,
     proc::ProcInst,
     random::*,
-    gamedata::{unit::*, dispos::ChapterData, skill::*, *},
+    gamedata::{unit::*, item::ItemData, god::RingData, dispos::ChapterData, *},
+    godpool::GodPool,
 };
-use unity::system::Dictionary;
-use engage::gamedata::dispos::DisposData;
-use engage::gamedata::item::ItemData;
-use engage::gamedata::god::RingData;
-use unity::system::List;
-use engage::godpool::GodPool;
 use super::CONFIG;
 use crate::utils::*;
 use crate::enums::*;
@@ -44,7 +39,7 @@ impl Gamedata for AchieveData {}
 
 // Continious Mode Stuff
 pub fn do_continious_mode() {
-    if GameVariableManager::get_number("G_Continuous") != 0 {
+    if GameVariableManager::get_number("G_Continuous") != 0 && !GameVariableManager::get_bool("G_Cleared_M026")  {
         let current_chapter = GameUserData::get_chapter();
         let flag = current_chapter.get_flag();
         let mut new_flag = flag;
@@ -79,6 +74,8 @@ fn dictionary_ctor(this: &Dictionary<&Unit, i32>, method_info: OptionalMethod);
 
 pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
     if GameVariableManager::get_number("G_Continuous") == 0 { return; }
+    if GameUserData::get_chapter().cid.get_string().unwrap() == "CID_M026" { return; }
+    if GameVariableManager::get_bool("G_Cleared_M026") { return; }
     unsafe {
         set_well_use_flag(2, None);
         let item_list = generate_item_list(proc);
@@ -102,7 +99,6 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
                         unit.add_sp(base_exp_gain);
                         continue; 
                     }
-
                     // level scaling    
                     let total_level = unit.level as i32 + unit.internal_level as i32;
                     if total_level < level_cap { 
@@ -506,8 +502,7 @@ pub fn update_ignots(){
 pub fn get_number_main_chapters_completed2() -> i32 {
     let mut number = 0;
     let chapters = ChapterData::get_list_mut().expect(":D");
-    let length = chapters.len();
-    for x in 0..length {
+    for x in 0..chapters.len() {
         if GameUserData::is_chapter_completed(chapters[x]) { number += 1; }
     }
     number
@@ -529,24 +524,18 @@ pub fn add_support_points() {
         let unit_list = my_room_reliance_select_get_unit_list(None);
         for x in 0..unit_list.len() {
             let unit_a = &unit_list[x];
-            let is_a_deployed = ( unit_a.force.unwrap().force_type == 0 );
-            let is_lueur = (unit_a.person.pid.get_string().unwrap() == "PID_リュール");
+            let is_a_deployed = unit_a.force.unwrap().force_type == 0;
+            let is_lueur = unit_a.person.pid.get_string().unwrap() == "PID_リュール";
             for y in x+1..unit_list.len(){
                 let unit_b = &unit_list[y];
                 let reliance = unit_reliance_try_get(unit_a, unit_b, None);
                 if reliance.is_some() {
                     let reliance_data = reliance.unwrap();
-                    let is_b_deployed = ( unit_b.force.unwrap().force_type == 0 );
+                    let is_b_deployed = unit_b.force.unwrap().force_type == 0;
                     let exp_needed = unit_get_exp_next_level(reliance_data, reliance_data.level, None);
                     if exp_needed != 100 && exp_needed != 0 { 
                         reliance_data.exp += 1 + (is_a_deployed || is_b_deployed) as i8 + is_lueur as i8;
                     }
-                }
-                if can_be_a_plus_support(unit_a, unit_b, None) { 
-                    level_up_support(unit_a, unit_b, None); 
-                    
-                    set_level_a_plus(unit_a, unit_b, None);
-                    GameVariableManager::set_number("G_所持_IID_約束の指輪", 1);
                 }
             }
         }
@@ -660,7 +649,9 @@ fn can_be_a_plus_support(unit_a: &Unit, unit_b: &Unit, method_info: OptionalMeth
 
 #[skyline::from_offset(0x01c5abf0)]
 fn level_up_support(unit_a: &Unit, unit_b: &Unit, method_info: OptionalMethod ) -> bool;
+
 #[skyline::from_offset(0x01c5b020)]
 fn set_level_a_plus(unit_a: &Unit, unit_b: &Unit, method_info: OptionalMethod );
+
 #[skyline::from_offset(0x02939a80)]
 pub fn set_well_use_flag(flag: i32, method_info: OptionalMethod);

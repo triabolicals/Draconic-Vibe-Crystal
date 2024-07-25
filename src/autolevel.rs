@@ -1,24 +1,14 @@
 use unity::prelude::*;
-use skyline::patching::Patch;
 use engage::{
-    menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}},
+    menu::{BasicMenuResult, config::*},
     gamevariable::*,
     gameuserdata::*,
     force::*,
     mess::*,
-    proc::ProcInst,
-    random::*,
-    gamedata::{unit::*, dispos::ChapterData, skill::*, *},
+    gamedata::{unit::*, dispos::*, skill::*, *},
 };
-use unity::system::Dictionary;
-use engage::gamedata::dispos::DisposData;
-use engage::gamedata::item::ItemData;
-use engage::gamedata::god::RingData;
-use unity::system::List;
-use engage::godpool::GodPool;
 use super::CONFIG;
 use crate::utils::*;
-use crate::enums::*;
 
 pub const EMBLEMS: &[&str] = &[ "GID_M010_敵リン", "GID_M007_敵ルキナ", "GID_M014_敵ベレト", "GID_M024_敵マルス", "GID_M017_敵シグルド", "GID_M017_敵セリカ", "GID_M019_敵ミカヤ", "GID_M019_敵ロイ", "GID_M017_敵リーフ", "GID_E006_敵エーデルガルト", "GID_E006_敵クロム", "GID_E006_敵カミラ", "GID_E006_敵セネリオ", "GID_E006_敵ヴェロニカ", "GID_E006_敵ヘクトル", "GID_E006_敵チキ"];
 pub const ENGAGE: &[&str] = &[ "AI_AT_EngageAttack", "AI_AT_EngageAttack", "AI_AT_EngageDance", "AI_AT_EngageAttack", "AI_AT_EngagePierce", "AI_AT_EngageAttack", "AI_AT_AttackToHeal", "AI_AT_EngageAttack", "AI_AT_EngageAttackNoGuard", "AI_AT_EngageClassPresident", "AI_AT_EngageAttack", "AI_AT_EngageCamilla", "AI_AT_EngageAttack", "AI_AT_EngageSummon", "AI_AT_EngageWait", "AI_AT_EngageBlessPerson"];
@@ -277,29 +267,6 @@ pub fn calculate_average_level(sortie_count: i32) -> i32 {
     average
 }
 
-pub struct AutolevelMod;
-impl ConfigBasicMenuItemSwitchMethods for AutolevelMod {
-    fn init_content(_this: &mut ConfigBasicMenuItem){}
-    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_b(CONFIG.lock().unwrap().autolevel);
-        if CONFIG.lock().unwrap().autolevel != result {
-            CONFIG.lock().unwrap().autolevel = result;
-            Self::set_command_text(this, None);
-            Self::set_help_text(this, None);
-            this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if CONFIG.lock().unwrap().autolevel { this.help_text = "Units/enemies will be scaled to army's power. (Togglable)".into(); }
-        else { this.help_text = "No changes to recruited/enemy unit's stats and levels. (Togglable)".into(); }
-    }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if CONFIG.lock().unwrap().autolevel { this.command_text = "On".into();  }
-        else { this.command_text = "Off".into(); }
-    }
-}
-
 
 //Get Average Level of Party
 #[skyline::from_offset(0x02b4afa0)]
@@ -344,7 +311,6 @@ pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
         if style_name.is_some() {
                 // Not Flying or Armored or wolf knight for Bow/Magic Emblems
             let god_data = GodData::get(EMBLEMS[emblem].into()).unwrap();
-
             if style_name.unwrap().get_string().unwrap() == "飛行スタイ ル" || style_name.unwrap().get_string().unwrap() == "重装スタイル" || job.jid.get_string().unwrap() == "JID_ウルフナイト" {
                 match emblem {
                     0 | 1 | 5 | 6 | 11 | 12 | 13 => { return false; }
@@ -383,5 +349,83 @@ pub fn adjust_emblem_unit_ai(unit: &Unit, data: &DisposData, emblem_index: usize
         else { data.set_ai_attack_value("3,3".into()); }
         if EMBLEMS[emblem_index] == "GID_M017_敵カムイ" { data.set_ai_attack_value("255, 255, 3, 3".into());  }
         set_unit_ai_dispos(unit, data, None);
+    }
+}
+
+pub struct AutolevelMod;
+impl ConfigBasicMenuItemSwitchMethods for AutolevelMod {
+    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().autolevel }
+            else { GameVariableManager::get_bool("G_DVC_Autolevel") };
+        let result = ConfigBasicMenuItem::change_key_value_b(value);
+        if value != result {
+            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().autolevel = result; }
+            else { GameVariableManager::set_bool("G_DVC_Autolevel",result); }
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        }
+        return BasicMenuResult::new(); 
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let value = if GameUserData::get_sequence() == 0 {  CONFIG.lock().unwrap().autolevel }
+            else { GameVariableManager::get_bool("G_DVC_Autolevel") };
+        this.help_text = if value { "Units/enemies will be scaled to army's power." }
+            else { "No changes to recruited/enemy unit's stats and levels." }.into();
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let value = if GameUserData::get_sequence() == 0 {  CONFIG.lock().unwrap().autolevel }
+            else { GameVariableManager::get_bool("G_DVC_Autolevel") };
+        this.command_text = if value { "Autoscale" } else { "No Scaling" }.into();
+    }
+}
+
+pub struct EnemyEmblemGauge;
+impl ConfigBasicMenuItemGaugeMethods  for EnemyEmblemGauge {
+    fn init_content(this: &mut ConfigBasicMenuItem){
+        this.gauge_ratio = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().enemy_emblem_rate as f32 / 100.0 }
+            else { GameVariableManager::get_number("G_EnemyEmblemGauge") as f32 / 100.0  };
+    }
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().enemy_emblem_rate  as f32 / 100.0  }
+            else { GameVariableManager::get_number("G_EnemyEmblemGauge") as f32 / 100.0 };
+        let result = ConfigBasicMenuItem::change_key_value_f(value, 0.0, 1.0, 0.25);
+        if value != result {
+            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().enemy_emblem_rate = ( result * 100.0 ) as i32; }
+            else { GameVariableManager::set_number("G_EnemyEmblemGauge", ( result * 100.0 ) as i32); }
+            this.gauge_ratio = result;
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        }
+        return BasicMenuResult::new(); 
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = "Percentage of enemy units equipped with a dark emblem.".into();
+    }
+}
+
+pub struct EnemyRevivalStones;
+impl ConfigBasicMenuItemGaugeMethods  for EnemyRevivalStones {
+    fn init_content(this: &mut ConfigBasicMenuItem){
+        this.gauge_ratio = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().revival_stone_rate as f32 / 100.0 }
+            else { GameVariableManager::get_number("G_EnemyRevivalStone") as f32 / 100.0  };
+    }
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().revival_stone_rate as f32 / 100.0  }
+            else { GameVariableManager::get_number("G_EnemyRevivalStone") as f32 / 100.0 };
+        let result = ConfigBasicMenuItem::change_key_value_f(value, 0.0, 1.0, 0.25);
+        if value != result {
+            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().revival_stone_rate = ( result * 100.0 ) as i32; }
+            else { GameVariableManager::set_number("G_EnemyRevivalStone", ( result * 100.0 ) as i32); }
+            this.gauge_ratio = result;
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        }
+        return BasicMenuResult::new(); 
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = "Percentage of enemy units gaining a revival stone.".into();
     }
 }

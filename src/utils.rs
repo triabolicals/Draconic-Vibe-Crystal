@@ -5,8 +5,28 @@ use engage::{
     mess::*,
     gamedata::{*, item::*, skill::*},
 };
+use engage::gamevariable::GameVariableManager;
 use skyline::patching::Patch;
 use crate::emblem::emblem_skill::STAT_BONUS;
+
+pub fn get_rng() -> &'static Random {
+    let rng = Random::instantiate().unwrap();
+    rng.ctor(GameVariableManager::get_number("G_Random_Seed") as u32);
+    rng
+}
+pub fn can_rand() -> bool { return GameVariableManager::get_number("G_Random_Seed") != 0; }
+
+pub fn class_count(jid: &str) -> i32 {
+    let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
+    let mut count = 0;
+   for ff in force_type {
+       let force_iter = Force::iter(Force::get(ff).unwrap());
+       for unit in force_iter {
+           if unit.job.jid.get_string().unwrap() == jid {  count += 1; }
+       }
+   }
+   count
+}
 
 // Getting Player's name for file name
 pub fn get_player_name() -> String {
@@ -21,6 +41,27 @@ pub fn get_player_name() -> String {
         }
     }
     return "randomized".to_string();
+}
+pub fn get_lueur_name_gender(){
+    GameVariableManager::make_entry("G_Lueur_Gender".into(), 0);
+    GameVariableManager::make_entry("G_Lueur_Name".into(), 0);
+    let f_type: [ForceType; 5] = [ForceType::Player, ForceType::Enemy, ForceType::Absent, ForceType::Dead, ForceType::Lost];
+    for f in f_type {
+        let force = Force::get(f).unwrap();
+        let mut force_iter = Force::iter(force);
+        while let Some(unit) = force_iter.next() {
+            if unit.person.pid.get_string().unwrap() == "PID_リュール" {
+                if unit.edit.name.is_some(){
+                    if unit.edit.gender != 0 {
+                        if unit.edit.gender > 2 { unit.edit.set_gender(1); }
+                            GameVariableManager::set_number("G_Lueur_Gender".into(), unit.edit.gender);
+                            GameVariableManager::set_string("G_Lueur_Name".into(), &unit.edit.name.unwrap().get_string().unwrap());
+                            return;
+                    }
+                }
+            }
+        }
+    }
 }
 
 pub fn str_contains(this: &Il2CppString, value: &str) -> bool { unsafe {string_contains(this, value.into(), None) } }
@@ -214,6 +255,10 @@ pub fn mov_1(address: usize){
     let _ = Patch::in_text(address).bytes(&[0x20,0x00, 0x80, 0x52]).unwrap();
 }
 
+pub fn mov_x0_0(address: usize){
+    let _ = Patch::in_text(address).bytes(&[0x00,0x00, 0x80, 0x52]).unwrap();
+}
+
 pub fn return_true(address: usize){
     let _ = Patch::in_text(address).bytes(&[0x20,0x00, 0x80, 0x52]).unwrap();
     let _ = Patch::in_text(address+0x4).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
@@ -228,12 +273,13 @@ pub fn dlc_check() -> bool {
         if has_content(0, None) {
             //mov_1(0x0253d7c0);
             //mov_1(0x0253d8b0);
-            return true;
+        return true;
         }
-            return false;
+        return false;
     }
-    
 }
+
+
 pub fn clamp_value(v: i32, min: i32, max: i32) -> i32 {
     unsafe { clamp(v, min, max, None)  }
 }
