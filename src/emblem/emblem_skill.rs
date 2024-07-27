@@ -13,6 +13,7 @@ use std::{fs::File, io::Write};
 const EMBLEM_WEAPON: [i32; 20] = [2, 6, 66, 64, 2, 31, 18, 18, 10, 2, 514, 6, 28, 512, 14, 64, 64, 72, 66, 258];
 
 pub static ENGAGE_SKILLS: Mutex<Vec<SkillIndex>> = Mutex::new(Vec::new());
+pub static ADDED_ENGAGE:  Mutex<Vec<SkillIndex>> = Mutex::new(Vec::new());
 pub static ENGAGE_SKILLS_CHAOS: Mutex<Vec<SkillIndex>> = Mutex::new(Vec::new());
 static ENGAGE_ATTACKS: Mutex<Vec<EngageAttackIndex>> = Mutex::new(Vec::new());
 static ENGAGE_ATK_SWAP: Mutex<Vec<EngageAttackIndex>> = Mutex::new(Vec::new());
@@ -655,20 +656,22 @@ fn randomize_emblem_stat_bonuses(rng: &Random){
         }
     }
 }
-fn randomized_common_sids(name: String) {
+fn randomized_common_sids(mpid: String) {
     let person_list = PersonData::get_list_mut().unwrap();
-    for x in 300..1250 {
+    for x in 300..1200 {
         let person_x = &person_list[x as usize];
         if person_x.get_name().is_none() { continue; }
-        let name2 = Mess::get( person_x.get_name().unwrap() ).get_string().unwrap();
-        if name != name2 { continue; }
+        let name2 = person_x.get_name().unwrap();
+        if !str_contains(name2, &mpid) { continue; }
         if person_x.get_common_sids().is_none() { continue; }
         let personal_sid = person_x.get_common_sids().unwrap();
+        println!("Replacing person {}", x);
         for y in 0..personal_sid.len() {
             let replacement_skill = SYNCHO_RANDOM_LIST.lock().unwrap().get_replacement_sid(personal_sid[y as usize], true);
             if replacement_skill.parent.index > 0 { personal_sid[y] = replacement_skill.sid; } 
         }
         person_x.on_complete();
+        println!("person {} replaced: {}", x, mpid);
     }
 }
 fn randomized_emblem_syncho_skills(rng: &Random) {
@@ -696,7 +699,6 @@ fn randomized_emblem_syncho_skills(rng: &Random) {
     // Change for ring reference
     for x in 0..20 {
         let god = GodData::get(&format!("GID_{}", EMBLEM_ASSET[x as usize])).unwrap();
-        let name = Mess::get(god.mid).get_string().unwrap();
         let ggid = GodGrowthData::try_get_from_god_data(god);
         if ggid.is_none() { continue; }
         let god_grow = ggid.unwrap();
@@ -711,9 +713,9 @@ fn randomized_emblem_syncho_skills(rng: &Random) {
             }
             god_grow[y].on_complete(); 
         }
-        randomized_common_sids(name);
+        if x < 19 { randomized_common_sids( RINGS[x as usize].to_string() );  }
     }
-    randomized_common_sids(Mess::get("MPID_Reflet").get_string().unwrap());
+    randomized_common_sids("MPID_Reflet".to_string());
     // enemy and others
     let god_list = GodData::get_list().unwrap();
     for x in 0..god_list.len() {
