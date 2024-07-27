@@ -20,6 +20,7 @@ pub mod ironman;
 pub mod enums;
 pub mod continuous;
 pub mod message;
+pub mod menus;
 
 pub const VERSION: &str = "Pre-2.0.0";
 
@@ -59,8 +60,9 @@ pub struct DeploymentConfig {
     emblem_skill_chaos: i32,
     random_engage_weapon: bool,
     random_gift_items: i32,
+    interaction_type: i32,
     random_shop_items: bool,
-    random_battle_styles: bool,
+    random_battle_styles: i32,
 }
 
 fn disable_support_restriction() {
@@ -134,8 +136,9 @@ impl DeploymentConfig {
             emblem_skill_chaos: 0,
             random_engage_weapon: false,
             random_gift_items: 0,
+            interaction_type: 0,
             random_shop_items: false,
-            random_battle_styles: false,
+            random_battle_styles: 0,
         };
         config
     }
@@ -218,6 +221,7 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                     deploy::unit_status();
                 }
                 if proc.hashcode == -988690862 && *label == 0 { // On Initial Title Screen Load
+                    grow::get_style_interact_default_values();
                     message::replace_hub_fxn();
                     enums::generate_black_list();
                     emblem::get_recommended_paralogue_levels();
@@ -286,7 +290,7 @@ pub fn main() {
     ); 
     // Fixes the emblem weapons arena issue
     Patch::in_text(0x01ca9afc).nop().unwrap();
-    random::install_vibe();
+    menus::install_vibe();
     disable_support_restriction();
     std::panic::set_hook(Box::new(|info| {
         let location = info.location().unwrap();

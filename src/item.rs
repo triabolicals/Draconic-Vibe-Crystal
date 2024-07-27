@@ -974,18 +974,20 @@ impl ConfigBasicMenuItemSwitchMethods for RandomItemMod {
         } else {return BasicMenuResult::new(); }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let selection = CONFIG.lock().unwrap().random_item;
-        if selection == 1 {  this.help_text = "Items obtained from chests/villages will be random.".into(); }
-        else if selection == 2 {  this.help_text = "Item drops from enemies will be random.".into(); }
-        else if selection == 3 {  this.help_text = "Item obtained from events and enemy drops will be random.".into(); } 
-        else { this.help_text = "No changes made to item events or item drops.".into(); }
+        this.help_text = match CONFIG.lock().unwrap().random_item {
+            1 => { "Items obtained from chests/villages will be random." },
+            2 => { "Item drops from enemies will be random." },
+            3 => { "Item obtained from events and enemy drops will be random." },
+            _ => { "No changes made to item events or item drops." },
+        }.into();
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let selection = CONFIG.lock().unwrap().random_item;
-        if selection == 1 { this.command_text = "Events".into(); }
-        else if selection == 2 { this.command_text = "Drops".into(); }
-        else if selection == 3 { this.command_text = "Events/Drops".into(); }
-        else { this.command_text = "None".into(); }
+        this.command_text = match CONFIG.lock().unwrap().random_item {
+            1 => { "Events"},
+            2 => { "Drops"},
+            3 => { "Events/Drops"}
+            _ => { "None "}
+        }.into();
     }
 }
 

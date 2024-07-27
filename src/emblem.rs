@@ -1,10 +1,12 @@
 use unity::prelude::*;
 use engage::{
+    dialog::yesno::*,
     menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}},
     gamevariable::*,
     gameuserdata::GameUserData,
     gamedata::{*, skill::SkillData, dispos::*},
 };
+use engage::dialog::yesno::TwoChoiceDialogMethods;
 use super::CONFIG;
 use crate::{utils::*, enums::*};
 use std::sync::Mutex;
@@ -415,7 +417,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEmblemLinkMod {
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().engage_link }
                     else { GameVariableManager::get_bool("G_EngagePlus") };
-        this.command_text = if value { "Randomize Links" } else { "No Random Links" }.into();
+        this.command_text = if value { "Random Links" } else { "No Links" }.into();
     }
 }
 
@@ -520,28 +522,13 @@ impl ConfigBasicMenuItemSwitchMethods for EngraveSettings {
         if GameUserData::get_sequence() == 0 { this.help_text = "Sets the level of randomness for engraves".into(); }
         else {
             let current_setting = GameVariableManager::get_number("G_EngraveSetting");
-            let current_str = match current_setting {
-                1 => { "Low"},
-                2 => { "Medium"},
-                3 => { "High"},
-                4 => { "Chaotic"},
-                5 => { "Custom"},
-                _ => { "None"},
-            };
-            this.help_text = format!("Engrave Random Level (Current: {}, A to confirm change)", current_str).into();
+            this.help_text = format!("Current Level: {} (Press A to confirm change)",  engrave_setting_text(current_setting)).into();
         }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().engrave_settings }
                     else { GameVariableManager::get_number("G_EngraveSetting2") }.into();
-        this.command_text = match value {
-            1 => { "Low"},
-            2 => { "Medium"},
-            3 => { "High"},
-            4 => { "Chaotic"},
-            5 => { "Custom"},
-            _ => { "No Randomization"},
-        }.into();
+        this.command_text = engrave_setting_text( value ).into();
     }
 }
 pub fn random_engrave_by_setting(setting: i32) {
@@ -561,18 +548,35 @@ pub fn random_engrave_by_setting(setting: i32) {
 pub fn engrave_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
     if GameUserData::get_sequence() == 0 {return BasicMenuResult::new(); }
     if GameVariableManager::get_number("G_EngraveSetting") == GameVariableManager::get_number("G_EngraveSetting2") { return BasicMenuResult::new();}
-    random_engrave_by_setting( GameVariableManager::get_number("G_EngraveSetting2") );
-    GameVariableManager::set_number("G_EngraveSetting", GameVariableManager::get_number("G_EngraveSetting2"));
-    let current_setting = GameVariableManager::get_number("G_EngraveSetting");
-    let current_str = match current_setting {
-        1 => { "Low"},
+    let text = format!("Change Engrave Randomization Level:\n\tFrom '{}' to '{}'?",
+        engrave_setting_text( GameVariableManager::get_number("G_EngraveSetting")), 
+        engrave_setting_text( GameVariableManager::get_number("G_EngraveSetting2")), 
+    );
+    YesNoDialog::bind::<EngraveConfirm>(this.menu, text, "Do it!", "Nah..");
+    this.help_text = format!("Current Level: {} (Press A to confirm change)", engrave_setting_text(  GameVariableManager::get_number("G_EngraveSetting") )).into();
+    this.update_text();
+    unsafe { rebuild_instant(this, None); }
+    return BasicMenuResult::new();
+}
+fn engrave_setting_text(choice: i32) -> String {
+    match choice {
+        1 => { "Low" },
         2 => { "Medium"},
         3 => { "High"},
         4 => { "Chaotic"},
         5 => { "Custom"},
         _ => { "None"},
-    };
-    this.help_text = format!("Engrave Random Level (Current: {}, A to confirm change)", current_str).into();
-    this.update_text();
-    return BasicMenuResult::new();
+    }.to_string()
 }
+
+pub struct EngraveConfirm;
+impl TwoChoiceDialogMethods for EngraveConfirm {
+    extern "C" fn on_first_choice(_this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
+        random_engrave_by_setting( GameVariableManager::get_number("G_EngraveSetting2") );
+        GameVariableManager::set_number("G_EngraveSetting", GameVariableManager::get_number("G_EngraveSetting2"));
+        BasicMenuResult::se_cursor().with_close_this(true)
+    }
+    extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
+}
+#[skyline::from_offset(0x02466340)]
+fn rebuild_instant(this: &ConfigBasicMenuItem, _method_info: OptionalMethod);

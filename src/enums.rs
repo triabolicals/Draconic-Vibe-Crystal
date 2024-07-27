@@ -27,6 +27,7 @@ pub const UNLOCK_PARA: [&str; 19] = ["M022", "M017", "M020", "M019", "M019", "M0
 pub const PARA_LEVEL: [i32; 19] = [35, 28, 32, 28, 31, 30, 21, 22, 25, 28, 26, 29, -1, -1, -1, -1, -1, -1, -1];
 pub const ENGAGE_ATK_AI: [&str; 9] = ["AI_AT_EngageAttack","AI_AT_EngagePierce", "AI_AT_EngageVision", "AI_AT_EngageDance", "AI_AT_EngageOverlap", "AI_AT_EngageBless", "AI_AT_EngageWaitGaze", "AI_AT_EngageSummon", "AI_AT_EngageCamilla"];
 // Items
+pub const STYLE_NAMES: [&str; 9] = ["連携スタイル", "騎馬スタイル", "隠密スタイル", "重装スタイル",  "飛行スタイル", "魔法スタイル", "気功スタイル", "竜族スタイル", "スタイル無し"];
 pub const BLACKLIST_ITEMS: [&str; 25] = [
     "IID_マスタープルフ", "IID_リベラシオン改", "IID_リベラシオン改_ノーマル",
     "IID_リベラシオン", "IID_リベラシオン_M000", "IID_無し", "IID_不明", "IID_エンゲージ枠", "IID_火炎砲台", "IID_牙", "IID_邪竜石_E",
