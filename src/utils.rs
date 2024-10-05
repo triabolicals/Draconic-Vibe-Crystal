@@ -3,10 +3,43 @@ use engage::{
     random::*,
     force::*,
     mess::*,
-    gamedata::{*, skill::*},
+    gamedata::{*, unit::Unit, item::*, skill::*},
 };
+use engage::gamevariable::GameVariableManager;
 use skyline::patching::Patch;
-use crate::skill::STAT_BONUS;
+use crate::randomizer::emblem::emblem_skill::STAT_BONUS;
+use crate::enums::*;
+
+pub fn get_rng() -> &'static Random {
+    let rng = Random::instantiate().unwrap();
+    rng.ctor(GameVariableManager::get_number("G_Random_Seed") as u32);
+    rng
+}
+pub fn can_rand() -> bool { return GameVariableManager::get_number("G_Random_Seed") != 0; }
+
+pub fn class_count(jid: &str) -> i32 {
+    let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
+    let mut count = 0;
+   for ff in force_type {
+       let force_iter = Force::iter(Force::get(ff).unwrap());
+       for unit in force_iter {
+           if unit.job.jid.get_string().unwrap() == jid {  count += 1; }
+       }
+   }
+   count
+}
+
+pub fn lueur_on_map() -> bool {
+    let lueur_unit = unsafe { unit_pool_get_hero(true, None) };
+    if lueur_unit.is_none() { return false;  }
+    return lueur_unit.unwrap().force.unwrap().force_type < 3 ;
+}
+
+pub fn is_player_unit(person: &PersonData) -> bool {
+    let pid = person.pid.get_string().unwrap();
+    for x in PIDS { if *x == pid { return true; } }
+    return false;
+}
 
 // Getting Player's name for file name
 pub fn get_player_name() -> String {
@@ -22,8 +55,30 @@ pub fn get_player_name() -> String {
     }
     return "randomized".to_string();
 }
+pub fn get_lueur_name_gender(){
+    GameVariableManager::make_entry("G_Lueur_Gender".into(), 0);
+    GameVariableManager::make_entry("G_Lueur_Name".into(), 0);
+    let f_type: [ForceType; 5] = [ForceType::Player, ForceType::Enemy, ForceType::Absent, ForceType::Dead, ForceType::Lost];
+    for f in f_type {
+        let force = Force::get(f).unwrap();
+        let mut force_iter = Force::iter(force);
+        while let Some(unit) = force_iter.next() {
+            if unit.person.pid.get_string().unwrap() == "PID_リュール" {
+                if unit.edit.name.is_some(){
+                    if unit.edit.gender != 0 {
+                        if unit.edit.gender > 2 { unit.edit.set_gender(1); }
+                            GameVariableManager::set_number("G_Lueur_Gender".into(), unit.edit.gender);
+                            GameVariableManager::set_string("G_Lueur_Name".into(), &unit.edit.name.unwrap().get_string().unwrap());
+                            return;
+                    }
+                }
+            }
+        }
+    }
+}
 
 pub fn str_contains(this: &Il2CppString, value: &str) -> bool { unsafe {string_contains(this, value.into(), None) } }
+pub fn str_contains2<'a>(this: &Il2CppString, value: impl Into<&'a Il2CppString>) -> bool { unsafe {string_contains(this, value.into(), None) } }
 
 pub fn get_person_name(person: &PersonData) -> String {
     let name = person.get_name().unwrap();
@@ -33,6 +88,19 @@ pub fn get_person_name(person: &PersonData) -> String {
 pub fn get_skill_name(skill: &SkillData) -> String {
     if skill.name.is_some() { return format!("{} ({})", mess_get(skill.name.unwrap()), skill.sid.get_string().unwrap()); }
     else {  return format!(" --- ({})", skill.sid.get_string().unwrap()); }
+}
+pub fn get_item_name(skill: &ItemData) -> String {
+    unsafe {  
+        if is_null_empty(skill.name, None) { 
+            return format!(" --- ({})", skill.iid.get_string().unwrap()); 
+        }
+    }
+    
+    let item_name = Mess::get(skill.name ).get_string().unwrap();
+    if item_name.len() != 0 { return format!("{} ({})", item_name, skill.iid.get_string().unwrap()); }
+    else {
+        return format!(" --- ({})", skill.iid.get_string().unwrap());
+    }
 }
 
 pub fn sid_array_string(sids: &Array<&Il2CppString> ) -> String {
@@ -201,21 +269,75 @@ pub fn mov_1(address: usize){
     let _ = Patch::in_text(address).bytes(&[0x20,0x00, 0x80, 0x52]).unwrap();
 }
 
+pub fn mov_x0_0(address: usize){
+    let _ = Patch::in_text(address).bytes(&[0x00,0x00, 0x80, 0x52]).unwrap();
+}
+
 pub fn return_true(address: usize){
     let _ = Patch::in_text(address).bytes(&[0x20,0x00, 0x80, 0x52]).unwrap();
+    let _ = Patch::in_text(address+0x4).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
+ }
+ pub fn return_4(address: usize){
+    let _ = Patch::in_text(address).bytes(&[0x80,0x00, 0x80, 0x52]).unwrap();
     let _ = Patch::in_text(address+0x4).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
  }
 
 pub fn dlc_check() -> bool {
     unsafe {
         if has_content(0, None) {
-            mov_1(0x0253d7c0);
-            mov_1(0x0253d8b0);
-            return true;
+            //mov_1(0x0253d7c0);
+            //mov_1(0x0253d8b0);
+        return true;
         }
-            return false;
+        return false;
     }
 }
+
+pub fn is_valid_skill_index(index: i32 ) -> bool {
+    let skill = SkillData::try_index_get(index);
+    if skill.is_none() { return false; }
+    let sk = skill.unwrap(); 
+    let sid = sk.sid.get_string().unwrap();
+    if crate::enums::SKILL_BLACK_LIST.lock().unwrap().iter().find(|x| **x == sid ).is_some() { return false; }
+    let mut skip = false;
+    let flag = sk.get_flag();
+    if sk.help.is_none() { return false; }
+    else if  Mess::get( sk.name.unwrap() ).get_string().unwrap().len() == 0 { return false; }
+    if sk.name.is_none() { return false; }
+    else if Mess::get( sk.help.unwrap() ).get_string().unwrap().len() == 0 { return false; }
+    if sk.is_style_skill() { return false; }
+    for y in 0..8 {
+        if flag & (1 << y ) != 0 {
+            skip = true;
+            break;
+        }
+    }
+    return !skip
+}
+pub fn pid_to_mpid(pid: &String) -> String { return PersonData::get(&pid).unwrap().get_name().unwrap().get_string().unwrap(); }
+
+pub fn clamp_value(v: i32, min: i32, max: i32) -> i32 {
+    unsafe { clamp(v, min, max, None)  }
+}
+
+pub fn replace_strs(this: &Il2CppString, str1: &str, str2: &str) -> &'static Il2CppString {
+    unsafe {
+        replace_str(this, str1.into(), str2.into(), None)
+    }
+}
+
+pub fn replace_strs_il2str<'a>(this: &Il2CppString, str1: impl Into<&'a Il2CppString>, str2: impl Into<&'a Il2CppString>) -> &'static mut Il2CppString {
+    unsafe {
+        replace_str(this, str1.into(), str2.into(), None)
+    }
+}
+pub fn il2_str_substring(this: &Il2CppString, start: i32) -> &'static Il2CppString {
+    unsafe { sub_string(this, start, None)}
+}
+
+#[skyline::from_offset(0x032dfb20)]
+pub fn clamp(value: i32, min: i32, max: i32, method_info: OptionalMethod) -> i32;
+
 //
 // Unity Functions from Engage
 //DLC Check 
@@ -236,8 +358,10 @@ pub fn sub_string(this: &Il2CppString, start: i32, method_info: OptionalMethod) 
 pub fn is_null_empty(this: &Il2CppString, method_info: OptionalMethod) -> bool;
 
 #[skyline::from_offset(0x03773720)]
-pub fn replace_str(this: &Il2CppString, old_value: &Il2CppString, new_value: &Il2CppString, method_info: OptionalMethod) -> &'static Il2CppString;
+pub fn replace_str(this: &Il2CppString, old_value: &Il2CppString, new_value: &Il2CppString, method_info: OptionalMethod) -> &'static mut Il2CppString;
 
 #[unity::from_offset("System", "String", "Contains")]
 pub fn string_contains(this: &Il2CppString, value: &Il2CppString, method_info: OptionalMethod) -> bool;
 
+#[unity::from_offset("App", "UnitPool", "GetHero")]
+pub fn unit_pool_get_hero(replay :bool, method_info: OptionalMethod) -> Option<&'static Unit>;
