@@ -19,7 +19,7 @@ use crate::config::DeploymentConfig;
 use unity::prelude::OptionalMethod;
 use engage::proc::ProcInst;
 pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| DeploymentConfig::new().into() );
-pub const VERSION: &str = "2.5.0";
+pub const VERSION: &str = "2.5.1";
 
 #[skyline::from_offset(0x02285890)]
 pub fn autosave_proc_inst(this: &ProcInst, kind: i32, index: i32, stuff: Option<&ProcInst>, method_info: OptionalMethod);
@@ -146,7 +146,6 @@ pub fn main() {
         event::get_cmd_info_from_cmd_lines_hook,
         event::get_active_character_hook,
         message::mess_get_impl_hook, 
-        event::mess_load_hook,
     ); 
     // Fixes the emblem weapons arena issue
     Patch::in_text(0x01ca9afc).nop().unwrap();
