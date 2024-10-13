@@ -227,7 +227,7 @@ impl EngageItemList {
             } //Already Randomized
             loop {
                 count += 1;
-                if count == 50 { break;}
+                if count == 100 { break;}
                 if s_list[index].in_used { index = rng.get_value(list_size) as usize; continue; }
                 if s_list[index].is_bow && !s_list[x as usize].god_can_bow { 
                     // If not the first engage item, then able to use a bow

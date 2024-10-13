@@ -10,6 +10,8 @@ use engage::gamedata::skill::SkillData;
 use std::sync::Mutex;
 pub mod unit_items;
 pub mod shop;
+pub mod item_rando;
+
 use super::CONFIG;
 use crate::{enums, utils};
 pub static RANDOM_ITEM_POOL: Mutex<Vec<i32>> = Mutex::new(Vec::new());
@@ -20,12 +22,16 @@ pub fn create_item_pool() {
     if RANDOM_ITEM_POOL.lock().unwrap().len() != 0 { return; }
     let item_list = ItemData::get_list_mut().unwrap();
     for x in 0..item_list.len() {
-        let random_item = &item_list[x];
+        let random_item = &mut item_list[x];
         if random_item.get_flag().value == 16 {
-            if random_item.iid.get_string().unwrap() != "IID_メティオ_G004" {
-                random_item.get_flag().value = 0;
+            let iid = random_item.iid.get_string().unwrap();
+            if iid != "IID_メティオ_G004" {
+                random_item.get_flag().value = 0; 
             }
-            else { continue;  }
+            if iid == "IID_メティオ" { 
+                random_item.endurance = 1; 
+                random_item.get_flag().value = 8;
+            }
         }
         let iid = random_item.iid.get_string().unwrap();
         let item_flag = random_item.get_flag().value;
@@ -50,6 +56,7 @@ pub fn create_item_pool() {
         if !skip { RANDOM_ITEM_POOL.lock().unwrap().push(random_item.parent.index); }
     }
     println!("{} items are in the Random Item Pool", RANDOM_ITEM_POOL.lock().unwrap().len());
+    item_rando::WEAPONDATA.lock().unwrap().intitalize();
 }
 
 pub fn random_item(item_type: i32, allow_rare: bool) -> &'static Il2CppString {

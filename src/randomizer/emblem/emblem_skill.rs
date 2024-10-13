@@ -2,6 +2,7 @@ use super::*;
 use super::{emblem_item::*, emblem_structs::*};
 use super::super::skill::SkillIndex;
 use std::sync::Mutex;
+use engage::gamedata::item::ItemData;
 use engage::{
     random::*,
     menu::{BasicMenuResult, config::{ConfigBasicMenuItem, ConfigBasicMenuItemSwitchMethods}},
@@ -104,8 +105,6 @@ pub fn create_emblem_skill_pool() {
             }
         }
     }
-
-
     SYNCHO_RANDOM_LIST.lock().unwrap().add_by_sid("SID_勇空＋", true, false);
     SYNCHO_RANDOM_LIST.lock().unwrap().add_by_sid("SID_太陽の腕輪＋", true, false);
     SYNCHO_RANDOM_LIST.lock().unwrap().add_by_sid("SID_日月の腕輪＋", true, false);
@@ -174,7 +173,6 @@ pub fn reset_emblem_skills() {
 
 pub fn randomized_god_data(){
     let mode = GameVariableManager::get_number("G_Random_God_Mode");
-    if mode == 0 { return; }
     println!("Randomizing God Data...");
     let rng = Random::instantiate().unwrap();
     let seed = 3*GameVariableManager::get_number("G_Random_Seed") as u32;
@@ -183,7 +181,7 @@ pub fn randomized_god_data(){
     let seed2 = 2*GameVariableManager::get_number("G_Random_Seed") as u32;
     let rng2 = Random::instantiate().unwrap();
     rng2.ctor(seed2);
-    if GameVariableManager::get_number("G_ChaosMode") == 4 {
+    if GameVariableManager::get_number("G_ChaosMode") == 4 && mode != 0 {
         let list = GameVariableManager::find_starts_with("G_AddS");
         if list.len() == 0 {
             println!("Adding Sync Skills from List");
@@ -209,33 +207,12 @@ pub fn randomized_god_data(){
             }
         }
     }
-    SYNCHO_RANDOM_LIST.lock().unwrap().randomized(rng2);
-    if mode & 1 != 0 {
-        for x in 0..20 { 
-            let god = GodData::get(&format!("GID_{}", EMBLEM_ASSET[x as usize])).unwrap();
-            let ggid = GodGrowthData::try_get_from_god_data(god);
-            if ggid.is_none() { continue; }
-            let god_grow = ggid.unwrap(); 
-            for y in 0..god_grow.len() {
-                let level = god_grow[y].get_inheritance_skills();
-                if level.is_none() {continue; }
-                let inherit_skills = level.unwrap();
-                for z in 0..inherit_skills.len() {
-                    let replacement_skill = SYNCHO_RANDOM_LIST.lock().unwrap().get_replacement_sid(inherit_skills[z], true);
-                    if replacement_skill.parent.index > 0 {
-                        inherit_skills[z] = replacement_skill.sid;
-                    }                   
-                }
-                god_grow[y].on_complete(); 
-            }
-        }
-        if CUSTOM_EMBLEMS.lock().unwrap()[0] > 0 { 
-            let god_list = GodData::get_list().unwrap();
-            let n_customs = CUSTOM_EMBLEMS.lock().unwrap()[0] as usize;
-            for x in 0..n_customs {
-                let c_index = CUSTOM_EMBLEMS.lock().unwrap()[x+1] as usize;
-                if c_index >= god_list.len() { continue; }
-                let ggid = GodGrowthData::try_get_from_god_data(&god_list[c_index]);
+    if mode != 0 {
+        SYNCHO_RANDOM_LIST.lock().unwrap().randomized(rng2);
+        if mode & 1 != 0 {
+            for x in 0..20 { 
+                let god = GodData::get(&format!("GID_{}", EMBLEM_ASSET[x as usize])).unwrap();
+                let ggid = GodGrowthData::try_get_from_god_data(god);
                 if ggid.is_none() { continue; }
                 let god_grow = ggid.unwrap(); 
                 for y in 0..god_grow.len() {
@@ -244,97 +221,127 @@ pub fn randomized_god_data(){
                     let inherit_skills = level.unwrap();
                     for z in 0..inherit_skills.len() {
                         let replacement_skill = SYNCHO_RANDOM_LIST.lock().unwrap().get_replacement_sid(inherit_skills[z], true);
-                        if replacement_skill.parent.index > 0 { inherit_skills[z] = replacement_skill.sid; }                   
+                        if replacement_skill.parent.index > 0 {
+                            inherit_skills[z] = replacement_skill.sid;
+                        }                   
                     }
                     god_grow[y].on_complete(); 
                 }
             }
-        }
-    }
-    if mode & 2 != 0 {
-        rng.ctor(seed);
-        println!("Randomizing Engage Attacks");
-        let engage_atk_size = ENGAGE_ATTACKS.lock().unwrap().len();
-        let mut linked_gid: [bool; 19] = [false; 19];
-        let mut count = 0;
-        Patch::in_text(0x01c77620).bytes(&[0xc0,0x03, 0x5f, 0xd6]).unwrap();
-        for x in 0..20 { 
-            let god = GodData::get_mut(&format!("GID_{}", EMBLEM_ASSET[x as usize])).unwrap();
-            // Engage Attack
-            let mut value;
-            let mut rng_counter = 0;
-            loop {
-                value = rng.get_value(engage_atk_size as i32) as usize;
-                rng_counter += 1;
-                if ( x == 9 || x == 13 ) && value == 7 {   continue; }  // No Astra Storm for Byleth/Tiki
-                if !ENGAGE_ATTACKS.lock().unwrap()[value].in_use { break; }
-                if rng_counter >= 100 { break; }
-            }
-            let engage_sid = skill_list[ ENGAGE_ATTACKS.lock().unwrap()[value].index_1 as usize ].sid;
-            god.set_engage_attack( engage_sid );
-            ENGAGE_ATTACKS.lock().unwrap()[value].in_use = true;
-            // Linked Engage Attack
-            let mut linked_index; // = rng.get_value(engage_atk_size as i32) as usize;
-            rng_counter = 0;
-            loop {
-                linked_index = rng.get_value(engage_atk_size as i32) as usize;
-                rng_counter += 1;
-                if ( x == 9 || x == 13 ) && value == 7 {   continue; }  // No Astra Storm for Byleth/Tiki
-                if !ENGAGE_ATTACKS.lock().unwrap()[linked_index].linked_use && linked_index != value { 
-                    break;
+            if CUSTOM_EMBLEMS.lock().unwrap()[0] > 0 { 
+                let god_list = GodData::get_list().unwrap();
+                let n_customs = CUSTOM_EMBLEMS.lock().unwrap()[0] as usize;
+                for x in 0..n_customs {
+                    let c_index = CUSTOM_EMBLEMS.lock().unwrap()[x+1] as usize;
+                    if c_index >= god_list.len() { continue; }
+                    let ggid = GodGrowthData::try_get_from_god_data(&god_list[c_index]);
+                    if ggid.is_none() { continue; }
+                    let god_grow = ggid.unwrap(); 
+                    for y in 0..god_grow.len() {
+                        let level = god_grow[y].get_inheritance_skills();
+                        if level.is_none() {continue; }
+                        let inherit_skills = level.unwrap();
+                        for z in 0..inherit_skills.len() {
+                            let replacement_skill = SYNCHO_RANDOM_LIST.lock().unwrap().get_replacement_sid(inherit_skills[z], true);
+                            if replacement_skill.parent.index > 0 { inherit_skills[z] = replacement_skill.sid; }                   
+                        }
+                        god_grow[y].on_complete(); 
+                    }
                 }
-                if rng_counter >= 100 && linked_index != value { break; }
             }
-            let linked_engage_sid = skill_list[ ENGAGE_ATTACKS.lock().unwrap()[linked_index].index_1 as usize ].sid;
-            god.set_engage_attack_link(linked_engage_sid);
-            ENGAGE_ATTACKS.lock().unwrap()[linked_index].linked_use = true;
-
-            ENGAGE_ATK_SWAP.lock().unwrap()[count as usize].index_1 = ENGAGE_ATTACKS.lock().unwrap()[value].index_2;
-            ENGAGE_ATK_SWAP.lock().unwrap()[count as usize].index_2 = ENGAGE_ATTACKS.lock().unwrap()[linked_index].index_2; 
-            
+        }
+        if mode & 2 != 0 {
+            rng.ctor(seed);
+            println!("Randomizing Engage Attacks");
+            let engage_atk_size = ENGAGE_ATTACKS.lock().unwrap().len();
+            let mut linked_gid: [bool; 19] = [false; 19];
+            let mut count = 0;
+            Patch::in_text(0x01c77620).bytes(&[0xc0,0x03, 0x5f, 0xd6]).unwrap();
+            for x in 0..20 { 
+                let god = GodData::get_mut(&format!("GID_{}", EMBLEM_ASSET[x as usize])).unwrap();
+                let o_god = GodData::get(&format!("GID_相手{}", EMBLEM_ASSET[x as usize])).unwrap();
+                // Engage Attack
+                let mut value;
+                let mut rng_counter = 0;
+                loop {
+                    value = rng.get_value(engage_atk_size as i32) as usize;
+                    rng_counter += 1;
+                    if ( x == 9 || x == 13 ) && value == 7 {   continue; }  // No Astra Storm for Byleth/Tiki
+                    if !ENGAGE_ATTACKS.lock().unwrap()[value].in_use { break; }
+                    if rng_counter >= 100 { break; }
+                }
+                let engage_sid = skill_list[ ENGAGE_ATTACKS.lock().unwrap()[value].index_1 as usize ].sid;
+                god.set_engage_attack( engage_sid );
+                o_god.set_engage_attack( engage_sid);
+                ENGAGE_ATTACKS.lock().unwrap()[value].in_use = true;
+                // Linked Engage Attack
+                let mut linked_index; // = rng.get_value(engage_atk_size as i32) as usize;
+                rng_counter = 0;
+                loop {
+                    linked_index = rng.get_value(engage_atk_size as i32) as usize;
+                    rng_counter += 1;
+                    if ( x == 9 || x == 13 ) && value == 7 {   continue; }  // No Astra Storm for Byleth/Tiki
+                    if !ENGAGE_ATTACKS.lock().unwrap()[linked_index].linked_use && linked_index != value { 
+                        break;
+                    }
+                    if rng_counter >= 100 && linked_index != value { break; }
+                }
+                let linked_engage_sid = skill_list[ ENGAGE_ATTACKS.lock().unwrap()[linked_index].index_1 as usize ].sid;
+                god.set_engage_attack_link(linked_engage_sid);
+                o_god.set_engage_attack( linked_engage_sid );
+                ENGAGE_ATTACKS.lock().unwrap()[linked_index].linked_use = true;
+                ENGAGE_ATK_SWAP.lock().unwrap()[count as usize].index_1 = ENGAGE_ATTACKS.lock().unwrap()[value].index_2;
+                ENGAGE_ATK_SWAP.lock().unwrap()[count as usize].index_2 = ENGAGE_ATTACKS.lock().unwrap()[linked_index].index_2; 
             // Linked Emblem
-            if x != 19 {    // Not Emblem Alear
-                let mut linked_god_index = rng.get_value(19) as usize;
-                if count == 18 { 
-                    for zz in 0..19 { if !linked_gid[zz as usize] { linked_god_index = zz; }  }
-                }
-                else {
-                    rng_counter = 0; 
-                    while linked_gid[linked_god_index] || x == linked_god_index { 
-                        linked_god_index = rng.get_value(19) as usize; 
-                        rng_counter += 1;
-                        if rng_counter >= 100 && x != linked_god_index { break; }
+                if x != 19 {    // Not Emblem Alear
+                    let mut linked_god_index = rng.get_value(19) as usize;
+                    if count == 18 { 
+                        for zz in 0..19 { if !linked_gid[zz as usize] { linked_god_index = zz; }  }
                     }
-                }
-                linked_gid[linked_god_index] = true;
-                let gid_linked = EMBLEM_GIDS[linked_god_index];
-                god.set_link_gid(gid_linked.into());
-                if x == 12 { // If Edelgard then change it for Dimitri and Claude
-                    let war_criminals = ["GID_ディミトリ", "GID_クロード"];
-                    for bg in war_criminals {
-                        let war_crimes = GodData::get_mut(bg).unwrap();
-                        war_crimes.set_engage_attack( engage_sid );
-                        war_crimes.set_link_gid( gid_linked.into() );
-                        war_crimes.set_engage_attack_link( linked_engage_sid);
-                        war_crimes.on_complete();
+                    else {
+                        rng_counter = 0; 
+                        while linked_gid[linked_god_index] || x == linked_god_index { 
+                            linked_god_index = rng.get_value(19) as usize; 
+                            rng_counter += 1;
+                            if rng_counter >= 100 && x != linked_god_index { break; }
+                        }
                     }
-                    ENGAGE_ATK_SWAP.lock().unwrap()[20].index_1 = ENGAGE_ATTACKS.lock().unwrap()[value].index_2;
-                    ENGAGE_ATK_SWAP.lock().unwrap()[20].index_2 = ENGAGE_ATTACKS.lock().unwrap()[linked_index].index_2; 
-                    ENGAGE_ATK_SWAP.lock().unwrap()[21].index_1 = ENGAGE_ATTACKS.lock().unwrap()[value].index_2;
-                    ENGAGE_ATK_SWAP.lock().unwrap()[21].index_2 = ENGAGE_ATTACKS.lock().unwrap()[linked_index].index_2; 
-                }
-                else if x == 11 {
-                    let ephirm = GodData::get_mut("GID_エフラム").unwrap();
-                    ephirm.set_engage_attack( engage_sid );
-                    ephirm.set_link_gid( gid_linked.into() );
-                    ephirm.set_engage_attack_link( linked_engage_sid);
-                    ephirm.on_complete();
-                }
+                    linked_gid[linked_god_index] = true;
+                    let gid_linked = EMBLEM_GIDS[linked_god_index];
+                    god.set_link_gid(gid_linked.into());
+                    o_god.set_link_gid(gid_linked.into());
+                    if x == 12 { // If Edelgard then change it for Dimitri and Claude
+                        let war_criminals = ["ディミトリ", "クロード"];
+                        for bg in war_criminals {
+                            let god = GodData::get_mut(&format!("GID_{}", bg)).unwrap();
+                            let o_god = GodData::get(&format!("GID_相手{}", bg)).unwrap();
+                            god.set_engage_attack( engage_sid );
+                            god.set_link_gid( gid_linked.into() );
+                            god.set_engage_attack_link( linked_engage_sid);
+                            god.on_complete();
+                            o_god.set_engage_attack( engage_sid );
+                            o_god.set_link_gid( gid_linked.into() );
+                            o_god.set_engage_attack_link( linked_engage_sid);
+                            o_god.on_complete();
+                        }
+                        ENGAGE_ATK_SWAP.lock().unwrap()[20].index_1 = ENGAGE_ATTACKS.lock().unwrap()[value].index_2;
+                        ENGAGE_ATK_SWAP.lock().unwrap()[20].index_2 = ENGAGE_ATTACKS.lock().unwrap()[linked_index].index_2; 
+                        ENGAGE_ATK_SWAP.lock().unwrap()[21].index_1 = ENGAGE_ATTACKS.lock().unwrap()[value].index_2;
+                        ENGAGE_ATK_SWAP.lock().unwrap()[21].index_2 = ENGAGE_ATTACKS.lock().unwrap()[linked_index].index_2; 
+                    }
+                    else if x == 11 {
+                        let ephirm = GodData::get_mut("GID_エフラム").unwrap();
+                        ephirm.set_engage_attack( engage_sid );
+                        ephirm.set_link_gid( gid_linked.into() );
+                        ephirm.set_engage_attack_link( linked_engage_sid);
+                        ephirm.on_complete();
+                    }
+                }   
+                count += 1;
+                god.on_complete();
             }
-            count += 1;
-            god.on_complete();
+            adjust_engage_weapon_type();
         }
-        adjust_engage_weapon_type();
     }
     if GameVariableManager::get_bool("G_Random_Engage_Weps") {
         println!("Randomizing Engage Weapons");
@@ -526,8 +533,9 @@ fn randomize_emblem_stat_bonuses(rng: &Random){
                 let skill_index = level_data[y].synchro_skills[z as usize].get_skill().unwrap().parent.index;
                 if skill_index <= max_index && min_index <= skill_index && stat_index < 4 {
                     let stat_skill = &skill_list[ skill_index as usize ];
-                    let sb_index: usize = if stat_skill.get_priority() == 0 {  ( stats[ stat_index ] as usize ) * 6 } //Replace Move+1 stat boost
-                                          else { ( stats[ stat_index ] as usize ) * 6  + ( stat_skill.get_priority()  - 1 ) as usize };
+                    let sb_index: usize = 
+                        if stat_skill.get_priority() == 0 {  ( stats[ stat_index ] as usize ) * 6 } //Replace Move+1 stat boost
+                        else { ( stats[ stat_index ] as usize ) * 6  + ( stat_skill.get_priority()  - 1 ) as usize };
                     let new_skill = &skill_list [ STAT_BONUS.lock().unwrap()[ sb_index ] as usize ];
                     level_data[y as usize ].synchro_skills.replace(z as i32, new_skill, 5);
                     stat_index += 1;
@@ -538,8 +546,9 @@ fn randomize_emblem_stat_bonuses(rng: &Random){
                 let skill_index = level_data[y].engaged_skills[z as usize].get_skill().unwrap().parent.index;
                 if skill_index <= max_index && min_index <= skill_index && stat_index < 4 {
                     let stat_skill = &skill_list[ skill_index as usize ];
-                    let sb_index = if stat_skill.get_priority() == 0 { ( stats[ stat_index ] as usize ) * 6  }
-                                   else { ( stats[ stat_index ] as usize ) * 6  + ( stat_skill.get_priority()  - 1 ) as usize  };
+                    let sb_index = 
+                        if stat_skill.get_priority() == 0 { ( stats[ stat_index ] as usize ) * 6  }
+                        else { ( stats[ stat_index ] as usize ) * 6  + ( stat_skill.get_priority()  - 1 ) as usize  };
                     let new_skill = &skill_list [ STAT_BONUS.lock().unwrap()[ sb_index ] as usize ];
                     level_data[y as usize ].engaged_skills.replace(z as i32, new_skill, 5);
                     stat_index += 1;
@@ -565,8 +574,9 @@ fn randomize_emblem_stat_bonuses(rng: &Random){
                     let skill_index = level_data[y].synchro_skills[z as usize].get_skill().unwrap().parent.index;
                     if skill_index <= max_index && min_index <= skill_index && stat_index < 4 {
                         let stat_skill = &skill_list[ skill_index as usize ];
-                        let sb_index: usize = if stat_skill.get_priority() == 0 {  ( stats[ stat_index ] as usize ) * 6 } //Replace Move+1 stat boost
-                                              else { ( stats[ stat_index ] as usize ) * 6  + ( stat_skill.get_priority()  - 1 ) as usize };
+                        let sb_index: usize = 
+                            if stat_skill.get_priority() == 0 {  ( stats[ stat_index ] as usize ) * 6 } //Replace Move+1 stat boost
+                            else { ( stats[ stat_index ] as usize ) * 6  + ( stat_skill.get_priority()  - 1 ) as usize };
                         let new_skill = &skill_list [ STAT_BONUS.lock().unwrap()[ sb_index ] as usize ];
                         level_data[y as usize ].synchro_skills.replace(z as i32, new_skill, 5);
                         stat_index += 1;
@@ -577,8 +587,9 @@ fn randomize_emblem_stat_bonuses(rng: &Random){
                     let skill_index = level_data[y].engaged_skills[z as usize].get_skill().unwrap().parent.index;
                     if skill_index <= max_index && min_index <= skill_index && stat_index < 4 {
                         let stat_skill = &skill_list[ skill_index as usize ];
-                        let sb_index = if stat_skill.get_priority() == 0 { ( stats[ stat_index ] as usize ) * 6  }
-                                       else { ( stats[ stat_index ] as usize ) * 6  + ( stat_skill.get_priority()  - 1 ) as usize  };
+                        let sb_index = 
+                            if stat_skill.get_priority() == 0 { ( stats[ stat_index ] as usize ) * 6  }
+                            else { ( stats[ stat_index ] as usize ) * 6  + ( stat_skill.get_priority()  - 1 ) as usize  };
                         let new_skill = &skill_list [ STAT_BONUS.lock().unwrap()[ sb_index ] as usize ];
                         level_data[y as usize ].engaged_skills.replace(z as i32, new_skill, 5);
                         stat_index += 1;
@@ -588,22 +599,94 @@ fn randomize_emblem_stat_bonuses(rng: &Random){
         }
     }
 }
-fn randomized_common_sids(mpid: String) {
+fn randomized_common_sids(mpid: String, emblem_index: i32) {
     let person_list = PersonData::get_list_mut().unwrap();
-    for x in 300..1200 {
+    let engage_attack: Option<&Il2CppString>;
+    let source_god = GodData::get(EMBLEM_GIDS[emblem_index as usize]).unwrap();
+    if emblem_index < 0 || emblem_index >= 19 { engage_attack = None; }
+    else { engage_attack = source_god.engage_attack;  }
+
+    let ggd = source_god.get_grow_table().unwrap();
+    let level_data = GodGrowthData::get_level_data(&ggd.get_string().unwrap()).unwrap();
+    let engaged_skills = level_data[15].engaged_skills;
+    let style_items = &level_data[0].style_items[2];
+
+    let mut weapon_type: [bool; 10] = [false; 10];
+    let mut items: [&Il2CppString; 3] = ["".into(); 3];
+    let mut item_count = 0;
+    for x in 0..style_items.len() {
+        let item = &style_items[x];
+        let new_iid = 
+            if item.get_flag().value & 128 != 0 { format!("{}_通常", item.iid.get_string().unwrap()) } 
+            else { item.iid.get_string().unwrap() };
+
+        if ItemData::get(&new_iid).is_some() {
+            if item.kind > 0 && item.kind < 10 { weapon_type[item.kind as usize] = true;  }
+            items[item_count as usize] = new_iid.into();
+            item_count += 1;
+        }
+    }
+
+    for x in 300..person_list.len() {
         let person_x = &person_list[x as usize];
         if person_x.get_name().is_none() { continue; }
         let name2 = person_x.get_name().unwrap();
         if !str_contains(name2, &mpid) { continue; }
+        if !str_contains(person_x.pid, "PID_召喚_") && person_x.get_asset_force() == 0 { continue; }
         if person_x.get_common_sids().is_none() { continue; }
-        let personal_sid = person_x.get_common_sids().unwrap();
-        for y in 0..personal_sid.len() {
-            let replacement_skill = SYNCHO_RANDOM_LIST.lock().unwrap().get_replacement_sid(personal_sid[y as usize], true);
-            if replacement_skill.parent.index > 0 { personal_sid[y] = replacement_skill.sid; } 
+        let person_skills = person_x.get_common_sids().unwrap();
+        let mut skill_count = 0;
+        let mut counter = 0;
+
+        loop {
+            if skill_count >= person_skills.len() || counter >= engaged_skills.list.size { break; }
+            let skill = engaged_skills[counter as usize].get_skill().unwrap();
+            // Must not be hidden and not Laguz Friend
+            if skill.get_flag() & 1 == 0 && !str_contains(skill.sid, "SID_アイクエンゲージスキル") {
+                person_skills[skill_count] = skill.sid;
+                skill_count += 1;
+            }
+            counter += 1;
         }
+        person_x.set_sp(emblem_index+1);
+        if str_contains(person_x.pid, "PID_召喚_")  {
+            let item = person_x.get_items();
+            if item.is_some() {
+                let summon_items = item.unwrap();
+                for x in 0..summon_items.len() {
+                    if x >= item_count { break; }
+                    summon_items[x] = items[x];
+                }
+            }
+        }
+        if person_x.get_engage_sid().is_some() { 
+            person_x.set_engage_sid(engage_attack);
+            println!("Paralogue Emblem {}: #{} Changed", mpid, x);
+         }
         person_x.on_complete();
+        if person_x.jid.is_some() {
+            let jid =  person_x.jid.unwrap().get_string().unwrap();
+            let job = JobData::get_mut(&jid).unwrap();
+            for x in 1..10 {
+                if weapon_type[x] {
+                    job.weapons[x] = 1;
+                    job.max_weapon_level[x] = "S".into();
+                    job.weapon_levels[x] = 5;
+                }
+                else {
+                    job.weapons[x] = 0;
+                    job.max_weapon_level[x] = "N".into();
+                    job.weapon_levels[x] = 0;
+                }
+            }
+            job.on_completed();
+            println!("Emblem Job #{} changed for Person {}", job.parent.index, person_x.parent.index);
+        }
     }
 }
+
+
+
 fn randomized_emblem_syncho_skills(rng: &Random) {
     if GameVariableManager::get_number("G_Random_God_Sync") <= 1 { return; }
     println!("Randomizing Syncho Skills");
@@ -692,11 +775,16 @@ fn randomized_emblem_syncho_skills(rng: &Random) {
             if non_hidden_skills < 4 {
                 for _y in 0..4-non_hidden_skills {
                     let mut index;
+                    let mut break_counter = 0;
                     loop {
                         index = rng.get_value( pool_size );
                         if index >= 400 { continue; }
                         if !used_skill[index as usize] { break; }
+                        break_counter += 1;
+                        if break_counter >= 150 { break; }
                     }
+                    if break_counter >= 150 { break; }
+
                     used_skill[index as usize] = true;
                     let skill_index = extra_skills[index as usize].index; 
                     let mut skill = SkillData::try_index_get(skill_index).unwrap();
@@ -738,35 +826,12 @@ fn randomized_emblem_syncho_skills(rng: &Random) {
                 let replacement_skill = SYNCHO_RANDOM_LIST.lock().unwrap().get_replacement(skill.unwrap(), false);
                 if str_contains(replacement_skill.sid, "SID_計略") { syncho_skills[z] = "".into(); }
                 else { syncho_skills[z] = replacement_skill.sid; }
-
             }
             god_grow[y].on_complete(); 
         }
-        if x < 19 { randomized_common_sids( RINGS[x as usize].to_string() );  }
+        if x < 19 { randomized_common_sids( RINGS[x as usize].to_string(), x );  }
     }
-    randomized_common_sids("MPID_Reflet".to_string());
-    // enemy and others
-    let god_list = GodData::get_list().unwrap();
-    for x in 0..god_list.len() {
-        if !str_contains(god_list[x].gid, "GID_M0") && !str_contains(god_list[x].gid, "GID_E00") { continue; }
-        let ggd = god_list[x].get_grow_table();
-        if ggd.is_none() { continue; }
-        let ld = GodGrowthData::get_level_data(&ggd.unwrap().get_string().unwrap());
-        if ld.is_none() { continue;}
-        let level_data = ld.unwrap();
-        for y in 0..level_data.len() {
-            for z in 0..level_data[y].synchro_skills.list.size {
-                let skill = level_data[y].synchro_skills[z as usize].get_skill().unwrap();
-                let replacement_skill = SYNCHO_RANDOM_LIST.lock().unwrap().get_replacement(skill, false);
-                level_data[y as usize ].synchro_skills.replace(z as i32, replacement_skill, 5);
-            }
-            for z in 0..level_data[y].engaged_skills.list.size {
-                let skill = level_data[y].engaged_skills[z as usize].get_skill().unwrap();
-                let replacement_skill =  SYNCHO_RANDOM_LIST.lock().unwrap().get_replacement(skill, false);
-                level_data[y as usize ].engaged_skills.replace(z as i32, replacement_skill, 5);
-            }
-        }
-    }
+    randomized_common_sids("MPID_Reflet".to_string(), 18 );
 }
 
 fn adjust_engage_weapon_type() {

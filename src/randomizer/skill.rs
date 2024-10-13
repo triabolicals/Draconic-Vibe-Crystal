@@ -191,6 +191,7 @@ pub fn reset_skills() {
 pub fn replace_all_sid_person(person: &PersonData) {
     if person.pid.get_string().unwrap() == "PID_ヴェイル" { return; } // ignore Veyle swaps
     let new_person = switch_person(person);
+    println!("Person: {} to {}", Mess::get_name(person.pid).get_string().unwrap(), Mess::get_name(new_person.pid).get_string().unwrap());
     let old_job = person.get_job().unwrap();
     let new_job = new_person.get_job().unwrap();
     let jid = 
@@ -213,8 +214,16 @@ pub fn replace_all_sid_person(person: &PersonData) {
     if GameVariableManager::get_number(&format!("G_P_{}", new_person.pid.get_string().unwrap())) != 0 {
         let new_skill_index = GameVariableManager::get_number(&format!("G_P_{}", new_person.pid.get_string().unwrap()));
         let new_skill = SkillData::try_index_get(new_skill_index);
-        if new_skill.is_none() { return; }
-        new_sid = new_skill.unwrap().sid;
+        if new_skill.is_none() { 
+            for y in 0..personal_sids.len() {
+                let skill = SkillData::get( &personal_sids[y as usize].get_string().unwrap() ).unwrap();
+                if skill.get_flag() & 1 == 0 {
+                    new_sid = personal_sids[y as usize];
+                    break;
+                }
+            }
+        }
+        else { new_sid = new_skill.unwrap().sid; }
     }
     else {
         for y in 0..personal_sids.len() {
@@ -227,6 +236,7 @@ pub fn replace_all_sid_person(person: &PersonData) {
     }
     let icon_name = new_person.get_unit_icon_id().get_string().unwrap();
     let help_name = new_person.get_help().get_string().unwrap();
+
     for x in 2..person_list.len() {
         let person_x = &person_list[x as usize];
         if person_x.get_flag().value & 128 != 0 { continue; }
@@ -272,6 +282,7 @@ pub fn replace_all_sid_person(person: &PersonData) {
             } // Growths
         }
         person_x.on_complete();
+        println!("Enemy {} is now: {}", person_x.parent.index, name);
     }
 }
 
@@ -298,7 +309,7 @@ pub fn randomize_skills() {
         let person = &person_list[p_index]; 
         let personal_sid = person.get_common_sids().
             expect(
-                format!("Person #{}: {} doesn't have skills!", person.parent.index, person.get_name().unwrap().get_string().unwrap()).as_str()
+                format!("Person #{}: {} doesn't have skills!", p_index, person.get_name().unwrap().get_string().unwrap()).as_str()
             );
 
         let personal_key = format!("G_P_{}", person.pid.get_string().unwrap());

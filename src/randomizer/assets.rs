@@ -14,7 +14,7 @@ pub mod accessory;
 pub mod animation;
 pub mod bust;
 
-use crate::CONFIG;
+use crate::{utils::str_contains, CONFIG};
 use unity::system::List;
 use crate::enums::*;
 static mut ASSET_SIZE: usize = 0;
@@ -172,6 +172,8 @@ pub struct AssetTableResult {
     pub magic: &'static Il2CppString,
     pub body_anim: &'static Il2CppString, 
     pub ride_anim: &'static Il2CppString,
+    unity_colors: [u64; 16],
+    pub scale_stuff: [f32; 19], 
 }
 
 #[unity::class("App", "AssetTableAccessory")]
@@ -278,8 +280,6 @@ pub fn try_add_accessory_list(this: &mut List<AssetTableAccessory>, accessory: &
 #[skyline::from_offset(0x01bb5a90)]
 pub fn get_for_talk(pid: &Il2CppString, method_info: OptionalMethod) -> &'static mut AssetTableResult;
 
-#[skyline::from_offset(0x01bb2d80)]
-pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_data: &GodData, is_darkness: bool, conditions: &Array<&'static Il2CppString>, method_info: OptionalMethod) -> &'static mut AssetTableResult;
 // Fixing Engage Attack Animation (kinda)
 
 #[skyline::from_offset(0x01bb2120)]
@@ -296,3 +296,28 @@ fn get_volume_legs(this: &AssetTableResult, method_info: OptionalMethod) -> f32;
 
 #[skyline::from_offset(0x01a4dff0)]
 fn unit_get_accessory_list(this: &Unit, method_info: OptionalMethod) -> &'static mut UnitAccessoryList;
+
+#[skyline::hook(offset=0x01bb2d80)]
+pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_data: Option<&GodData>, is_darkness: bool, conditions: &Array<&'static Il2CppString>, method_info: OptionalMethod) -> &'static mut AssetTableResult {
+    if mode > 10 {
+        return call_original!(this, mode-10, god_data, is_darkness, conditions, method_info);
+    }
+    if god_data.is_none() {
+        return call_original!(this, mode, god_data, is_darkness, conditions, method_info);
+    }
+    let gid = god_data.unwrap().gid.get_string().unwrap(); 
+    let is_enemy_emblem = crate::randomizer::emblem::enemy::ENEMY_EMBLEMS.iter().find(|&x| x.0 == gid);
+    if is_enemy_emblem.is_some() {
+        let emblem_index = is_enemy_emblem.unwrap().1;
+        let new_emblem = crate::randomizer::emblem::EMBLEM_ORDER.lock().unwrap()[emblem_index as usize] as usize;
+        if new_emblem > 19 { return call_original!(this, mode, god_data, is_darkness, conditions, method_info);  }
+        let replace_god = if new_emblem < 12 { GodData::get( EMBLEM_GIDS[new_emblem]).unwrap() }
+            else { GodData::get(&format!("GID_E006_敵{}", EMBLEM_ASSET[new_emblem])).unwrap() };
+
+        let is_m002 = gid == "GID_M002_シグルド";
+        return call_original!(this, mode, Some(replace_god), !is_m002, conditions, method_info);
+    }
+    else { return call_original!(this, mode, god_data, is_darkness, conditions, method_info); }
+
+
+}

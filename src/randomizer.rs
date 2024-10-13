@@ -435,6 +435,9 @@ fn create_game_variables_after_new_game() {
     if GameVariableManager::get_number("G_Random_Engage_Weps") == 0 {
         GameVariableManager::set_number("G_Random_Engage_Weps", CONFIG.lock().unwrap().random_engage_weapon as i32);
     }
+    if !GameVariableManager::get_bool("G_Random_Names") {
+        GameVariableManager::set_number("G_Random_Names", CONFIG.lock().unwrap().random_names as i32);
+    }
 }
 
 fn randomize_gamedata(is_new_game: bool) {
@@ -458,12 +461,14 @@ fn randomize_gamedata(is_new_game: bool) {
     person::change_lueur_for_recruitment(is_new_game);
     println!("Replace Enemy Version");
     skill::replace_enemy_version();
+    emblem::enemy::randomize_enemy_emblems();
     println!("Name Replacement");
     names::give_names_to_generics();
     unsafe { 
         CURRENT_SEED = GameVariableManager::get_number("G_Random_Seed"); 
         LUEUR_CHANGE = true;
     }
+    
     if GameVariableManager::get_number("G_Random_Job") != 0 { assets::unlock_royal_classes(); }
 }
 
@@ -511,6 +516,7 @@ pub fn reset_gamedata() {
     for p in 0..persons.len() {  persons[p].on_completed();  }
     GodData::unload();
     GodData::load();
+    engage_count();
     GodGrowthData::unload();
     GodGrowthData::load();
     RingData::unload();
@@ -634,11 +640,15 @@ pub fn randomize_stuff() {
             }
         }
         println!("Randomization Complete");
+        println!("Meteor Adjustment");
+        item::unit_items::adjust_items();   //Meteor Adjustment
     }
+    fix_ascii_names();
 }
 
 pub fn intitalize_game_data() {
     person::ai::create_custom_ai();
+    person::get_playable_list();
     emblem::get_custom_emblems();
     assets::auto_adjust_asset_table();
     assets::accessory::gather_all_accesories();
@@ -646,16 +656,23 @@ pub fn intitalize_game_data() {
     assets::bust::get_bust_values();
     assets::animation::add_names();
 
-    person::get_playable_list();
     interact::get_style_interact_default_values();
     skill::create_skill_pool();
     emblem::engrave::get_engrave_stats();
     item::create_item_pool();
     bgm::get_bgm_pool();
     emblem::get_recommended_paralogue_levels();
-
+    engage_count();
     emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().intialize_list();
+}
 
+pub fn engage_count() {
+    let god_data = GodData::get_list_mut().unwrap();
+    for x in 0..god_data.len() {
+        if god_data[x].engage_count != 0 { god_data[x].engage_count = 7; }
+    }
+}
+pub fn fix_ascii_names() {
 }
 
 #[skyline::from_offset(0x0232e6b0)]

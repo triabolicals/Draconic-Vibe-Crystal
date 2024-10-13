@@ -297,6 +297,7 @@ impl ShopData for HubRandomSet {}
 
 pub fn randomize_hub_random_items(){
     if !crate::utils::can_rand() || GameVariableManager::get_number("G_Random_Item") == 0  { return; }
+    println!("Randomizing Hub Items");
     let hublist = HubRandomSet::get_list_mut().unwrap();
     for x in 0..hublist.len() {
         let list = &mut hublist[x]; 

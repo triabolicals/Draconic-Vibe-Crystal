@@ -137,7 +137,6 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
     let result = call_original!(dyn_value, method_info);
     if result.is_none() || !crate::utils::can_rand() { return result; }
     let result_string = result.unwrap();
-
     if str_contains(result_string, "Kengen") || ( str_contains(&result_string, "Scene03") || str_contains(&result_string, "Scene04") ) {
         if GameVariableManager::get_number("G_Emblem_Mode") == 0 { return result; }
         if str_contains(&result_string, "Scene04") { return None; }

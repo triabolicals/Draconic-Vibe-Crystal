@@ -12,6 +12,7 @@ pub static SET_RECRUITMENT: Mutex<Vec<(i32, i32, bool)>> = Mutex::new(Vec::new()
 pub static mut UNIT_RANDOM: bool = false;
 pub static mut EMBLEM_RANDOM: bool = false;
 pub static mut LUEUR_CHANGE: bool = false; 
+
 pub const MPIDS: [&str;41] = ["MPID_Lueur", "MPID_Vandre", "MPID_Clan", "MPID_Fram", "MPID_Alfred", "MPID_Etie", "MPID_Boucheron", "MPID_Celine", "MPID_Chloe", "MPID_Louis", "MPID_Yunaka", "MPID_Staluke", "MPID_Citrinica", "MPID_Lapis", "MPID_Diamand", "MPID_Umber", "MPID_Jade", "MPID_Ivy", "MPID_Kagetsu", "MPID_Zelkova", "MPID_Fogato", "MPID_Pandoro", "MPID_Bonet", "MPID_Misutira", "MPID_Panetone", "MPID_Merin", "MPID_Hortensia", "MPID_Seadas", "MPID_Rosado", "MPID_Goldmary", "MPID_Linden", "MPID_Saphir", "MPID_Veyre", "MPID_Mauve", "MPID_Anna", "MPID_Jean", "MPID_El", "MPID_Rafale", "MPID_Selestia", "MPID_Gregory", "MPID_Madeline"];
 pub const PIDS: [&str; 41] = ["PID_リュール", "PID_ヴァンドレ", "PID_クラン", "PID_フラン", "PID_アルフレッド", "PID_エーティエ", "PID_ブシュロン", "PID_セリーヌ", "PID_クロエ", "PID_ルイ", "PID_ユナカ", "PID_スタルーク", "PID_シトリニカ", "PID_ラピス", "PID_ディアマンド", "PID_アンバー", "PID_ジェーデ", "PID_アイビー", "PID_カゲツ", "PID_ゼルコバ", "PID_フォガート", "PID_パンドロ", "PID_ボネ", "PID_ミスティラ", "PID_パネトネ", "PID_メリン", "PID_オルテンシア", "PID_セアダス", "PID_ロサード", "PID_ゴルドマリー", "PID_リンデン", "PID_ザフィーア", "PID_ヴェイル", "PID_モーヴ", "PID_アンナ", "PID_ジャン", "PID_エル", "PID_ラファール", "PID_セレスティア", "PID_グレゴリー", "PID_マデリーン"];
 pub const RECRUIT_CID : [&str; 41] = ["M001", "M001", "M002", "M002", "M003", "M003", "M003", "M004", "M004", "M004", "M006", "M007", "M007", "M007", "M008", "M008", "M009", "M011", "M011", "M011", "M012", "M012", "M012", "M013", "M013", "M013", "M014", "M015", "M016", "M016", "M018", "M019", "M022", "M021", "S002", "S001", "E006", "E006", "E006", "E006", "E006"];
@@ -24,11 +25,11 @@ pub const RINGS: [&str; 19] = ["Marth", "Siglud", "Celica", "Micaiah", "Roy", "L
 pub const EMBELM_PARA: [&str; 19] = ["S014", "S009", "S013", "S011", "S012", "S010", "S003", "S004", "S005", "S006", "S007", "S008", "G007", "G001", "G002", "G003", "G004", "G005", "G006"];
 pub const UNLOCK_PARA: [&str; 19] = ["M022", "M017", "M020", "M019", "M019", "M017", "M011", "M012", "M013", "M014", "M015", "M016", "", "G001", "G002", "G003", "G004", "G005", "G006"];
 pub const PARA_LEVEL: [i32; 19] = [35, 28, 32, 28, 31, 30, 21, 22, 25, 28, 26, 29, -1, -1, -1, -1, -1, -1, -1];
-pub const ENGAGE_ATK_AI: [&str; 10] = ["AI_AT_EngageAttack","AI_AT_EngagePierce", "AI_AT_EngageVision", "AI_AT_EngageDance", "AI_AT_EngageOverlap", "AI_AT_EngageBless", "AI_AT_EngageWaitGaze", "AI_AT_EngageSummon", "AI_AT_EngageCamilla", "AI_AT_Versus"];
+pub const ENGAGE_ATK_AI: [&str; 11] = ["AI_AT_EngageAttack","AI_AT_EngagePierce", "AI_AT_EngageVision", "AI_AT_EngageDance", "AI_AT_EngageOverlap", "AI_AT_EngageBless", "AI_AT_EngageWaitGaze", "AI_AT_EngageSummon", "AI_AT_EngageCamilla", "AI_AT_Versus", "AI_AT_EngageWait"];
 // Items
 
+// Emblem Cutscene Related
 pub const KENGEN: [&str; 19] = ["Scene03", "Kengen01", "Kengen02", "Kengen03", "Kengen04", "Kengen05", "Kengen07", "Kengen06", "Kengen08", "Kengen09", "Kengen10", "Kengen11", "Kengen13", "Kengen14", "Kengen15", "Kengen19", "Kengen16", "Kengen17", "Kengen18"];
-
 pub const STYLE_NAMES: [&str; 9] = ["連携スタイル", "騎馬スタイル", "隠密スタイル", "重装スタイル",  "飛行スタイル", "魔法スタイル", "気功スタイル", "竜族スタイル", "スタイル無し"];
 pub const BLACKLIST_ITEMS: [&str; 25] = [
     "IID_マスタープルフ", "IID_リベラシオン改", "IID_リベラシオン改_ノーマル",

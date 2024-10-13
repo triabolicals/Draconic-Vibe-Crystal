@@ -17,12 +17,33 @@ pub mod emblem_item;
 pub mod emblem_structs;
 pub mod engrave;
 pub mod emblem_skill;
-
+pub mod enemy;
 //pub static mut RANDOMIZED_INDEX: [i32; 38] = [0; 38];
 pub static mut CURRENT_SEED: i32 = -1;
 pub static ENGRAVE_STATS: Mutex<[i8; 132]> = Mutex::new([0; 132]);
 pub static RECOMMENED_LVL: Mutex<[u8; 12]> = Mutex::new([0; 12]);
 pub static CUSTOM_EMBLEMS: Mutex<[i32; 20]> = Mutex::new([-1; 20]);
+pub static EMBLEM_ORDER: Mutex<[i32; 21]> = Mutex::new([-1; 21]);
+
+pub fn fill_emblem_order() {
+    if GameVariableManager::get_number("G_Emblem_Mode") == 0 {
+        for x in 0..19 { EMBLEM_ORDER.lock().unwrap()[x as usize] = x; }
+        return; 
+    }
+    for x in 0..19 {
+        let key = format!("G_R_{}",EMBLEM_GIDS[x as usize]);
+        let pid = GameVariableManager::get_string(&key).get_string().unwrap();
+        for y in 0..19 {
+            if pid == EMBLEM_GIDS[y as usize] { EMBLEM_ORDER.lock().unwrap()[x as usize] = y; }
+        }
+    }
+}
+
+pub fn get_god_from_index(index: i32, randomized: bool) -> Option<&'static GodData> {
+    if index < 0 || index >= 19 { return None; }
+    if GameVariableManager::get_number("G_Emblem_Mode") == 0 || !randomized { return (GodData::get(EMBLEM_GIDS[index as usize]));  }
+    else { return GodData::get(EMBLEM_GIDS[ EMBLEM_ORDER.lock().unwrap()[index as usize] as usize]); }
+}
 
 pub fn get_custom_emblems() {
     if CUSTOM_EMBLEMS.lock().unwrap()[0] != -1 { return; }
@@ -194,6 +215,7 @@ pub fn randomize_emblems() {
     if GameVariableManager::get_bool("G_Random_Emblem_Set") {
         set_emblem_paralogue_unlock();
         set_m022_emblem_assets();
+        fill_emblem_order();
         return; 
     }
     if GameVariableManager::exist(&format!("G_R_{}",EMBLEM_GIDS[0])){
@@ -251,6 +273,7 @@ pub fn randomize_emblems() {
     }
     set_m022_emblem_assets();
     set_emblem_paralogue_unlock();
+    fill_emblem_order();
     GameVariableManager::set_bool("G_Random_Emblem_Set", true);
 }
 fn set_emblem_paralogue_unlock() {
@@ -298,10 +321,11 @@ pub fn get_engage_attack_type(skill: Option<&SkillData>) -> i32 {
         }
     }
     match engage_type {
-        0|2|4|5|6|11|12|16|19|20|21 => { return 0; }, //AI_AT_EngageAttack
+        0|2|4|5|6|11|12|16|18|19|20|21 => { return 0; }, //AI_AT_EngageAttack
         1 => { return 1; }, //AI_AT_EngagePierce
         3 => { return 9; }, //AI_AT_Versus
         7 => { return 2; }, // AI_AT_EngageVision
+        8 => { return 10; }, // AI_AT_EngageWait
         9 => { return 3; }, // AI_AT_EngageDance
         10 => { return 4; }, // AI_AT_EngageOverlap
         13 => { return 5; }, // AI_AT_EngageBless

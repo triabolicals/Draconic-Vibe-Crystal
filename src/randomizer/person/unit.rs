@@ -1,4 +1,5 @@
 use super::{*, ai};
+use crate::randomizer::emblem;
 use crate::randomizer::{job, item::unit_items, assets, skill};
 use crate::utils;
 
@@ -13,17 +14,16 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     }
     if !can_rand() { return; }
     if !is_player_unit(this.person) {
-        if this.person.get_sp() > 0 {
-            if GameVariableManager::get_number("G_Random_Job") == 1 ||  GameVariableManager::get_number("G_Random_Job") == 3  {
+        let playable = PLAYABLE.lock().unwrap();
+        if playable.iter().find(|&&x| x == this.person.parent.index).is_some() {
+            if GameVariableManager::get_number("G_Random_Job") & 1 != 0 {
                 job::unit_change_to_random_class(this);
                 fixed_unit_weapon_mask(this);
                 println!("CreateFromDispos Adjust Unit Items for {}", Mess::get(this.person.get_name().unwrap()).get_string().unwrap());
             }
-            if GameVariableManager::get_number("G_Random_Recruitment") != 0 ||  ( GameVariableManager::get_number("G_Random_Job") == 1 ||  GameVariableManager::get_number("G_Random_Job") == 3 ) {  adjust_unit_items(this);  }
+            if GameVariableManager::get_number("G_Random_Recruitment") != 0 ||  ( GameVariableManager::get_number("G_Random_Job") & 1 != 0 ) {  adjust_unit_items(this);  }
         }
-        if this.person.get_asset_force() != 0 {
-            assets::accessory::accesorize_enemy_unit(this);
-        }
+        if this.person.get_asset_force() != 0 { assets::accessory::accesorize_enemy_unit(this); }
         return;
     }
     if GameVariableManager::get_number("G_Random_Recruitment") != 0 {
@@ -61,7 +61,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         // if randomized to the same person
         else if switch_person(this.person).pid.get_string().unwrap() ==  this.person.pid.get_string().unwrap() {
             println!("Same Person");
-            if GameVariableManager::get_number("G_Random_Job") == 1 || GameVariableManager::get_number("G_Random_Job") == 3  {
+            if GameVariableManager::get_number("G_Random_Job") & 1 != 0  {
                 job::unit_change_to_random_class(this);
                 fixed_unit_weapon_mask(this);
                 adjust_unit_items(this);
@@ -96,37 +96,40 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
            data.set_gid(new_gid);
        }
    }
+   if GameVariableManager::get_number("G_Emblem_Mode") != 0 { adjust_emblem_paralogue_items(data); }
+
    // Changing Person AI
    ai::adjust_dispos_person_ai(data);
    call_original!(this, data, method_info);
+   ai::engage_attack_ai(this, data); 
    if !utils::can_rand() { return; }
    let rng = Random::get_game();
-   if ( GameVariableManager::get_bool("G_Random_Skills") && GameVariableManager::get_number("G_EnemySkillGauge") > 10 ) && ( utils::can_rand() && this.person.get_asset_force() != 0 ) {
-        let diffculty = GameUserData::get_difficulty(false);
-
-        if data.sid.is_some() {
-            let skill = skill::get_random_skill( diffculty, rng);
-            data.sid = Some(skill.sid); 
+   if this.person.get_engage_sid().is_none()  {
+        if ( GameVariableManager::get_bool("G_Random_Skills") && GameVariableManager::get_number("G_EnemySkillGauge") > 10 ) && ( utils::can_rand() && this.person.get_asset_force() != 0 ) {
+            let diffculty = GameUserData::get_difficulty(false);
+            if data.sid.is_some() {
+                let skill = skill::get_random_skill( diffculty, rng);
+                data.sid = Some(skill.sid); 
+            }
+            else if rng.get_value(20) < 2*diffculty && GameVariableManager::get_bool("G_Cleared_M004") {
+                let skill = skill::get_random_skill( diffculty, rng);
+                data.sid = Some(skill.sid);
+            }
         }
-        else if rng.get_value(20) < 2*diffculty && GameVariableManager::get_bool("G_Cleared_M004") {
-            let skill = skill::get_random_skill( diffculty, rng);
-            data.sid = Some(skill.sid);
-        }
-    }
-    call_original!(this, data, method_info);
+   }
+   call_original!(this, data, method_info);
    set_unit_edit_name(this);
    if this.person.get_flag().value & 512 == 512 {  // Person was change 
        fixed_unit_weapon_mask(this);
        adjust_unit_items(this); 
        ai::adjust_unit_ai(this, data);
    }
-   if this.person.get_asset_force() == 0 && ( GameVariableManager::get_number("G_Random_Job") == 1 ||  GameVariableManager::get_number("G_Random_Job") == 3 ) {
+   if this.person.get_asset_force() == 0 && ( GameVariableManager::get_number("G_Random_Job") & 1 != 0 ){
        ai::adjust_unit_ai(this, data); // change green unit recruitable ai on random classes
    }
    if this.person.get_asset_force() != 0 && !GameUserData::is_evil_map() {
-       *CONFIG.lock().unwrap() = crate::DeploymentConfig::new();
        if GameVariableManager::get_bool("G_DVC_Autolevel") { auto_level_unit(this); }
-       if GameVariableManager::get_number("G_Random_Job") >= 2 && GameVariableManager::get_bool("G_Cleared_M004"){
+       if ( GameVariableManager::get_number("G_Random_Job") & 2 != 0 )  && GameVariableManager::get_bool("G_Cleared_M004"){
            if this.person.get_asset_force() == 2 || ( unsafe { get_bmap_size(this.person, None) } == 1 && rng.get_value(100) < GameVariableManager::get_number("G_EnemyJobGauge") ) {
                if job::enemy_unit_change_to_random_class(this){ 
                    fixed_unit_weapon_mask(this);
@@ -145,7 +148,7 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
        if str_contains(GameUserData::get_chapter().cid, "CID_S0") && GameVariableManager::get_number("G_Emblem_Mode") != 0 { emblem_paralogue_level_adjustment(this); } 
        if GameVariableManager::get_number("G_Random_Item") >= 2 { unit_items::random_items_drops(this); }
        if !GameVariableManager::get_bool("G_Cleared_M004") { return; }
-       if GameVariableManager::get_bool("G_Random_Skills") && rng.get_value(100) < GameVariableManager::get_number("G_EnemySkillGauge") {
+       if GameVariableManager::get_bool("G_Random_Skills") && rng.get_value(100) < GameVariableManager::get_number("G_EnemySkillGauge") && this.person.get_engage_sid().is_none() {
            let mut valid_skill = false;
            let mut count = 0;
            while !valid_skill && count < 5 {
@@ -165,11 +168,13 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
            if current_chapter != "CID_M022" && current_chapter != "CID_M011"  {
                let emblem = rng.get_value(EMBLEMS.len() as i32) as usize;
                if try_equip_emblem(this, emblem) { 
-                ai::adjust_unit_ai(this, data);
+                    ai::engage_attack_ai(this, data); 
+                    ai::adjust_unit_ai(this, data);
                }
            }
        } 
    }
+   unit_items::adjust_enemy_meteor(this);
    // Prevent Green Emblems from dying in Chapter 22 if AI is changed
    if str_contains(this.person.pid, "PID_M022_紋章士") { this.private_skill.add_sid("SID_死亡回避", 10, 0);  }  
 }
@@ -194,6 +199,7 @@ pub fn adjust_unit_items(unit: &Unit) {
     let mut slot = 0;
     let mut weapon_mask_array: [i32; 4] = [0; 4];
     let mut weapon_level: [i32; 4] = [0; 4];
+    let enemy = unit.person.get_asset_force() != 0;
     for x in 1..9 {
         if x == 7 { continue; }
         if weapon_mask & (1 << x) != 0 {
@@ -211,11 +217,10 @@ pub fn adjust_unit_items(unit: &Unit) {
         let item = unit.item_list.get_item(x);
         if item.is_some() {
             let weapon = &item.unwrap();
-            //if weapon.is_drop() { continue; }
             let kind = weapon.item.get_kind(); 
             if kind > 8 || kind == 0 { continue; }
             if kind == 7 { continue; }
-            if weapon.item.get_flag().value & 128 != 0 || weapon.item.get_flag().value & 2 != 0 { continue;  }
+            if weapon.item.get_flag().value & 128 != 0 || ( weapon.item.get_flag().value & 2 != 0 && !enemy) { continue;  }
             //let rank = weapon.item.get_weapon_level();
             //println!("{}: Weapon Mask {} & {} (kind = {}, rank {} ) = {} for {} ", name, weapon_mask, 1 << kind, kind, rank, weapon_mask & ( 1 <<  kind ), weapon.item.name.get_string().unwrap());
             if weapon_mask & ( 1 <<  kind ) == 0 {
@@ -245,20 +250,22 @@ pub fn adjust_unit_items(unit: &Unit) {
                     }
                 }
                 else {
+                    println!("{} has Weapon {} to be replaced", name, weapon.item.name.get_string().unwrap());
                     if slot < n_weapons {
-                        unit_items::replace_weapon(weapon, weapon_mask_array[slot as usize], weapon_level[slot as usize]);
+                        unit_items::replace_weapon(weapon, weapon_mask_array[slot as usize], weapon_level[slot as usize], enemy);
                         if n_weapons > 1 { slot += 1; }
                     }
                     else if slot < 4 && slot >= 1 {
-                        unit_items::replace_weapon(weapon, weapon_mask_array[slot - 1 as usize], weapon_level[slot - 1 as usize]);
+                        unit_items::replace_weapon(weapon, weapon_mask_array[slot - 1 as usize], weapon_level[slot - 1 as usize], enemy);
                     }
                 }
             }
         }
     }
     unit_items::adjust_staffs(unit);
-    unsafe { unit_update_auto_equip(unit, None); }
+    unit_items::adjust_melee_weapons(unit);
     unit_items::remove_duplicates(unit.item_list);
+    unsafe { unit_update_auto_equip(unit, None); }
 }
 
 pub fn set_unit_edit_name(unit: &Unit) {
@@ -465,13 +472,52 @@ fn calculate_new_offset(original: &PersonData, new: &PersonData) -> [i8; 11] {
     out
 }
 
-
 fn has_skill(this: &Unit, skill: &SkillData) -> bool {
     return this.mask_skill.unwrap().find_sid(skill.sid).is_some() | this.private_skill.find_sid(skill.sid).is_some()| this.equip_skill.find_sid(skill.sid).is_some();
 }
 pub fn has_sid(this: &Unit, sid: &str) -> bool {
     return this.mask_skill.unwrap().find_sid(sid.into()).is_some() | this.private_skill.find_sid(sid.into()).is_some()| this.equip_skill.find_sid(sid.into()).is_some();
 }
+
+fn adjust_emblem_paralogue_items(data: &mut DisposData) {
+    let person = data.get_person();
+    if person.is_none() { return; }
+    let emblem = person.unwrap();
+
+    let sp = emblem.get_sp() ;
+    if sp == 0 || sp > 99 { return; }
+    let jid = emblem.jid.unwrap().get_string().unwrap();
+    if !str_contains(emblem.jid.unwrap(), "JID_紋章士") { return; }
+
+    let emblem_index = sp - 1;
+    let god = emblem::get_god_from_index(emblem_index, false);
+    if god.is_none() { return; } 
+    let growth_data = god.unwrap().get_level_data();
+    if growth_data.is_none() { return; }
+    let level_data = growth_data.unwrap();
+    let style_items = &level_data[0].style_items[2];
+    let mut item_count: usize = 0;
+
+    for x in 0..style_items.len() {
+        let item = &style_items[x];
+        //println!("Emblem Person {} Item: {}", emblem_index, item.name.get_string().unwrap());
+        let new_iid = 
+            if item.get_flag().value & 128 != 0 { format!("{}_通常", item.iid.get_string().unwrap()) } 
+            else { item.iid.get_string().unwrap() };
+
+        if ItemData::get(&new_iid).is_some() {
+            data.items[item_count].set_iid(new_iid.clone().into());
+            match item_count {
+                0 => { data.item1.set_iid(new_iid.into()) },
+                1 => { data.item2.set_iid(new_iid.into()) },
+                2 => { data.item3.set_iid(new_iid.into()) },
+                _ => {},
+            }
+            item_count += 1;
+        }
+    }
+}
+
 
 #[unity::from_offset("App", "Unit", "UpdateStateWithAutoEquip")]
 pub fn unit_update_auto_equip(this: &Unit, method_info: OptionalMethod);
@@ -491,4 +537,5 @@ fn get_bmap_size(this: &PersonData, method_info: OptionalMethod) -> u8;
 
 #[skyline::from_offset(0x01a3c290)]
 fn unit_learn_job_skill(this: &Unit, method_info: OptionalMethod) -> &'static engage::gamedata::skill::SkillData;
+
 

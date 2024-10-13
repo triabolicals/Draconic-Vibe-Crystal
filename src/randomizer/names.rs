@@ -90,6 +90,7 @@ pub fn give_names_to_generics() {
         if list[x].get_job().is_none() { continue; }
         let name = list[x].get_name().unwrap().get_string().unwrap();
         if name == "MPID_Hide" || name == "MPID_SombreDragon" { continue; }
+        if str_contains(list[x].get_name().unwrap(), "Villager") { continue; }
         if gender == 1 {
             if male_names.iter().find(|&s| *s == name).is_none() { male_names.push(name); }
         }
@@ -100,7 +101,7 @@ pub fn give_names_to_generics() {
     let size_m =  male_names.len() as i32;
     let size_f =  female_names.len() as i32;
     if GameVariableManager::get_bool("G_Random_Names") {
-        for x in 2..list.len() {
+        for x in 2..1400 {
             if list[x].get_name().is_none() { continue; }
             if list[x].get_job().is_none() { continue; }
             let gender = list[x].get_gender();

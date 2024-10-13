@@ -1,9 +1,0 @@
-/Users/trile/Project/global/target/aarch64-skyline-switch/release/deps/libthiserror-7b20f4ceff108618.rmeta: /Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/lib.rs /Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/aserror.rs /Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/display.rs
-
-/Users/trile/Project/global/target/aarch64-skyline-switch/release/deps/libthiserror-7b20f4ceff108618.rlib: /Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/lib.rs /Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/aserror.rs /Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/display.rs
-
-/Users/trile/Project/global/target/aarch64-skyline-switch/release/deps/thiserror-7b20f4ceff108618.d: /Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/lib.rs /Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/aserror.rs /Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/display.rs
-
-/Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/lib.rs:
-/Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/aserror.rs:
-/Users/trile/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.58/src/display.rs:

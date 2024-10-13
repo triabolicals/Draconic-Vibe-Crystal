@@ -36,6 +36,8 @@ pub fn lueur_on_map() -> bool {
 }
 
 pub fn is_player_unit(person: &PersonData) -> bool {
+    let key = format!("G_R_{}", person.pid.get_string().unwrap());
+    if GameVariableManager::exist(&key) { return true; }
     let pid = person.pid.get_string().unwrap();
     for x in PIDS { if *x == pid { return true; } }
     return false;

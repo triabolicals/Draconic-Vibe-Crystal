@@ -39,24 +39,29 @@ impl ConfigBasicMenuItemSwitchMethods for RandomGrowMod {
 
 pub fn randomize_person_grow(){
     let mut max: [u8; 11] = [0; 11];
+    let mut min: [u8; 11] = [100; 11];
     let person_list = PersonData::get_list_mut().unwrap();
     for x in 0..person_list.len() {
         let grow = person_list[x].get_grow();
         if grow.is_zero() { continue; }
         for y in 0..11 {
             if grow[y as usize] > max[y as usize] { max[ y as usize ] = grow[y as usize]; }
+            if grow[y as usize] < min[y as usize] { min[ y as usize ] = grow[y as usize]; }
         }
     }
-    for y in 0..11 {  max[y as usize] = max[y as usize] / 5; }
+    for y in 0..11 { 
+        max[y as usize] = max[y as usize] / 5;
+        min[y as usize] = min[y as usize] / 5;
+    }
     let rng = crate::utils::get_rng();
     for x in 0..person_list.len() {
         let grow = person_list[x].get_grow();
         if grow.is_zero() { continue; } 
         let mut total = 0;
-        while total < 100 || total > 500 {
+        while total < 150 || total > 400 {
             total = 0;
             for y in 0..9 {
-                let v = rng.get_min_max(0, max[y as usize] as i32) as u8;
+                let v = rng.get_min_max(min[y as usize] as i32 , max[y as usize] as i32) as u8;
                 total += 5*(v as i32);
                 grow[y as usize] = v*5;
             }
@@ -66,21 +71,26 @@ pub fn randomize_person_grow(){
 
 pub fn randomize_job_grow(){
     let mut max: [i8; 11] = [0; 11];
+    let mut min: [i8; 11] = [100; 11];
     let job_list = JobData::get_list_mut().unwrap();
     for x in 0..job_list.len() {
         let grow = job_list[x].get_diff_grow();
         if grow.is_zero() { continue; } 
         for y in 0..11 {
             if grow[y as usize] > max[y as usize] { max[ y as usize ] = grow[y as usize]; }
+            if grow[y as usize] < min[y as usize] { min[ y as usize ] = grow[y as usize]; }
         }
     }
-    for y in 0..11 { max[y as usize] = max[y as usize] / 5; }
+    for y in 0..11 { 
+        max[y as usize] = max[y as usize] / 5; 
+        min[y as usize] = min[y as usize] / 5; 
+    }
     let rng = crate::utils::get_rng();
     for x in 0..job_list.len() {
         let grow = job_list[x].get_diff_grow();
         if grow.is_zero() { continue; } 
         for y in 0..9 {
-            let v = rng.get_min_max(0, (max[y as usize]) as i32) as i8;
+            let v = rng.get_min_max(min[y as usize] as i32, (max[y as usize]) as i32) as i8;
             grow[y as usize] = v*5;
         }
     }

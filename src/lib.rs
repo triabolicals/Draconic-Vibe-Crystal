@@ -19,7 +19,7 @@ use crate::config::DeploymentConfig;
 use unity::prelude::OptionalMethod;
 use engage::proc::ProcInst;
 pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| DeploymentConfig::new().into() );
-pub const VERSION: &str = "2.5.1";
+pub const VERSION: &str = "2.6.3";
 
 #[skyline::from_offset(0x02285890)]
 pub fn autosave_proc_inst(this: &ProcInst, kind: i32, index: i32, stuff: Option<&ProcInst>, method_info: OptionalMethod);
@@ -66,9 +66,6 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                 if proc.hashcode == -988690862 && *label == 0 { // On Initial Title Screen Load
                     enums::generate_black_list();
                     randomizer::intitalize_game_data();
-                    
-                    //grow::get_style_interact_default_values();
-                    //asset::gather_all_accesories();
                     message::replace_hub_fxn();
                     set_personal_caps();
                     randomizer::assets::ASSET_DATA.lock().unwrap().apply_bust_changes();
@@ -143,9 +140,13 @@ pub fn main() {
         randomizer::person::unit::unit_create_impl_2_hook, 
         randomizer::person::unit::create_from_dispos_hook,
         randomizer::assets::animation::asset_table_result_setup_hook,
+        randomizer::assets::asset_table_result_god_setup,
+        randomizer::assets::animation::asset_table_result_setup_person_hook,
         event::get_cmd_info_from_cmd_lines_hook,
         event::get_active_character_hook,
         message::mess_get_impl_hook, 
+        randomizer::person::get_bond_face,  
+        randomizer::person::get_thumb_face,
     ); 
     // Fixes the emblem weapons arena issue
     Patch::in_text(0x01ca9afc).nop().unwrap();
@@ -156,7 +157,6 @@ pub fn main() {
     menus::install_vibe();
     disable_support_restriction();
     remove_skill_equip_restrictions();
-
     std::panic::set_hook(Box::new(|info| {
         let location = info.location().unwrap();
         let msg = match info.payload().downcast_ref::<&'static str>() {

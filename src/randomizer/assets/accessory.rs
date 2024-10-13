@@ -80,7 +80,7 @@ pub fn gather_all_accesories(){
             if cond == "私服" { find_somniel_condition_index = y as i32;  }
         }
         if find_somniel_condition_index != -1  {
-            conditions[ find_somniel_condition_index as usize ] = "私服 | 緑軍 | 赤軍".into(); 
+            conditions[ find_somniel_condition_index as usize ] = "".into(); 
         }
     }
     // Skipping Character unique outfits

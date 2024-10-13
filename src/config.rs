@@ -44,6 +44,7 @@ pub struct DeploymentConfig {
     pub random_battle_styles: i32,
     pub change_unit_offset: bool,
     pub random_names: bool,
+    pub custom_units: bool,
     pub apply_rando_post_new_game: bool,
     pub auto_adjust_asset_table: bool,
     pub misc_option_1 : f32,
@@ -123,6 +124,7 @@ impl DeploymentConfig {
             random_names: false,
             apply_rando_post_new_game: false,
             auto_adjust_asset_table: false,
+            custom_units: false,
             misc_option_1 : 0.0,
             misc_option_2 : 1.0,
         };

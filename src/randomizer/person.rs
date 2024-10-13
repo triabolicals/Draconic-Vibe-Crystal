@@ -1,6 +1,7 @@
 pub use unity::prelude::*;
 pub use engage::{
     menu::{
+        BasicMenuItemAttribute,
         BasicMenuResult, 
         config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}
     },
@@ -52,7 +53,39 @@ impl ConfigBasicMenuItemSwitchMethods for RandomPersonMod {
     }
 }
 
+// Custom Person Mod
+pub struct CustomPersonMod;
+impl ConfigBasicMenuItemSwitchMethods for CustomPersonMod {
+    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let result = ConfigBasicMenuItem::change_key_value_b(CONFIG.lock().unwrap().custom_units);
+        if CONFIG.lock().unwrap().custom_units != result {
+            CONFIG.lock().unwrap().custom_units = result;
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        } else {return BasicMenuResult::new(); }
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = if CONFIG.lock().unwrap().custom_units { "Custom units are include in random recruitment order." }
+            else { "Custom units will excluded from random recruitment order." }.into();
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.command_text = if CONFIG.lock().unwrap().custom_units  { "Add" } 
+            else { "Default"}.into();
+    }
+}
+fn build_attribute_custom_units(_this: &mut ConfigBasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
+    if PLAYABLE.lock().unwrap().len() == 41 { BasicMenuItemAttribute::Hide }
+    else { BasicMenuItemAttribute::Enable }
+}
 
+pub extern "C" fn vibe_custom_units() -> &'static mut ConfigBasicMenuItem { 
+    let item = ConfigBasicMenuItem::new_switch::<CustomPersonMod>("Custom Units (RR)");
+    item.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = build_attribute_custom_units as _);
+    item
+}
 pub fn get_playable_list() {
     if PLAYABLE.lock().unwrap().len() != 0 { return; }
     let mut list = PLAYABLE.lock().unwrap();
@@ -63,15 +96,30 @@ pub fn get_playable_list() {
     }
     // Add all others that have non zero SP
     let person_list = PersonData::get_list().unwrap(); 
+    let mut count = 0;
     for x in 0..person_list.len() { 
         let person = &person_list[x as usize];
+        if person.get_sp() == 0 { continue; }
+        count += 1;
+    }
+    if count > 150 { return; }
+    for x in 1..person_list.len() { 
+        let person = &person_list[x as usize];
+        if str_contains(person.pid, "_竜化") { continue; }  //No Dragons
+        if person.get_common_sids().is_none() { continue; }
         let index = person.parent.index; 
-        if person.get_sp() > 0 {
-            if list.iter().find(|r| **r == index).is_none() { list.push(index); }
+        if str_contains(person.pid, "PLAYABLE") || str_contains(person.pid, "layable") { person.set_asset_force(0); } 
+        if person.get_sp() > 0 && person.get_asset_force() == 0 {
+            if person.get_sp() < 300 { person.set_sp(300); }
+            if list.iter().find(|r| **r == index).is_none() { 
+                list.push(index);
+                println!("Person #{}: {} was added", index, Mess::get_name(person.pid).get_string().unwrap());
+            }
         }
     }
     println!("Total of {} Playable Units", list.len());
 }
+
 fn create_reverse() {
     for x in 0..41 {
         let key = format!("G_R_{}",PIDS[x as usize]);
@@ -173,18 +221,60 @@ pub fn randomize_person() {
         let mut set_emblems: [bool; 41] = [false; 41];
         match GameVariableManager::get_number("G_Random_Recruitment") {
             1 => {
-                while emblem_count < emblem_list_size {
-                    let index = rng.get_value(emblem_list_size);
-                    if index >= emblem_list_size { continue; }
-                    if !set_emblems[index as usize] {
-                        let string = format!("G_R_{}",PIDS[emblem_count as usize]);
-                        GameVariableManager::set_string(&string, PIDS[index as usize]);
-                        let string2 = format!("G_R2_{}",PIDS[index as usize]);
-                        GameVariableManager::set_string(&string2, PIDS[emblem_count as usize]);
-                        println!("{} -> {}", PersonData::get(PIDS[ emblem_count as usize]).unwrap().get_name().unwrap().get_string().unwrap(),
-                        PersonData::get(PIDS[ index as usize]).unwrap().get_name().unwrap().get_string().unwrap());
-                        set_emblems[ index as usize ] = true;
-                        emblem_count += 1;
+                let playable_size = PLAYABLE.lock().unwrap().len();
+                if playable_size > 41 && CONFIG.lock().unwrap().custom_units {  // Custom R
+                    let list = PLAYABLE.lock().unwrap();
+                    let mut playable_list: Vec<usize> = (0..playable_size).collect();
+                    let mut to_replace_list: Vec<usize> = (0..playable_size).collect();
+                    if !dlc_check() { 
+                        for x in 36..41 {   // Remove DLC characters in the pool
+                            if let Some(index) = playable_list.iter().position(|&i| i == x) {  playable_list.remove(index);  }
+                            if let Some(index) = to_replace_list.iter().position(|&i| i == x) {  to_replace_list.remove(index);  }
+                        }
+                    }
+                    let person_list = PersonData::get_list().unwrap();
+                    let pids: Vec<String> = list.iter().map(|&x| person_list[x as usize].pid.get_string().unwrap() ).collect();
+
+                    // Alear and somniel royals must be switched with non-dlc units
+                    let royals = [0, 23, 4, 17, 14, 27];
+                    for x_i in royals {
+                        loop {
+                            let x_j = playable_list[ rng.get_value(playable_list.len() as i32) as usize ];
+                            if royals.iter().find(|&&i|i == x_j ).is_some() || x_j > 35 { continue; }
+                            GameVariableManager::set_string(&format!("G_R_{}",PIDS[x_j as usize]), PIDS[x_i as usize]);
+                            GameVariableManager::set_string(&format!("G_R2_{}", PIDS[x_i as usize]), PIDS[x_j as usize]);
+                            if let Some(index1) = to_replace_list.iter().position(|&i| i == x_j) { to_replace_list.remove(index1); }
+                            if let Some(index2) = playable_list.iter().position(|&i| i == x_i) {  playable_list.remove(index2);  }
+                            println!("#{}: {} -> {}", x_j, Mess::get_name(PIDS[x_j as usize]).get_string().unwrap(),  Mess::get_name(PIDS[x_i as usize]).get_string().unwrap());
+                            break;
+                        }
+                    }
+                    for x_i in to_replace_list {
+                        let key_pid_x = format!("G_R_{}", pids[x_i as usize]);
+                        let x_j = playable_list[rng.get_value(playable_list.len() as i32) as usize ];
+                        GameVariableManager::make_entry_str(&key_pid_x, &pids[x_j as usize]);
+                        GameVariableManager::set_string(&key_pid_x, &pids[x_j as usize]);
+                        let key_pid_j = format!("G_R2_{}", pids[x_j as usize]);
+                        GameVariableManager::make_entry_str(&key_pid_j, &pids[x_i as usize]);
+                        GameVariableManager::set_string(&key_pid_j, &pids[x_i as usize]);
+                        if let Some(index) = playable_list.iter().position(|&i| i == x_j) {  playable_list.remove(index);  }
+                        println!("#{}: {} -> {}", x_i, Mess::get_name(pids[x_i as usize].clone()).get_string().unwrap(),  Mess::get_name(pids[x_j as usize].clone()).get_string().unwrap());
+                    }
+                }
+                else {
+                    while emblem_count < emblem_list_size {
+                        let index = rng.get_value(emblem_list_size);
+                        if index >= emblem_list_size { continue; }
+                        if !set_emblems[index as usize] {
+                            let string = format!("G_R_{}",PIDS[emblem_count as usize]);
+                            GameVariableManager::set_string(&string, PIDS[index as usize]);
+                            let string2 = format!("G_R2_{}",PIDS[index as usize]);
+                            GameVariableManager::set_string(&string2, PIDS[emblem_count as usize]);
+                            println!("{} -> {}", PersonData::get(PIDS[ emblem_count as usize]).unwrap().get_name().unwrap().get_string().unwrap(),
+                            PersonData::get(PIDS[ index as usize]).unwrap().get_name().unwrap().get_string().unwrap());
+                            set_emblems[ index as usize ] = true;
+                            emblem_count += 1;
+                        }
                     }
                 }
             },
@@ -348,11 +438,11 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
     // LueurW_God or Lueur_God in GetPath 
     if GameVariableManager::get_number("G_Lueur_Gender2") == 2 {  
         Patch::in_text(0x02d524e8).bytes(&[0x48, 0x00, 0x80, 0x52]).unwrap(); 
-        person_lueur.set_ascii_name("LueurW".into());
+       person_lueur.set_gender(2);
     }
     else { 
         Patch::in_text(0x02d524e8).bytes(&[0x28, 0x00, 0x80, 0x52]).unwrap();
-        person_lueur.set_ascii_name("Lueur".into());
+        person_lueur.set_gender(1);
     }
 
     Patch::in_text(0x0233f104).bytes(&[0x01,0x10, 0x80, 0x52]).unwrap(); // GodUnit$$GetName ignore hero flag on Emblem Alear
@@ -425,3 +515,24 @@ pub fn m011_ivy_recruitment_check(){
 fn join_unit(person: &PersonData, method_info: OptionalMethod) -> Option<&'static mut Unit>;
 
 
+#[skyline::hook(offset=0x02d51d80)]
+pub fn get_thumb_face(this: &Unit, method_info: OptionalMethod) -> &Il2CppString {
+    if this.person.pid.get_string().unwrap() == "PID_リュール" {
+        if GameVariableManager::exist("G_Lueur_Gender2") { 
+            if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "LueurW".into(); }
+            else { return "Lueur".into(); }
+        }
+    }
+    call_original!(this, method_info)
+}
+
+#[skyline::hook(offset=0x021e1250)]
+pub fn get_bond_face(this: &Unit, method_info: OptionalMethod) -> &Il2CppString {
+    if this.person.pid.get_string().unwrap() == "PID_リュール" {
+        if GameVariableManager::exist("G_Lueur_Gender2") { 
+            if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "Telop/LevelUp/FaceThumb/LueurW".into(); }
+            else { return "Telop/LevelUp/FaceThumb/Lueur".into(); }
+        }
+    }
+    call_original!(this, method_info)
+}

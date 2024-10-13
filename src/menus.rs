@@ -96,7 +96,7 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalMenu {
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::RandomGiftMod>("Reward/Gift Item Settings"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::shop::RandomShopMod>("Shop Setting"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::shop::RandomHubItemMod>("Exploration Items"));
-                config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::RandomGodMod>("Randomize Emblem Data"));       
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::RandomGodMod>("Randomize Emblem Skill Data"));       
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::RandomSynchoMod>("Randomize Emblem Sync Data"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::emblem_skill::EmblemSkillChaos>("Emblem Skill Chaos Mode"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::engrave::EngraveSettings>("Engrave Randomization Level"));
@@ -123,9 +123,8 @@ extern "C" fn vibe() -> &'static mut ConfigBasicMenuItem {
     ConfigBasicMenuItem::new_command::<TriabolicalMenu>(title)
 }
 extern "C" fn vibe_post_save() -> &'static mut ConfigBasicMenuItem { 
-    ConfigBasicMenuItem::new_switch::<RandomEnable>("Randomize Exisiting Saves") 
+    ConfigBasicMenuItem::new_switch::<RandoSave>("Randomize Save Files")
 }
-
 pub struct RandomEnable;
 impl ConfigBasicMenuItemSwitchMethods for RandomEnable {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
@@ -174,6 +173,8 @@ impl ConfigBasicMenuItemSwitchMethods for RandoSave {
         this.command_text = if CONFIG.lock().unwrap().apply_rando_post_new_game { "Enable" } else { "Disable" }.into();
     }
 }
+
+
 
 pub struct TriabolicalInGameMenu;
 impl ConfigBasicMenuItemCommandMethods for TriabolicalInGameMenu {
@@ -249,6 +250,7 @@ extern "C" fn vibe2() -> &'static mut ConfigBasicMenuItem {
 pub fn install_vibe() { 
     cobapi::install_global_game_setting(vibe_enable);
     cobapi::install_global_game_setting(vibe_post_save);
+    cobapi::install_global_game_setting(randomizer::person::vibe_custom_units);
     cobapi::install_global_game_setting(vibe); 
     cobapi::install_game_setting(vibe2);
 }
