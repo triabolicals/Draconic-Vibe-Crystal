@@ -61,6 +61,7 @@ pub fn adjust_map_inspectors() {
     else if GameVariableManager::get_number("G_EmblemDeployMode") == 1 {
         unsafe { remove_all_rings(0, None); }
         let emblem_list = get_emblem_list();
+        if emblem_list.len() == 0 { return; }
         let mut emblem_count = emblem_list.len();
         let mut set_emblems: [bool; 20] = [false; 20];
         let player_force = Force::get(ForceType::Player).unwrap();

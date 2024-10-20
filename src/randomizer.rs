@@ -664,6 +664,7 @@ pub fn intitalize_game_data() {
     emblem::get_recommended_paralogue_levels();
     engage_count();
     emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().intialize_list();
+    crate::event::create_name_array();
 }
 
 pub fn engage_count() {

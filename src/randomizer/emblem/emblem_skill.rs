@@ -71,9 +71,7 @@ pub fn create_emblem_skill_pool() {
     for x in EMBLEM_ASSET {
         if x == "ディミトリ" { break; }
         let growth_id = format!("GGID_{}", x);
-        let keys = GodGrowthData::get_level_data(&growth_id);
-        if keys.is_some() {
-            let level_data = keys.unwrap();
+        if let Some(level_data) = GodGrowthData::get_level_data(&growth_id) {
             let engage_skill = level_data[0].engage_skills[0].get_skill().unwrap();
             ENGAGE_SKILLS.lock().unwrap().push(SkillIndex::new(engage_skill.parent.index));
             for y in 0..level_data.len() {

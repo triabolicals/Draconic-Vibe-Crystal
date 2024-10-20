@@ -2,6 +2,25 @@ use crate::utils::str_contains;
 use crate::enums;
 use super::*;
 static mut NAME_SET: bool  = false;
+
+pub fn add_asset_entry_at_position(conditions: &Vec<String>, animation: &[String; 6], pos: usize, mode: i32 ) {
+    let new_asset_table_entry = AssetTable::instantiate().unwrap();
+    let list = AssetTable::get_list_mut().unwrap();
+    let asset_entry = &list[pos];
+    unsafe {
+        asset_table_ctor(new_asset_table_entry, None); 
+        asset_table_on_build(new_asset_table_entry, None);
+    }
+    let aconditions = asset_entry.conditions.as_ref().unwrap();
+    let new_conditions = Array::<&Il2CppString>::new_specific( aconditions.get_class(), conditions.len() ).unwrap();
+    new_asset_table_entry.mode = mode;
+    for x in 0..conditions.len() {
+        new_conditions[x] = conditions[x].clone().into();
+    }
+    unsafe { asset_table_set_conditions(new_asset_table_entry, new_conditions, None)};
+    new_asset_table_entry.body_anim = Some(animation[0].clone().into());
+    list.insert( pos as i32 + 1, new_asset_table_entry);
+}
 pub fn add_animation_by_name_jid(mpid: String, jid: String, gender: &str) {
     let list = AssetTable::get_list_mut().unwrap();
     let mut x = 1000;
@@ -101,6 +120,9 @@ pub fn add_animation_unique_classes() {
     }
     println!("Attempting to add animations to unique classes");
     let upper_limit = if crate::utils::dlc_check() { 41 } else { 36 };
+    let mut emblem_block = 0;
+    let asset_table = AssetTable::get_list_mut().unwrap();
+
     for x in 0..upper_limit {
         let person = PersonData::get(PIDS[x as usize]).unwrap();
         let job = person.get_job().unwrap();
@@ -116,11 +138,167 @@ pub fn add_animation_unique_classes() {
         if high_job.len() == 0 { continue;}
         add_animation_by_name_jid(mpid.clone(), high_job[0].jid.get_string().unwrap(), gender);
     }
+    for x in 3110..asset_table.len() {
+        if asset_table[x].conditions.is_none() { continue; }
+        if  str_contains(asset_table[x].conditions.as_ref().unwrap()[0], "EID_") && asset_table[x].mode == 2 {
+            emblem_block = x - 1;
+            break;
+        }
+    }
+
     let mf = "JID_裏邪竜ノ子 | JID_蛮族 | JID_ティラユール下級 | JID_ティラユール | JID_アクスファイター| JID_ベルセルク| JID_ウォーリアー| JID_アーチャー| JID_スナイパー| JID_マージ| JID_セイジ | JID_モンク | JID_シーフ | JID_ダンサー".to_string();
     let cav_jids = "JID_グレートナイト | JID_ロイヤルナイト | JID_ソードナイト | JID_ランスナイト | JID_アクスナイト | JID_パラディン | JID_クピードー下級 | JID_クピードー | JID_アヴニール下級 | JID_アヴニール | JID_アヴニール_E | JID_クピードー_E".to_string();
     let armor_jids = "JID_ジェネラル | JID_ソードアーマー | JID_ランスアーマー | JID_アクスアーマー".to_string();
-    add_body_animation_for_classes(&"JID_ダンサー".to_string(), "踊り", false, "Dnc0AM-No1_c000_N");
+    let female_emblem = [2, 3, 6, 7, 10, 11, 12, 13, 15, 17];
+    let mut male_emblems = "MPID_Marth | MGID_Marth".to_string();
+    let mut female_emblems = "MPID_Celica | MGID_Celica".to_string();
+    let mut count = 0;
+    RINGS.iter().for_each(|&x|{
+            if count == 0 || count == 3 {}
+            else if female_emblem.iter().any(|&y| y == count) { female_emblems = format!("{} | MPID_{} | MGID_{} ", female_emblems, x, x); }
+            else { male_emblems = format!("{} | MPID_{} | MGID_{} ", male_emblems, x, x); }
+            count += 1;
+        }
+    );
+    println!("Emblem Block: {}", emblem_block);
+    println!("Males: {}", male_emblems);
+    println!("Females: {}", female_emblems);
 
+    let mut emblem_conditions = Vec::new();
+    let mut animations: [String; 6] = Default::default();
+
+    emblem_conditions.push(male_emblems);
+    emblem_conditions.push("!エンゲージ中".to_string());
+    emblem_conditions.push(cav_jids.clone());
+
+// Emblem Cav Animations Bow + Magic 
+    animations[0] = "Cav1BM-#_c000_N".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Cav1BM".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+    emblem_conditions.push("魔道書".to_string());
+    animations[0] = "Mag2BM-#_c000_M".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Mag2BM".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+    emblem_conditions[3] = "弓".to_string();
+    animations[0] = "Bow2BM-#_c000_L".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Bow2BM".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+// Emblem Wyvern Male
+    emblem_conditions[2] = "JID_ドラゴンナイト".to_string();
+    emblem_conditions[3] = "".to_string(); //"弓 | 魔道書".to_string();
+    animations[0] = "Wng2DM-#_c000_N".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[3] = "弓 | 魔道書".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Wng2DM".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+// Wolf Knight Male
+    emblem_conditions[2] = "JID_ドラゴンナイト".to_string();
+    emblem_conditions[3] = "".to_string();
+    animations[0] = "Cav2CM-#_c000_N".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    emblem_conditions[3] = "弓 | 魔道書".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Cav2CM".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+//Griffin Male
+    emblem_conditions[2] = "JID_グリフォンナイト".to_string();
+    emblem_conditions[3] = "".to_string();
+    animations[0] = "Wng1FM-#_c702_N".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Wng1FM".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+    emblem_conditions[0] = female_emblems.clone();
+    emblem_conditions[2] = cav_jids.clone();
+
+// Female Emblem Cav Animations Bow + Magic 
+    animations[0] = "Cav1BF-#_c000_N".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Cav1BF".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+    emblem_conditions[3] = "魔道書".to_string();
+    animations[0] = "Mag2BF-#_c000_M".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Mag2BF".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+    emblem_conditions[3] = "弓".to_string();
+    animations[0] = "Bow2BF-#_c000_L".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Bow2BF".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+// Emblem Wyvern Female + Lindwurm / WingT amer
+    emblem_conditions[2] = "JID_ドラゴンナイト | JID_リンドブルム下級 | JID_リンドブルム".to_string();
+    emblem_conditions[3] = "".to_string();
+    animations[0] = "Wng2DF-#_c000_N".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Wng2DF".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+    emblem_conditions[3] = "弓 | 魔道書".to_string();
+    animations[0] = "Lnd1DF-Mg1_c350_M".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Lnd1DF".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+// Wolf Knight Female
+    emblem_conditions[2] = "JID_ドラゴンナイト".to_string();
+    emblem_conditions[3] = "".to_string();
+    animations[0] = "Cav2CF-#_c000_N".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    emblem_conditions[3] = "弓 | 魔道書".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Cav2CF".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+//Griffin Female
+    emblem_conditions[2] = "JID_グリフォンナイト".to_string();
+    emblem_conditions[3] = "".to_string();
+    animations[0] = "Wng1FF-#_c702_N".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+// Flier / Hortensia Wing Tamer
+    emblem_conditions[2] = "JID_ソードペガサス | JID_ランスペガサス | JID_アクスペガサス | JID_スレイプニル下級 | JID_スレイプニル".to_string();
+    animations[0] = "Wng0EF-#_c000_N".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+    
+    animations[0] = "UAS_Wng0EF".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+    emblem_conditions[3] = "魔道書 | 弓".to_string();
+    animations[0] = "Slp1EF-Mg1_c351_M".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 2);
+
+    animations[0] = "UAS_Slp1EF".to_string();
+    add_asset_entry_at_position(&emblem_conditions, &animations, emblem_block, 1);
+
+    add_body_animation_for_classes(&"JID_ダンサー".to_string(), "踊り", false, "Dnc0AM-No1_c000_N");
     add_body_animation_for_classes(&cav_jids, "魔道書", true, "Mag2BF-#_c000_M");
     add_body_animation_for_classes(&cav_jids, "魔道書", true, "UAS_Mag2BF");
 
@@ -401,7 +579,8 @@ pub fn add_names() {
         let name = list[x].get_name().unwrap().get_string().unwrap();
         if name == "MPID_Morph" || name == "MPID_Phantom" || name == "MPID_Veyre" { continue; }
         if name == "MPID_FileneSoldier" || name == "MPID_BrodiaSoldier" { continue; }
-        if name == "MPID_IrcionSoldier" || name == "MPID_SolumSoldier" { continue; }
+        if name == "MPID_IrcionSoldier" || name == "MPID_SolumSoldier" || name == "MPID_MysteriousGroup" { continue; }
+        if str_contains(list[x].get_name().unwrap(), "Villager") { continue; }
         if name == "MPID_Hide" || name == "MPID_SombreDragon" || name == "MPID_Il_E006" { continue; }
         let pid = list[x].pid.get_string().unwrap();
         add_mpid_condition(pid, name, true);
@@ -415,7 +594,7 @@ pub fn add_names() {
 
 #[skyline::hook(offset=0x01bb4290)]
 pub fn asset_table_result_setup_person_hook(this: &AssetTableResult, mode: i32, 
-    person: Option<&PersonData>, job: Option<&JobData>, equipped: &ItemData, conditions: &Array<&Il2CppString>, method_info: OptionalMethod) -> &'static mut AssetTableResult {
+    person: Option<&PersonData>, job: Option<&JobData>, equipped: Option<&ItemData>, conditions: &Array<&Il2CppString>, method_info: OptionalMethod) -> &'static mut AssetTableResult {
         if person.is_none() && job.is_some() {
             let jid = job.unwrap().jid.get_string().unwrap();
             if jid == "JID_裏邪竜ノ娘" {

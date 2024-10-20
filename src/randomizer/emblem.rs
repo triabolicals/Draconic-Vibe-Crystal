@@ -228,20 +228,16 @@ pub fn randomize_emblems() {
         }
         let rng = crate::utils::get_rng();
         let emblem_list_size = if dlc_check() { 19 } else { 12 };
-        let mut emblem_count: i32 = 0;
         let mut set_emblems: [bool; 20] = [false; 20];
         match GameVariableManager::get_number("G_Emblem_Mode") {
             1 => {
-                while emblem_count < emblem_list_size {
-                    let index = rng.get_value(emblem_list_size);  
-                    if index >= emblem_list_size { continue; }
-                    if !set_emblems[index as usize] {
-                        let string = format!("G_R_{}",EMBLEM_GIDS[emblem_count as usize]);
-                        GameVariableManager::set_string(&string, EMBLEM_GIDS[index as usize]);
-                        GameVariableManager::set_string(&format!("G_R2_{}",EMBLEM_GIDS[index  as usize]), EMBLEM_GIDS[emblem_count as usize]);
-                        set_emblems[index as usize] = true;
-                        emblem_count += 1;
-                    }
+                let mut emblem_list: Vec<usize> = (0..emblem_list_size as usize).collect();
+                for x_i in 0..emblem_list_size {
+                    let x_j = emblem_list[ rng.get_value( emblem_list.len() as i32 ) as usize];
+                    let string = format!("G_R_{}",EMBLEM_GIDS[x_i]);
+                    GameVariableManager::set_string(&string, EMBLEM_GIDS[x_j]);
+                    GameVariableManager::set_string(&format!("G_R2_{}",EMBLEM_GIDS[x_j]), EMBLEM_GIDS[x_i]);
+                    if let Some(index) = emblem_list.iter().position(|&i| i == x_j) {  emblem_list.remove(index);  }
                 }
             },
             2 => {  // Reverse

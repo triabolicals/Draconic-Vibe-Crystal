@@ -9,6 +9,9 @@ pub use engage::{
 };
 use crate::{enums::*, utils::*, CONFIG};
 
+use super::person::PLAYABLE;
+pub static mut EMBLEM_NAMES: [i32; 25] = [-1; 25];
+
 pub struct RandomNameMods;
 impl ConfigBasicMenuItemSwitchMethods for RandomNameMods {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
@@ -34,6 +37,9 @@ impl ConfigBasicMenuItemSwitchMethods for RandomNameMods {
 
 #[unity::from_offset("App", "PersonData", "set_Belong")]
 fn set_belong_person(this: &PersonData, value: Option<&Il2CppString>, method_info: OptionalMethod);
+
+#[unity::from_offset("App", "PersonData", "get_Belong")]
+fn get_person_bid(this: &PersonData, method_info: OptionalMethod) -> Option<&Il2CppString>;
 
 #[unity::from_offset("App", "PersonData", "set_Aid")]
 fn set_aid_person(this: &PersonData, value: Option<&Il2CppString>, method_info: OptionalMethod);
@@ -100,8 +106,9 @@ pub fn give_names_to_generics() {
     }
     let size_m =  male_names.len() as i32;
     let size_f =  female_names.len() as i32;
+    let playable_list = PLAYABLE.lock().unwrap();
     if GameVariableManager::get_bool("G_Random_Names") {
-        for x in 2..1400 {
+        for x in 2..list.len() {
             if list[x].get_name().is_none() { continue; }
             if list[x].get_job().is_none() { continue; }
             let gender = list[x].get_gender();
@@ -121,30 +128,52 @@ pub fn give_names_to_generics() {
         let lueur = unsafe { crate::deployment::force_get_unit_from_pid(PIDS[0].into(), true, None) };
         if lueur.is_some() {
             let gender = lueur.unwrap().edit.gender;
-            if gender == 1 {
-                list[1].set_name( male_names[ rng.get_value(size_m) as usize ].clone().into() );
-            }
-            else if gender == 2 {
-                list[1].set_name(   female_names[ rng.get_value(size_f) as usize ].clone().into() );
-            }
+            if gender == 1 { list[1].set_name( male_names[ rng.get_value(size_m) as usize ].clone().into() ); }
+            else if gender == 2 { list[1].set_name(   female_names[ rng.get_value(size_f) as usize ].clone().into() ); }
             set_generic_aid(list[1]); 
         }
+        randomize_emblem_names();
     }
     else if GameVariableManager::get_number("G_Random_Recruitment") != 0 {
         for x in 2..list.len() {
+            if playable_list.iter().any(|&y| y == x as i32) { continue; }
             if list[x].get_name().is_none() { continue; }
+            if list[x].get_job().is_none() { continue; }
             let name = list[x].get_name().unwrap().get_string().unwrap();
-            if name != "MPID_Phantom" && name != "MPID_Morph" { continue; }
-            unsafe { set_aid_person(list[x], None, None) };
+            if unsafe { get_person_bid(list[x], None ).is_none() } { continue; }
+            if str_contains(list[x].get_job().unwrap().jid, "JID_紋章士_") { continue; }
+            if name == "MPID_Phantom" { unsafe { set_aid_person(list[x], None, None) };  }
+
+            //
             let gender = list[x].get_gender();
-            if gender == 1 {
-                list[x].set_name(male_names[ rng.get_value(size_m) as usize ].clone().into() );
-            }
-            else if gender == 2 {
-                list[x].set_name(  female_names[ rng.get_value(size_f) as usize ].clone().into() );
-            }
+            if gender == 1 { list[x].set_name(male_names[ rng.get_value(size_m) as usize ].clone().into() ); }
+            else if gender == 2 { list[x].set_name(  female_names[ rng.get_value(size_f) as usize ].clone().into() ); }
             set_generic_aid(list[x]); 
             list[x].on_completed();
         }
+    }
+}
+
+pub fn randomize_emblem_names() {
+    let name_size = if dlc_check() { 40 } else { 35 };
+    let mut used: [bool; 41] = [false; 41];
+
+    if GameVariableManager::get_bool("G_Random_Names") {
+        let rng = get_rng();
+        let mut emblem_count = 0;
+        EMBLEM_GIDS.iter().for_each(|gid|{
+                let god = GodData::get_mut(gid).unwrap();
+                loop {
+                    let value = rng.get_value(name_size) + 1;
+                    if !used[value as usize] {
+                        unsafe { EMBLEM_NAMES[ emblem_count] = value; }
+                        god.mid = MPIDS[ value as usize ].into();
+                        emblem_count += 1;
+                        used[value as usize] = true;
+                        break;
+                    }
+                }
+            }
+        );
     }
 }

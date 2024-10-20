@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use unity::prelude::*;
 pub use engage::{
     random::Random,
@@ -12,6 +14,19 @@ use crate::utils::*;
 
 const VEYRE: [&str; 7] = ["PID_ヴェイル_フード", "PID_ヴェイル_包帯", "PID_ヴェイル_フード_顔出し", "PID_ヴェイル_白_悪", "PID_ヴェイル_黒_悪", "PID_ヴェイル_黒_善", "PID_ヴェイル_黒_善_角折れ" ];
 
+static mut NAME_VEC: Vec<String> = Vec::new();
+static mut CURRENT_TEXT: &str = "";
+static mut CURRENT_STRING: String = String::new();
+
+pub fn create_name_array() {
+    unsafe { NAME_VEC.clear(); }
+    unsafe {
+        MPIDS.iter().for_each(|&mpid| NAME_VEC.push(Mess::get(mpid).get_string().unwrap()));
+        println!("Name Vec has {} Names", MPIDS.len());
+    }
+    
+}
+
 #[unity::class("App", "EventDemoSequence")]
 pub struct EventDemoSequence {
     proc: [u8; 0x78],
@@ -25,7 +40,7 @@ pub struct TalkSequence {
 }
 
 #[skyline::from_offset(0x03782000)]
-pub fn to_string(this: &Il2CppString, value: *const u8, method_info: OptionalMethod) -> &'static mut Il2CppString;
+pub fn to_string(this: Option<&Il2CppString>, value: *const u8, method_info: OptionalMethod) -> &'static mut Il2CppString;
 
 #[skyline::from_offset(0x03780660)]
 pub fn to_char_array(this: &Il2CppString, method_info: OptionalMethod) -> &'static Array<u16>;
@@ -156,4 +171,22 @@ pub fn get_active_character_hook(this: &mut TalkSequence, method_info: OptionalM
         }
     }
     return result; 
+}
+#[unity::hook("App", "Mess", "GetIntPtr")]
+pub fn get_int_ptr(label: &Il2CppString, method_info: OptionalMethod) -> *const u8 {
+    let result = call_original!(label, method_info);
+    let string = unsafe { to_string(None, result, None) };
+    unsafe {
+        println!("GetIntPtr: {}", string.get_string().unwrap());
+        if let Some(pos) = NAME_VEC.iter().position(|str| str_contains(string, str.as_str())) {
+
+            let old_name = &NAME_VEC[pos];
+            let new_name = &NAME_VEC[ crate::randomizer::person::pid_to_index(&PIDS[pos].to_string(), false) as usize ];
+            CURRENT_STRING = replace_strs_il2str(string, old_name, new_name).get_string().unwrap().clone();
+            println!("GetIntPtr: {}", CURRENT_STRING );
+            return CURRENT_STRING.as_ptr();
+    
+        }
+    }
+    return result;
 }

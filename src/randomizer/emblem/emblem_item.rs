@@ -96,35 +96,32 @@ impl EngageItemList {
             let gid = format!("GID_{}", EMBLEM_ASSET[x]);
             let god = GodData::get(&gid).unwrap();
             if god.get_engage_attack().get_string().unwrap() == "SID_リンエンゲージ技" {
-                let s_starting_index = s_list.iter().position(|r| r.god_index == ( x as i32 ) );
-                if s_starting_index.is_none() { continue; }
-                let starting_index = s_starting_index.unwrap();
-                let mut index = rng.get_value(list_size as i32) as usize;
-
-                while bow_weapons[index].1 { index = rng.get_value(list_size as i32) as usize; }
-                bow_weapons[index].1 = true;
-
-                s_list[starting_index].replaced_index = bow_weapons[index].0 as i32;
-                s_list[ bow_weapons[index].0 ].in_used = true;
-                s_list[ bow_weapons[index].0 ].reverse_index = starting_index as i32;
-                s_list[ bow_weapons[index].0 ].new_emblem = s_list[starting_index].original_emblem;
+                if let Some(starting_index) = s_list.iter().position(|r| r.god_index == ( x as i32 ) ) {
+                    let mut index = rng.get_value(list_size as i32) as usize;
+                    while bow_weapons[index].1 { index = rng.get_value(list_size as i32) as usize; }
+                    bow_weapons[index].1 = true;
+    
+                    s_list[starting_index].replaced_index = bow_weapons[index].0 as i32;
+                    s_list[ bow_weapons[index].0 ].in_used = true;
+                    s_list[ bow_weapons[index].0 ].reverse_index = starting_index as i32;
+                    s_list[ bow_weapons[index].0 ].new_emblem = s_list[starting_index].original_emblem
+                }
+                else { println!("No Available Engage Bows for Emblem {}'s Astra Storm", x); }
             }
             if god.get_engage_attack_link().is_none() { continue; }
-
             let link_engage = god.get_engage_attack_link();
             if link_engage.unwrap().get_string().unwrap() == "SID_リンエンゲージ技" {
-                if s_list.iter().position(|r| r.god_index == ( x as i32 ) && !r.is_first_item).is_none() { continue; }
-                let starting_index = s_list.iter().position(|r| r.god_index == ( x as i32 ) && !r.is_first_item).expect(&format!("No Available Engage Bows for Link Astra Storm Emblem {}", x));
-
-                let mut index = rng.get_value(list_size as i32) as usize;
-
-                while bow_weapons[index].1 { index = rng.get_value(list_size as i32) as usize; }
-                bow_weapons[index].1 = true;
-                s_list[starting_index].replaced_index = bow_weapons[index].0 as i32;
-
-                s_list[ bow_weapons[index].0 ].in_used = true;
-                s_list[ bow_weapons[index].0 ].reverse_index = starting_index as i32;
-                s_list[ bow_weapons[index].0 ].new_emblem = s_list[starting_index].original_emblem;
+                if let Some(starting_index) = s_list.iter().position(|r| r.god_index == ( x as i32 ) && !r.is_first_item) {
+                    let mut index = rng.get_value(list_size as i32) as usize;
+                    while bow_weapons[index].1 { index = rng.get_value(list_size as i32) as usize; }
+                    bow_weapons[index].1 = true;
+                    s_list[starting_index].replaced_index = bow_weapons[index].0 as i32;
+    
+                    s_list[ bow_weapons[index].0 ].in_used = true;
+                    s_list[ bow_weapons[index].0 ].reverse_index = starting_index as i32;
+                    s_list[ bow_weapons[index].0 ].new_emblem = s_list[starting_index].original_emblem;
+                }
+                else { println!("No Available Engage Bows for Emblem {}'s Link Astra Storm", x); }
             }
         }
     }

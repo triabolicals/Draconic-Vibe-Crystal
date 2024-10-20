@@ -9,12 +9,13 @@ use engage::{
     menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItemGaugeMethods, ConfigBasicMenuItem}},
     gamedata::{unit::*, skill::*,},
 };
+use super::names::EMBLEM_NAMES;
 
 pub mod accessory;
 pub mod animation;
 pub mod bust;
 
-use crate::{utils::str_contains, CONFIG};
+use crate::CONFIG;
 use unity::system::List;
 use crate::enums::*;
 static mut ASSET_SIZE: usize = 0;
@@ -299,12 +300,26 @@ fn unit_get_accessory_list(this: &Unit, method_info: OptionalMethod) -> &'static
 
 #[skyline::hook(offset=0x01bb2d80)]
 pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_data: Option<&GodData>, is_darkness: bool, conditions: &Array<&'static Il2CppString>, method_info: OptionalMethod) -> &'static mut AssetTableResult {
-    if mode > 10 {
-        return call_original!(this, mode-10, god_data, is_darkness, conditions, method_info);
-    }
     if god_data.is_none() {
         return call_original!(this, mode, god_data, is_darkness, conditions, method_info);
     }
+    if GameVariableManager::get_bool("G_Random_Names") {
+        let god = god_data.unwrap();
+        if let Some(emblem) = EMBLEM_GIDS.iter().position(|&x| x == god.gid.get_string().unwrap()) {
+            if unsafe { EMBLEM_NAMES[emblem] } != -1 {
+                let index: usize = unsafe { EMBLEM_NAMES[emblem] as usize };
+                let person = unsafe { PersonData::get(PIDS[index]) };
+                let job = person.unwrap().get_job().unwrap();
+                let item = crate::randomizer::job::get_weapon_for_asset_table(job);
+                return animation::asset_table_result_setup_person_hook(this, mode, person, person.unwrap().get_job(), item, conditions, None);
+            }
+        }
+    }
+
+    if mode > 10 {
+        return call_original!(this, mode-10, god_data, is_darkness, conditions, method_info);
+    }
+
     let gid = god_data.unwrap().gid.get_string().unwrap(); 
     let is_enemy_emblem = crate::randomizer::emblem::enemy::ENEMY_EMBLEMS.iter().find(|&x| x.0 == gid);
     if is_enemy_emblem.is_some() {

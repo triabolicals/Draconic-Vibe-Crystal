@@ -66,7 +66,7 @@ fn change_enemy_emblem_data(enemy_god: &mut GodData, index: i32, different_order
     enemy_god.nickname = source_god.nickname;
     enemy_god.sound_id = source_god.sound_id;
     if enemy_god.gid.get_string().unwrap() == "GID_M002_シグルド" || ( emblem_index == 8 || emblem_index == 10 || emblem_index == 11 ) {
-        enemy_god.asset_id = source_god.asset_id;
+         enemy_god.asset_id = source_god.asset_id;
     }
     else {
         enemy_god.asset_id = format!("敵{}", EMBLEM_ASSET[emblem_index as usize]).into();
@@ -79,13 +79,10 @@ fn change_enemy_emblem_data(enemy_god: &mut GodData, index: i32, different_order
     let source_ggd = source_god.get_grow_table().unwrap();
     let src_data = GodGrowthData::get_level_data(&source_ggd.get_string().unwrap()).unwrap();
     let engage_skill = src_data[0].engage_skills[0].get_skill().unwrap();
-    let ggd =  enemy_god.get_grow_table();
     let emblem_level = get_enemy_emblem_level(enemy_god.gid);
 
-    if ggd.is_some() {
-        let ld = GodGrowthData::get_level_data(&ggd.unwrap().get_string().unwrap());
-        if ld.is_some() {
-            let level_data = ld.unwrap();
+    if let Some(ggd) = enemy_god.get_grow_table() {
+        if let Some(level_data) = GodGrowthData::get_level_data(&ggd.get_string().unwrap()) {
             for y in 0..level_data.len() {
                 level_data[y].synchro_skills.clear();
                 level_data[y].engaged_skills.clear();

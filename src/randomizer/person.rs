@@ -185,6 +185,7 @@ fn set_hub_facilities() {
         let data = HubFacilityData::get_mut(aid[x as usize]);
         let pid = PIDS[index[x] as usize];
         let a_index = pid_to_index(&pid.to_string(), true) as usize;
+        println!("Hub Person: {} -> {}", index[x], a_index);
         if data.is_some() {
             let facility = data.unwrap();
             facility.condition_cid = format!("CID_{}", RECRUIT_CID[ a_index as usize] ).into() ;
@@ -211,71 +212,64 @@ pub fn randomize_person() {
     }
     else if GameVariableManager::exist("G_R_PID_リュール") && !GameVariableManager::exist("G_R2_PID_リュール") { create_reverse();}
     else {
-        let emblem_list_size = if dlc_check() { 41 } else { 36};
         for i in 0..41 { 
             GameVariableManager::make_entry_str(&format!("G_R_{}",PIDS[i as usize]), PIDS[i as usize]);
             GameVariableManager::make_entry_str(&format!("G_R2_{}",PIDS[i as usize]), PIDS[i as usize]);
         }
         let rng = get_rng();
-        let mut emblem_count: i32 = 0;
         let mut set_emblems: [bool; 41] = [false; 41];
         match GameVariableManager::get_number("G_Random_Recruitment") {
             1 => {
-                let playable_size = PLAYABLE.lock().unwrap().len();
-                if playable_size > 41 && CONFIG.lock().unwrap().custom_units {  // Custom R
-                    let list = PLAYABLE.lock().unwrap();
-                    let mut playable_list: Vec<usize> = (0..playable_size).collect();
-                    let mut to_replace_list: Vec<usize> = (0..playable_size).collect();
-                    if !dlc_check() { 
-                        for x in 36..41 {   // Remove DLC characters in the pool
-                            if let Some(index) = playable_list.iter().position(|&i| i == x) {  playable_list.remove(index);  }
-                            if let Some(index) = to_replace_list.iter().position(|&i| i == x) {  to_replace_list.remove(index);  }
-                        }
-                    }
-                    let person_list = PersonData::get_list().unwrap();
-                    let pids: Vec<String> = list.iter().map(|&x| person_list[x as usize].pid.get_string().unwrap() ).collect();
-
-                    // Alear and somniel royals must be switched with non-dlc units
-                    let royals = [0, 23, 4, 17, 14, 27];
-                    for x_i in royals {
-                        loop {
-                            let x_j = playable_list[ rng.get_value(playable_list.len() as i32) as usize ];
-                            if royals.iter().find(|&&i|i == x_j ).is_some() || x_j > 35 { continue; }
-                            GameVariableManager::set_string(&format!("G_R_{}",PIDS[x_j as usize]), PIDS[x_i as usize]);
-                            GameVariableManager::set_string(&format!("G_R2_{}", PIDS[x_i as usize]), PIDS[x_j as usize]);
-                            if let Some(index1) = to_replace_list.iter().position(|&i| i == x_j) { to_replace_list.remove(index1); }
-                            if let Some(index2) = playable_list.iter().position(|&i| i == x_i) {  playable_list.remove(index2);  }
-                            println!("#{}: {} -> {}", x_j, Mess::get_name(PIDS[x_j as usize]).get_string().unwrap(),  Mess::get_name(PIDS[x_i as usize]).get_string().unwrap());
-                            break;
-                        }
-                    }
-                    for x_i in to_replace_list {
-                        let key_pid_x = format!("G_R_{}", pids[x_i as usize]);
-                        let x_j = playable_list[rng.get_value(playable_list.len() as i32) as usize ];
-                        GameVariableManager::make_entry_str(&key_pid_x, &pids[x_j as usize]);
-                        GameVariableManager::set_string(&key_pid_x, &pids[x_j as usize]);
-                        let key_pid_j = format!("G_R2_{}", pids[x_j as usize]);
-                        GameVariableManager::make_entry_str(&key_pid_j, &pids[x_i as usize]);
-                        GameVariableManager::set_string(&key_pid_j, &pids[x_i as usize]);
-                        if let Some(index) = playable_list.iter().position(|&i| i == x_j) {  playable_list.remove(index);  }
-                        println!("#{}: {} -> {}", x_i, Mess::get_name(pids[x_i as usize].clone()).get_string().unwrap(),  Mess::get_name(pids[x_j as usize].clone()).get_string().unwrap());
+                let playable_size = if CONFIG.lock().unwrap().custom_units && PLAYABLE.lock().unwrap().len() > 41 { 
+                    PLAYABLE.lock().unwrap().len() }
+                    else { 41 };
+        
+                let list = PLAYABLE.lock().unwrap();
+                let mut playable_list: Vec<usize> = (0..playable_size).collect();
+                let mut to_replace_list: Vec<usize> = (0..playable_size).collect();
+                if !dlc_check() { 
+                    for x in 36..41 {   // Remove DLC characters in the pool
+                        if let Some(index) = playable_list.iter().position(|&i| i == x) {  playable_list.remove(index);  }
+                        if let Some(index) = to_replace_list.iter().position(|&i| i == x) {  to_replace_list.remove(index);  }
                     }
                 }
-                else {
-                    while emblem_count < emblem_list_size {
-                        let index = rng.get_value(emblem_list_size);
-                        if index >= emblem_list_size { continue; }
-                        if !set_emblems[index as usize] {
-                            let string = format!("G_R_{}",PIDS[emblem_count as usize]);
-                            GameVariableManager::set_string(&string, PIDS[index as usize]);
-                            let string2 = format!("G_R2_{}",PIDS[index as usize]);
-                            GameVariableManager::set_string(&string2, PIDS[emblem_count as usize]);
-                            println!("{} -> {}", PersonData::get(PIDS[ emblem_count as usize]).unwrap().get_name().unwrap().get_string().unwrap(),
-                            PersonData::get(PIDS[ index as usize]).unwrap().get_name().unwrap().get_string().unwrap());
-                            set_emblems[ index as usize ] = true;
-                            emblem_count += 1;
-                        }
+                let person_list = PersonData::get_list().unwrap();
+                let pids: Vec<String> = list.iter().map(|&x| person_list[x as usize].pid.get_string().unwrap() ).collect();
+
+            // Alear and somniel royals must be switched with non-dlc units
+                let royals = [0, 23, 4, 17, 14, 27];
+                for x_i in royals {
+                    if !playable_list.iter().any(|&i| i == x_i) { continue; }
+                    loop {
+                        let x_j = to_replace_list[ rng.get_value(to_replace_list.len() as i32) as usize ];
+                        if x_j > 35 || x_j == 30 { continue; }
+                        GameVariableManager::set_string(&format!("G_R_{}",PIDS[x_j as usize]), PIDS[x_i as usize]);
+                        GameVariableManager::set_string(&format!("G_R2_{}", PIDS[x_i as usize]), PIDS[x_j as usize]);
+                        if let Some(index1) = to_replace_list.iter().position(|&i| i == x_j) { to_replace_list.remove(index1); }
+                        if let Some(index2) = playable_list.iter().position(|&i| i == x_i) {  playable_list.remove(index2);  }
+                        println!("#{}: {} -> {}", x_j, Mess::get_name(PIDS[x_j as usize]).get_string().unwrap(),  Mess::get_name(PIDS[x_i as usize]).get_string().unwrap());
+                        break;
                     }
+                }
+                for x_i in 0..playable_size {
+                    if !to_replace_list.iter().any(|&x| x_i == x) { continue; }
+                    let key_pid_x = format!("G_R_{}", pids[x_i as usize]);
+                    if playable_list.len() == 0 {
+                        println!("out of playables :(");
+                        GameVariableManager::make_entry_str(&key_pid_x, &pids[x_i as usize]);
+                        GameVariableManager::set_string(&key_pid_x, &pids[x_i as usize]);
+                        GameVariableManager::make_entry_str(&format!("G_R2_{}", pids[x_i as usize]), &pids[x_i as usize]);
+                        GameVariableManager::set_string(&format!("G_R2_{}", pids[x_i as usize]), &pids[x_i as usize]);
+                        continue; 
+                    }
+                    let x_j = playable_list[rng.get_value(playable_list.len() as i32) as usize ];
+                    GameVariableManager::make_entry_str(&key_pid_x, &pids[x_j as usize]);
+                    GameVariableManager::set_string(&key_pid_x, &pids[x_j as usize]);
+                    let key_pid_j = format!("G_R2_{}", pids[x_j as usize]);
+                    GameVariableManager::make_entry_str(&key_pid_j, &pids[x_i as usize]);
+                    GameVariableManager::set_string(&key_pid_j, &pids[x_i as usize]);
+                    if let Some(index) = playable_list.iter().position(|&i| i == x_j) {  playable_list.remove(index);  }
+                    println!("#{}: {} -> {}", x_i, Mess::get_name(pids[x_i as usize].clone()).get_string().unwrap(),  Mess::get_name(pids[x_j as usize].clone()).get_string().unwrap());
                 }
             },
             2 => {   //Reverse
@@ -316,19 +310,16 @@ pub fn randomize_person() {
 }
 
 pub fn find_pid_replacement(pid: &String, reverse: bool) -> Option<String>{
-    let found_pid = PIDS.iter().position(|&x| x == *pid); 
-    if found_pid.is_some() {
+    if PIDS.iter().position(|&x| x == *pid).is_some() {
         if reverse { return Some( GameVariableManager::get_string(&format!("G_R2_{}", pid)).get_string().unwrap()); }   
         else { return Some( GameVariableManager::get_string(&format!("G_R_{}", pid)).get_string().unwrap()); }
     }
-    let found_gid = EMBLEM_GIDS.iter().position(|&x| x == *pid);
-    if found_gid.is_some() {
+    else if EMBLEM_GIDS.iter().position(|&x| x == *pid).is_some() {
         if reverse { return Some( GameVariableManager::get_string(&format!("G_R2_{}", pid)).get_string().unwrap()); }   
         else { return Some( GameVariableManager::get_string(&format!("G_R_{}", pid)).get_string().unwrap()); }
     }
     return None;
 }
-
 
 pub fn change_hub_dispos(revert: bool) {
     let t_list = HubDisposData::get_array_mut().expect("Me");
@@ -461,13 +452,9 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
 
 
 pub fn pid_to_index(pid: &String, reverse: bool) -> i32 {
-    let replacement = find_pid_replacement(pid, reverse);
-    if replacement.is_some() {
-        let found = replacement.unwrap();
-        let found_pid = PIDS.iter().position(|&x| x == found); 
-        if found_pid.is_some() { return found_pid.unwrap() as i32; }
-        let found_gid = EMBLEM_GIDS.iter().position(|&x| x == found); 
-        if found_gid.is_some() { return found_gid.unwrap() as i32; }
+    if let Some(replacement) = find_pid_replacement(pid, reverse) {
+        if let Some(found_pid) = PIDS.iter().position(|&x| x == replacement) { return found_pid as i32; }
+        if let Some(found_gid) = EMBLEM_GIDS.iter().position(|&x| x == replacement) { return found_gid as i32;  }
     }
     return -1;  // to cause crashes
 }
@@ -514,25 +501,100 @@ pub fn m011_ivy_recruitment_check(){
 #[skyline::from_offset(0x01c73960)]
 fn join_unit(person: &PersonData, method_info: OptionalMethod) -> Option<&'static mut Unit>;
 
-
 #[skyline::hook(offset=0x02d51d80)]
 pub fn get_thumb_face(this: &Unit, method_info: OptionalMethod) -> &Il2CppString {
-    if this.person.pid.get_string().unwrap() == "PID_リュール" {
-        if GameVariableManager::exist("G_Lueur_Gender2") { 
-            if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "LueurW".into(); }
-            else { return "Lueur".into(); }
+    let pid = this.person.pid.get_string().unwrap();
+    if pid == "PID_リュール" {
+        if this.person.get_name().unwrap().get_string().unwrap() == "MPID_Lueur" {
+            if GameVariableManager::exist("G_Lueur_Gender2") { 
+                if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "LueurW".into(); }
+                else { return "Lueur".into(); }
+            }
         }
     }
-    call_original!(this, method_info)
+    let name = this.person.get_name().unwrap();
+    if let Some(pos) = RINGS.iter().position(|&x| str_contains(name, x)) {
+        if pos > 11 { return format!("{}_DLC", RINGS[pos]).into();  }
+        else { return RINGS[pos].into();  }
+    }
+    return this.person.get_ascii_name().unwrap();
 }
-
+#[skyline::hook(offset=0x02d52340)]
+pub fn get_god_thumb_face(this: &GodData, method_info: OptionalMethod) -> &Il2CppString {
+    let name = this.mid;
+    if this.gid.get_string().unwrap() == "GID_リュール" {
+        if name.get_string().unwrap() == "MPID_Lueur" {
+            if GameVariableManager::exist("G_Lueur_Gender2") { 
+                if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "LueurW".into(); }
+                else { return "Lueur".into(); }
+            }
+        }
+    }
+    if let Some(pos) = MPIDS.iter().position(|&x| str_contains(name, x)) {
+        let new_name = &MPIDS[pos][5..];
+        return new_name.into();
+    }
+    return call_original!(this, method_info);
+}
 #[skyline::hook(offset=0x021e1250)]
 pub fn get_bond_face(this: &Unit, method_info: OptionalMethod) -> &Il2CppString {
+    let name = this.person.get_name().unwrap().get_string().unwrap();
     if this.person.pid.get_string().unwrap() == "PID_リュール" {
-        if GameVariableManager::exist("G_Lueur_Gender2") { 
-            if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "Telop/LevelUp/FaceThumb/LueurW".into(); }
-            else { return "Telop/LevelUp/FaceThumb/Lueur".into(); }
+        if this.person.get_name().unwrap().get_string().unwrap() == "MPID_Lueur" {
+            if GameVariableManager::exist("G_Lueur_Gender2") { 
+                if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "Telop/LevelUp/FaceThumb/LueurW".into(); }
+                else { return "Telop/LevelUp/FaceThumb/Lueur".into(); }
+            }
         }
     }
-    call_original!(this, method_info)
+    if MPIDS.iter().position(|&x| x == name).is_some() { call_original!(this, method_info) }
+    else {
+        let rng = Random::get_system();
+        let size = if dlc_check() { 41 } else { 36 };
+        let new_name = &MPIDS[rng.get_value(size) as usize][5..];
+        let path = format!("Telop/LevelUp/FaceThumb/{}", new_name);
+        println!("{}", path);
+        return path.into();
+    }
+}
+
+#[skyline::hook(offset=0x01a22eb0)]
+pub fn get_unit_ascii_name(unit: &Unit, method_info: OptionalMethod) -> &'static Il2CppString {
+    let pid = unit.person.pid.get_string().unwrap();
+    if let Some(pos) = PIDS.iter().position(|&x| x == pid) {  il2_str_substring(MPIDS[pos].into(), 5) }
+    else { call_original!(unit, method_info)  }
+}
+
+#[skyline::hook(offset=0x021e16f0)]
+pub fn get_god_face(this: &GodData, method_info: OptionalMethod) -> &Il2CppString {
+    let mid = this.mid;
+    let result = call_original!(this, method_info);
+    println!("Result: {}", result.get_string().unwrap());
+    if str_contains(mid, "Lueur") {
+        if GameVariableManager::exist("G_Lueur_Gender2") { 
+            if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "Telop/LevelUp/FaceThumb/God/LueurW".into(); }
+            else { return "Telop/LevelUp/FaceThumb/God/Lueur".into(); }
+        }
+    }
+    if let Some(pos) = MPIDS.iter().position(|&x| str_contains(mid, x)) {
+        let new_name = &MPIDS[pos][5..];
+        let path = format!("Telop/LevelUp/FaceThumb/{}", new_name);
+        println!("{}", path);
+        return path.into();
+    }
+    if RINGS.iter().any(|&x| str_contains(mid, x)) {  return result;  }
+    else {
+        let rng = Random::get_system();
+        let dlc = dlc_check();
+        let size = if dlc { 61 } else { 47 };
+        let emblem_range = if dlc { 22 } else { 12 };
+        let person_limit = if dlc { 41 } else { 36 };
+        let index = rng.get_value(size) as usize + 1;
+        let new_name = 
+            if index < person_limit { &MPIDS[rng.get_value(size) as usize][5..] }
+            else { RINGS[ rng.get_value(emblem_range) as usize ] };
+        let path = format!("Telop/LevelUp/FaceThumb/{}", new_name);
+        println!("{}", path);
+        return path.into();
+    }
 }

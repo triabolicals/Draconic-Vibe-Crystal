@@ -83,6 +83,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     unit_items::remove_duplicates(this.item_list);
     println!("Finish with Create2Impl for {}", this.person.get_name().unwrap().get_string().unwrap());
     set_unit_edit_name(this);
+    unsafe { unit_update_auto_equip(this, None); }
 }
 
 #[unity::hook("App", "Unit", "CreateFromDispos")]
@@ -175,6 +176,7 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
        } 
    }
    unit_items::adjust_enemy_meteor(this);
+   unsafe { unit_update_auto_equip(this, None); }
    // Prevent Green Emblems from dying in Chapter 22 if AI is changed
    if str_contains(this.person.pid, "PID_M022_紋章士") { this.private_skill.add_sid("SID_死亡回避", 10, 0);  }  
 }
@@ -258,14 +260,18 @@ pub fn adjust_unit_items(unit: &Unit) {
                     else if slot < 4 && slot >= 1 {
                         unit_items::replace_weapon(weapon, weapon_mask_array[slot - 1 as usize], weapon_level[slot - 1 as usize], enemy);
                     }
+                    println!("Finished");
                 }
             }
         }
     }
+    println!("Adjusting Staffs");
     unit_items::adjust_staffs(unit);
+    println!("Adjusting Melee Weapons");
     unit_items::adjust_melee_weapons(unit);
     unit_items::remove_duplicates(unit.item_list);
     unsafe { unit_update_auto_equip(unit, None); }
+    println!("Finished adjusting items");
 }
 
 pub fn set_unit_edit_name(unit: &Unit) {
@@ -486,7 +492,6 @@ fn adjust_emblem_paralogue_items(data: &mut DisposData) {
 
     let sp = emblem.get_sp() ;
     if sp == 0 || sp > 99 { return; }
-    let jid = emblem.jid.unwrap().get_string().unwrap();
     if !str_contains(emblem.jid.unwrap(), "JID_紋章士") { return; }
 
     let emblem_index = sp - 1;

@@ -1,5 +1,4 @@
 use engage::force::ForceType;
-use utils::get_rng;
 use super::*;
 use super::item_rando::*;
 use crate::randomizer::person::unit;
@@ -100,7 +99,9 @@ pub fn replace_weapon(item: &UnitItem, weapon_mask: i32, max_rank: i32, is_enemy
     }
     // Random Weapons for Enemy
     if is_enemy {
+        println!("Enemy Item Replacement");
         let new_item = item_rando::WEAPONDATA.lock().unwrap().get_new_weapon(item, new_weapon_type, true);
+        println!("1");
         if new_item.is_some() {
             let n_item = new_item.unwrap();
             item.ctor(new_item.unwrap());
@@ -108,12 +109,14 @@ pub fn replace_weapon(item: &UnitItem, weapon_mask: i32, max_rank: i32, is_enemy
             return;
         }
         let generic_weapon = item_rando::WEAPONDATA.lock().unwrap().get_generic_weapon(new_weapon_type, level);
+        println!("2");
         if generic_weapon.is_some() {
             item.ctor(generic_weapon.unwrap());
             item.set_flags(flag);
             return;
         } 
     }
+    println!("Normal Item Replacement");
     if new_weapon_type == 7 { new_weapon_type = 6; }
     if new_weapon_type < 0 || new_weapon_type > 6 { return; }
     if weapon_mask & 512 != 0 { return;  }
@@ -551,7 +554,7 @@ pub fn add_generic_weapons(unit: &Unit) {
             has_weapon[kind as usize] = true;
         }
         else {
-            if weapon.flags & 2 == 0 { weapon.dispose();  }
+            if weapon.flags & 2 != 0 { weapon.dispose();  }
         }
     }
     for i in 1..9 {
@@ -576,16 +579,20 @@ pub fn add_generic_weapons(unit: &Unit) {
 pub fn random_items_drops(unit: &Unit){
     let rng = Random::get_system();
     let mut none_count = 0;
-    let mut rate = GameVariableManager::get_number("G_ItemDropGauge");
-    if GameUserData::get_difficulty(false) == 2 {
-        rate = rate / 2;
+    let mut rate =
+        if GameUserData::get_difficulty(false) == 2 {1 / 2} else { 1 } * GameVariableManager::get_number("G_ItemDropGauge");
+        
+    for x in 0..8 {
+        if let Some(u_item) = unit.item_list.get_item(x) {
+            if u_item.item.flag.value & 131 != 0 {  u_item.flags = 0; }
+        }
     }
     for x in 0..8 {
         let item = unit.item_list.get_item(x);
         if item.is_none() { continue; }
         let u_item = &mut item.unwrap();
         if u_item.is_drop(){
-            if u_item.item.flag.value & 3 != 0 || u_item.item.flag.value & 128 != 0 { 
+            if u_item.item.flag.value & 131 != 0  { //Unequip 
                 u_item.flags = 0;  
                 continue;
             }
@@ -606,6 +613,7 @@ pub fn random_items_drops(unit: &Unit){
             else { none_count += 1; }
         } 
     }
+
 }
 
 fn magic_dagger_weapon_change(veyle_job: &JobData){
@@ -662,7 +670,7 @@ pub fn adjust_items() {
     let item_list = ItemData::get_list_mut().unwrap();
     for x in 0..item_list.len() {
         let random_item = &mut item_list[x];
-        if random_item.get_flag().value == 16 {
+        if random_item.get_flag().value & 16 != 0  {
             let iid = random_item.iid.get_string().unwrap();
             if iid != "IID_メティオ_G004" {
                 random_item.get_flag().value = 0; 
@@ -675,6 +683,9 @@ pub fn adjust_items() {
         let o_unit: Option<&mut Unit> = unsafe { unit_pool_get(x, None) };
         if o_unit.is_none() { continue; }
         let unit = o_unit.unwrap();
+        let force = if unit.force.is_none() { -1 } else {
+            unit.force.unwrap().force_type
+        };
         let uses = if unit.force.is_none() { 255 }
             else if unit.force.unwrap().force_type == 1 { 255 }
             else { 1 };
@@ -683,6 +694,9 @@ pub fn adjust_items() {
             if unit.item_list.unit_items[y].item.parent.index == index {
                 unit.item_list.unit_items[y].set_endurance(uses);
             }
+            if ( force == 0 || force == 3 ) && unit.item_list.unit_items[y].item.flag.value & 2 != 0 {  //Cant Trade
+                unit.item_list.unit_items[y].dispose();
+            }
         }
     }
     let convoy_index = unsafe { get_empty_index(None) };
@@ -690,6 +704,9 @@ pub fn adjust_items() {
         let item = unsafe {  get_item_from_index(x, None ) };
         if item.unit_item.item.parent.index == index {
             item.unit_item.endurance = 1;
+        }
+        if item.unit_item.item.flag.value & 130 != 0 {  //Engage + //Cant Trade
+            item.unit_item.dispose();
         }
     }
 }

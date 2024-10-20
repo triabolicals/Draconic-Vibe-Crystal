@@ -75,6 +75,7 @@ impl WeaponData {
         if self.is_slim == item2.is_slim { return true; }
         if enemy && item2.is_rare { return false; }
         if item2.rank == self.rank { return true; }
+        if item2.is_rare && !GameVariableManager::get_bool("G_Cleared_M007") { return false; }
         else {
             let might_diff = item2.might as i8 - self.might as i8;
             if might_diff > 15 || might_diff < -2 { return false;}
@@ -237,14 +238,16 @@ impl WeaponDatabase {
         let min_rank = if gen.is_some() { get_min_rank() } else { 1 };
         if generic.is_some() {
             let g_weapon = generic.unwrap();
-            let possible_weapons: Vec<&WeaponData> = self.weapon_list.iter().filter(|&x| 
+            let possible_weapons: Vec<&WeaponData> = self.weapon_list.iter().filter(|&x|
                 g_weapon.can_replace(x, kind, enemy) &&
                 x.rank >= min_rank
             ).collect();
             if possible_weapons.len() == 0 { return None;   }
+            println!("Weapons of Type: {} = {}", new_type, possible_weapons.len());
             let rng = Random::get_system();
+            let mut index;
             let selection = rng.get_value(possible_weapons.len() as i32) as usize;
-            let index = possible_weapons[selection].item_index;
+            index = possible_weapons[selection].item_index;
             return ItemData::try_index_get(index);
         }
         return None;
@@ -325,12 +328,28 @@ impl WeaponDatabase {
         return ItemData::try_index_get(self.dragonstones[selection]);
     }
 
+    pub fn get_random_weapon(&self, kind: i32) -> Option<&'static ItemData> {
+        let weapon = ( kind - 1 ) as u8;
+        let possible_weapons: Vec<&WeaponData>  = self.weapon_list.iter().filter(|x| x.weapon_type == weapon).collect();
+        if possible_weapons.len() == 0 {
+            return None;
+        }
+        let rng = Random::get_system();
+        let selection = rng.get_value(possible_weapons.len() as i32) as usize;
+        let index = possible_weapons[selection].item_index;
+        return ItemData::try_index_get(index);
+    }
+
+
 }
 
 
 pub fn is_generic(item: &ItemData) -> bool {
     let iid = item.iid;
     // check if Slim/Iron/Steel/
+    if item.kind == 6 {
+        return str_contains(iid, "IID_ファイアー") || str_contains(iid, "IID_エルファイアー") || str_contains(iid, "IID_ボルガノン");
+    }
     return str_contains(iid, "IID_ほそみの") || str_contains(iid, "IID_鉄の") || str_contains(iid, "IID_鋼の") || str_contains(iid, "IID_銀の") || str_contains(iid, "IID_勇者の");
 }
 pub fn is_vaild_weapon(item: &ItemData) -> bool {
@@ -340,9 +359,7 @@ pub fn is_vaild_weapon(item: &ItemData) -> bool {
     if item.kind == 0 || item.kind > 9 { return false; }
     let flags = item.get_flag().value;
     if flags & 128 != 0  { return false; }
-    let iid = item.iid.get_string().unwrap();
-    if enums::ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == iid).is_some() { false; }
-    return true;
+    return enums::ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == item.parent.index).is_none();
 }
 
 pub fn check_effectiveness(item: &ItemData) -> bool {

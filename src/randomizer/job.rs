@@ -314,3 +314,15 @@ pub fn add_job_list_unit(this: &mut ChangeJobData, unit: &Unit, method_info: Opt
     return result;
 }
 
+pub fn get_weapon_for_asset_table(job: &JobData) -> Option<&'static ItemData> {
+    let mut weapon_type = 0;
+    let mut weapon_level = 0;
+    for x in 1..10 {
+        if x == 7 { continue; }
+        if weapon_level < job.get_max_weapon_level(x) {
+            weapon_type = x;
+            weapon_level = job.get_max_weapon_level(x);
+        }
+    }
+    return crate::randomizer::item::item_rando::WEAPONDATA.lock().unwrap().get_random_weapon(weapon_type);
+}

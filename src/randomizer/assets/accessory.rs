@@ -80,7 +80,7 @@ pub fn gather_all_accesories(){
             if cond == "私服" { find_somniel_condition_index = y as i32;  }
         }
         if find_somniel_condition_index != -1  {
-            conditions[ find_somniel_condition_index as usize ] = "".into(); 
+            conditions[ find_somniel_condition_index as usize ] = "!エンゲージ中".into(); 
         }
     }
     // Skipping Character unique outfits

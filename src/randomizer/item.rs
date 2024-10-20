@@ -25,17 +25,13 @@ pub fn create_item_pool() {
         let random_item = &mut item_list[x];
         if random_item.get_flag().value == 16 {
             let iid = random_item.iid.get_string().unwrap();
-            if iid != "IID_メティオ_G004" {
-                random_item.get_flag().value = 0; 
-            }
+            if iid != "IID_メティオ_G004" { random_item.get_flag().value = 0;  }
             if iid == "IID_メティオ" { 
                 random_item.endurance = 1; 
-                random_item.get_flag().value = 8;
             }
         }
-        let iid = random_item.iid.get_string().unwrap();
         let item_flag = random_item.get_flag().value;
-        if enums::ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == iid).is_some() { continue; }
+        if enums::ITEM_BLACK_LIST.lock().unwrap().iter().find(|y| **y == x as i32).is_some() { continue; }
         if crate::utils::str_contains(random_item.name, "MIID_Ring") { continue; }
         if !has_name(random_item, true) { continue; }
         if random_item.is_unknown() { continue; }
@@ -45,15 +41,7 @@ pub fn create_item_pool() {
         if item_flag & 134217728 != 0 { continue; } //Bullet
         if item_flag & 131072 != 0 { continue; } // Bento
         if item_flag & 32768 != 0 { continue; } // AI 
-        let mut skip = false; 
-        for y in 1..8 {
-            if y == 2 { continue; }
-            if item_flag & (1 << y ) != 0 {                
-                skip = true;
-                break;
-            }
-        }
-        if !skip { RANDOM_ITEM_POOL.lock().unwrap().push(random_item.parent.index); }
+        if item_flag & 510 == 0 { RANDOM_ITEM_POOL.lock().unwrap().push(random_item.parent.index); }
     }
     println!("{} items are in the Random Item Pool", RANDOM_ITEM_POOL.lock().unwrap().len());
     item_rando::WEAPONDATA.lock().unwrap().intitalize();
@@ -98,13 +86,10 @@ pub fn random_item(item_type: i32, allow_rare: bool) -> &'static Il2CppString {
 
 // For item replacement
 pub fn get_random_item(item: &'static Il2CppString, allow_rare: bool) -> &'static Il2CppString {
-    let item_check = ItemData::get(&item.get_string().unwrap());
-    // if Item is rare
-    if item_check.is_some() {
-        let flag = item_check.unwrap().get_flag().value;
+    if let Some(item_check) = ItemData::get(&item.get_string().unwrap()) {
+        let flag = item_check.get_flag().value;
         if flag & 1 == 1 { return item;  }
-        let iid = item_check.unwrap().iid.get_string().unwrap();
-        if enums::ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == iid).is_some() { return item; }
+        if enums::ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == item_check.parent.index).is_some() { return item; }
     }
     else { return item; }
     let price = ItemData::get(&item.get_string().unwrap()).unwrap().price;
@@ -153,47 +138,47 @@ pub fn randomize_well_rewards() {
             }
         }
     }
-    let well_reward_list = ["アイテム交換_期待度１", "アイテム交換_期待度２", "アイテム交換_期待度３", "アイテム交換_期待度４", "アイテム交換_期待度５" ];
-    for x in well_reward_list {
-        let well_list = RewardData::try_get_mut(x);
-        if well_list.is_none() { continue; }
-        let well_items = well_list.unwrap();
-        let mut in_set: [bool; 1000] = [false; 1000];
-        for y in 0..well_items.len() {
-            let iid = well_items[y as usize].iid;
-            let price = ItemData::get(&iid.get_string().expect("Bad Item in Well Item List")).expect(format!("Invalid Item ID in Well Item {}", y).as_str()).price;
-            let mut new_price; 
-            let mut item_index;
-            let mut new_iid; 
-            let curent_reward = &well_items[y as usize];
-            let mut count = 0;
-            loop {
-                new_iid = random_item(1, true);
-                new_price = ItemData::get(&new_iid.get_string().unwrap()).unwrap().price;
-                item_index = ItemData::get(&new_iid.get_string().unwrap()).unwrap().parent.index;
-                if new_price > 3*price { count += 1; continue; }
-                if count < 50 && in_set[item_index as usize] { count += 1; continue; }
-                if count >= 50 { break; }
-                if !in_set[item_index as usize] { break; }
+    ["アイテム交換_期待度１", "アイテム交換_期待度２", "アイテム交換_期待度３", "アイテム交換_期待度４", "アイテム交換_期待度５" ].iter().for_each(|&x|{
+            if let Some(well_items) = RewardData::try_get_mut(x) {
+                let mut in_set: [bool; 1000] = [false; 1000];
+                for y in 0..well_items.len() {
+                    let iid = well_items[y as usize].iid;
+                    let price = ItemData::get(&iid.get_string().expect("Bad Item in Well Item List")).expect(format!("Invalid Item ID in Well Item {}", y).as_str()).price;
+                    let mut new_price; 
+                    let mut item_index;
+                    let mut new_iid; 
+                    let curent_reward = &well_items[y as usize];
+                    let mut count = 0;
+                    loop {
+                        new_iid = random_item(1, true);
+                        new_price = ItemData::get(&new_iid.get_string().unwrap()).unwrap().price;
+                        item_index = ItemData::get(&new_iid.get_string().unwrap()).unwrap().parent.index;
+                        if new_price > 3*price { count += 1; continue; }
+                        if count < 50 && in_set[item_index as usize] { count += 1; continue; }
+                        if count >= 50 { break; }
+                        if !in_set[item_index as usize] { break; }
+                    }
+                    let new_reward = RewardData::instantiate().unwrap();
+                    new_reward.ctor();
+                    new_reward.set_iid(new_iid);
+                    let new_item = ItemData::get(&new_iid.get_string().unwrap()).unwrap();
+                    if new_item.get_flag().value & 1 != 0 || ( new_item.kind == 18 || new_item.kind == 17 ) {   // If rare or money / bond
+                        new_reward.ratio = 2.5;
+                        new_reward.min = 2.5;
+                        new_reward.max = 2.5;
+                    }
+                    else {
+                        new_reward.ratio = curent_reward.ratio;
+                        new_reward.min = curent_reward.min;
+                        new_reward.max = curent_reward.max;
+                    }
+                    well_items.add(new_reward);
+                    in_set[item_index as usize] = true; 
+                }
             }
-            let new_reward = RewardData::instantiate().unwrap();
-            new_reward.ctor();
-            new_reward.set_iid(new_iid);
-            let new_item = ItemData::get(&new_iid.get_string().unwrap()).unwrap();
-            if new_item.get_flag().value & 1 != 0 || ( new_item.kind == 18 || new_item.kind == 17 ) {   // If rare or money / bond
-                new_reward.ratio = 2.5;
-                new_reward.min = 2.5;
-                new_reward.max = 2.5;
-            }
-            else {
-                new_reward.ratio = curent_reward.ratio;
-                new_reward.min = curent_reward.min;
-                new_reward.max = curent_reward.max;
-            }
-            well_items.add(new_reward);
-            in_set[item_index as usize] = true; 
         }
-    }
+    );
+        
     println!("Complete Randomization of Gift/Well Items");
     shop::randomize_hub_random_items();
 }

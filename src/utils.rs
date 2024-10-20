@@ -296,25 +296,16 @@ pub fn dlc_check() -> bool {
 }
 
 pub fn is_valid_skill_index(index: i32 ) -> bool {
-    let skill = SkillData::try_index_get(index);
-    if skill.is_none() { return false; }
-    let sk = skill.unwrap(); 
-    let sid = sk.sid.get_string().unwrap();
-    if crate::enums::SKILL_BLACK_LIST.lock().unwrap().iter().find(|x| **x == sid ).is_some() { return false; }
-    let mut skip = false;
-    let flag = sk.get_flag();
-    if sk.help.is_none() { return false; }
-    else if  Mess::get( sk.name.unwrap() ).get_string().unwrap().len() == 0 { return false; }
-    if sk.name.is_none() { return false; }
-    else if Mess::get( sk.help.unwrap() ).get_string().unwrap().len() == 0 { return false; }
-    if sk.is_style_skill() { return false; }
-    for y in 0..8 {
-        if flag & (1 << y ) != 0 {
-            skip = true;
-            break;
-        }
+    if let Some(skill) = SkillData::try_index_get(index) {
+        if SKILL_BLACK_LIST.lock().unwrap().iter().find(|x| **x ==  skill.parent.index).is_some() { return false; }
+        if skill.help.is_none() { return false; }
+        else if  Mess::get( skill.name.unwrap() ).get_string().unwrap().len() == 0 { return false; }
+        if skill.name.is_none() { return false; }
+        else if Mess::get( skill.help.unwrap() ).get_string().unwrap().len() == 0 { return false; }
+        if skill.is_style_skill() { return false; }
+        return  skill.get_flag() & 511 == 0;
     }
-    return !skip
+    return false;
 }
 pub fn pid_to_mpid(pid: &String) -> String { return PersonData::get(&pid).unwrap().get_name().unwrap().get_string().unwrap(); }
 

@@ -1,4 +1,5 @@
-#![feature(lazy_cell, ptr_sub_ptr)]
+#![feature(ptr_sub_ptr)]
+
 use cobapi::{Event, SystemEvent};
 use std::sync::{Mutex, LazyLock};
 use skyline::patching::Patch;
@@ -19,7 +20,7 @@ use crate::config::DeploymentConfig;
 use unity::prelude::OptionalMethod;
 use engage::proc::ProcInst;
 pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| DeploymentConfig::new().into() );
-pub const VERSION: &str = "2.6.3";
+pub const VERSION: &str = "2.7.0";
 
 #[skyline::from_offset(0x02285890)]
 pub fn autosave_proc_inst(this: &ProcInst, kind: i32, index: i32, stuff: Option<&ProcInst>, method_info: OptionalMethod);
@@ -144,9 +145,13 @@ pub fn main() {
         randomizer::assets::animation::asset_table_result_setup_person_hook,
         event::get_cmd_info_from_cmd_lines_hook,
         event::get_active_character_hook,
+        event::get_int_ptr,
         message::mess_get_impl_hook, 
+        randomizer::person::get_unit_ascii_name,
         randomizer::person::get_bond_face,  
         randomizer::person::get_thumb_face,
+        randomizer::person::get_god_face,
+        randomizer::person::get_god_thumb_face,
     ); 
     // Fixes the emblem weapons arena issue
     Patch::in_text(0x01ca9afc).nop().unwrap();

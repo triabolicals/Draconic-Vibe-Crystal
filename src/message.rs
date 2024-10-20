@@ -137,15 +137,14 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
     let result = call_original!(dyn_value, method_info);
     if result.is_none() || !crate::utils::can_rand() { return result; }
     let result_string = result.unwrap();
-    if str_contains(result_string, "Kengen") || ( str_contains(&result_string, "Scene03") || str_contains(&result_string, "Scene04") ) {
+    if str_contains(result_string, "Kengen") {
         if GameVariableManager::get_number("G_Emblem_Mode") == 0 { return result; }
-        if str_contains(&result_string, "Scene04") { return None; }
         let str1 = result_string.get_string().unwrap();
         let emblem_index = KENGEN.iter().position(|x| *x == str1);
         if emblem_index.is_none() { return result;}
         let gid = EMBLEM_GIDS[emblem_index.unwrap()];
         let new_index = crate::randomizer::person::pid_to_index(&gid.to_string(), false);
-        if new_index < 0 || new_index >= 20 { return result; }
+        if new_index < 1 || new_index >= 20 { return result; }
         return Some(KENGEN[new_index as usize].into());
     }
     if unsafe { string_start_with(result_string, "GID_".into(), None) } {

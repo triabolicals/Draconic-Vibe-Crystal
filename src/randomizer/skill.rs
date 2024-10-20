@@ -74,6 +74,7 @@ pub fn create_skill_pool() {
     let skill_list = SkillData::get_list_mut().unwrap();
     let mut inherit_list: Vec<i32> = Vec::new();
     let godgrowlist = GodGrowthData::get_list().unwrap();
+
     for x in 0..godgrowlist.len() { 
         for y in 0..godgrowlist[x].len() {
             let level = godgrowlist[x][y].get_inheritance_skills();
@@ -89,7 +90,7 @@ pub fn create_skill_pool() {
         let skill = &skill_list[x]; // fix bad inheritance data
         if skill.parent.index == 382 { continue; }
         if skill.get_inheritance_cost() > 0 && skill.get_inheritance_sort() == 0 {
-            if inherit_list.iter().find(|y| **y == skill.parent.index ).is_none() {
+            if !inherit_list.iter().any(|&y| y == skill.parent.index ) {
                 skill.set_inherit_cost(0);
             }
         }
@@ -107,24 +108,16 @@ pub fn create_skill_pool() {
         if skill_list[x].help.is_none() { continue; }
         if skill_list[x].name.is_none() { continue; }
         let sid = skill_list[x as usize].sid.get_string().unwrap();
-        if SKILL_BLACK_LIST.lock().unwrap().iter().find(|x| **x == sid ).is_some() { continue;}
-        let mut skip = false;
+        if SKILL_BLACK_LIST.lock().unwrap().iter().any(|&y| y == x as i32 ) { continue;}
         let flag = skill_list[x].get_flag();
         if Mess::get(skill_list[x].name.unwrap()).get_string().unwrap().len() < 1 || Mess::get(skill_list[x].help.unwrap()).get_string().unwrap().len() < 1 { continue; }
         if skill_list[x].get_inheritance_cost() != 0 && skill_list[x].get_inheritance_sort() != 0 { 
             SYNCHO_RANDOM_LIST.lock().unwrap().add_list(skill_list[x], false);
         }
         if skill_list[x].is_style_skill() { continue; }
-        for y in 0..8 {
-            if flag & (1 << y ) != 0 {
-                skip = true;
-                break;
-            }
-        }
-        if !skip {
+        if flag & 511 == 0 {
             if str_contains(skill_list[x].sid ,"E00"){ continue; }
             if str_contains(skill_list[x].sid ,"G00"){ continue; }
-            if flag & 1 == 1 { continue; }
             SKILL_POOL.lock().unwrap().push(SkillIndex::new(x as i32));
             SYNCHO_RANDOM_LIST.lock().unwrap().add_list(skill_list[x], false); // Chaos Skills
             if MADDENING_BLACK_LIST.iter().find(|lol| **lol == sid ).is_none() {
@@ -288,10 +281,7 @@ pub fn replace_all_sid_person(person: &PersonData) {
 
 pub fn replace_enemy_version() {
     if GameVariableManager::get_number("G_Random_Recruitment") == 0 || !GameVariableManager::get_bool("G_Random_Skills") { return; } 
-    for x in 0..41 {
-        let person = PersonData::get(PIDS[x]).unwrap();
-        replace_all_sid_person(person);
-    }
+    PIDS.iter().for_each(|&x| replace_all_sid_person(PersonData::get(x).unwrap()));
 }
 pub fn randomize_skills() {
     if !GameVariableManager::get_bool("G_Random_Skills") || !crate::utils::can_rand() { return; }
@@ -300,89 +290,144 @@ pub fn randomize_skills() {
     let rng = Random::instantiate().unwrap();
     let seed = 2*GameVariableManager::get_number("G_Random_Seed") as u32;
     rng.ctor(seed);
-    let skill_pool_count = SKILL_POOL.lock().unwrap().len() as i32;
-    // Playables
-    let playable_size = PLAYABLE.lock().unwrap().len();
-    let person_list = PersonData::get_list().unwrap();
-    for x in 0..playable_size {
-        let p_index = PLAYABLE.lock().unwrap()[x as usize] as usize;
-        let person = &person_list[p_index]; 
-        let personal_sid = person.get_common_sids().
-            expect(
-                format!("Person #{}: {} doesn't have skills!", p_index, person.get_name().unwrap().get_string().unwrap()).as_str()
-            );
 
-        let personal_key = format!("G_P_{}", person.pid.get_string().unwrap());
-        let mut skill_index: usize; 
-        let mut index; 
-        if GameVariableManager::exist(&personal_key) {
-            index = GameVariableManager::get_number(&personal_key) as usize; 
-            let pos = SKILL_POOL.lock().unwrap().iter().position(|x| x.index == index as i32);
-            if pos.is_some() {
-                skill_index = pos.unwrap() as usize; 
-                for y in 0..personal_sid.len() {
-                    let skill = SkillData::get( &personal_sid[y as usize].get_string().unwrap() ).unwrap();
-                    if skill.get_flag() & 1 == 0 {
-                        personal_sid[y as usize] = skill_list[ index  as usize].sid;
-                        SKILL_POOL.lock().unwrap()[ skill_index ].in_use = true;
-                        break;
-                    }
-                }
-                person.on_complete();
-                continue;
+    let mut playable = PLAYABLE.lock().unwrap();
+    let person_list = PersonData::get_list_mut().unwrap();
+    let mut skill_pool = SKILL_POOL.lock().unwrap();
+    let person_b_list = PERSONAL_BLIST.lock().unwrap();
+    // convert indexes to hash
+    if !playable.iter().any(|&x| {
+            let person = &person_list[x as usize];
+            let personal_key = format!("G_P_{}", person.pid.get_string().unwrap());
+            if GameVariableManager::exist(&personal_key) {
+                GameVariableManager::get_number(&personal_key) < 0 || GameVariableManager::get_number(&personal_key) >= skill_list.len() as i32
             }
+            else {  false  }
         }
-        skill_index = rng.get_value(skill_pool_count) as usize;
-        index = SKILL_POOL.lock().unwrap()[skill_index].index as usize; 
-        let mut skill_sid = skill_list[index as usize].sid.get_string().unwrap();
-        let mut count = 0;
-        while count < 50 && ( ( SKILL_POOL.lock().unwrap()[skill_index].in_use || skill_list[index].get_inheritance_cost() != 0 ) || PERSONAL_BLIST.lock().unwrap().iter().find(|x| **x == skill_sid).is_some() ) { 
-            skill_index = rng.get_value(skill_pool_count) as usize;
-            index = SKILL_POOL.lock().unwrap()[skill_index].index as usize;
-            if index > 1250 { continue; }
-            skill_sid = skill_list[index as usize].sid.get_string().unwrap();
-            if skill_sid == "SID_双聖" { SKILL_POOL.lock().unwrap()[ skill_index ].in_use = true; }
-            count+=1;
-        }
-        for y in 0..personal_sid.len() {
-            let skill = SkillData::get( &personal_sid[y as usize].get_string().unwrap() ).unwrap();
-            if skill.get_flag() & 1 == 0 {
-                personal_sid[y as usize] = skill_list[ index  as usize].sid;
-                SKILL_POOL.lock().unwrap()[ skill_index ].in_use = true;
-                GameVariableManager::make_entry(&personal_key, index as i32);
-                break;
+    ) {
+        playable.iter().for_each(|&x| {
+            let personal_key = format!("G_P_{}", person_list[x as usize].pid.get_string().unwrap());
+            if GameVariableManager::exist(&personal_key) {
+                let index = GameVariableManager::get_number(&personal_key);
+                if let Some(personal) = SkillData::try_index_get(index) { GameVariableManager::set_number(&personal_key, personal.parent.hash); }
+                else { GameVariableManager::set_number(&personal_key, 0); }
             }
-        }
-        person.on_complete();
+            else {  GameVariableManager::set_number(&personal_key, 0); }
+        });
     }
+    let mut need_personals: Vec<usize> = Vec::new();
 
+    playable.iter_mut().for_each(|x|{
+            let person = &mut person_list[*x as usize];
+            let personal_key = format!("G_P_{}", person.pid.get_string().unwrap());
+            if GameVariableManager::exist(&personal_key) {
+                let hash = GameVariableManager::get_number(&personal_key);
+                if hash == 0 { need_personals.push(*x as usize); }
+                else {
+                    if let Some(skill) = SkillData::try_get_hash(hash) { 
+                        change_personal_sid(*person, skill);
+                        if let Some(skill_index) = skill_pool.iter_mut().find(|a| a.index == skill.parent.index) {
+                            skill_index.in_use = true;
+                        }
+                    }
+                    else { need_personals.push(*x as usize); }
+                }
+            }
+            else { 
+                GameVariableManager::make_entry(&personal_key, 0);
+                need_personals.push(*x as usize);
+            }
+        }
+    );
+    if need_personals.len() > 0 {
+        println!("{} persons need personals.", need_personals.len());
+        need_personals.iter().for_each(|&x| {
+                let mut available: Vec<&mut SkillIndex> = skill_pool.iter_mut().filter(|a| 
+                    !a.in_use && 
+                    skill_list[a.index as usize].get_inheritance_cost() == 0 &&
+                    !person_b_list.iter().any(|&y| y == a.index)
+                ).collect();
+                let len = available.len() as i32;
+                if len == 0 { panic!("No Available Skills to give as personals to {}",  Mess::get_name(person_list[x].pid).get_string().unwrap()); }
+                let new_skill_index = &mut available[ rng.get_value(len) as usize];
+                let skill = SkillData::try_index_get(new_skill_index.index).expect("Attempting to assign personal skill: Bad Skill? :O");
+                change_personal_sid(person_list[x], skill);
+                new_skill_index.in_use = true;
+            }
+        );
+    }
     // the rest 
     println!("Person Skills complete");
     let job_list = JobData::get_list_mut().unwrap();
-    for x in 0..job_list.len() {
-        let job = &job_list[x as usize];
-        if job.is_low() && job.max_level == 20 { continue; }
-        let mut skill_index;
-        let mut count = 0;
-        loop {
-            count += 1;
-            skill_index = rng.get_value(skill_pool_count) as usize;
-            if skill_list[ SKILL_POOL.lock().unwrap()[ skill_index ].index as usize ].can_override_skill() { continue; }
-            if !SKILL_POOL.lock().unwrap()[skill_index].in_use || count >= 50 { break; }
+    let pool_size = skill_pool.len() as i32;
+    let mut jobs: Vec<usize> = Vec::new();
+    let skill_pool_count = skill_pool.len() as i32;
+    if GameVariableManager::find_starts_with("G_L_JID_").len() == 0 {   // Old Method
+        let job_list = JobData::get_list_mut().unwrap();
+        println!("Job Skills Randomization Start");
+        for x in 0..job_list.len() {
+            let job = &job_list[x as usize];
+            if job.is_low() && job.max_level == 20 { continue; }
+            let mut skill_index;
+            let mut count = 0;
+            let job_key = format!("G_L_{}", job.jid.get_string().unwrap());
+            loop {
+                count += 1;
+                skill_index = rng.get_value(skill_pool_count) as usize;
+                if skill_list[ skill_pool[ skill_index ].index as usize ].can_override_skill() { continue; }
+                if !skill_pool[skill_index].in_use || count >= 50 { break; }
+            }
+            skill_pool[ skill_index ].in_use = true;
+
+            let mut skill_index2;
+            loop {
+                skill_index2 = rng.get_value(skill_pool_count) as usize;
+                if skill_list[ skill_pool[ skill_index2 ].index as usize ].can_override_skill() { continue; }
+                if skill_index2 == skill_index { continue; }
+                else {break; }
+            }
+            let learn_skill =  &skill_list[ skill_pool[ skill_index  ].index as usize ];
+            job.set_learning_skill(learn_skill.sid ); 
+            GameVariableManager::make_entry(&job_key, learn_skill.parent.hash);
+            job.set_lunatic_skill(  skill_list[ skill_pool[ skill_index2 ].index as usize ].sid ); 
         }
-        SKILL_POOL.lock().unwrap()[ skill_index ].in_use = true;
-        let mut skill_index2;
-        loop {
-            skill_index2 = rng.get_value(skill_pool_count) as usize;
-            if skill_list[ SKILL_POOL.lock().unwrap()[ skill_index2 ].index as usize ].can_override_skill() { continue; }
-            if skill_index2 == skill_index { continue; }
-            else {break; }
+    }
+    else {
+        for x in 1..job_list.len() {
+            let job = &job_list[x as usize];
+            if job.is_low() && job.max_level == 20 { continue; } 
+            let job_key = format!("G_L_{}", job.jid.get_string().unwrap());
+            if GameVariableManager::exist(&job_key) {
+                if let Some(skill) = SkillData::try_get_hash( GameVariableManager::get_number(&job_key) ) {
+                    if let Some(skill_index1) = skill_pool.iter_mut().find(|x| x.index == skill.parent.index) {
+                        skill_index1.in_use = true;
+                        job.set_learning_skill( skill.sid );
+                        continue;
+                    }
+                }
+            }
+            else { GameVariableManager::make_entry(&job_key, 0);  }
+            jobs.push(x);
         }
-        job.set_learning_skill( skill_list[ SKILL_POOL.lock().unwrap()[ skill_index  ].index as usize ].sid ); 
-        job.set_lunatic_skill(  skill_list[ SKILL_POOL.lock().unwrap()[ skill_index2 ].index as usize ].sid ); 
+        jobs.iter().for_each(|x|{
+                let mut available: Vec<&mut SkillIndex> = skill_pool.iter_mut().filter(|a| 
+                    !a.in_use && 
+                    !skill_list[a.index as usize].can_override_skill()
+                ).collect();
+                let job = &job_list[*x as usize];
+                let len = available.len() as i32;
+                if len > 0 {
+                    let new_skill_index = &mut available[ rng.get_value(len) as usize];
+                    let skill = SkillData::try_index_get(new_skill_index.index).expect("Attempting to assign personal skill: Bad Skill? :O");
+                    job.set_learning_skill( skill.sid );
+                    new_skill_index.in_use = true;
+                    let job_key = format!("G_L_{}", job.jid.get_string().unwrap());
+                    GameVariableManager::set_number(&job_key, skill.parent.hash);
+                }
+            }
+        );   
     }
     randomize_bond_ring_skills();
-
 }
 pub fn randomize_bond_ring_skills(){
     let maddening_pool_size = MADDENING_POOL.lock().unwrap().len() as i32;
@@ -431,4 +476,17 @@ pub fn randomize_bond_ring_skills(){
     }
 }
 
+fn change_personal_sid(person: &mut PersonData, skill: &SkillData) {
+    let personal_sid = person.get_common_sids().
+        expect(
+            format!("Person #{}: {} doesn't have skills!", person.parent.index, person.get_name().unwrap().get_string().unwrap()).as_str()
+        );
 
+    for y in 0..personal_sid.len() {
+        if skill.get_flag() & 1 == 0 {
+            personal_sid[y as usize] = skill.sid;
+            break;
+       }
+    }
+    person.on_complete();
+}       
