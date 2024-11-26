@@ -23,7 +23,7 @@ pub fn class_count(jid: &str) -> i32 {
    for ff in force_type {
        let force_iter = Force::iter(Force::get(ff).unwrap());
        for unit in force_iter {
-           if unit.job.jid.get_string().unwrap() == jid {  count += 1; }
+           if unit.job.jid.to_string() == jid {  count += 1; }
        }
    }
    count
@@ -36,9 +36,9 @@ pub fn lueur_on_map() -> bool {
 }
 
 pub fn is_player_unit(person: &PersonData) -> bool {
-    let key = format!("G_R_{}", person.pid.get_string().unwrap());
+    let key = format!("G_R_{}", person.pid.to_string());
     if GameVariableManager::exist(&key) { return true; }
-    let pid = person.pid.get_string().unwrap();
+    let pid = person.pid.to_string();
     for x in PIDS { if *x == pid { return true; } }
     return false;
 }
@@ -50,8 +50,8 @@ pub fn get_player_name() -> String {
         let force = Force::get(f).unwrap();
         let mut force_iter = Force::iter(force);
         while let Some(unit) = force_iter.next() {
-            if unit.person.pid.get_string().unwrap() == "PID_リュール" {
-                if unit.edit.name.is_some(){ return unit.edit.name.unwrap().get_string().unwrap(); }
+            if unit.person.pid.to_string() == "PID_リュール" {
+                if unit.edit.name.is_some(){ return unit.edit.name.unwrap().to_string(); }
             }
         }
     }
@@ -65,12 +65,12 @@ pub fn get_lueur_name_gender(){
         let force = Force::get(f).unwrap();
         let mut force_iter = Force::iter(force);
         while let Some(unit) = force_iter.next() {
-            if unit.person.pid.get_string().unwrap() == "PID_リュール" {
+            if unit.person.pid.to_string() == "PID_リュール" {
                 if unit.edit.name.is_some(){
                     if unit.edit.gender != 0 {
                         if unit.edit.gender > 2 { unit.edit.set_gender(1); }
-                            GameVariableManager::set_number("G_Lueur_Gender".into(), unit.edit.gender);
-                            GameVariableManager::set_string("G_Lueur_Name".into(), &unit.edit.name.unwrap().get_string().unwrap());
+                            GameVariableManager::set_number("G_Lueur_Gender", unit.edit.gender);
+                            GameVariableManager::set_string("G_Lueur_Name", &unit.edit.name.unwrap().to_string());
                             return;
                     }
                 }
@@ -88,20 +88,20 @@ pub fn get_person_name(person: &PersonData) -> String {
 }
 
 pub fn get_skill_name(skill: &SkillData) -> String {
-    if skill.name.is_some() { return format!("{} ({})", mess_get(skill.name.unwrap()), skill.sid.get_string().unwrap()); }
-    else {  return format!(" --- ({})", skill.sid.get_string().unwrap()); }
+    if skill.name.is_some() { return format!("{} ({})", mess_get(skill.name.unwrap()), skill.sid.to_string()); }
+    else {  return format!(" --- ({})", skill.sid.to_string()); }
 }
 pub fn get_item_name(skill: &ItemData) -> String {
     unsafe {  
         if is_null_empty(skill.name, None) { 
-            return format!(" --- ({})", skill.iid.get_string().unwrap()); 
+            return format!(" --- ({})", skill.iid.to_string()); 
         }
     }
     
-    let item_name = Mess::get(skill.name ).get_string().unwrap();
-    if item_name.len() != 0 { return format!("{} ({})", item_name, skill.iid.get_string().unwrap()); }
+    let item_name = Mess::get(skill.name ).to_string();
+    if item_name.len() != 0 { return format!("{} ({})", item_name, skill.iid.to_string()); }
     else {
-        return format!(" --- ({})", skill.iid.get_string().unwrap());
+        return format!(" --- ({})", skill.iid.to_string());
     }
 }
 
@@ -110,7 +110,7 @@ pub fn sid_array_string(sids: &Array<&Il2CppString> ) -> String {
     let mut n_print = 0;
     let mut out: String = "".to_string();
     for x in 0..n_skills {
-        let skill = SkillData::get(&sids[x as usize].get_string().unwrap());
+        let skill = SkillData::get(&sids[x as usize].to_string());
         if skill.is_none() { continue;  }
         if n_print == 0 { out = get_skill_name(skill.unwrap()); n_print += 1; }
         else { out = format!("{}, {}", out, get_skill_name(skill.unwrap())); n_print += 1; }
@@ -200,7 +200,7 @@ pub fn get_stats_for_emblem(rng: &Random) -> [i32; 4] {
     return out;
 }
 
-pub fn mess_get(value: &Il2CppString) -> String { return Mess::get(value).get_string().unwrap(); }
+pub fn mess_get(value: &Il2CppString) -> String { return Mess::get(value).to_string(); }
 
 pub fn get_random_number_for_seed() -> u32 {
     //Convet frame count to a random seed
@@ -235,36 +235,36 @@ pub fn get_weapon_mask_str(value: i32) -> String {
 }
 pub fn get_stat_label(index: usize) -> String {
     match index {
-        0 => { return Mess::get("MID_SYS_HP").get_string().unwrap();}
-        1 => { return Mess::get("MID_SYS_Str").get_string().unwrap();}
-        2 => { return Mess::get("MID_SYS_Tec").get_string().unwrap();}
-        3 => { return Mess::get("MID_SYS_Spd").get_string().unwrap();}
-        4 => { return Mess::get("MID_SYS_Lck").get_string().unwrap();}
-        5 => { return Mess::get("MID_SYS_Def").get_string().unwrap();}
-        6 => { return Mess::get("MID_SYS_Mag").get_string().unwrap();}
-        7 => { return Mess::get("MID_SYS_Res").get_string().unwrap();}
-        8 => { return Mess::get("MID_SYS_Phy").get_string().unwrap();}
-        9 => { return Mess::get("MID_SYS_Vis").get_string().unwrap();}
-        10 => { return Mess::get("MID_SYS_Mov").get_string().unwrap();}
-        11 => { return Mess::get("MID_SYS_Avo").get_string().unwrap(); }
-        12 => { return Mess::get("MID_SYS_Crit").get_string().unwrap();}
-        13 => { return Mess::get("MID_SYS_Hit").get_string().unwrap();}
-        14 => { return  Mess::get("MID_SYS_Mt").get_string().unwrap(); }
-        15 => { return Mess::get("MID_SYS_Secure").get_string().unwrap(); }
-        16 => { return Mess::get("MID_SYS_Weight").get_string().unwrap(); } 
+        0 => { return Mess::get("MID_SYS_HP").to_string();}
+        1 => { return Mess::get("MID_SYS_Str").to_string();}
+        2 => { return Mess::get("MID_SYS_Tec").to_string();}
+        3 => { return Mess::get("MID_SYS_Spd").to_string();}
+        4 => { return Mess::get("MID_SYS_Lck").to_string();}
+        5 => { return Mess::get("MID_SYS_Def").to_string();}
+        6 => { return Mess::get("MID_SYS_Mag").to_string();}
+        7 => { return Mess::get("MID_SYS_Res").to_string();}
+        8 => { return Mess::get("MID_SYS_Phy").to_string();}
+        9 => { return Mess::get("MID_SYS_Vis").to_string();}
+        10 => { return Mess::get("MID_SYS_Mov").to_string();}
+        11 => { return Mess::get("MID_SYS_Avo").to_string(); }
+        12 => { return Mess::get("MID_SYS_Crit").to_string();}
+        13 => { return Mess::get("MID_SYS_Hit").to_string();}
+        14 => { return  Mess::get("MID_SYS_Mt").to_string(); }
+        15 => { return Mess::get("MID_SYS_Secure").to_string(); }
+        16 => { return Mess::get("MID_SYS_Weight").to_string(); } 
         _ => { return "".to_string(); }
     }
 }
 
 pub fn get_person_growth_line(person: &PersonData) -> String {
-    let pid = person.pid.get_string().unwrap();
+    let pid = person.pid.to_string();
     let mut name = " -- ".to_string();
     if person.get_name().is_some() { name = get_person_name(person); }
     let grow = person.get_grow();
     return format!("{} ({})\t| {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% |", name, pid, 
-    Mess::get("MID_SYS_HP").get_string().unwrap(), grow[0], Mess::get("MID_SYS_Str").get_string().unwrap(), grow[1], Mess::get("MID_SYS_Mag").get_string().unwrap(), grow[6], 
-    Mess::get("MID_SYS_Tec").get_string().unwrap(), grow[2], Mess::get("MID_SYS_Spd").get_string().unwrap(), grow[3], Mess::get("MID_SYS_Lck").get_string().unwrap(), grow[4],
-    Mess::get("MID_SYS_Def").get_string().unwrap(), grow[5], Mess::get("MID_SYS_Res").get_string().unwrap(), grow[7], Mess::get("MID_SYS_Phy").get_string().unwrap(), grow[8]);
+    Mess::get("MID_SYS_HP").to_string(), grow[0], Mess::get("MID_SYS_Str").to_string(), grow[1], Mess::get("MID_SYS_Mag").to_string(), grow[6], 
+    Mess::get("MID_SYS_Tec").to_string(), grow[2], Mess::get("MID_SYS_Spd").to_string(), grow[3], Mess::get("MID_SYS_Lck").to_string(), grow[4],
+    Mess::get("MID_SYS_Def").to_string(), grow[5], Mess::get("MID_SYS_Res").to_string(), grow[7], Mess::get("MID_SYS_Phy").to_string(), grow[8]);
 }
 
 pub fn mov_1(address: usize){
@@ -299,15 +299,15 @@ pub fn is_valid_skill_index(index: i32 ) -> bool {
     if let Some(skill) = SkillData::try_index_get(index) {
         if SKILL_BLACK_LIST.lock().unwrap().iter().find(|x| **x ==  skill.parent.index).is_some() { return false; }
         if skill.help.is_none() { return false; }
-        else if  Mess::get( skill.name.unwrap() ).get_string().unwrap().len() == 0 { return false; }
+        else if  Mess::get( skill.name.unwrap() ).to_string().len() == 0 { return false; }
         if skill.name.is_none() { return false; }
-        else if Mess::get( skill.help.unwrap() ).get_string().unwrap().len() == 0 { return false; }
+        else if Mess::get( skill.help.unwrap() ).to_string().len() == 0 { return false; }
         if skill.is_style_skill() { return false; }
         return  skill.get_flag() & 511 == 0;
     }
     return false;
 }
-pub fn pid_to_mpid(pid: &String) -> String { return PersonData::get(&pid).unwrap().get_name().unwrap().get_string().unwrap(); }
+pub fn pid_to_mpid(pid: &String) -> String { return PersonData::get(&pid).unwrap().get_name().unwrap().to_string(); }
 
 pub fn clamp_value(v: i32, min: i32, max: i32) -> i32 {
     unsafe { clamp(v, min, max, None)  }
@@ -358,3 +358,6 @@ pub fn string_contains(this: &Il2CppString, value: &Il2CppString, method_info: O
 
 #[unity::from_offset("App", "UnitPool", "GetHero")]
 pub fn unit_pool_get_hero(replay :bool, method_info: OptionalMethod) -> Option<&'static Unit>;
+
+#[skyline::from_offset(0x01c80e30)]
+pub fn fnv_hash_string(name: &Il2CppString, method_info: OptionalMethod) -> i32;

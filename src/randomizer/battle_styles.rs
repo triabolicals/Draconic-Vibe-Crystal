@@ -101,26 +101,36 @@ pub fn randomize_job_styles(){
     match GameVariableManager::get_number("G_BattleStyles") {
         1 => {  // Random
             if !crate::utils::can_rand() { return; }
-            for x in 1..job_list.len() {
-                let style = crate::enums::STYLE_NAMES[ rng.get_value(8) as usize ];
-                job_list[x].style_name = style.into();
-                job_list[x].on_completed();
-            }
+            job_list.iter_mut()
+                .for_each(|job|{
+                    if job.parent.index > 0 {
+                        let style = crate::enums::STYLE_NAMES[ rng.get_value(8) as usize ];
+                        job.style_name = style.into();
+                        job.on_completed();
+                    }
+                }
+            );
         },
         2 => {  // None
-            for x in 1..job_list.len() {
-                job_list[x].style_name = "スタイル無し".into();
-                job_list[x].on_completed();
-            }
+            job_list.iter_mut()
+                .for_each(|job|{
+                    if job.parent.index > 0 {
+                        job.style_name = "スタイル無し".into();
+                        job.on_completed();
+                    }
+                }
+            );
         },
         0 => {  //Default
-            println!("Reseting Job Styles");
-            for x in 1..job_list.len() {
-                let index = BATTLE_STYLES_DEFAULT.lock().unwrap()[x];
-                if index < 0 || index >= 9 { continue; }
-                job_list[x].style_name = crate::enums::STYLE_NAMES[index as usize].into();
-                job_list[x].on_completed();
-            }
+            job_list.iter_mut()
+                .for_each(|job|{
+                    if job.parent.index > 0 {
+                        let index = BATTLE_STYLES_DEFAULT.lock().unwrap()[job.parent.index as usize];
+                        job.style_name = crate::enums::STYLE_NAMES[index as usize].into();
+                        job.on_completed();
+                    }
+                }
+            );
         },
         _ => {},
     }

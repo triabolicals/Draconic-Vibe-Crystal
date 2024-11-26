@@ -127,15 +127,14 @@ pub fn unit_status() {
     let dead_force = Force::get(ForceType::Dead).unwrap();
     let mut force_iter = Force::iter( dead_force  );
     while let Some(unit) = force_iter.next() {
-        if unit.person.pid.get_string().unwrap() == "PID_リュール" && has_emblem_lueur {
+        if unit.person.pid.to_string() == "PID_リュール" && has_emblem_lueur {
             let god_lueur = GodData::get("GID_リュール").unwrap();
             if god_lueur.get_flag().value & -2147483648 != 0 {
                 god_lueur.get_flag().value -= -2147483648;  //Alear is now an equippable ring due to death
             }
         }
     }
-
- }
+}
 // Generating the list of equipable emblems
 pub fn get_emblem_list() -> Vec<&'static str> {
     let mut result: Vec<&str> = Vec::new();
@@ -157,7 +156,7 @@ pub fn emblem_selection_menu_enable(enabled: bool) {
 
 pub fn get_emblem_paralogue_level() {
     if !crate::utils::can_rand() { return; }
-    let cid = GameUserData::get_chapter().get_prefixless_cid().get_string().unwrap();
+    let cid = GameUserData::get_chapter().get_prefixless_cid().to_string();
     GameVariableManager::make_entry("G_Paralogue_Level", 0);
 
     let e_index = EMBELM_PARA.iter().position(|&x| x == cid);
@@ -190,7 +189,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
 
     let absent_force = Force::get(ForceType::Absent).unwrap();
     let hero_unit = absent_force.get_hero_unit();
-    println!("Create Player Team Hook: Hero Unit: {}", hero_unit.person.get_name().unwrap().get_string().unwrap());
+    println!("Create Player Team Hook: Hero Unit: {}", hero_unit.person.get_name().unwrap().to_string());
     if GameVariableManager::get_number("G_DeploymentMode") == 3 {
         if GameUserData::get_status().value & 64 != 0 { GameUserData::get_status().value -= 64;  }  //Disables Continuous Flag 
     }
@@ -213,7 +212,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
     let absent_count = absent_force.get_count();
     let rng = Random::get_game();
 
-    if GameVariableManager::get_number("G_DeploymentMode") == 3 && !GameUserData::is_encount_map() && GameUserData::get_chapter().cid.get_string().unwrap() != "CID_M022" { 
+    if GameVariableManager::get_number("G_DeploymentMode") == 3 && !GameUserData::is_encount_map() && GameUserData::get_chapter().cid.to_string() != "CID_M022" { 
         if hero_unit.status.value & 20 != 0 { hero_unit.status.value -= 20; }
         if GameVariableManager::get_number("G_EmblemDeployMode")!= 0 {
             emblem_selection_menu_enable(false);
@@ -265,7 +264,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
                     mpid = unit.person.get_name().unwrap();
                 }
             }
-            println!("{} is deployed with rating of {}", mpid.get_string().unwrap(), capability_score);
+            println!("{} is deployed with rating of {}", mpid.to_string(), capability_score);
             let move_unit = unsafe { force_get_unit_from_pid(pid, false, None) };
             if move_unit.is_some() {
                 let unit = move_unit.unwrap();

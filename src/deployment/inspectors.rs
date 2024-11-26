@@ -37,7 +37,7 @@ pub fn change_g_pid_lueur() {
     if unsafe { crate::utils::is_null_empty(replacement_pid, None) } { return; }
     println!("Replacing Lueur with replacement"); 
     if crate::utils::str_contains(replacement_pid, "PID_") {
-        if replacement_pid.get_string().unwrap() != "PID_リュール" {
+        if replacement_pid.to_string() != "PID_リュール" {
             let dyn_value = unsafe { crate::message::dynvalue_new_string(replacement_pid, None) };
             crate::message::set_script_variable("g_pid_lueur", dyn_value);
             println!("Lueur PID was replaced for Chapter 22"); 
@@ -45,11 +45,14 @@ pub fn change_g_pid_lueur() {
     }
 }
 
+pub fn replace_lueur_chapter22() {
+    if GameUserData::get_chapter().cid.to_string() == "CID_M022" && GameUserData::get_sequence() == 3 {  change_g_pid_lueur(); }
+}
+
 pub fn adjust_map_inspectors() {
     println!("Adjust Map Inspectors");
-    if GameUserData::get_chapter().cid.get_string().unwrap() == "CID_M022" {
+    if GameUserData::get_chapter().cid.to_string() == "CID_M022" {
         GameVariableManager::make_entry("VeyleRecruitment", 0);
-
         // Change PID
         if GameVariableManager::get_number("G_Random_Recruitment") != 0 || crate::utils::lueur_on_map() { change_g_pid_lueur(); }
 

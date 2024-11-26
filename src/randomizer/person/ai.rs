@@ -6,18 +6,16 @@ static mut AISET: bool = false;
 
 pub fn adjust_dispos_person_ai(data: &mut DisposData) {
     if GameVariableManager::get_number("G_Random_Recruitment") == 0 { return; }
-
     if data.ai_action_value.is_some() {
-        let string = data.ai_action_value.unwrap().get_string().unwrap();
+        let string = data.ai_action_value.unwrap().to_string();
         let found = PIDS.iter().position(|x| *x == string);
         if found.is_some() {
-            let new_string = format!("G_R_{}", string);
-            let new_pid = GameVariableManager::get_string(&new_string);
+            let new_pid = GameVariableManager::get_string(format!("G_R_{}", string).as_str());
             data.ai_action_value = Some(new_pid);
         }
     }
     if data.ai_mind_value.is_some() {
-        let string = data.ai_mind_value.unwrap().get_string().unwrap();
+        let string = data.ai_mind_value.unwrap().to_string();
         let found = PIDS.iter().position(|x| *x == string);
         if found.is_some() {
             let new_string = format!("G_R_{}", string);
@@ -26,7 +24,7 @@ pub fn adjust_dispos_person_ai(data: &mut DisposData) {
         }
     }
     if data.ai_move_value.is_some() {
-        let string = data.ai_move_value.unwrap().get_string().unwrap();
+        let string = data.ai_move_value.unwrap().to_string();
         let found = PIDS.iter().position(|x| *x == string);
         if found.is_some() {
             let new_string = format!("G_R_{}", string);
@@ -35,9 +33,8 @@ pub fn adjust_dispos_person_ai(data: &mut DisposData) {
         }
     }
     if data.ai_attack_value.is_some() {
-        let string = data.ai_attack_value.unwrap().get_string().unwrap();
-        let found = PIDS.iter().position(|x| *x == string);
-        if found.is_some() {
+        let string = data.ai_attack_value.unwrap().to_string();
+        if let Some(found) = PIDS.iter().position(|x| *x == string){
             let new_string = format!("G_R_{}", string);
             let new_pid = GameVariableManager::get_string(&new_string);
             data.ai_attack_value = Some(new_pid);
@@ -57,12 +54,10 @@ pub fn engage_attack_ai(unit: &Unit, data:& mut DisposData) {
     unsafe { unit_set_dispos_ai(unit, data, None) };
 }
 
-
-
 pub fn adjust_unit_ai(unit: &Unit, data: &mut DisposData) {
     let job = unit.get_job();
-    let m022 = GameUserData::get_chapter().cid.get_string().unwrap() == "CID_M022";
-    let jid = job.jid.get_string().unwrap();
+    let m022 = GameUserData::get_chapter().cid.to_string() == "CID_M022";
+    let jid = job.jid.to_string();
     let old_ai_names: [&Il2CppString; 4] = [data.ai_action_name, data.ai_mind_name, data.ai_attack_name, data.ai_move_name];
     let old_ai_values: [Option<&Il2CppString>; 4] = [data.ai_action_value, data.ai_mind_value, data.ai_attack_value, data.ai_move_value];
     let not_ac_every_time = !utils::str_contains(data.ai_action_name, "AC_Everytime");
@@ -71,6 +66,7 @@ pub fn adjust_unit_ai(unit: &Unit, data: &mut DisposData) {
     if str_contains(old_ai_names[1], "Treasure") || str_contains(old_ai_names[3], "Treasure") {
         unit.private_skill.add_sid("SID_鍵開け", 10, 0); 
     }
+    if old_ai_names[3].contains("Retreat") { data.ai_move_name = "AI_MV_NearestEnemy".into(); }
     if jid == "JID_ダンサー" {
         data.ai_mind_name = "AI_MI_Irregular".into();
         if not_ac_every_time { data.ai_action_name = "AI_AC_AttackRange".into();  }
@@ -190,31 +186,31 @@ fn ai_data_ctor(this: &AIData, method_info: OptionalMethod);
 
 pub fn create_custom_ai() {
     if unsafe { AISET} { return; }
-    let ai_data_list = AIData::get_list_mut().unwrap();
-    for x in 0..ai_data_list.len() {
-        if str_contains(ai_data_list[x].array_name, "Engage") || str_contains(ai_data_list[x].array_name, "AI_AT") {
-            add_to_ai_data(ai_data_list[x], 0, 3, 52, -128, "V_Default", "V_Default", false); //Create Doubles
-            add_to_ai_data(ai_data_list[x], 0, 3, 120, -128, "V_Default", "V_Default", false); // Rally
-            add_to_ai_data(ai_data_list[x], 0, 3, 119, -128, "V_Default", "V_Default", false); // Contract
-            add_to_ai_data(ai_data_list[x], 0, 3, 117, -128, "V_Default", "V_Default", false); //Gambit
-            add_to_ai_data(ai_data_list[x], 0, 3, -3, -128, "2", "2", true); 
-            add_to_ai_data(ai_data_list[x], 0, 3, -3, -128, "V_Default", "V_Default", true); 
-            add_to_ai_data(ai_data_list[x], 0, 3, 50, -128, "V_0", "V_1", true); 
-            add_to_ai_data(ai_data_list[x], 0, 3, 50, -128, "V_Default", "V_Default", true); 
-            add_to_ai_data(ai_data_list[x], 0, 3, 21, -128, "V_0", "V_1", false); 
-            add_to_ai_data(ai_data_list[x], 0, 3, 110, -128, "V_Default", "V_Default", false); // Battle Command
-            continue;
+    AIData::get_list_mut().unwrap().iter_mut()
+        .for_each(|ai|{
+            if ai.array_name.contains("Engage") || ai.array_name.contains("AI_AT") {
+                add_to_ai_data(ai, 0, 3, 50, -128, "2", "2", true);  
+                 // Engage Attack
+                if ai.array_name.contains("Interference") || ai.array_name.contains("Rod") {
+                    add_to_ai_data(ai, 0, 3, 20, -128, "1", "1", false);    // Warp
+                    add_to_ai_data(ai, 0, 3, 23, -128, "1", "1", false);    // Rescue
+                    add_to_ai_data(ai, 0, 3, 108, -128, "V_Default", "V_Default", false);    // Rewrap
+                }
+                add_to_ai_data(ai, 0, 3, -12, -128, "V_Default", "V_Default", false);   // Let Fly  
+                add_to_ai_data(ai, 0, 3, -8, -128, "V_Default", "V_Default", false);  // Use Cannons
+                add_to_ai_data(ai, 0, 3, 110, -128, "V_Default", "V_Default", false); //Battle Commands
+                add_to_ai_data(ai, 0, 3, 117, -128, "V_Default", "V_Default", false);   // Gambit
+                add_to_ai_data(ai, 0, 3, 120, -128, "V_Default", "V_Default", false);   // Rally
+                add_to_ai_data(ai, 0, 3, 119, -128, "V_Default", "V_Default", false); // Contract
+                add_to_ai_data(ai, 0, 3, -6, -128, "V_Default", "V_Default", false);    // Dance
+                add_to_ai_data(ai, 0, 3, 52, -128, "V_Default", "V_Default", false); // Call Doubles
+                add_to_ai_data(ai, 0, 3, -5, -128, "0", "V_Default", false);    // Command
+                add_to_ai_data(ai, 0, 3, -5, -128, "1", "V_Default", false);    // Command
+                add_to_ai_data(ai, 0, 3, -3, -128, "V_Default", "V_Default", false); 
+                add_to_ai_data(ai, 0, 0, 0, -128, "V_Default", "V_Default", false);  
+            }
         }
-        add_to_ai_data(ai_data_list[x], 0, 3, -8, -128, "V_Default", "V_Default", false); //Use Siege Weapons
-        add_to_ai_data(ai_data_list[x], 0, 3, 117, -128, "V_Default", "V_Default", false); //Gambit
-        add_to_ai_data(ai_data_list[x], 0, 3, 119, -128, "V_Default", "V_Default", false); // Contract
-        add_to_ai_data(ai_data_list[x], -2, 3, 120, -128, "V_Default", "V_Default", false); // Rally
-        add_to_ai_data(ai_data_list[x], 0, 3, 52, -128, "V_Default", "V_Default", false); //Create Doubles
-        add_to_ai_data(ai_data_list[x], 0, 3, -5, -128, "0", "V_Default", false);// Command
-        add_to_ai_data(ai_data_list[x], 0, 3, -5, -128, "1", "V_Default", false); // Command
-        add_to_ai_data(ai_data_list[x], 0, 3, 110, -128, "V_Default", "V_Default", false); //Command
-        add_to_ai_data(ai_data_list[x], 0, 3, 23, -128, "1", "1", false); //Use Siege Weapons
-    }
+    );
     unsafe {  AISET = true; }
 
 }
@@ -232,6 +228,5 @@ fn add_to_ai_data(ai: &mut StructDataArrayList<AIData>, active: i8, code: i8, mi
     new_ai_data.str_value1 = str1.into();
     new_ai_data.str_value2 = str2.into();
     ai.insert(at_pos as i32, new_ai_data);
-    //println!("Added: Mind {} to {}", mind, ai.array_name.get_string().unwrap());
 }
 

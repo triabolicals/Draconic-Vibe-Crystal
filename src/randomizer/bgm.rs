@@ -36,13 +36,13 @@ pub fn get_bgm_pool() {
     for x in 6..music_list.len() {
         if crate::utils::str_contains(music_list[x].event_name, "BGM_Sys_ED") { continue; }
         if crate::utils::str_contains(music_list[x].event_name, "BGM_Sys") { 
-            BGM_POOL.lock().unwrap().push(music_list[x].event_name.get_string().unwrap());
+            BGM_POOL.lock().unwrap().push(music_list[x].event_name.to_string());
         }
         else if music_list[x].change_event_name.is_some() {
-            BGM_POOL.lock().unwrap().push(music_list[x].change_event_name.unwrap().get_string().unwrap());
+            BGM_POOL.lock().unwrap().push(music_list[x].change_event_name.unwrap().to_string());
         }
         else if x >= 68 && x <= 74 {
-            BGM_POOL.lock().unwrap().push(music_list[x].event_name.get_string().unwrap());
+            BGM_POOL.lock().unwrap().push(music_list[x].event_name.to_string());
         }
     }
     let chapter_list = ChapterData::get_list().unwrap();
@@ -60,11 +60,11 @@ pub fn get_bgm_pool() {
 fn get_music_event_index(bgm: Option<&Il2CppString>) -> i32 {
     if bgm.is_none() { return -1; }
     let music_list = MusicData::get_list().unwrap();
-    let compare = bgm.unwrap().get_string().unwrap();
+    let compare = bgm.unwrap().to_string();
 
     for x in 0..music_list.len() {
         if music_list[x].change_event_name.is_none() { continue; }
-        if music_list[x].change_event_name.unwrap().get_string().unwrap() == compare { return x as i32; }
+        if music_list[x].change_event_name.unwrap().to_string() == compare { return x as i32; }
     }
     return -1;
 }
@@ -127,7 +127,7 @@ pub fn change_bgm() {
             chapter_set_player_bgm(chapter, string1, None);
             field_bgm_play(0, None);
         }
-        println!("Bgm: {}", string1.get_string().unwrap());
+        println!("Bgm: {}", string1.to_string());
     }
     else {
         let music_list = MusicData::get_list().unwrap();
@@ -149,7 +149,8 @@ impl ConfigBasicMenuItemSwitchMethods for RandomBGMMod {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_map_bgm } 
-                    else { GameVariableManager::get_bool("G_RandomBGM") };
+            else { GameVariableManager::get_bool("G_RandomBGM") };
+            
         let result = ConfigBasicMenuItem::change_key_value_b(value);
         if value != result {
             if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_map_bgm = result; }

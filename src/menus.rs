@@ -1,12 +1,6 @@
 use unity::prelude::*;
 use engage::{
-    dialog::yesno::*,
-    menu::{*, BasicMenuResult, config::{ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItem, ConfigBasicMenuItemSwitchMethods}},
-    gamevariable::*,
-    gameuserdata::*,
-    proc::ProcInst,
-    pad::Pad,
-    util::get_instance,
+    dialog::yesno::*, gameuserdata::*, gamevariable::*, menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItemSwitchMethods}, BasicMenuResult, *}, pad::Pad, proc::ProcInst, random, util::get_instance
 };
 use crate::{deployment, randomizer, ironman, continuous, autolevel};
 use super::CONFIG;
@@ -79,16 +73,19 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalMenu {
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<deployment::DeploymentMod>("Deployment Mode"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<deployment::EmblemMod>("Emblem Deployment Mode"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<ironman::IronmanMod>("Ironman Mode"));
-                config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::names::RandomNameMods>("Random Character Names"));
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::names::RandomNameMods>("Random Emblem Names"));
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::names::GenericAppearance>("Random Generic Units Setting"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<autolevel::AutolevelMod>("Level Scale Units")); 
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::person::RandomPersonMod>("Unit Recruitment Order"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::RandomEmblemMod>("Emblem Recruitment Order"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::RandomJobMod>("Random Classes"));
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::RandomCC>("Random Reclassing"));
                 config_menu.add_item(randomizer::job::vibe_job_gauge());
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::grow::RandomGrowMod>("Random Growth Mode"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::battle_styles::RandomBattleStyles>("Randomize Class Types"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::interact::InteractionSettings>("Weapon Triangle Settings"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::RandomSkillMod>("Randomize Skills"));
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::RandomSkillCost>("Skill Inheritance SP Cost"));
                 config_menu.add_item(ConfigBasicMenuItem::new_gauge::<randomizer::skill::EnemySkillGauge>("Random Enemy Skill Rate"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::RandomItemMod>("Randomize Obtained Items"));
                 config_menu.add_item(ConfigBasicMenuItem::new_gauge::<randomizer::item::ItemPriceGauge>("Randomized Item Value"));
@@ -166,15 +163,13 @@ impl ConfigBasicMenuItemSwitchMethods for RandoSave {
         return BasicMenuResult::new();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = if CONFIG.lock().unwrap().apply_rando_post_new_game { "Apply disabled randomization settings on a previous save. (Some settings are excluded)." } 
+        this.help_text = if CONFIG.lock().unwrap().apply_rando_post_new_game { "Apply disabled randomization settings to saves." } 
             else { "No actions done to previous save files." }.into();
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.command_text = if CONFIG.lock().unwrap().apply_rando_post_new_game { "Enable" } else { "Disable" }.into();
     }
 }
-
-
 
 pub struct TriabolicalInGameMenu;
 impl ConfigBasicMenuItemCommandMethods for TriabolicalInGameMenu {
@@ -195,8 +190,13 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalInGameMenu {
                 config_menu.add_item(deployment::vibe_deployment());
                 config_menu.add_item(deployment::vibe_emblem_deployment());
                 config_menu.add_item(randomizer::assets::accessory::vibe_enemy_outfit());
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::assets::accessory::PlayerOutfits>("Player Battle Outfits Mode"));
                 config_menu.add_item(randomizer::assets::bust::vibe_bust());
+                config_menu.add_item(randomizer::names::vibe_generic());
+                config_menu.add_item(randomizer::grow::vibe_pgmode());
                 config_menu.add_item(autolevel::vibe_autolevel());
+                config_menu.add_item(autolevel::autobench());
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::RandomCC>("Random Reclassing"));
                 config_menu.add_item(randomizer::skill::vibe_skill_gauge());
                 config_menu.add_item(randomizer::job::vibe_job_gauge());
                 config_menu.add_item(randomizer::item::vibe_drops());
@@ -209,6 +209,7 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalInGameMenu {
                 config_menu.add_item(autolevel::vibe_enemy_emblem());
                 config_menu.add_item(autolevel::vibe_enemy_stones());
                 config_menu.add_item(randomizer::emblem::vibe_engage_links());
+                config_menu.add_item(randomizer::vibe_reseed());
                 BasicMenuResult::se_cursor()
             }   
             else { BasicMenuResult::new() }
@@ -252,5 +253,6 @@ pub fn install_vibe() {
     cobapi::install_global_game_setting(vibe_post_save);
     cobapi::install_global_game_setting(randomizer::person::vibe_custom_units);
     cobapi::install_global_game_setting(vibe); 
+    cobapi::install_global_game_setting(randomizer::vibe_seed);
     cobapi::install_game_setting(vibe2);
 }

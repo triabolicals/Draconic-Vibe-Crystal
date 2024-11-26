@@ -26,7 +26,7 @@ use super::*;
  impl Gamedata for TerrainData  {}
 
  pub fn is_tile_good(tid: &Il2CppString) -> bool{
-    let terrain = TerrainData::get(&tid.get_string().unwrap());
+    let terrain = TerrainData::get(&tid.to_string());
     if terrain.is_none() { false   }
     else { 
         let t = terrain.unwrap();
@@ -47,10 +47,9 @@ use super::*;
     let mut player_array = if is_encounter { 0 } else { -1 };
 
     for x in 0..dispos.len() {
-        if dispos[x].array_name.get_string().unwrap() == "Terrain" { continue; }
-        if dispos[x].array_name.get_string().unwrap() == "Player" { player_array = x as i32; }
-        if dispos[x].array_name.get_string().unwrap() == "Player0" { player_array = x as i32; }
-        let is_enemy = dispos[x].array_name.get_string().unwrap() == "Enemy" || is_encounter;
+        if dispos[x].array_name.to_string() == "Terrain" { continue; }
+        if dispos[x].array_name.contains("Player") { player_array = x as i32; }
+        let is_enemy = dispos[x].array_name.to_string() == "Enemy" || is_encounter;
         for y in 0..dispos[x].len() {
             if dispos[x][y].get_force() == 0 {
                 unit_pos.push( (dispos[x][y].dispos_x as i32, dispos[x][y].dispos_y as i32, 0) );
@@ -191,8 +190,8 @@ pub fn load_extra_deployment_slots() {
     let mut unit_pos: Vec<(i32, i32, i32)> = Vec::new();
     let mut player_array = -1;
     for x in 0..dispos.len() {
-        if dispos[x].array_name.get_string().unwrap() == "Player" { player_array = x as i32; }
-        if dispos[x].array_name.get_string().unwrap() == "Terrain" { continue; }
+        if dispos[x].array_name.to_string() == "Player" { player_array = x as i32; }
+        if dispos[x].array_name.to_string() == "Terrain" { continue; }
         for y in 0..dispos[x].len() {
             let force = dispos[x][y].get_force();
             if  force == 0 || force == 1 {
@@ -217,7 +216,7 @@ pub fn load_extra_deployment_slots() {
 }
 pub fn load_extras() -> Option<Vec<(i32, i32, i32)>> {
     let my_str = include_str!("DVC.fdp");
-    let cid = GameUserData::get_chapter().cid.get_string().unwrap();
+    let cid = GameUserData::get_chapter().cid.to_string();
     println!("Current Chapter: {}", cid);
     let mut read_slots = false;
     let mut out: Vec<(i32, i32, i32)> = Vec::new();

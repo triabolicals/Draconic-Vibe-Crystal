@@ -20,7 +20,7 @@ use crate::config::DeploymentConfig;
 use unity::prelude::OptionalMethod;
 use engage::proc::ProcInst;
 pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| DeploymentConfig::new().into() );
-pub const VERSION: &str = "2.7.0";
+pub const VERSION: &str = "2.8.7";
 
 #[skyline::from_offset(0x02285890)]
 pub fn autosave_proc_inst(this: &ProcInst, kind: i32, index: i32, stuff: Option<&ProcInst>, method_info: OptionalMethod);
@@ -52,7 +52,6 @@ pub fn set_personal_caps(){
         for y in 0..11 { personal_limits[y] = 0; } 
     }
 }
-
 extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
         match ev {
@@ -62,6 +61,8 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                     continuous::update_ignots();
                     continuous::continous_mode_post_battle_stuff(proc);
                     //deployment::engage_plus_remove_rings(); 
+                    randomizer::assets::accessory::clear_generic_acc();
+                    autolevel::autolevel_party();
                     randomizer::bgm::reset_bgm();
                 }
                 if proc.hashcode == -988690862 && *label == 0 { // On Initial Title Screen Load
@@ -92,7 +93,9 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                     randomizer::emblem::emblem_gmap_spot_adjust();
                     if engage::gamevariable::GameVariableManager::get_number("G_Random_Recruitment") != 0 { 
                         randomizer::person::change_map_dispos(); 
+                        deployment::inspectors::replace_lueur_chapter22();
                     }
+                    randomizer::assets::accessory::clear_generic_acc();
                 }
                 // New Game After Character Creation
                 if proc.hashcode == -1912552174 && *label == 28 { randomizer::start_new_game();  }
@@ -103,6 +106,7 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                     autolevel::calculate_player_cap(); 
                     continuous::update_bonds();
                     randomizer::bgm::randomize_bgm_map(); 
+                    randomizer::assets::accessory::clear_generic_acc();
                     unsafe { crate::enums::LUEUR_CHANGE = true; }
                 }
                 //if proc.hashcode == 1650205480
@@ -133,6 +137,8 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
 pub fn main() {
     let _ = std::fs::create_dir_all("sd:/Draconic Vibe Crystal/");
     cobapi::register_system_event_handler(initalize_random_persons);
+    CONFIG.lock().unwrap().debug = true; //false;
+    CONFIG.lock().unwrap().save();
     skyline::install_hooks!( 
         randomizer::job::add_job_list_unit, 
         randomizer::try_get_index, 
@@ -141,17 +147,22 @@ pub fn main() {
         randomizer::person::unit::unit_create_impl_2_hook, 
         randomizer::person::unit::create_from_dispos_hook,
         randomizer::assets::animation::asset_table_result_setup_hook,
-        randomizer::assets::asset_table_result_god_setup,
-        randomizer::assets::animation::asset_table_result_setup_person_hook,
+        randomizer::assets::emblem::asset_table_result_god_setup,
+        randomizer::assets::transform::asset_table_result_setup_person_hook,
+        randomizer::assets::transform::change_dragon,
         event::get_cmd_info_from_cmd_lines_hook,
         event::get_active_character_hook,
-        event::get_int_ptr,
         message::mess_get_impl_hook, 
         randomizer::person::get_unit_ascii_name,
         randomizer::person::get_bond_face,  
         randomizer::person::get_thumb_face,
         randomizer::person::get_god_face,
         randomizer::person::get_god_thumb_face,
+        randomizer::job::unit_grow_class_change,
+        randomizer::assets::emblem::asset_table_result_get_preset_name,
+        //get_file_count,
+        event::talk_ptr,
+        event::calculate_str_width,
     ); 
     // Fixes the emblem weapons arena issue
     Patch::in_text(0x01ca9afc).nop().unwrap();
@@ -159,6 +170,15 @@ pub fn main() {
     Patch::in_text(0x02677308).bytes(&[0x1f, 0x15, 0x00,0x71]).unwrap();
     Patch::in_text(0x01e40d7c).bytes(&[0x3F,0x0d,0x00,0x71]).unwrap();
     Patch::in_text(0x01e40f0c).bytes(&[0x3F,0x0d,0x00,0x71]).unwrap();
+
+    // FX-Related
+    Patch::in_text(0x01c79694).nop().unwrap();
+    Patch::in_text(0x01c79740).nop().unwrap();
+    Patch::in_text(0x01c796f0).nop().unwrap();
+
+    // Patch::in_text(0x0228151c).bytes(&[0xEA, 0x01, 0x80, 0x52]).unwrap();
+    // Patch::in_text(0x02281fb8).bytes(&[0xe8, 0x01, 0x80, 0x52]).unwrap();
+
     menus::install_vibe();
     disable_support_restriction();
     remove_skill_equip_restrictions();

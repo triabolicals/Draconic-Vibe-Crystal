@@ -49,7 +49,7 @@ pub fn do_continious_mode() {
         let current_chapter = GameUserData::get_chapter();
         let flag = current_chapter.get_flag();
         let current_chapter = GameUserData::get_chapter();
-        let current_cid = current_chapter.cid.get_string().unwrap();
+        let current_cid = current_chapter.cid.to_string();
         if current_cid == "CID_G006" { current_chapter.set_next_chapter("CID_M010"); }
         let mut new_flag = flag;
         if flag & 16 != 0 { new_flag -= 16; }   // hub  disable
@@ -76,7 +76,7 @@ pub fn do_continious_mode() {
 
 pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
     if GameVariableManager::get_number("G_Continuous") == 0 { return; }
-    if GameUserData::get_chapter().cid.get_string().unwrap() == "CID_M026" { return; }
+    if GameUserData::get_chapter().cid.to_string() == "CID_M026" { return; }
     if GameVariableManager::get_bool("G_Cleared_M026") { return; }
     let chapter = GameUserData::get_chapter();
     let flag = chapter.get_flag();
@@ -108,7 +108,7 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
             for ff in force_type {
                 let force_iter = Force::iter(Force::get(ff).unwrap());
                 for unit in force_iter {
-                    if unit.person.pid.get_string().unwrap() == "PID_残像" { continue; }    // Lyn doubles are a no-no
+                    if unit.person.pid.to_string() == "PID_残像" { continue; }    // Lyn doubles are a no-no
                     if unit.level == unit.job.max_level { 
                         unit.add_sp(base_exp_gain);
                         continue; 
@@ -127,7 +127,7 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
                     }
                 }
                 base_exp_gain = clamp_value(base_exp_gain * 5 / 3 , base_exp_gain, 100);
-                level_cap -= 6; 
+                level_cap -= 5; 
                 if base_exp_gain == 0 { break; }
             }
             // Heroes DLC
@@ -141,7 +141,7 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
                 GameVariableManager::make_entry("G_拠点_コンテンツ報酬受け取り済", 1);
                 GameVariableManager::set_bool("G_拠点_コンテンツ報酬受け取り済", true);
             }
-            if GameUserData::get_chapter().cid.get_string().unwrap() == "CID_S015" {
+            if GameUserData::get_chapter().cid.to_string() == "CID_S015" {
                 GameVariableManager::make_entry("G_所持_IID_約束の指輪", 40);
                 GameVariableManager::set_number("G_所持_IID_約束の指輪", 40);
             }
@@ -155,7 +155,7 @@ fn generate_item_list(proc: &ProcInst) -> &'static mut List<ItemData> {
     unsafe { 
         set_well_use_flag(2, None);
         let current_chapter = GameUserData::get_chapter();
-        let current_cid = current_chapter.cid.get_string().unwrap(); 
+        let current_cid = current_chapter.cid.to_string(); 
         let seed = Random::get_system().value() as u32;
         let random = Random::instantiate().unwrap();
         random.ctor(seed);
@@ -167,7 +167,7 @@ fn generate_item_list(proc: &ProcInst) -> &'static mut List<ItemData> {
                     let n_items = dlc_items.len();
                     for x in 0..n_items {
                         let item = dlc_items[x].iid;
-                        patch_items.add(ItemData::get_mut(&item.get_string().unwrap()).unwrap());
+                        patch_items.add(ItemData::get_mut(&item.to_string()).unwrap());
                     } 
                 }
                 return patch_items;
@@ -178,7 +178,7 @@ fn generate_item_list(proc: &ProcInst) -> &'static mut List<ItemData> {
                     let dlc_items = calc_rewards("DLC購入特典1".into(), None);
                     for x in 0..dlc_items.len() {
                         let item = dlc_items[x].iid;
-                        patch_items.add(ItemData::get_mut(&item.get_string().unwrap()).unwrap());
+                        patch_items.add(ItemData::get_mut(&item.to_string()).unwrap());
                     } 
                 }
                 return patch_items;
@@ -225,7 +225,7 @@ fn set_next_chapter() {
     if !GameVariableManager::get_bool("G_Cleared_M004") { return; }
     emblem::emblem_gmap_spot_adjust();
     let current_chapter = GameUserData::get_chapter();
-    let current_cid = current_chapter.cid.get_string().unwrap();
+    let current_cid = current_chapter.cid.to_string();
     if current_cid == "CID_M005" { current_chapter.set_next_chapter("CID_S001"); }
     if current_cid == "CID_S001" { current_chapter.set_next_chapter("CID_M006"); }
     let dlc = continuous_mode_dlc_allowed();
@@ -246,7 +246,7 @@ fn set_next_chapter() {
     }
     if dlc && !GameVariableManager::get_bool("G_Cleared_G006") {    // Divine Paralogue order with DLC
         if current_cid == "CID_G001" { current_chapter.set_next_chapter("CID_S002"); }
-        if current_cid == "CID_S002" { current_chapter.set_next_chapter("CID_G002");  }
+        if current_cid == "CID_S002" { current_chapter.set_next_chapter("CID_G002"); }
         if current_cid == "CID_G002" { current_chapter.set_next_chapter("CID_M007"); }
         if current_cid == "CID_M007" { current_chapter.set_next_chapter("CID_G003"); }
         if current_cid == "CID_G003" { current_chapter.set_next_chapter("CID_M008"); }
@@ -266,13 +266,13 @@ fn set_next_chapter() {
         let mut chapter_index = 0;
         for x in 29..42 {
             let paralogue = &chapter_list[x];
-            if paralogue.cid.get_string().unwrap() == current_cid { continue; }
-            if GameVariableManager::get_bool(&paralogue.get_cleared_flag_name().get_string().unwrap()) { continue; }    // already completed
+            if paralogue.cid.to_string() == current_cid { continue; }
+            if GameVariableManager::get_bool(&paralogue.get_cleared_flag_name().to_string()) { continue; }    // already completed
             let paralogue_level = paralogue.get_recommended_level();
             // If map to unlock is divine paralogue and the map required to unlock is cleared
-            //println!("{} level: {} and {} level: {}", paralogue.cid.get_string().unwrap(), paralogue_level, current_cid, rec_level );
+            //println!("{} level: {} and {} level: {}", paralogue.cid.to_string(), paralogue_level, current_cid, rec_level );
             if crate::utils::str_contains(paralogue.get_gmap_open_condition(), "G00") || 
-               GameVariableManager::get_bool(&format!("G_Cleared_{}", paralogue.get_gmap_open_condition().get_string().unwrap())) {
+               GameVariableManager::get_bool(&format!("G_Cleared_{}", paralogue.get_gmap_open_condition().to_string())) {
                 if paralogue_level < rec_level {
                     if paralogue_level < min_rec_level {
                         min_rec_level = paralogue_level;
@@ -283,17 +283,17 @@ fn set_next_chapter() {
         }
         if chapter_index > 0 {
             let paralogue = &chapter_list[chapter_index as usize];
-            current_chapter.set_next_chapter(&paralogue.cid.get_string().unwrap());
-            //println!("New Chapter Paralogue: {} at level {}", paralogue.cid.get_string().unwrap(), paralogue.get_recommended_level());
+            current_chapter.set_next_chapter(&paralogue.cid.to_string());
+            //println!("New Chapter Paralogue: {} at level {}", paralogue.cid.to_string(), paralogue.get_recommended_level());
             return;
         }
         // main chapter
         for x in 16..28 {
             let main = &chapter_list[x];
-            if main.cid.get_string().unwrap() == current_cid { continue; }
-            if GameVariableManager::get_bool(&main.get_cleared_flag_name().get_string().unwrap()) { continue; }
-            current_chapter.set_next_chapter(&main.cid.get_string().unwrap());
-            //println!("New Chapter {} (main)", main.cid.get_string().unwrap());
+            if main.cid.to_string() == current_cid { continue; }
+            if GameVariableManager::get_bool(&main.get_cleared_flag_name().to_string()) { continue; }
+            current_chapter.set_next_chapter(&main.cid.to_string());
+            //println!("New Chapter {} (main)", main.cid.to_string());
             return;
         }
     }
@@ -445,12 +445,12 @@ fn add_ring(ring_id: &Il2CppString) { unsafe { add_ring_to_pool(ring_id, None, 1
 
 fn do_dlc() {
     if !continuous_mode_dlc_allowed() { return; }
-    let current_cid = GameUserData::get_chapter().cid.get_string().unwrap();
+    let current_cid = GameUserData::get_chapter().cid.to_string();
     if current_cid == "CID_M006" {
         let god;
         if GameVariableManager::get_number("G_Emblem_Mode") != 1 { god = GodData::get("GID_エーデルガルト").unwrap(); }
         else {
-            let gid = GameVariableManager::get_string("G_R_GID_エーデルガルト").get_string().unwrap(); 
+            let gid = GameVariableManager::get_string("G_R_GID_エーデルガルト").to_string(); 
             god = GodData::get(&gid).unwrap();
         }
         unsafe { godpool_create(god, None); }
@@ -463,7 +463,7 @@ fn do_dlc() {
         let persons = ["PID_エル", "PID_ラファール", "PID_セレスティア", "PID_グレゴリー", "PID_マデリーン"];
         for x in persons {
             if GameVariableManager::get_bool("G_Random_Recruitment") {
-                let new_person = GameVariableManager::get_string(&format!("G_R_{}", x)).get_string().unwrap();
+                let new_person = GameVariableManager::get_string(&format!("G_R_{}", x)).to_string();
                 let person_data = PersonData::get(&new_person).unwrap();
                 GameVariableManager::make_entry("MapRecruit", 1);
                 GameVariableManager::set_bool("MapRecruit", true);
@@ -505,10 +505,10 @@ pub fn get_number_main_chapters_completed2() -> i32 {
 }
 fn get_recommended_level_main() -> u8 {
     let chapters = ChapterData::get_list_mut().expect(":D");
-    let current_cid = GameUserData::get_chapter().cid.get_string().unwrap();
+    let current_cid = GameUserData::get_chapter().cid.to_string();
     if current_cid == "CID_M026" { return 0; }
     for x in 1..27 {
-        if chapters[x].cid.get_string().unwrap() == current_cid { continue; }
+        if chapters[x].cid.to_string() == current_cid { continue; }
         if !GameUserData::is_chapter_completed(chapters[x]) {  return chapters[x].get_recommended_level();  }
     }
     return  GameUserData::get_chapter().get_recommended_level();
@@ -520,12 +520,10 @@ pub fn add_support_points() {
     for x in 0..unit_list.len() {
         let unit_a = &unit_list[x];
         let is_a_deployed = unit_a.force.unwrap().force_type == 0;
-        let is_lueur = unit_a.person.pid.get_string().unwrap() == "PID_リュール";
+        let is_lueur = unit_a.person.pid.to_string() == "PID_リュール";
         for y in x+1..unit_list.len(){
             let unit_b = &unit_list[y];
-            let reliance = unsafe { unit_reliance_try_get(unit_a, unit_b, None) };
-            if reliance.is_some() {
-                let reliance_data = reliance.unwrap();
+            if let Some(reliance_data) = unsafe { unit_reliance_try_get(unit_a, unit_b, None) } {
                 let is_b_deployed = unit_b.force.unwrap().force_type == 0;
                 let exp_needed = unsafe { unit_get_exp_next_level(reliance_data, reliance_data.level, None) };
                 if exp_needed != 100 && exp_needed != 0 { reliance_data.exp += 1 + (is_a_deployed || is_b_deployed) as i8 + is_lueur as i8; }
@@ -539,10 +537,10 @@ impl ConfigBasicMenuItemSwitchMethods for ContiniousMode {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let result;
-        if dlc_check() { result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().continuous, 0, 2, 1); }
-        else { result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().continuous, 0, 1, 1); }
+        if dlc_check() { result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().continuous, 0, 3, 1); }
+        else { result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().continuous, 0, 2, 1); }
         if CONFIG.lock().unwrap().continuous != result {
-            CONFIG.lock().unwrap().continuous  = result;
+            CONFIG.lock().unwrap().continuous = result;
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -550,26 +548,32 @@ impl ConfigBasicMenuItemSwitchMethods for ContiniousMode {
         } else {return BasicMenuResult::new(); }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if dlc_check() {
-            if CONFIG.lock().unwrap().continuous == 1 {  this.help_text = "Game will progress from map to map.".into(); }
-            else if CONFIG.lock().unwrap().continuous == 2 {  this.help_text = "Game will progress from map to map without DLC.".into(); }
-            else { this.help_text = "Game will progress with access to the Somniel and World Map".into(); }
+        let mode = CONFIG.lock().unwrap().continuous;
+        this.help_text = if dlc_check() {
+            if mode == 1 {  "Game will progress map to map."}
+            else if mode == 2 {  "Game will progress map to map without DLC." }
+            else if mode == 3 { "Game will progress map to map in random order."}
+            else {"Game will progress with access to the Somniel and World Map" }
         }
         else {
-            if CONFIG.lock().unwrap().continuous == 1 {  this.help_text = "Game will progress from map to map.".into(); }
-            else { this.help_text = "Game will progress with access to the Somniel and World Map".into(); }
-        }
+            if mode == 1 { "Game will progress map to map." }
+            else if mode == 2 { "Game will progress map to map in random order."}
+            else { "Game will progress with access to the Somniel and World Map" }
+        }.into();
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if dlc_check() {
-            if CONFIG.lock().unwrap().continuous == 1 { this.command_text = "Enabled".into(); }
-            else if CONFIG.lock().unwrap().continuous == 2 { this.command_text = "Enabled w/o DLC".into(); }
-            else { this.command_text = "Disabled".into(); }
+        let mode = CONFIG.lock().unwrap().continuous;
+        this.command_text =  if dlc_check() {
+            if mode == 1 { "Enabled" }
+            else if mode == 2 { "Enabled w/o DLC" }
+            else if mode == 3 { "Random" }
+            else { "Disabled" }
         }
         else {
-            if CONFIG.lock().unwrap().continuous == 1 { this.command_text = "Enabled".into(); }
-            else { this.command_text = "Disabled".into(); }
-        }
+            if mode == 1 { "Enabled" }
+            else if mode == 2 { "Random" }
+            else { "Disabled" }
+        }.into();
     }
 }
 

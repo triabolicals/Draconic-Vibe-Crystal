@@ -161,7 +161,7 @@ pub fn get_style_interact_default_values() {
     for x in 1..200 { if super::battle_styles::BATTLE_STYLES_DEFAULT.lock().unwrap()[x] > 0 { return; }  } // already set
     let job_list = JobData::get_list_mut().unwrap();
     for x in 1..job_list.len() {
-        let style_name = job_list[x].style_name.get_string().unwrap();
+        let style_name = job_list[x].style_name.to_string();
         let pos = crate::enums::STYLE_NAMES.iter().position(|&x| x == style_name);
         if pos.is_some() { super::battle_styles::BATTLE_STYLES_DEFAULT.lock().unwrap()[x] = pos.unwrap() as i32; }
         else { super::battle_styles::BATTLE_STYLES_DEFAULT.lock().unwrap()[x] = -1; }

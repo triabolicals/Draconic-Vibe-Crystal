@@ -1,3 +1,4 @@
+use enums::RINGS;
 use utils::str_contains;
 use std::sync::Mutex;
 use super::*;
@@ -33,7 +34,18 @@ pub struct WeaponData {
     pub is_rare: bool,
     pub is_effective: bool,
 }
-
+pub struct DragonStoneData {
+    pub item_index: i32,
+    pub is_enemy_only: bool,
+}
+impl DragonStoneData {
+    pub fn new(item: &ItemData) -> Self {
+        Self {
+            item_index: item.parent.index,
+            is_enemy_only: item.flag.value & 2 != 0,
+        }
+    }
+}
 impl WeaponData {
     pub fn new(item: &ItemData) -> Self {
         let flags = item.get_flag().value;
@@ -145,7 +157,7 @@ impl StaffData {
                 avail[3] = true;
                 avail[4] = true;
             },
-            9|10 => {  // Freeze
+            9|10 => {  // Rewarp /Freeze
                 staff_kind = 2;
                 avail[1] = true;
                 avail[2] = true;
@@ -157,7 +169,7 @@ impl StaffData {
                 avail[3] = true;
                 avail[4] = true;
             },
-            29 => { // Fracture
+            8|29 => { // Fracture
                 staff_kind = 2;
                 avail[0] = true;
                 avail[1] = true;
@@ -187,7 +199,7 @@ pub struct WeaponDatabase {
     pub weapon_list: Vec<WeaponData>,
     pub bullet_list: Vec<WeaponData>,
     pub staff_list: Vec<StaffData>,
-    pub dragonstones: Vec<i32>,
+    pub dragonstones: Vec<DragonStoneData>,
     intialize: bool, 
 }
 
@@ -205,28 +217,24 @@ impl WeaponDatabase {
         println!("Total of {} staffs in the database.", self.staff_list.len());
         println!("Total of {} dragonstones in database", self.dragonstones.len());
     }
-
     pub fn try_add_weapon(&mut self, item: &ItemData) {
         if is_generic(item) { self.generic_weapons.push(WeaponData::new(item)); }
         if item.kind == 7 { //Staff
             self.staff_list.push(StaffData::new(item));
             return;
         }
-        if str_contains(item.name, "MIID_Bullet") {
-            self.bullet_list.push(WeaponData::new(item));
-            return;
-        }
         else if item.kind < 9 {
             let flag = item.flag.value;
-            if item.kind < 5 && flag & 65536 != 0 { self.magic_weapons.push(WeaponData::new(item)); }
+            if item.kind != 6 && flag & 65536 != 0 { self.magic_weapons.push(WeaponData::new(item)); }
             self.weapon_list.push(WeaponData::new(item));
         }
         else if item.kind == 9 {
             let icon = item.icon.unwrap();
-            if let Some(equip) = item.equip_condition {
-                if equip.get_string().unwrap() == "SID_竜石装備" && !str_contains(icon, "Sombre") {
-                    self.dragonstones.push(item.parent.index);
-                }
+            if item.flag.value & 67108864 != 0 && !str_contains(icon, "Sombre") {
+                self.dragonstones.push(DragonStoneData::new(item)); 
+            }
+            else if item.flag.value & 134217728 != 0 { //Bullets
+                self.bullet_list.push(WeaponData::new(item));
             }
         }
     }
@@ -243,20 +251,19 @@ impl WeaponDatabase {
                 x.rank >= min_rank
             ).collect();
             if possible_weapons.len() == 0 { return None;   }
-            println!("Weapons of Type: {} = {}", new_type, possible_weapons.len());
             let rng = Random::get_system();
-            let mut index;
             let selection = rng.get_value(possible_weapons.len() as i32) as usize;
-            index = possible_weapons[selection].item_index;
+            let index = possible_weapons[selection].item_index;
             return ItemData::try_index_get(index);
         }
         return None;
     }
 
     pub fn get_generic_weapon(&self, new_type: i32, rank: i32) -> Option<&'static ItemData> {
+        let kind = new_type;
         let possible_weapons: Vec<&WeaponData> = self.generic_weapons.iter().filter(|&x|
             x.rank == rank as u8 && 
-            x.weapon_type == new_type as u8).collect();
+            x.weapon_type == kind as u8).collect();
 
         if possible_weapons.len() == 1 {
             return ItemData::try_index_get(possible_weapons[0].item_index);
@@ -321,15 +328,16 @@ impl WeaponDatabase {
         }
         else { return None; }
     }
-    pub fn get_dragon_stone(&self) -> Option<&'static ItemData> {
-        if self.dragonstones.len() == 0 { return None; }
+    pub fn get_dragon_stone(&self, is_enemy: bool) -> Option<&'static ItemData> {
+        let possible_weapons: Vec<&DragonStoneData> = self.dragonstones.iter().filter(|&x|  if x.is_enemy_only { is_enemy } else { true } ).collect();
+        if possible_weapons.len() == 0 { return None; }
         let rng = Random::get_system();
-        let selection = rng.get_value(self.dragonstones.len() as i32) as usize;
-        return ItemData::try_index_get(self.dragonstones[selection]);
+        let selection = rng.get_value(possible_weapons.len() as i32) as usize;
+        return ItemData::try_index_get( possible_weapons[selection].item_index);
     }
 
     pub fn get_random_weapon(&self, kind: i32) -> Option<&'static ItemData> {
-        let weapon = ( kind - 1 ) as u8;
+        let weapon = kind  as u8;
         let possible_weapons: Vec<&WeaponData>  = self.weapon_list.iter().filter(|x| x.weapon_type == weapon).collect();
         if possible_weapons.len() == 0 {
             return None;
@@ -345,20 +353,15 @@ impl WeaponDatabase {
 
 
 pub fn is_generic(item: &ItemData) -> bool {
-    let iid = item.iid;
-    // check if Slim/Iron/Steel/
-    if item.kind == 6 {
-        return str_contains(iid, "IID_ファイアー") || str_contains(iid, "IID_エルファイアー") || str_contains(iid, "IID_ボルガノン");
-    }
-    return str_contains(iid, "IID_ほそみの") || str_contains(iid, "IID_鉄の") || str_contains(iid, "IID_鋼の") || str_contains(iid, "IID_銀の") || str_contains(iid, "IID_勇者の");
+    let iid = item.iid.to_string();
+    return super::unit_items::STANDARD_WEPS.iter().any(|&iid2| iid2 == iid.as_str());
 }
 pub fn is_vaild_weapon(item: &ItemData) -> bool {
-    if item.iid.get_string().unwrap() == "IID_メティオ" { return false; }
+    if item.iid.to_string() == "IID_メティオ" { return false; }
     if !item.is_weapon() && item.kind != 7 { return false; }
     if item.icon.is_none() { return false; }
     if item.kind == 0 || item.kind > 9 { return false; }
-    let flags = item.get_flag().value;
-    if flags & 128 != 0  { return false; }
+    if item.flag.value & 128 != 0  { return false; }
     return enums::ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == item.parent.index).is_none();
 }
 

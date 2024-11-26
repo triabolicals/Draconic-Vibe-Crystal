@@ -1,3 +1,5 @@
+use data::AccessoryAssets;
+use concat_string::concat_string;
 use unity::prelude::*;
 use engage::{
     dialog::yesno::*,
@@ -10,12 +12,15 @@ use engage::{
     gamedata::{unit::*, skill::*,},
 };
 use super::names::EMBLEM_NAMES;
+use std::{fs, fs::File, io::Write};
 
 pub mod accessory;
+pub mod data;
 pub mod animation;
 pub mod bust;
-
-use crate::CONFIG;
+pub mod emblem;
+pub mod transform;
+use crate::{utils::str_contains, CONFIG};
 use unity::system::List;
 use crate::enums::*;
 static mut ASSET_SIZE: usize = 0;
@@ -39,9 +44,8 @@ impl AccessoryList {
         if index < 0 || index > 7 { return 0; }
         if self.n_entries[ index as usize ] == 0 { return 0; }
         let position = rng.get_value( self.n_entries[ index as usize]);
-        let found = self.list.iter().find(|&x| x.1 == index && x.2 == position);
-        if found.is_none() { 0 }
-        else { found.unwrap().0 }
+        if let Some(found) = self.list.iter().find(|&x| x.1 == index && x.2 == position) { found.0 } 
+        else { 0 }
     }
 }
 
@@ -51,6 +55,7 @@ pub struct AssetData {
     pub male: AccessoryList,
     pub female: AccessoryList,
     pub bust_values: Vec<(i32, f32)>,  
+    pub assets: Vec<AccessoryAssets>, 
 }
 
 pub static ASSET_DATA: Mutex<AssetData> = Mutex::new(
@@ -58,6 +63,7 @@ pub static ASSET_DATA: Mutex<AssetData> = Mutex::new(
         male: AccessoryList { list: Vec::new(), n_entries: [0; 8] },
         female: AccessoryList { list: Vec::new(), n_entries: [0; 8] },
         bust_values: Vec::new(),
+        assets: Vec::new(),
     }
 );
 
@@ -73,22 +79,51 @@ impl AssetData {
             _ => {},
         }
     }
+    pub fn add_asset_data(&mut self, line: String) {
+        let list = AccessoryData::get_list().unwrap();
+        let args: Vec<_> = line.split_whitespace().collect();
+        let aid = concat_string!("AID_", args[0]);
+        if let Some(acc) = list.iter().find(|&x| str_contains(&x.aid, aid.as_str())) {
+            let index = acc.parent.index;
+            let gen = args[1].parse::<i32>().unwrap();
+            let gstr = if gen == 1 { "M" } else if gen == 2 {"F"} else { "X" };
+            if acc.mask == 1 {
+                let asset = if index < 43 { concat_string!("uBody_Wear", gstr, "_", args[2]) }
+                else { concat_string!("uBody_", args[2], "_c000") };
+                println!("AID {}: {}", index, asset);
+                self.assets.push(AccessoryAssets::new(index, gen, asset, false));
+                if gen == 1 {
+                    let entry_index = self.male.n_entries[0];
+                    self.male.n_entries[0] = entry_index + 1;
+                    self.male.list.push((index, 0, entry_index));
+                }
+                else {
+                    let entry_index = self.female.n_entries[0];
+                    self.female.n_entries[0] = entry_index + 1;
+                    self.female.list.push((index, 0, entry_index));
+                }
+            }
+            else {
+                self.assets.push(AccessoryAssets::new(index, gen, args[2].to_string(), true));
+            }
+        }
+    }
+
+
+
+
     pub fn apply_bust_changes(&self) {
         if CONFIG.lock().unwrap().misc_option_1 <= 0.4 { self.reset_busts(); }
         else { self.set_busts(); }
     }
     pub fn reset_busts(&self) {
         let static_fields = &mut Il2CppClass::from_name("App", "AssetTable").unwrap().get_static_fields_mut::<AssetTableStaticFields>().search_lists[2];
-        for x in &self.bust_values {
-            static_fields[x.0 as usize].scale_stuff[11] = x.1;
-        }
+        self.bust_values.iter().for_each(|x|static_fields[x.0 as usize].scale_stuff[11] = x.1);
     }
     pub fn set_busts(&self) {
         let value = CONFIG.lock().unwrap().misc_option_1;
         let static_fields = &mut Il2CppClass::from_name("App", "AssetTable").unwrap().get_static_fields_mut::<AssetTableStaticFields>().search_lists[2];
-        for x in &self.bust_values {
-            static_fields[x.0 as usize].scale_stuff[11] = value;
-        }
+        self.bust_values.iter().for_each(|x| static_fields[x.0 as usize].scale_stuff[11] = value );
     }
 }
 
@@ -98,7 +133,7 @@ pub struct AssetTable {
     pub preset_name: Option<&'static Il2CppString>,
     pub mode: i32,
     __: i32,
-    pub conditions: Option<&'static mut Array<&'static Il2CppString>>,
+    pub conditions: Option<&'static mut Array<&'static mut Il2CppString>>,
     pub body_model: Option<&'static Il2CppString>,
     pub dress_model: Option<&'static Il2CppString>,
     pub head_model: Option<&'static Il2CppString>,
@@ -139,7 +174,7 @@ pub struct AssetTable {
     pub mask_color_025_r: u8,
     pub mask_color_025_g: u8,
     pub mask_color_025_b: u8,
-    unity_colors: [u64; 16],
+    pub unity_colors: [UnityColor; 8],
     pub accessories: [&'static mut AssetTableAccessory; 8],
     pub accessory_list: &'static List<AssetTableAccessory>,
     pub scale_stuff: [f32; 19], 
@@ -150,13 +185,48 @@ pub struct AssetTable {
     pub comment: Option<&'static Il2CppString>,
     //ConditionIndexes
 }
+#[unity::class("App", "AsssetTable.ConditionFlags")]
+pub struct AssetTableConditionFlags {}
+
 impl Gamedata for AssetTable {}
+#[repr(C)]
 pub struct AssetTableStaticFields { 
     preset_name: &'static List<Il2CppString>,
     pub search_lists: &'static mut Array<&'static mut List<AssetTable>>,
+    condition_indexes: *const u8,
+    pub condition_flags: &'static AssetTableConditionFlags,
+
 }
 
+impl AssetTableConditionFlags {
+    pub fn add_by_key<'a>(&self, key: impl Into<&'a Il2CppString>) {
+        unsafe { condition_add_by_key(self, key.into(), None);}
+    }
+    pub fn add_unit(&self, unit: &Unit ) {
+        unsafe { condition_add_unit(self, unit, None);}
+    }
 
+}
+#[derive(Clone, Copy)]
+pub struct UnityColor {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+impl UnityColor {
+    pub fn set(&mut self, r: f32, g: f32, b: f32) {
+        self.r = r;
+        self.g = g;
+        self.b = b;
+    }
+}
+
+pub struct AssetTableSound {
+    pub voice: Option<&'static Il2CppString>,
+    pub footstep: Option<&'static Il2CppString>,
+    pub material: Option<&'static Il2CppString>,
+}
 #[unity::class("App", "AssetTable.Result")]
 pub struct AssetTableResult {
     pub pid: &'static Il2CppString,
@@ -171,11 +241,22 @@ pub struct AssetTableResult {
     pub right_hand: &'static Il2CppString,
     pub trail: &'static Il2CppString,
     pub magic: &'static Il2CppString,
-    pub body_anim: &'static Il2CppString, 
-    pub ride_anim: &'static Il2CppString,
-    unity_colors: [u64; 16],
+    pub body_anim: Option<&'static Il2CppString>,
+    pub ride_anim: Option<&'static Il2CppString>,
+    pub unity_colors: [UnityColor; 8],
     pub scale_stuff: [f32; 19], 
+    __ : i32,
+    pub sound: AssetTableSound,
+    pub info_anims: Option<&'static Il2CppString>,
+    pub talk_anims: Option<&'static Il2CppString>,
+    pub demo_anims: Option<&'static Il2CppString>,
+    pub hub_anims: Option<&'static Il2CppString>,
+    pub force_id: Option<&'static Il2CppString>,
+    pub weapon_id: Option<&'static Il2CppString>,
+    pub body_anims: &'static mut List<Il2CppString>,
+    pub accessory_list: &'static mut List<AssetTableAccessory>,
 }
+
 
 #[unity::class("App", "AssetTableAccessory")]
 pub struct AssetTableAccessory {
@@ -206,59 +287,102 @@ pub fn asset_table_on_build(this: &AssetTable, method_info: OptionalMethod);
 
 //Unlock royal classes if asset table entry is found
 pub fn unlock_royal_classes(){
-    let list = AssetTable::get_list().unwrap();
-    let job_list = JobData::get_list().unwrap();
-    
-    for j in 0..job_list.len() {
-        let current_job = &job_list[j as usize];  
-        let job = current_job.jid.get_string().unwrap();
-        let flag = current_job.get_flag();
-        if flag.value & 1 == 0 {continue; }    // If not reclassable, skip
-        if flag.value & 2 != 0 {continue; } // If already reclassable by everyone, skip
-        for x in 0..list.len(){
-                //Search all assettable entries
-            let asset_entry = &list[x];
-            if asset_entry.body_model.is_none() || asset_entry.conditions.is_none() { continue; }
-            let mut job_conditions: [bool; 3] = [false; 3];
-            let conditions = asset_entry.conditions.as_ref().unwrap(); 
-            for y in 0..conditions.len() {
-                if conditions[y].get_string().is_err() { continue; }
-                if conditions[y].get_string().unwrap() == job { job_conditions[0] = true; }
-                if conditions[y].get_string().unwrap() == "女装" { job_conditions[1] = true;}  //Females
-                if conditions[y].get_string().unwrap() == "男装" { job_conditions[2] = true;}  // Dudes
-            }
-            if job_conditions[0] {
-                if job_conditions[1] {
-                    flag.value = flag.value | 2;
-                    flag.value = flag.value | 4;
-                }
-                else if job_conditions[2] {
-                    flag.value = flag.value | 2;
-                    flag.value = flag.value | 16;
-                }
-            }
+    println!("Unlocking Royal Classes");
+    let data = data::UNIQUE_JOB_DATA.lock().unwrap();
+    data.iter().for_each(|ujob|{
+        if let Some(job) = JobData::get_mut(ujob.jid.as_str()) {
+            let flag = job.get_flag();
+            if ujob.gender == 2 { flag.value |= 4;}
+            else { flag.value |= 16; }
+            flag.value |= 2;
+            if flag.value & 20 == 20 { flag.value -= 20; }
         }
-        // If both Male and Female are flagged, disable flags
-        if flag.value & 4 != 0 && flag.value & 16 != 0 {    flag.value = 3; }
-    }
+    });
+    return; 
 }
 
-pub fn auto_adjust_asset_table() {
-    if !CONFIG.lock().unwrap().auto_adjust_asset_table { return; }
-    let list = AssetTable::get_list_mut().unwrap();
-    for j in 0..list.len() {
-        if list[j].mode != 1 { continue; }
-        list[j].scale_stuff[16] = 2.50;
-        list[j].scale_stuff[15] = 0.0;
-        list[j].scale_stuff[14] = 0.0;
-        for x in 0..9 {
-         list[j].scale_stuff[x] = 1.0;
-
-        }
+pub fn auto_adjust_asset_table(is_ghast: bool) {
+    CONFIG.lock().unwrap().debug = false;
+    if is_ghast {
+        CONFIG.lock().unwrap().auto_adjust_asset_table = true;
+        CONFIG.lock().unwrap().enable_tradables_item = true;
+        CONFIG.lock().unwrap().save();
     }
+    else {
+        CONFIG.lock().unwrap().auto_adjust_asset_table = false;
+        CONFIG.lock().unwrap().save();
+        if !CONFIG.lock().unwrap().auto_adjust_asset_table { return; }
+    }
+    let list = AssetTable::get_list_mut().unwrap();
+    list.iter_mut().for_each(|entry|{
+        if entry.mode == 1 { 
+            for x in 0..9 { entry.scale_stuff[x] = 1.0; }
+            entry.scale_stuff[18] = 0.50;
+            entry.scale_stuff[17] = 0.0;
+            entry.scale_stuff[16] = 2.50;
+            if let Some(body) = entry.body_model {
+                match body.to_string().as_str() {
+                    "oBody_Tik1AT_c000" => {
+                        entry.scale_stuff[16] = 1.0;
+                        entry.scale_stuff[17] = 0.0;
+                        entry.scale_stuff[18] = 0.50;
+                    }
+                    "oBody_Wng1FM_c000"|"oBody_Wng2DM_c000"|"oBody_Wng2DM_c704" => {
+                        entry.scale_stuff[18] = 0.50;
+                    }
+                    "oBody_Mrp0AT_c706" | "oBody_Mrp0AT_c715" | "oBody_Fyd0DT_c707" | "oBody_Fyd0DT_c750" => {
+                        entry.scale_stuff[16] = 2.0;
+                        entry.scale_stuff[18] = 0.0;
+                        entry.scale_stuff[17] = 0.0;
+                    }
+                    "oBody_Sds0AT_c049"|"oBody_Sds0AT_c099"|"oBody_Sds1AT_c049" => {
+                        entry.scale_stuff[16] = 0.5;
+                    }
+                    "oBody_Sdk1AT_c504" => {
+                        entry.scale_stuff[16] = 0.70;
+                    }
+                    "oBody_Cav2CM_c000" | "oBody_Cav2CF_c000" | "oBody_Wlf0CT_c707" | "oBody_Wlf0CT_c715" => {
+                        entry.scale_stuff[16] = 2.40;
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(ride_model) = entry.ride_model {
+                match ride_model.to_string().as_str() {
+                    "oBody_Cav0BR_c000" | "oBody_Wng0ER_c000" | "oBody_Cmi0DR_c561" => {
+                        entry.scale_stuff[16] = 2.10;
+                    }
+                    "oBody_Sig0BR_c531" | "oBody_Sig0BR_c538" => {
+                        entry.scale_stuff[16] = 2.20;
+                    }
+                    "oBody_Cav2CR_c000"  => {
+                        entry.scale_stuff[16] = 2.40;
+                    }
+                    _ => {}
+                }
+            }
+            if let Some(body_act) = entry.body_anim {
+                match body_act.to_string().as_str() {
+                    "UAS_oBody_AM" | "UAS_oBody_AF" => {
+                        entry.scale_stuff[16] = 2.60;
+                    }
+                    "UAS_oBody_FF" | "UAS_oBody_FM" | "UAS_oBody_BF" | "UAS_oBody_BM"  => {
+                        entry.scale_stuff[16] = 2.40;
+                    }
+                    _ => {}
+                }
+            }
+        }
+    });
     unsafe { asset_table_on_completed_end(list[0], None); }
 }
 
+pub fn unit_dress_gender(unit: &Unit) -> i32 {
+    if unit.person.pid.contains(PIDS[0]) {
+         if unit.edit.is_enabled() { return unit.edit.gender; }
+    }
+    unsafe { get_dress_gender(unit.person, None) }
+}
 
 #[skyline::from_offset(0x01bb0100)]
 pub fn unit_god_get_state(this: &Unit, method_info: OptionalMethod) -> i32;
@@ -298,41 +422,78 @@ fn get_volume_legs(this: &AssetTableResult, method_info: OptionalMethod) -> f32;
 #[skyline::from_offset(0x01a4dff0)]
 fn unit_get_accessory_list(this: &Unit, method_info: OptionalMethod) -> &'static mut UnitAccessoryList;
 
-#[skyline::hook(offset=0x01bb2d80)]
-pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_data: Option<&GodData>, is_darkness: bool, conditions: &Array<&'static Il2CppString>, method_info: OptionalMethod) -> &'static mut AssetTableResult {
-    if god_data.is_none() {
-        return call_original!(this, mode, god_data, is_darkness, conditions, method_info);
-    }
-    if GameVariableManager::get_bool("G_Random_Names") {
-        let god = god_data.unwrap();
-        if let Some(emblem) = EMBLEM_GIDS.iter().position(|&x| x == god.gid.get_string().unwrap()) {
-            if unsafe { EMBLEM_NAMES[emblem] } != -1 {
-                let index: usize = unsafe { EMBLEM_NAMES[emblem] as usize };
-                let person = unsafe { PersonData::get(PIDS[index]) };
-                let job = person.unwrap().get_job().unwrap();
-                let item = crate::randomizer::job::get_weapon_for_asset_table(job);
-                return animation::asset_table_result_setup_person_hook(this, mode, person, person.unwrap().get_job(), item, conditions, None);
-            }
+#[skyline::from_offset(0x01bafdd0)]
+fn condition_add_by_key(condition: &AssetTableConditionFlags, key: &Il2CppString, method_info: OptionalMethod);
+
+#[skyline::from_offset(0x01bb0200)]
+fn condition_add_unit(condition: &AssetTableConditionFlags, unit: &Unit, method_info: OptionalMethod);
+
+#[skyline::from_offset(0x01f266a0)]
+fn get_dress_gender(person: &PersonData, method_info: OptionalMethod) -> i32; 
+
+pub fn get_weapon_mode_2_hands() {
+
+    let asset_table: Vec<_> = AssetTable::get_list().unwrap().iter().filter(|asset| 
+        {
+            let mut sum = 0.0;
+            for x in 0..14 { sum += asset.scale_stuff[x]; }
+            sum > 1.0 && asset.mode != 1
+
         }
-    }
+        
+        ).collect();
 
-    if mode > 10 {
-        return call_original!(this, mode-10, god_data, is_darkness, conditions, method_info);
-    }
+    let filename = "sd:/Draconic Vibe Crystal/Scale.txt";
+    let mut file = File::options().create(true).write(true).truncate(true).open(filename).unwrap();
+    asset_table.iter()
+        .for_each(|asset|{
+            let sum = asset.unity_colors[0].r + asset.unity_colors[0].g + asset.unity_colors[0].b;
+            let skin: [i32; 3] = [ (asset.unity_colors[0].r * 255.0 ) as i32, (asset.unity_colors[0].g * 255.0 ) as i32, (asset.unity_colors[0].b * 255.0 ) as i32 ];
+            let mut hands = "Scale: ".to_string();
+            for x in 0..14 {
+                hands = format!("{} {}", hands, asset.scale_stuff[x]);
+            }
+            if let Some(head) = asset.head_model {
+                hands = format!("{}\tHead: {}", hands, head);
+            }
+            if sum > 1.0 {
+                hands = format!("{}\tSkin: {} {} {}", hands, skin[0], skin[1], skin[2]);
+            }
+            if let Some(conditions) = &asset.conditions {
+                hands = format!("{}\tConditions: ", hands);
+                conditions.iter().for_each(|con|{
+                    hands = format!("{} {}", hands, con);
+                });
+            }
+            writeln!(&mut file, "Mode: {} | {}", asset.mode, hands).unwrap();
+        }
+    );
 
-    let gid = god_data.unwrap().gid.get_string().unwrap(); 
-    let is_enemy_emblem = crate::randomizer::emblem::enemy::ENEMY_EMBLEMS.iter().find(|&x| x.0 == gid);
-    if is_enemy_emblem.is_some() {
-        let emblem_index = is_enemy_emblem.unwrap().1;
-        let new_emblem = crate::randomizer::emblem::EMBLEM_ORDER.lock().unwrap()[emblem_index as usize] as usize;
-        if new_emblem > 19 { return call_original!(this, mode, god_data, is_darkness, conditions, method_info);  }
-        let replace_god = if new_emblem < 12 { GodData::get( EMBLEM_GIDS[new_emblem]).unwrap() }
-            else { GodData::get(&format!("GID_E006_敵{}", EMBLEM_ASSET[new_emblem])).unwrap() };
+    /* 
+    ItemData::get_list().unwrap().iter().for_each(|item|{
+        let iid = item.iid.to_string();
+        let mut hands = String::new();
+        if let Some(found) = asset_table.iter().find(|&asset|{
+            if let Some(cons) = &asset.conditions {
+                cons.iter().any(|str| str.contains(iid.as_str()))
+            }
+            else { false }
+        }){
+            if let Some(right) = found.right_hand {
+                if let Some(left) = found.left_hand {
+                    hands = format!("{}\t{}", right.to_string(), left.to_string());
+                }
+                else {
+                    hands = right.to_string();
+                }
+                writeln!(&mut file, "{}\t{}", iid, hands).unwrap();
+            }
+            else if let Some(left) = found.left_hand {
+                hands = left.to_string();
+                writeln!(&mut file, "{}\t{}", iid, hands).unwrap();
+            }
 
-        let is_m002 = gid == "GID_M002_シグルド";
-        return call_original!(this, mode, Some(replace_god), !is_m002, conditions, method_info);
-    }
-    else { return call_original!(this, mode, god_data, is_darkness, conditions, method_info); }
-
-
+        }
+    }); 
+    */
 }

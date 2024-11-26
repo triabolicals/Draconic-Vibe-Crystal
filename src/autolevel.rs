@@ -76,7 +76,7 @@ pub fn calculate_player_cap() -> i32 {
     let count_average: usize = max_cap.len() - (2*diff as usize);
     for i in 0..count_average {
         average += max_cap[i] / (count_average as i32 );
-        println!("Rank {}: {}/{} with rating {}", i+1, Mess::get(unit_name[i]).get_string().unwrap(), unit_name[i].get_string().unwrap(), max_cap[i]);
+        println!("Rank {}: {}/{} with rating {}", i+1, Mess::get(unit_name[i]).to_string(), unit_name[i].to_string(), max_cap[i]);
     }
     println!("{} unit Average is {}", count_average, average);
     GameVariableManager::set_number("G_Player_Rating_Average", average);
@@ -157,7 +157,7 @@ pub fn promote_unit(this: &Unit, level: i32){
         }
     }
     else if job_max_level < level && job.is_low() {
-        let job_jid = job.jid.get_string().unwrap();
+        let job_jid = job.jid.to_string();
         let mut high_job_index: usize = 0;
         if job_jid == "JID_ソードペガサス" || job_jid == "JID_ランスペガサス" || job_jid == "JID_アクスペガサス" {
             high_job_index = 1; //Change Flier to Wyvern Instead
@@ -167,7 +167,7 @@ pub fn promote_unit(this: &Unit, level: i32){
         this.set_level(level-job_max_level);
         this.set_weapon_mask_from_person();
         this.set_internal_level(job_max_level);
-        if this.person.get_unit_icon_id().get_string().unwrap() == "702MorphLC" {
+        if this.person.get_unit_icon_id().to_string() == "702MorphLC" {
             this.person.set_unit_icon_id("702Morph".into());
         }
     }
@@ -213,9 +213,8 @@ pub fn auto_level_unit(unit: &mut Unit){
     let mut enemy_cap = unit_cap_total(unit, true);
     let mut count = 0;
     let unit_level = unit.level;
-    let floor_cap;
-    if player { floor_cap = player_cap;  }
-    else { floor_cap = player_cap + diff*( get_number_main_chapters_completed() - 10 ); }
+    let floor_cap = if player {player_cap }
+        else { player_cap + diff*( get_number_main_chapters_completed() - 10 ) };
     while enemy_cap < floor_cap && count < 30 {
         unit.level_up(4);
         enemy_cap = unit_cap_total(unit, true);
@@ -223,7 +222,7 @@ pub fn auto_level_unit(unit: &mut Unit){
         count += 1;
     }
     if starting_cap != enemy_cap { 
-        println!("{} {} gain {} stat points to {} ( {} Ups )", Mess::get(unit.get_job().name).get_string().unwrap(), Mess::get(unit.person.get_name().unwrap()).get_string().unwrap(), enemy_cap-starting_cap, enemy_cap, count);
+        println!("{} {} gain {} stat points to {} ( {} Ups )", Mess::get(unit.get_job().name).to_string(), Mess::get(unit.person.get_name().unwrap()).to_string(), enemy_cap-starting_cap, enemy_cap, count);
     }
     unit.set_hp(unit.get_capability(0, true));
     return;
@@ -231,23 +230,32 @@ pub fn auto_level_unit(unit: &mut Unit){
 
 pub fn calculate_average_level(sortie_count: i32) -> i32 {
     let vander_replace = if GameVariableManager::exist("G_R_PID_ヴァンドレ") {
-        GameVariableManager::get_string("G_R_PID_ヴァンドレ").get_string().unwrap()
+        GameVariableManager::get_string("G_R_PID_ヴァンドレ").to_string()
     } 
     else { "PID_ヴァンドレ".to_string() };
     let mut sum = 0;
     let count = if sortie_count == 0 { 10 } else { sortie_count };
+    let mut used: Vec<i32> = Vec::new();
     for _x in 0..count {
         let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
         let mut level = 0;
+        let mut last_index = -1;
         for ff in force_type {
             let force_iter = Force::iter(Force::get(ff).unwrap());
             for unit in force_iter {
-                if unit.person.pid.get_string().unwrap() == vander_replace { continue; }
+                if unit.person.pid.to_string() == vander_replace { continue; }
                 let total_level = unit.level as i32 + unit.internal_level as i32; 
-                if level < total_level { level = total_level; }
+                let index = unit.person.parent.index;
+                if level < total_level && !used.iter().any(|&i| i == index) {
+                    level = total_level; 
+                    last_index = index;
+                }
             }
         }
-        sum += level;
+        if last_index > 0 {
+            used.push(last_index);
+            sum += level;
+        }
     }
     let average = sum / count;
     println!("Player Average Level: {}", average);
@@ -281,11 +289,12 @@ pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
     // triabolical config check
     println!("Attempting to equip emblems for enemies");
 
-    let jobname = unit.person.get_job().unwrap().name.get_string().unwrap();
+    let jobname = unit.person.get_job().unwrap().name.to_string();
     if emblem >= EMBLEMS.len() { return false; }
-    if GodData::get(EMBLEMS[emblem].into()).is_none() { return false; }
+    if unit.person.get_engage_sid().is_some() { return false; }
+    if GodData::get(EMBLEMS[emblem]).is_none() { return false; }
     let job = unit.get_job();
-    if job.name.get_string().unwrap() == "MJID_Emblem" || jobname == "MJID_Emblem" { return false; }
+    if job.name.to_string() == "MJID_Emblem" || jobname == "MJID_Emblem" { return false; }
     if job.get_sort() == 9999 { return false;}
     //Prevents Wyrms/Wolves from getting emblems
     
@@ -293,12 +302,12 @@ pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
     if jobname  == "JID_異形竜" || jobname == "JID_幻影竜" {  return false; } //Wyrms
     if job.parent.index < 10 { return false; }
 
-    if ( job.get_flag().value == 0 && job.jid.get_string().unwrap() != "JID_蛮族" ) || job.get_flag().value == 8 { return false; }
+    if ( job.get_flag().value == 0 && job.jid.to_string() != "JID_蛮族" ) || job.get_flag().value == 8 { return false; }
     let style_name = job.get_job_style();
     if style_name.is_some() {
                 // Not Flying or Armored or wolf knight for Bow/Magic Emblems
-        let god_data = GodData::get(EMBLEMS[emblem].into()).unwrap();
-        if style_name.unwrap().get_string().unwrap() == "飛行スタイ ル" || style_name.unwrap().get_string().unwrap() == "重装スタイル" || job.jid.get_string().unwrap() == "JID_ウルフナイト" {
+        let god_data = GodData::get(EMBLEMS[emblem]).unwrap();
+        if style_name.unwrap().to_string() == "飛行スタイ ル" || style_name.unwrap().to_string() == "重装スタイル" || job.jid.to_string() == "JID_ウルフナイト" {
             match emblem {
                 0 | 1 | 5 | 6 | 11 | 12 | 13 => { false }
                 _ => { 
@@ -341,6 +350,69 @@ pub fn adjust_emblem_unit_ai(unit: &Unit, data: &DisposData, emblem_index: usize
         set_unit_ai_dispos(unit, data, None);
     }
 }
+
+pub fn autolevel_party(){
+    if GameVariableManager::get_bool("G_AutoBench"){
+        let bench = Force::get(ForceType::Absent).unwrap();
+        let avg_number = 8 + 2*GameUserData::get_difficulty(false);
+        let player_average = calculate_average_level(avg_number) - GameUserData::get_difficulty(false);
+        println!("Autoleveling Bench to average of {}", player_average);
+        let mut force_iter = Force::iter(bench);
+        while let Some(unit) = force_iter.next() {
+            let total_level: i32 = (unit.level as i8 + unit.internal_level) as i32;
+            let number_of_levelups = player_average - total_level;
+            if number_of_levelups < 1 { continue; }
+            multiple_level_ups(unit, number_of_levelups);
+            println!("{}: gained {} levels", Mess::get_name(unit.person.pid), number_of_levelups);
+        }
+    }
+}
+
+pub fn multiple_level_ups(unit: &Unit, number_of_levels: i32){
+    // Levels up unit and fixes their HP and internal Level
+    if number_of_levels < 0 { return; }
+    let job_max_level = unit.get_job().get_max_level();
+    for _x in 0..number_of_levels { 
+        if job_max_level <= unit.level {
+            if unit.get_job().is_low() && unit.get_job().has_high() {
+                unit.class_change(unit.get_job().get_high_jobs()[0]);
+                let weapon_mask: &mut WeaponMask = unit.get_aptitude();
+                let value = weapon_mask.value;
+                unit.set_weapon_mask_from_person();
+                weapon_mask.value = value;
+            }
+        }
+        unit.level_up(3);
+        unit.add_sp(100);
+    }
+    unit.set_hp(unit.get_capability(0, true));
+    unit.get_learn_job_skill();
+}
+
+pub struct BenchAutoLevelOption;
+impl ConfigBasicMenuItemSwitchMethods for BenchAutoLevelOption {
+    fn init_content(this: &mut ConfigBasicMenuItem){ GameVariableManager::make_entry("G_AutoBench", 0); } 
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let toggle =  GameVariableManager::get_bool("G_AutoBench");
+        let result = ConfigBasicMenuItem::change_key_value_b(toggle);
+        if toggle != result {
+            GameVariableManager::set_bool("G_AutoBench", result);
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        } else { return BasicMenuResult::new();  }
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = if !GameVariableManager::get_bool("G_AutoBench") {"Undeployed will not be autoleveled at the end of the chapter." }
+            else { "Undeployed units will autolevel to difficulty-adjusted average."   }.into();
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.command_text = if !GameVariableManager::get_bool("G_AutoBench") { "Disabled" }
+            else { "Enabled" }.into();
+    }
+}
+pub extern "C" fn autobench() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_switch::<BenchAutoLevelOption>("Post Chapter Autoleveling")   }
 
 pub struct AutolevelMod;
 impl ConfigBasicMenuItemSwitchMethods for AutolevelMod {
@@ -398,7 +470,7 @@ impl ConfigBasicMenuItemGaugeMethods  for EnemyEmblemGauge {
         return BasicMenuResult::new(); 
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = "Percentage of enemy units equipped with a dark emblem.".into();
+        this.help_text = "Chance of enemy units equipped with a dark emblem.".into();
     }
 }
 
@@ -422,7 +494,7 @@ impl ConfigBasicMenuItemGaugeMethods  for EnemyRevivalStones {
         return BasicMenuResult::new(); 
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = "Percentage of enemy units gaining a revival stone.".into();
+        this.help_text = "Chance of enemy units gaining a revival stone.".into();
     }
 }
 

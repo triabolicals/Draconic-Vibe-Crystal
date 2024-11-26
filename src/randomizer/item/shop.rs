@@ -28,23 +28,22 @@ impl ShopRandomizer {
         for x in 0..length {
             let entry = &mut self.pool[x];
             if !entry.is_inf { entry.used = false; }
-            if ItemData::try_index_get(entry.index).unwrap().usetype == 7 { entry.used = true;  }
-            if ItemData::try_index_get(entry.index).unwrap().usetype == 13 { entry.used = true;  }
-            if ItemData::try_index_get(entry.index).unwrap().usetype == 21 { entry.used = true;   }
+            if let Some(item) = ItemData::try_index_get(entry.index) {
+                if item.usetype == 7 || item.usetype == 13 || item.usetype == 21  { entry.used = true; }
+            }
         }
     }
     pub fn flag_item(&mut self, iid: &Il2CppString, is_inf: bool) {
         let index = ItemData::get_index(iid);
-        let pos = self.pool.iter_mut().find(|x| x.index == index );
-        if pos.is_some() {
-            let item = pos.unwrap();
-            item.is_inf = is_inf;
-            item.used = true;
+        if index <= 2 { return; }
+        if let Some(found) = self.pool.iter_mut().find(|x| x.index == index ) {
+            found.is_inf = is_inf;
+            found.used = true;
         }
         else { self.pool.push(RandomItem::new(index, is_inf, true)); }
     }
     pub fn add_list(&mut self, item: &ItemData){
-        if self.pool.iter().find(|&x| x.index == item.parent.index).is_none() {
+        if !self.pool.iter().any(|x| x.index == item.parent.index) {
             self.pool.push(RandomItem::new(item.parent.index, false, false));
         }
     }
@@ -110,6 +109,13 @@ pub struct FleaMarketData {
     pub stock: i32, 
     pub attribute: i32,
 }
+#[unity::class("App", "AccessoryShopData")]
+pub struct AccessoryShopData {
+    pub parent: StructDataArrayFields,
+    pub aid: &'static Il2CppString,
+}
+impl GamedataArray for AccessoryShopData {}
+impl ShopData for AccessoryShopData {}
 impl GamedataArray for FleaMarketData {}
 impl ShopData for FleaMarketData {}
 
@@ -303,7 +309,7 @@ pub fn randomize_hub_random_items(){
         let list = &mut hublist[x]; 
         for y in 0..list.len() {
             if utils::str_contains(list.parent.list[y].iid, "PID_") { break; } //Person
-            let iid = list.parent.list[y].iid.get_string().unwrap(); 
+            let iid = list.parent.list[y].iid.to_string(); 
             if iid == "IID_てつの晶石" || iid == "IID_はがねの晶石" || iid == "IID_ぎんの晶石" { // Ore Check
                 continue; 
             }
@@ -359,7 +365,6 @@ pub fn randomize_item_evolve() {
                 _ => { continue; },
             }
             new_evolve.iid = new_item.iid;
-            println!("Added {}, #{} to evolve item {}", new_item.name.get_string().unwrap(), new_item.parent.index, x);
             break;
         }
         list.add(new_evolve);
@@ -434,4 +439,23 @@ pub extern "C" fn vibe_hub_items() -> &'static mut ConfigBasicMenuItem {
     let hub_items = ConfigBasicMenuItem::new_switch::<RandomHubItemMod2>("Exploration Items");
     hub_items.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_hub_items as _);
     hub_items
+}
+
+pub fn add_personal_outfits() {
+    if crate::randomizer::assets::AssetTable::get_count() >= 5000 { return; }
+    let hublist = AccessoryShopData::get_list_mut().unwrap();
+    if hublist[0].len() > 40 { 
+        AccessoryShopData::register();
+    }
+    else {
+        for x in 1..41 {
+            let aid = format!("AID_{}私服", &crate::enums::PIDS[x][4..]);
+            let acc = AccessoryShopData::instantiate().unwrap();
+            acc.ctor();
+            acc.aid = aid.into();
+            hublist[0].add(acc);
+        }
+        AccessoryShopData::register();
+    }
+    println!("Outfits Registered");
 }

@@ -1,9 +1,8 @@
-use engage::force::ForceType;
 use super::*;
 use super::item_rando::*;
-use crate::randomizer::person::unit;
+use crate::randomizer::{assets::animation::MONSTERS, person::unit::{self, unit_update_auto_equip}};
 
-pub const STANDARD_WEPS: [&str; 35] = [
+pub const STANDARD_WEPS: [&str; 35] = [ // S L A B K T F
     "IID_鉄の剣", "IID_鉄の槍", "IID_鉄の斧", "IID_鉄の弓", "IID_鉄のナイフ", "IID_ファイアー", "IID_鉄身の法" ,    //D
     "IID_鋼の剣", "IID_鋼の槍", "IID_鋼の斧", "IID_鋼の弓", "IID_鋼のナイフ", "IID_エルファイアー", "IID_鋼身の法", //C
     "IID_銀の剣", "IID_銀の槍", "IID_銀の斧", "IID_銀の弓", "IID_銀のナイフ", "IID_エルファイアー", "IID_銀身の法", //B
@@ -28,7 +27,7 @@ pub fn get_replacement_type(item: &UnitItem) -> i32 {
         if e_skills.unwrap().find_sid("SID_スマッシュ".into()).is_some() { return 6; }  // Smash
         if e_skills.unwrap().find_sid("SID_轟雷発動可能".into()).is_some() { return 7; } // Thunder
     }
-    let iid = item.item.iid.get_string().unwrap();
+    let iid = item.item.iid.to_string();
     match iid.as_str() {
         "IID_いかづちの剣"|"IID_ほのおの槍"|"IID_かぜの大斧"| "IID_光の弓" => { 2 },    //magic
         "IID_ほそみの剣"|"IID_ほそみの槍"| "IID_ショートアクス" => { 1 },   //silm
@@ -39,14 +38,14 @@ pub fn get_replacement_type(item: &UnitItem) -> i32 {
     }
 }
 pub fn is_slim(item: &UnitItem) -> bool {
-    let iid = item.item.iid.get_string().unwrap();
+    let iid = item.item.iid.to_string();
     if iid == "IID_ほそみの剣" { return true; }
     if iid == "IID_ほそみの槍" { return true; }
     if iid == "IID_ショートアクス" { return true; }
     return false; 
 }
 pub fn is_magic_weapon(item: &UnitItem) -> bool {
-    let iid = item.item.iid.get_string().unwrap();
+    let iid = item.item.iid.to_string();
     if iid == "IID_いかづちの剣" { return true; }
     if iid == "IID_ほのおの槍" { return true; }
     if iid == "IID_かぜの大斧" { return true; }
@@ -54,7 +53,7 @@ pub fn is_magic_weapon(item: &UnitItem) -> bool {
     return false; 
 }
 pub fn is_crit_weapon(item: &UnitItem) -> bool {
-    let iid = item.item.iid.get_string().unwrap();
+    let iid = item.item.iid.to_string();
     if iid == "IID_キルソード" { return true; }
     if iid == "IID_キラーランス" { return true; }
     if iid == "IID_キラーアクス" { return true; }
@@ -63,7 +62,7 @@ pub fn is_crit_weapon(item: &UnitItem) -> bool {
     return false; 
 }
 pub fn range_weapon(item: &UnitItem) -> bool {
-    let iid = item.item.iid.get_string().unwrap();
+    let iid = item.item.iid.to_string();
     if iid == "IID_手槍" { return true; }
     if iid == "IID_スレンドスピア" { return true; }
     if iid == "IID_手斧" { return true; }
@@ -72,7 +71,7 @@ pub fn range_weapon(item: &UnitItem) -> bool {
     return false;
 }
 pub fn is_effective_weapon(item: &UnitItem) -> bool {
-    let iid = item.item.iid.get_string().unwrap();
+    let iid = item.item.iid.to_string();
     if iid == "IID_アーマーキラー" { return true; }
     if iid == "IID_ナイトキラー" { return true; }
     if iid == "IID_ポールアクス" { return true; }
@@ -101,7 +100,6 @@ pub fn replace_weapon(item: &UnitItem, weapon_mask: i32, max_rank: i32, is_enemy
     if is_enemy {
         println!("Enemy Item Replacement");
         let new_item = item_rando::WEAPONDATA.lock().unwrap().get_new_weapon(item, new_weapon_type, true);
-        println!("1");
         if new_item.is_some() {
             let n_item = new_item.unwrap();
             item.ctor(new_item.unwrap());
@@ -109,7 +107,6 @@ pub fn replace_weapon(item: &UnitItem, weapon_mask: i32, max_rank: i32, is_enemy
             return;
         }
         let generic_weapon = item_rando::WEAPONDATA.lock().unwrap().get_generic_weapon(new_weapon_type, level);
-        println!("2");
         if generic_weapon.is_some() {
             item.ctor(generic_weapon.unwrap());
             item.set_flags(flag);
@@ -174,7 +171,7 @@ pub fn replace_weapon(item: &UnitItem, weapon_mask: i32, max_rank: i32, is_enemy
         }
         _ => {},
     }
-    //println!("Replace item {} , weapon mask {}, max level {}", item.item.name.get_string().unwrap(), weapon_mask, max_rank);
+    //println!("Replace item {} , weapon mask {}, max level {}", item.item.name.to_string(), weapon_mask, max_rank);
     item.ctor_str(weapons[new_weapon_type as usize]);
     item.set_flags(flag);
 }
@@ -187,7 +184,7 @@ pub fn replace_staves(item_list: &UnitItemList){
             let staff = &item.unwrap();
             let kind = staff.item.get_kind(); 
             if kind == 7 { 
-                let staff_name = staff.item.iid.get_string().unwrap();
+                let staff_name = staff.item.iid.to_string();
                 if staff_name == "IID_ライブ" || staff_name == "IID_リブロー" || staff_name == "IID_リライブ" { 
                     staff.ctor_str("IID_傷薬");
                 }
@@ -216,26 +213,46 @@ pub fn dispose_tomes(item_list: &UnitItemList){
         }
     }
 }
+pub fn dispose_unusables(unit: &Unit) {
+    for x in 0..8 {
+        if unit.item_list.unit_items[x].item.parent.index < 3 { continue; }
+        if let Some(item) = unit.item_list.get_item(x as i32 ) {
+            if item.item.flag.value & 128 == 0 && item.flags & 2 == 0 && item.item.kind > 0 { // Not Engage Weapon or Not Drop
+                if unsafe { !unit_can_equip_item(unit, x as i32 , true, true, None) } {
+                    item.dispose();
+                }
+            }
+        }
+    }
+    for x in 0..8 {
+        let item = unit.item_list.unit_items[x];
+        if item.item.parent.index < 3 { continue; }
+        if item.is_empty() {
+            for y in x+1..unit.item_list.unit_items.len() {
+                if !unit.item_list.unit_items[y].is_empty() {
+                    unit.item_list.move_item(y as i32, x as i32);
+                    break;
+                }
+            }
+        }
+    }
+}
+
 pub fn remove_duplicates(item_list: &UnitItemList) {
     for x in 0..8 {
-        let item = item_list.get_item(x as i32);
-        if item.is_some() {
-            let unit_item = item.unwrap();
-            if unit_item.is_drop() { 
-                if unit_item.item.flag.value & 131 != 0 { unit_item.flags = 0; }
-            }
-            let iid1 =  unit_item.item.iid.get_string().unwrap();
-            if iid1 == "IID_エンゲージ枠" || iid1 == "IID_不明" { continue; } 
-            if iid1 == "IID_無し" { continue; }
+        if let Some(unit_item) = item_list.get_item(x as i32) { 
+            if unit_item.is_drop() {  if unit_item.item.flag.value & 131 != 0 { unit_item.flags = 0; } }
+            if unit_item.item.parent.index < 3 { continue; }
+            let iid1 =  unit_item.item.iid.to_string();
             for y in x+1..8 {
                 let item2 = item_list.get_item(y as i32 );
                 if item2.is_some() {
                     let unit_item2 = item2.unwrap(); 
                     if unit_item2.is_drop() { continue; }
-                    let iid2 =  unit_item2.item.iid.get_string().unwrap();
+                    let iid2 =  unit_item2.item.iid.to_string();
                     if iid2 == iid1 { 
                         unit_item2.dispose(); 
-                        println!("Dispose of {}", unit_item2.item.name.get_string().unwrap());
+                        println!("Dispose of {}", unit_item2.item.name.to_string());
                     }
                     // remove vuls if exlixir/antitoxin exists
                     else if (iid1 == "IID_毒消し" || iid1 == "IID_特効薬") && iid2 == "IID_傷薬" { unit_item2.dispose();  }
@@ -246,7 +263,7 @@ pub fn remove_duplicates(item_list: &UnitItemList) {
     }
     for x in 0..8 {
         let item = item_list.unit_items[x];
-        let iid1 =  item.item.iid.get_string().unwrap();
+        let iid1 =  item.item.iid.to_string();
         if iid1 == "IID_エンゲージ枠" || iid1 == "IID_不明" { continue; } 
         if item.is_empty() {
             for y in x+1..item_list.unit_items.len() {
@@ -278,6 +295,14 @@ pub fn adjust_melee_weapons(unit: &Unit) {
         return;
     }
 }
+pub fn get_number_of_usable_weapons(unit: &Unit) -> i32 {
+    let mut count = 0;
+    for x in 0..8 {
+        if unsafe { unit_can_equip_item(unit, x as i32 , true, true, None) }  { count += 1;}
+    }
+    count
+}
+
 pub fn can_change_weapon(weapon: &UnitItem, melee: bool) -> bool {
     if !weapon.item.is_weapon() { return false; }
     let flag = weapon.item.get_flag().value; 
@@ -290,10 +315,10 @@ pub fn can_change_weapon(weapon: &UnitItem, melee: bool) -> bool {
 pub fn adjust_staffs(unit: &Unit) {
     let job = unit.get_job();
     let weapon_mask = job.get_weapon_mask();
-    let jid = job.jid.get_string().unwrap();
+    let jid = job.jid.to_string();
     remove_duplicates(unit.item_list);
-    let is_vander = GameVariableManager::get_string("G_R_PID_ヴァンドレ").get_string().unwrap() == unit.person.pid.get_string().unwrap();
-    let is_veyle = unit.person.pid.get_string().unwrap() == "PID_ヴェイル";
+    let is_vander = GameVariableManager::get_string("G_R_PID_ヴァンドレ").to_string() == unit.person.pid.to_string();
+    let is_veyle = unit.person.pid.to_string() == "PID_ヴェイル";
     let rng = Random::get_system();
     if weapon_mask.value & 64 != 0 && (!is_vander && !is_veyle) {
         dispose_tomes(unit.item_list);
@@ -373,63 +398,27 @@ pub fn adjust_staffs(unit: &Unit) {
                 let staff_ = WEAPONDATA.lock().unwrap().get_staff(x, staff_level);
                 if staff_.is_some() { unit.item_list.add_item_no_duplicate(staff_.unwrap()); }
             }
-            /*
-            // Heal Staff
-            match staff_level {
-                // A and Above
-                4|5|6 => {
-                    unit.item_list.add_iid_no_duplicate("IID_リザーブ");
-                    match value {
-                        1 => { 
-                            if GameVariableManager::get_bool("G_Cleared_M020") { unit.item_list.add_iid_no_duplicate("IID_ドロー"); }
-                            else { unit.item_list.add_iid_no_duplicate("IID_フリーズ"); }
-                        },
-                        2 => {  unit.item_list.add_iid_no_duplicate("IID_ワープ"); },
-                        3 => { unit.item_list.add_iid_no_duplicate("IID_レスキュー"); },
-                        _ => {  unit.item_list.add_iid_no_duplicate("IID_フリーズ");   },
-                    }
-                },
-                // B Rank 
-                3 => {
-                    if job.is_low() {
-                        if value % 3 == 0 { unit.item_list.add_iid_no_duplicate("IID_カップケーキ杖"); }
-                        else if value % 3 == 1 { unit.item_list.add_iid_no_duplicate("IID_リブロー_G004"); }
-                        else { unit.item_list.add_iid_no_duplicate("IID_リライブ"); }
-                    }
-                    else {
-                        unit.item_list.add_iid_no_duplicate("IID_リカバー"); // Recover
-                    }
-                    match value {
-                        1 => {  unit.item_list.add_iid_no_duplicate("IID_コラプス"); }, // Fracture
-                        2 => { 
-                            if GameVariableManager::get_bool("G_Cleared_M017") || GameVariableManager::get_bool("G_Cleared_S006") {
-                                unit.item_list.add_iid_no_duplicate("IID_ワープ"); //Warp
-                            }
-                            else { unit.item_list.add_iid_no_duplicate("IID_サイレス");  }
-                        },   
-                        3 => { unit.item_list.add_iid_no_duplicate("IID_レスキュー"); },  // Rescue
-                        _ => { unit.item_list.add_iid_no_duplicate("IID_フリーズ"); },   // Freeze
-                    }
-                },
-                2 => {
-                    unit.item_list.add_iid_no_duplicate("IID_リブロー_G004"); 
-                    if value % 2 == 0 { unit.item_list.add_iid_no_duplicate("IID_フリーズ"); }
-                    else { unit.item_list.add_iid_no_duplicate("IID_サイレス");}
-                },
-                1 => { unit.item_list.add_iid_no_duplicate("IID_リライブ"); },
-                _ => {}
-            }
-            */
         }
     }
-    let pid = unit.person.pid.get_string().unwrap();
+    let pid = unit.person.pid.to_string();
+    add_equip_condition(unit);
+    dispose_unusables(unit);
     remove_duplicates(unit.item_list);
+    let enemy = unit.person.get_asset_force() != 0;
     if jid == "JID_裏邪竜ノ娘" || jid == "JID_裏邪竜ノ子" { 
         unit.private_skill.add_sid("SID_オヴスキュリテ装備可能", 10, 0);    //Equip Obscurite
         if pid != "PID_エル" && pid != "PID_ラファール" {
-            let dragonstone = WEAPONDATA.lock().unwrap().get_dragon_stone();
-            if let Some(stone) = dragonstone {
-                unit.item_list.add_item_no_duplicate(stone);
+            let dragonstone = WEAPONDATA.lock().unwrap().get_dragon_stone(enemy);
+            if let Some(stone1) = dragonstone {
+                unit.item_list.add_item_no_duplicate(stone1);
+                loop {
+                    if let Some(stone2) = WEAPONDATA.lock().unwrap().get_dragon_stone(enemy) {
+                        if stone2.parent.index != stone1.parent.index {
+                            unit.item_list.add_item_no_duplicate(stone2);
+                            break;
+                        }
+                    }
+                }
             }
         }
     }
@@ -471,41 +460,43 @@ pub fn adjust_staffs(unit: &Unit) {
         unit.item_list.add_iid_no_duplicate("IID_オヴスキュリテ"); 
         unit.private_skill.add_sid("SID_オヴスキュリテ装備可能", 10, 0); //Equip Obscurite
         unit.private_skill.add_sid("SID_ミセリコルデ装備可能", 10, 0);  //Equip Misercode
-        if unit.person.get_asset_force() == 0 { // Vul or Elixir
-            if unit.get_capability(0, false) >= 45 { unit.item_list.add_iid_no_duplicate("IID_特効薬");   }
-            else { unit.item_list.add_item_no_duplicate(ItemData::get("IID_傷薬").unwrap());  }
-        }
+    }
+    if unit.person.get_asset_force() == 0 { // Vul or Elixir
+        if unit.get_capability(0, false) >= 45 { unit.item_list.add_iid_no_duplicate("IID_特効薬");   }
+        else { unit.item_list.add_item_no_duplicate(ItemData::get("IID_傷薬").unwrap());  }
     }
     add_generic_weapons(unit);
     adjust_melee_weapons(unit);
     remove_duplicates(unit.item_list);
     add_equip_condition(unit);
+    if get_number_of_usable_weapons(unit) < 1 {
+        println!("Has No Weapons: {} {}", Mess::get_name(unit.person.pid), Mess::get_name(unit.get_job().jid));
+        add_generic_weapons(unit);
+    }
 }
 
 
 
 pub fn fix_weapons_by_rank(unit: &Unit, upgrade_weapon: bool) {
-    println!("Fixing weapons by rank for {}", Mess::get(unit.person.get_name().unwrap()).get_string().unwrap());
+    println!("Fixing weapons by rank for {}", Mess::get(unit.person.get_name().unwrap()).to_string());
     let unit_level = unit.level as i32 + unit.internal_level as i32;
     let weapon_rank = if !upgrade_weapon { 0 }
     else if unit_level < 25 { 2 }
     else { 3 };
 
     let job = unit.get_job();
-    let pid = unit.person.pid.get_string().unwrap();
+    let pid = unit.person.pid.to_string();
     for x in 0..unit.item_list.unit_items.len() {
-        let item = unit.item_list.get_item(x as i32);
-        if item.is_none() { continue;}
-        let weapon = item.unwrap();
+        let weapon = unit.item_list.get_item(x as i32).unwrap();
         if !can_change_weapon(weapon, false) { continue; }
-        let iid = weapon.item.iid.get_string().unwrap();
+        let iid = weapon.item.iid.to_string();
         if iid == "IID_エンゲージ枠" || iid == "IID_不明" { continue; } // if engage weapon slot or none skip
         if iid == "IID_ミセリコルデ" && pid != "PID_ヴェイル" {
             weapon.dispose();
             continue;
         }
         let kind = weapon.item.kind;
-        println!("Item {}: {} Kind: {}", x, weapon.item.name.get_string().unwrap(), kind);
+        println!("Item {}: {} Kind: {}", x, weapon.item.name.to_string(), kind);
         let weapon_level = job.get_max_weapon_level(kind as i32) as i32;
         if weapon_level == 0 && !weapon.is_drop(){ weapon.dispose(); continue;  }
         if weapon_level < weapon.item.get_weapon_level() && weapon_level > 0 { // Weapon is higher than the Job's rank
@@ -529,19 +520,24 @@ pub fn fix_weapons_by_rank(unit: &Unit, upgrade_weapon: bool) {
 }
 pub fn add_generic_weapons(unit: &Unit) {
     //if unit.person.get_asset_force() != 0 { // Making sure enemies have weapons
-    println!("Adding Weapons for {}", Mess::get(unit.person.get_name().unwrap()).get_string().unwrap());
+
     let job = unit.get_job();
-    let jid = job.jid.get_string().unwrap();
+    let job_mask = job.get_weapon_mask().value;
+    println!("Adding Weapons for {} ({}), with Selected Mask {} / {}", Mess::get(unit.person.get_name().unwrap()).to_string(), Mess::get(unit.get_job().name), unit.selected_weapon_mask.value, job_mask);
+    let jid = job.jid.to_string();
     if jid == "JID_ボウナイト" { unit.item_list.add_item_no_duplicate(ItemData::get("IID_銀の弓").unwrap());  }
     if jid == "JID_エンチャント" {
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_HPの薬").unwrap());  
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_力の薬").unwrap());  
     }
-    let weapon_rank;
+    let combine_mask = unit.selected_weapon_mask.value | job_mask;
     let unit_level = unit.level as i32 + unit.internal_level as i32;
-    if unit_level < 25 { weapon_rank = 2; }
-    else { weapon_rank = 3; }
+    let weapon_rank = if !GameVariableManager::get_bool("G_Cleared_M006") { 1 }
+        else if !GameVariableManager::get_bool("G_Cleared_M011") { 2 }
+        else if unit_level < 25 { 2 }
+        else { 3 };
     let mut has_weapon: [bool; 10] = [false; 10];
+    has_weapon[7] = true;
     for x in 0..unit.item_list.unit_items.len() {
         let item = unit.item_list.get_item(x as i32);
         if item.is_none() { continue;}
@@ -550,30 +546,31 @@ pub fn add_generic_weapons(unit: &Unit) {
         let kind = weapon.item.kind;
         if kind > 9 || kind == 0 { continue; }
         let weapon_level = job.get_max_weapon_level(kind as i32) as i32;
-        if weapon.item.get_weapon_level() <= weapon_level && ( ( unit.selected_weapon_mask.value & ( 1 << kind ) != 0 || unit.selected_weapon_mask.value == 0 ) ) {
-            has_weapon[kind as usize] = true;
-        }
-        else {
-            if weapon.flags & 2 != 0 { weapon.dispose();  }
-        }
+        if weapon.item.get_weapon_level() <= weapon_level && combine_mask & ( 1 << kind ) != 0 { has_weapon[kind as usize] = true; }
+        else if weapon.flags & 2 != 0 { weapon.dispose();  }
     }
     for i in 1..9 {
-        if i == 7 { continue; } // Rod
+        if i == 7 || i == 6 { continue; }
         if has_weapon[i as usize] { continue; }
-        if i == 8 {
-            if job.get_max_weapon_level(i) >= weapon_rank && ( unit.selected_weapon_mask.value & ( 1 << i ) != 0 || unit.selected_weapon_mask.value == 0 ) {
-                let index = 7*(weapon_rank - 1) + i - 2;
-                if index < 35 { unit.item_list.add_item_no_duplicate(ItemData::get(STANDARD_WEPS[index as usize]).unwrap()); }
+        let rank = if job.get_max_weapon_level(i) < weapon_rank { job.get_max_weapon_level(i) } else { weapon_rank };
+        if combine_mask & (1 << i ) != 0 && rank > 0 {
+            if unit.person.get_asset_force() == 0 || !GameVariableManager::get_bool("G_Cleared_M011") {
+                if let Some(item) = WEAPONDATA.lock().unwrap().get_generic_weapon(i-1, rank) { unit.item_list.add_item_no_duplicate(item); }
+            }
+            else {
+                loop {
+                    if let Some(item) = WEAPONDATA.lock().unwrap().get_random_weapon(i-1) {
+                        if item.get_weapon_level() <= rank {
+                            unit.item_list.add_item_no_duplicate(item); 
+                            break;
+                        }
+                    }
+                }
             }
         }
-        else {
-            if job.get_max_weapon_level(i) >= weapon_rank && ( unit.selected_weapon_mask.value & ( 1 << i ) != 0 || unit.selected_weapon_mask.value == 0 ) {
-                let index = 7*(weapon_rank - 1) + i - 1;
-                if index < 35 { unit.item_list.add_item_no_duplicate(ItemData::get(STANDARD_WEPS[index as usize]).unwrap());  }
-            }
-        } 
-    } 
-    if job.get_max_weapon_level(4) >= 2 && GameVariableManager::get_bool("G_Cleared_M017") { unit.item_list.add_item_no_duplicate(ItemData::get("IID_長弓").unwrap());  } 
+    }
+    if job.get_max_weapon_level(4) >= 2 && GameVariableManager::get_bool("G_Cleared_M022") { unit.item_list.add_item_no_duplicate(ItemData::get("IID_長弓").unwrap());  } 
+    println!("Has {} weapons", get_number_of_usable_weapons(unit));
 }
 
 pub fn random_items_drops(unit: &Unit){
@@ -598,15 +595,15 @@ pub fn random_items_drops(unit: &Unit){
             }
             else if !u_item.is_equip() { 
                 let new_item = get_random_item(u_item.item.iid, false);
-                u_item.ctor_str(&new_item.get_string().unwrap());
+                u_item.ctor_str(&new_item.to_string());
                 u_item.flags = 2;
                 none_count += 1;
             }
         } 
-        let iid1 =  u_item.item.iid.get_string().unwrap();
+        let iid1 =  u_item.item.iid.to_string();
         if iid1 == "IID_無し" && none_count == 0 { 
             if rng.get_value(100) < rate {
-                u_item.ctor_str(&random_item(4, false).get_string().unwrap());
+                u_item.ctor_str(&random_item(4, false).to_string());
                 u_item.flags = 2;
                 rate = rate / 2;
             }
@@ -664,14 +661,17 @@ fn magic_dagger_weapon_change(veyle_job: &JobData){
 
 // Meteor Adjustment
 pub fn adjust_items() {
-    let mut meteor = ItemData::get_mut("IID_メティオ").unwrap();
+    let meteor = ItemData::get_mut("IID_メティオ").unwrap();
     meteor.endurance = 1;
     let index = meteor.parent.index;
     let item_list = ItemData::get_list_mut().unwrap();
+    let can_trade = true; //CONFIG.lock().unwrap().enable_tradables_item;
     for x in 0..item_list.len() {
         let random_item = &mut item_list[x];
+        let flag = random_item.flag.value;
+        if can_trade && ( flag & 131 == 3 || flag & 131 == 2 ) { random_item.get_flag().value = flag - 2; }
         if random_item.get_flag().value & 16 != 0  {
-            let iid = random_item.iid.get_string().unwrap();
+            let iid = random_item.iid.to_string();
             if iid != "IID_メティオ_G004" {
                 random_item.get_flag().value = 0; 
                 random_item.price = 5000;
@@ -691,6 +691,7 @@ pub fn adjust_items() {
             else { 1 };
 
         for y in 0..8 {
+            if unit.item_list.unit_items[y].item.parent.index < 3 { continue; }
             if unit.item_list.unit_items[y].item.parent.index == index {
                 unit.item_list.unit_items[y].set_endurance(uses);
             }
@@ -698,6 +699,19 @@ pub fn adjust_items() {
                 unit.item_list.unit_items[y].dispose();
             }
         }
+        for x in 0..8 {
+            let item = unit.item_list.unit_items[x];
+            if item.item.parent.index < 3 { continue; } 
+            if item.is_empty() {
+                for y in x+1..unit.item_list.unit_items.len() {
+                    if !unit.item_list.unit_items[y].is_empty() {
+                        unit.item_list.move_item(y as i32, x as i32);
+                        break;
+                    }
+                }
+            }
+        }
+        unsafe { unit_update_auto_equip(unit, None);}
     }
     let convoy_index = unsafe { get_empty_index(None) };
     for x in 0..convoy_index {
@@ -721,14 +735,48 @@ pub fn adjust_enemy_meteor(unit: &mut Unit) {
     }
 }
 
-fn add_equip_condition(unit: &Unit) {
+pub fn add_equip_condition(unit: &Unit) {
     for x in 0..8 {
         if unit.item_list.unit_items[x].item.equip_condition.is_some() {
-            let sid = unit.item_list.unit_items[x].item.equip_condition.unwrap().get_string().unwrap();
+            let sid = unit.item_list.unit_items[x].item.equip_condition.unwrap().to_string();
             unit.private_skill.add_sid(&sid, 10, 0);
         }
     }
 }
+
+pub fn add_monster_weapons(unit: &Unit){
+    // ["JID_幻影飛竜", "JID_異形飛竜", "JID_幻影狼", "JID_異形狼",  "JID_E006ラスボス", "JID_幻影竜", "JID_異形竜", "JID_邪竜"];
+    let jid = unit.get_job().jid.to_string();
+    unit.item_list.put_off_all_item();
+    if let Some(pos) = MONSTERS.iter().position(|&x| jid == x) {
+        match pos {
+            0 => { // Phantom Wyvern
+                unit.item_list.add_iid_no_duplicate("IID_氷のブレス");
+                unit.item_list.add_iid_no_duplicate("IID_氷塊");
+            }
+            1 => {  // Corrupted Wyvern
+                unit.item_list.add_iid_no_duplicate("IID_瘴気のブレス");
+                unit.item_list.add_iid_no_duplicate("IID_瘴気の塊");
+            }
+            2|3 => {    // Wolves
+                unit.item_list.add_iid_no_duplicate("IID_牙");
+            }
+            4|7 => {
+                unit.item_list.add_iid_no_duplicate("IID_邪竜石_魔法攻撃");
+                unit.item_list.add_iid_no_duplicate("IID_邪竜石");
+            }   
+            5|6 => {    //Wyrms
+                unit.item_list.add_iid_no_duplicate("IID_火のブレス");
+                unit.item_list.add_iid_no_duplicate("IID_炎塊");
+            }
+            _ => {},
+        }
+        add_equip_condition(unit);
+    }
+    if unit.person.get_asset_force() == 0 { unit.item_list.add_iid_no_duplicate("IID_特効薬"); }
+    println!("Monster Class Weapons Added");
+}
+
 
 #[unity::class("App", "Transporter.Data")]
 pub struct TransporterData {
@@ -743,3 +791,6 @@ fn get_empty_index(method_info: OptionalMethod) -> i32;
 
 #[skyline::from_offset(0x01c53f80)]
 fn unit_pool_get(index:i32, method_info: OptionalMethod) -> Option<&'static mut Unit>;
+
+#[skyline::from_offset(0x01a436b0)]
+fn unit_can_equip_item(unit: &Unit, index: i32, rod: bool, exp: bool, method_info: OptionalMethod) -> bool;

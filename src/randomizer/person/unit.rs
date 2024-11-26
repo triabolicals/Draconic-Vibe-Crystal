@@ -1,15 +1,17 @@
 use super::{*, ai};
+use crate::randomizer::assets::animation::MONSTERS;
 use crate::randomizer::emblem;
-use crate::randomizer::{job, item::unit_items, assets, skill};
+use crate::randomizer::item::unit_items::{add_generic_weapons, get_number_of_usable_weapons};
+use crate::randomizer::{grow, job, item::unit_items, assets, skill};
 use crate::utils;
 
 #[unity::hook("App", "Unit", "CreateImpl2")]
 pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     let can_lueur_change = unsafe { LUEUR_CHANGE };
     call_original!(this, method_info);
-    println!("Create Impl 2 on {} - #{}", this.person.get_name().unwrap().get_string().unwrap(),  this.person.parent.index);
+    println!("Create Impl 2 on {} - #{}", this.person.get_name().unwrap().to_string(),  this.person.parent.index);
     if !can_lueur_change {
-        if this.person.pid.get_string().unwrap() == "PID_リュール" {  unsafe { LUEUR_CHANGE = true; } }
+        if this.person.pid.to_string() == "PID_リュール" {  unsafe { LUEUR_CHANGE = true; } }
         return;
     }
     if !can_rand() { return; }
@@ -18,27 +20,27 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         if playable.iter().find(|&&x| x == this.person.parent.index).is_some() {
             if GameVariableManager::get_number("G_Random_Job") & 1 != 0 {
                 job::unit_change_to_random_class(this);
-                fixed_unit_weapon_mask(this);
-                println!("CreateFromDispos Adjust Unit Items for {}", Mess::get(this.person.get_name().unwrap()).get_string().unwrap());
+                println!("CreateFromDispos Adjust Unit Items for {}", Mess::get(this.person.get_name().unwrap()).to_string());
             }
             if GameVariableManager::get_number("G_Random_Recruitment") != 0 ||  ( GameVariableManager::get_number("G_Random_Job") & 1 != 0 ) {  adjust_unit_items(this);  }
         }
         if this.person.get_asset_force() != 0 { assets::accessory::accesorize_enemy_unit(this); }
+        unsafe { unit_update_auto_equip(this, None); }
+        grow::adaptive_growths(this);
         return;
     }
     if GameVariableManager::get_number("G_Random_Recruitment") != 0 {
-        if GameVariableManager::get_string("G_R_PID_リュール").get_string().unwrap() == this.person.pid.get_string().unwrap() && GameUserData::get_sequence() == 0 {
+        if GameVariableManager::get_string("G_R_PID_リュール") == this.person.pid && GameUserData::get_sequence() == 0 {
             change_unit_autolevel(this, true);
             this.item_list.put_off_all_item();
             this.item_list.add_item_no_duplicate(ItemData::get("IID_鉄の剣").unwrap()); 
             this.item_list.add_item_no_duplicate(ItemData::get("IID_傷薬").unwrap());
         }
         else if GameVariableManager::get_bool("DDFanClub") {
-            let old_person = switch_person_reverse(this.person).pid.get_string().unwrap();
+            let old_person = switch_person_reverse(this.person).pid.to_string();
             change_unit_autolevel(this, true);
-
-            // If Chapter 1 and Vander -> Switch
-            if GameUserData::get_chapter().cid.get_string().unwrap() == "CID_M001" && ( old_person == "PID_クラン" || old_person == "PID_フラン" ) {
+        // If Chapter 1 and Vander -> Switch
+            if GameUserData::get_chapter().cid.contains("M001") && ( old_person == "PID_クラン" || old_person == "PID_フラン" ) {
                 this.item_list.put_off_all_item();
             }
             else {
@@ -52,45 +54,42 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             (GameUserData::get_sequence() == 3 && ( GameVariableManager::get_bool("MapRecruit") || ( GameVariableManager::get_number("G_DeploymentMode") != 3 && !crate::utils::lueur_on_map() ) ) )  { 
             println!("Hub/Kizuna Recruitment");
             change_unit_autolevel(this, true);
-            if this.person.pid.get_string().unwrap() == "PID_ヴェイル" {
+            if this.person.pid.contains("PID_ヴェイル") {
                 this.item_list.put_off_all_item();
-                this.item_list.add_item_no_duplicate(ItemData::get("IID_オヴスキュリテ").unwrap()); 
-                this.item_list.add_item_no_duplicate(ItemData::get("IID_ミセリコルデ").unwrap());
+                this.item_list.add_iid_no_duplicate("IID_オヴスキュリテ");
+                this.item_list.add_iid_no_duplicate("IID_ミセリコルデ");
             }
         }
         // if randomized to the same person
-        else if switch_person(this.person).pid.get_string().unwrap() ==  this.person.pid.get_string().unwrap() {
-            println!("Same Person");
+        else if switch_person(this.person).pid ==  this.person.pid {
             if GameVariableManager::get_number("G_Random_Job") & 1 != 0  {
                 job::unit_change_to_random_class(this);
                 fixed_unit_weapon_mask(this);
                 adjust_unit_items(this);
             }
+            grow::adaptive_growths(this);
             return;
         }
         else { change_unit_autolevel(this, false);  }
-        if this.person.pid.get_string().unwrap() == "PID_リュール" && GameUserData::get_sequence() != 0{
+        if this.person.pid.to_string() == "PID_リュール" && GameUserData::get_sequence() != 0{
             this.edit.set_gender( GameVariableManager::get_number("G_Lueur_Gender2") );
             if GameVariableManager::exist("G_Lueur_Name") { this.edit.set_name( GameVariableManager::get_string("G_Lueur_Name") ); }
         }
     }
-    if GameVariableManager::get_number("G_Random_Job") == 1 ||  GameVariableManager::get_number("G_Random_Job") == 3  {
-        job::unit_change_to_random_class(this);
-        fixed_unit_weapon_mask(this);
-
-    }
-    if GameVariableManager::get_number("G_Random_Recruitment") != 0 ||  ( GameVariableManager::get_number("G_Random_Job") == 1 ||  GameVariableManager::get_number("G_Random_Job") == 3 ) {  adjust_unit_items(this);  }
+    if GameVariableManager::get_number("G_Random_Job") & 1 != 0   { job::unit_change_to_random_class(this); }
+    if GameVariableManager::get_number("G_Random_Recruitment") != 0 || GameVariableManager::get_number("G_Random_Job") & 1 != 0 {  adjust_unit_items(this);  }
     unit_items::remove_duplicates(this.item_list);
-    println!("Finish with Create2Impl for {}", this.person.get_name().unwrap().get_string().unwrap());
+    println!("Finish with Create2Impl for {}", this.person.get_name().unwrap().to_string());
     set_unit_edit_name(this);
     unsafe { unit_update_auto_equip(this, None); }
+    grow::adaptive_growths(this);
 }
 
 #[unity::hook("App", "Unit", "CreateFromDispos")]
 pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_info: OptionalMethod) {
 // Changing Emblems
    if data.gid.is_some() && GameVariableManager::get_number("G_Emblem_Mode") != 0 {
-       let string = data.gid.unwrap().get_string().unwrap();
+       let string = data.gid.unwrap().to_string();
        if EMBLEM_GIDS.iter().position(|x| *x == string).is_some() {
            let new_string = format!("G_R_{}", string);
            let new_gid = GameVariableManager::get_string(&new_string);
@@ -104,6 +103,7 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
    call_original!(this, data, method_info);
    ai::engage_attack_ai(this, data); 
    if !utils::can_rand() { return; }
+   let job = this.get_job();
    let rng = Random::get_game();
    if this.person.get_engage_sid().is_none()  {
         if ( GameVariableManager::get_bool("G_Random_Skills") && GameVariableManager::get_number("G_EnemySkillGauge") > 10 ) && ( utils::can_rand() && this.person.get_asset_force() != 0 ) {
@@ -119,6 +119,8 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
         }
    }
    call_original!(this, data, method_info);
+   if super::super::assets::animation::MONSTERS.iter().any(|str| job.jid.contains(str)) { return;  }
+
    set_unit_edit_name(this);
    if this.person.get_flag().value & 512 == 512 {  // Person was change 
        fixed_unit_weapon_mask(this);
@@ -128,7 +130,7 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
    if this.person.get_asset_force() == 0 && ( GameVariableManager::get_number("G_Random_Job") & 1 != 0 ){
        ai::adjust_unit_ai(this, data); // change green unit recruitable ai on random classes
    }
-   if this.person.get_asset_force() != 0 && !GameUserData::is_evil_map() {
+   if this.person.get_asset_force() != 0 {
        if GameVariableManager::get_bool("G_DVC_Autolevel") { auto_level_unit(this); }
        if ( GameVariableManager::get_number("G_Random_Job") & 2 != 0 )  && GameVariableManager::get_bool("G_Cleared_M004"){
            if this.person.get_asset_force() == 2 || ( unsafe { get_bmap_size(this.person, None) } == 1 && rng.get_value(100) < GameVariableManager::get_number("G_EnemyJobGauge") ) {
@@ -148,7 +150,10 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
        }
        if str_contains(GameUserData::get_chapter().cid, "CID_S0") && GameVariableManager::get_number("G_Emblem_Mode") != 0 { emblem_paralogue_level_adjustment(this); } 
        if GameVariableManager::get_number("G_Random_Item") >= 2 { unit_items::random_items_drops(this); }
-       if !GameVariableManager::get_bool("G_Cleared_M004") { return; }
+       if !GameVariableManager::get_bool("G_Cleared_M004") { 
+            unsafe { unit_update_auto_equip(this, None); }
+            return; 
+        }
        if GameVariableManager::get_bool("G_Random_Skills") && rng.get_value(100) < GameVariableManager::get_number("G_EnemySkillGauge") && this.person.get_engage_sid().is_none() {
            let mut valid_skill = false;
            let mut count = 0;
@@ -165,7 +170,7 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
            this.hp_stock_count_max += 1;
        }
        if rng.get_value(200) < GameVariableManager::get_number("G_EnemyEmblemGauge") && this.get_god_unit().is_none() {
-           let current_chapter = GameUserData::get_chapter().cid.get_string().unwrap();
+           let current_chapter = GameUserData::get_chapter().cid.to_string();
            if current_chapter != "CID_M022" && current_chapter != "CID_M011"  {
                let emblem = rng.get_value(EMBLEMS.len() as i32) as usize;
                if try_equip_emblem(this, emblem) { 
@@ -178,7 +183,8 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
    unit_items::adjust_enemy_meteor(this);
    unsafe { unit_update_auto_equip(this, None); }
    // Prevent Green Emblems from dying in Chapter 22 if AI is changed
-   if str_contains(this.person.pid, "PID_M022_紋章士") { this.private_skill.add_sid("SID_死亡回避", 10, 0);  }  
+   if this.person.pid.contains("PID_M022_紋章士") { this.private_skill.add_sid("SID_死亡回避", 10, 0);  }  
+   else if get_number_of_usable_weapons(this) == 0 { add_generic_weapons(this); }
 }
 
 pub fn fixed_unit_weapon_mask(this: &mut Unit){
@@ -191,12 +197,16 @@ pub fn fixed_unit_weapon_mask(this: &mut Unit){
     this.add_aptitude_from_weapon_mask();
 }
 
-pub fn adjust_unit_items(unit: &Unit) {
+pub fn adjust_unit_items(unit: &mut Unit) {
     let job = unit.get_job();
-    let mut weapon_mask = job.get_weapon_mask().value | unit.selected_weapon_mask.value;
-    if weapon_mask == 0 {  weapon_mask = unit.selected_weapon_mask.value; }
+    let weapon_mask = job.get_weapon_mask_with_selected(unit.weapon_mask, unit.selected_weapon_mask).value;
+    let jid = job.jid.to_string();
+    if MONSTERS.iter().any(|&x| jid == x) {
+        unit_items::add_monster_weapons(unit);
+        return;
+    }
     let list_count = unit.item_list.get_count();
-    let name =  unit.person.get_name().unwrap().get_string().unwrap();
+    let name =  unit.person.get_name().unwrap().to_string();
     if list_count == 0 { return; }
     let mut slot = 0;
     let mut weapon_mask_array: [i32; 4] = [0; 4];
@@ -214,17 +224,16 @@ pub fn adjust_unit_items(unit: &Unit) {
     }
     let n_weapons = slot;
     slot = 0;
-    let jid = unit.get_job().jid.get_string().unwrap();
+    let jid = unit.get_job().jid.to_string();
     for x in 0..8 {
         let item = unit.item_list.get_item(x);
         if item.is_some() {
             let weapon = &item.unwrap();
             let kind = weapon.item.get_kind(); 
-            if kind > 8 || kind == 0 { continue; }
-            if kind == 7 { continue; }
+            if kind > 8 || kind == 0 || kind == 7 { continue; }
             if weapon.item.get_flag().value & 128 != 0 || ( weapon.item.get_flag().value & 2 != 0 && !enemy) { continue;  }
             //let rank = weapon.item.get_weapon_level();
-            //println!("{}: Weapon Mask {} & {} (kind = {}, rank {} ) = {} for {} ", name, weapon_mask, 1 << kind, kind, rank, weapon_mask & ( 1 <<  kind ), weapon.item.name.get_string().unwrap());
+            //println!("{}: Weapon Mask {} & {} (kind = {}, rank {} ) = {} for {} ", name, weapon_mask, 1 << kind, kind, rank, weapon_mask & ( 1 <<  kind ), weapon.item.name.to_string());
             if weapon_mask & ( 1 <<  kind ) == 0 {
                 // For Veyle
                 if name == "MPID_Veyre" && weapon_mask_array[slot] == 64 {
@@ -252,7 +261,7 @@ pub fn adjust_unit_items(unit: &Unit) {
                     }
                 }
                 else {
-                    println!("{} has Weapon {} to be replaced", name, weapon.item.name.get_string().unwrap());
+                    println!("{} has Weapon {} to be replaced", name, weapon.item.name.to_string());
                     if slot < n_weapons {
                         unit_items::replace_weapon(weapon, weapon_mask_array[slot as usize], weapon_level[slot as usize], enemy);
                         if n_weapons > 1 { slot += 1; }
@@ -260,14 +269,11 @@ pub fn adjust_unit_items(unit: &Unit) {
                     else if slot < 4 && slot >= 1 {
                         unit_items::replace_weapon(weapon, weapon_mask_array[slot - 1 as usize], weapon_level[slot - 1 as usize], enemy);
                     }
-                    println!("Finished");
                 }
             }
         }
     }
-    println!("Adjusting Staffs");
     unit_items::adjust_staffs(unit);
-    println!("Adjusting Melee Weapons");
     unit_items::adjust_melee_weapons(unit);
     unit_items::remove_duplicates(unit.item_list);
     unsafe { unit_update_auto_equip(unit, None); }
@@ -275,14 +281,14 @@ pub fn adjust_unit_items(unit: &Unit) {
 }
 
 pub fn set_unit_edit_name(unit: &Unit) {
-    if unit.person.pid.get_string().unwrap() == "PID_リュール" || unit.person.get_flag().value & 1024 != 0 {
+    if unit.person.pid.to_string() == "PID_リュール" || unit.person.get_flag().value & 1024 != 0 {
         if GameVariableManager::get_number("G_Lueur_Gender2") != 0 { unit.edit.set_gender( GameVariableManager::get_number("G_Lueur_Gender2") ); }
         else {unit.edit.set_gender( 1 );  }
         if GameVariableManager::exist("G_Lueur_Name") { unit.edit.set_name( GameVariableManager::get_string("G_Lueur_Name") ); }
         unit.person.set_gender( unit.edit.gender );
     }
     if unit.person.get_flag().value & 128 != 0 {
-        println!("Person #{} Name is set to be {}", unit.person.parent.index, GameVariableManager::get_string("G_Lueur_Name").get_string().unwrap());
+        println!("Person #{} Name is set to be {}", unit.person.parent.index, GameVariableManager::get_string("G_Lueur_Name").to_string());
         unit.edit.set_name( GameVariableManager::get_string("G_Lueur_Name") );
         if GameVariableManager::get_number("G_Lueur_Gender2") != 0 { unit.edit.set_gender( GameVariableManager::get_number("G_Lueur_Gender2") ); }
         else {unit.edit.set_gender( 1 );  }
@@ -299,7 +305,7 @@ pub fn emblem_paralogue_level_adjustment(this: &Unit){
         if this.level == 1 { level = 2; }
         else { level = this.level as i32 ;  }
         let mut count = 0;
-        let count_max = -1*(level_difference + level_difference / 3 );
+        let count_max = -2*(level_difference + level_difference);
         loop {
             this.level_down();
             this.set_level(level);
@@ -330,7 +336,7 @@ pub fn emblem_paralogue_level_adjustment(this: &Unit){
 pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
     let person = if reverse { super::switch_person_reverse(unit.person) } else { &unit.person };
     let new_person = if reverse { &unit.person } else { super::switch_person(unit.person) }; 
-    println!("{} -> {}",  person.get_name().unwrap().get_string().unwrap(), new_person.get_name().unwrap().get_string().unwrap());
+    println!("{} -> {}",  person.get_name().unwrap().to_string(), new_person.get_name().unwrap().to_string());
     let is_low = person.get_job().unwrap().is_low();
     let is_new_low = new_person.get_job().unwrap().is_low();
     let current_level = person.get_level() as i32;
@@ -376,7 +382,7 @@ pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
             unit.auto_grow_capability( current_level, current_level);
             unit.set_level( current_level );
             unit.set_internal_level( 0 );
-            println!("{} -> {} Base -> Base Level {}",  person.get_name().unwrap().get_string().unwrap(), new_person.get_name().unwrap().get_string().unwrap(), current_level);
+            println!("{} -> {} Base -> Base Level {}",  person.get_name().unwrap().to_string(), new_person.get_name().unwrap().to_string(), current_level);
         }
         else {
             let new_job_list = new_person.get_job().unwrap().get_low_jobs();
@@ -455,7 +461,7 @@ fn calculate_new_offset(original: &PersonData, new: &PersonData) -> [i8; 11] {
     let old_offset = original.get_offset_n();
     let new_grow = new.get_grow();
     // Use Vander's outset if vander
-    if original.pid.get_string().unwrap() == "PID_ヴァンドレ" {
+    if original.pid.to_string() == "PID_ヴァンドレ" {
         for x in 0..11 {
             let value: i32 = 100 * old_offset[x as usize ] as i32 + old_level * new_grow[ x ] as i32 + 50;
             out[x as usize] = (value / 100 ) as i8;
@@ -489,36 +495,37 @@ fn adjust_emblem_paralogue_items(data: &mut DisposData) {
     let person = data.get_person();
     if person.is_none() { return; }
     let emblem = person.unwrap();
+    let job = emblem.get_job().unwrap();
+    if let Some(emblem_index) = EMBLEM_ASSET.iter().position(|x| job.jid.contains(x)) {
+        if let Some(god) = emblem::get_god_from_index(emblem_index as i32, false) {
+            let level_data = god.get_level_data().unwrap();
+            let style_items = &level_data[20].style_items[2];
+            let mut item_count: usize = 0;
 
-    let sp = emblem.get_sp() ;
-    if sp == 0 || sp > 99 { return; }
-    if !str_contains(emblem.jid.unwrap(), "JID_紋章士") { return; }
-
-    let emblem_index = sp - 1;
-    let god = emblem::get_god_from_index(emblem_index, false);
-    if god.is_none() { return; } 
-    let growth_data = god.unwrap().get_level_data();
-    if growth_data.is_none() { return; }
-    let level_data = growth_data.unwrap();
-    let style_items = &level_data[0].style_items[2];
-    let mut item_count: usize = 0;
-
-    for x in 0..style_items.len() {
-        let item = &style_items[x];
-        //println!("Emblem Person {} Item: {}", emblem_index, item.name.get_string().unwrap());
-        let new_iid = 
-            if item.get_flag().value & 128 != 0 { format!("{}_通常", item.iid.get_string().unwrap()) } 
-            else { item.iid.get_string().unwrap() };
-
-        if ItemData::get(&new_iid).is_some() {
-            data.items[item_count].set_iid(new_iid.clone().into());
-            match item_count {
-                0 => { data.item1.set_iid(new_iid.into()) },
-                1 => { data.item2.set_iid(new_iid.into()) },
-                2 => { data.item3.set_iid(new_iid.into()) },
-                _ => {},
+            for x in 0..style_items.len() {
+                let item = &style_items[x];
+                let item_index = item.parent.index +1;
+                
+                let new_iid = 
+                    if item.iid.contains("アイムール"){ "IID_三級長_アイムール_通常".into() }
+                    else if item.iid.contains("アラドヴァル"){  "IID_三級長_アラドヴァル_通常".into()   }
+                    else if item.iid.contains("フェイルノート"){  "IID_三級長_フェイルノート_通常".into()  }
+                    else if item.get_flag().value & 128 != 0 { format!("{}_通常", item.iid.to_string()) }
+                    else { item.iid.to_string() };
+                if ItemData::get(new_iid.as_str()).is_some() {
+                    data.items[item_count].set_iid(new_iid.clone().into());
+                    match item_count {
+                        0 => { data.item1.set_iid(new_iid.into()) },
+                        1 => { data.item2.set_iid(new_iid.into()) },
+                        2 => { data.item3.set_iid(new_iid.into()) },
+                        _ => {},
+                    }
+                    item_count += 1;
+                }
+                else {
+                    println!("Cannot find: {} for emblem {}", Mess::get(item.name), Mess::get_name(emblem.pid));
+                }
             }
-            item_count += 1;
         }
     }
 }

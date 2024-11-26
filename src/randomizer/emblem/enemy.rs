@@ -1,6 +1,7 @@
 use super::*;
 use lazy_static::lazy_static;
 use engage::gamedata::god::*;
+use engage::mess::*;
 
 lazy_static! {
 pub static ref ENEMY_EMBLEMS: Vec<(&'static str, i32)> = vec![ 
@@ -50,22 +51,23 @@ fn change_enemy_emblem_data(enemy_god: &mut GodData, index: i32, different_order
     let emblem_index =  if different_order { EMBLEM_ORDER.lock().unwrap()[index as usize] } else { index };
     if emblem_index < 0 || emblem_index > 19 { return; }
     let source_god = GodData::get(EMBLEM_GIDS[emblem_index as usize]).unwrap();
-    if enemy_god.engage_attack.is_some() && !str_contains(enemy_god.gid, "M011") {
-        if source_god.get_engage_attack().get_string().unwrap() == "SID_ベレトエンゲージ技"  {
+    if enemy_god.engage_attack.is_some() {
+        if source_god.get_engage_attack().to_string() == "SID_ベレトエンゲージ技"  {
             enemy_god.set_engage_attack("SID_ベレトエンゲージ技_闇".into());
         }
-        else if source_god.get_engage_attack().get_string().unwrap() == "SID_リンエンゲージ技" {
-                enemy_god.set_engage_attack("SID_リンエンゲージ技_威力減".into());
+        else if source_god.get_engage_attack().to_string() == "SID_リンエンゲージ技" {
+            enemy_god.set_engage_attack("SID_リンエンゲージ技_威力減".into());
         }
         else { enemy_god.set_engage_attack( source_god.get_engage_attack() );  }
     }
+
     enemy_god.link_gid = source_god.link_gid;
     enemy_god.engage_attack_link = source_god.engage_attack_link;
     enemy_god.ascii_name = source_god.ascii_name;
     enemy_god.mid = source_god.mid;
     enemy_god.nickname = source_god.nickname;
     enemy_god.sound_id = source_god.sound_id;
-    if enemy_god.gid.get_string().unwrap() == "GID_M002_シグルド" || ( emblem_index == 8 || emblem_index == 10 || emblem_index == 11 ) {
+    if enemy_god.gid.to_string() == "GID_M002_シグルド" || ( emblem_index == 8 || emblem_index == 10 || emblem_index == 11 ) {
          enemy_god.asset_id = source_god.asset_id;
     }
     else {
@@ -77,12 +79,12 @@ fn change_enemy_emblem_data(enemy_god: &mut GodData, index: i32, different_order
     enemy_god.unit_icon_id = source_god.unit_icon_id;
     enemy_god.on_complete();
     let source_ggd = source_god.get_grow_table().unwrap();
-    let src_data = GodGrowthData::get_level_data(&source_ggd.get_string().unwrap()).unwrap();
-    let engage_skill = src_data[0].engage_skills[0].get_skill().unwrap();
+    let src_data = GodGrowthData::get_level_data(&source_ggd.to_string()).unwrap();
+    let mut engage_skill = src_data[0].engage_skills[0].get_skill().unwrap();
+    if let Some(engage) = get_enemy_version_of_skills(engage_skill) {   engage_skill = engage; }
     let emblem_level = get_enemy_emblem_level(enemy_god.gid);
-
     if let Some(ggd) = enemy_god.get_grow_table() {
-        if let Some(level_data) = GodGrowthData::get_level_data(&ggd.get_string().unwrap()) {
+        if let Some(level_data) = GodGrowthData::get_level_data(&ggd.to_string()) {
             for y in 0..level_data.len() {
                 level_data[y].synchro_skills.clear();
                 level_data[y].engaged_skills.clear();
@@ -90,11 +92,12 @@ fn change_enemy_emblem_data(enemy_god: &mut GodData, index: i32, different_order
                 level_data[y].engage_skills.clear();
                 for z in 0..src_data[emblem_level as usize].synchro_skills.list.size {
                     let skill = src_data[emblem_level as usize].synchro_skills[z as usize].get_skill().unwrap();
-                    level_data[y as usize ].synchro_skills.add_skill(skill, 5, 0);
+                    level_data[y as usize ].synchro_skills.add_skill(skill, 5, 0); 
+
                 }
                 for z in 0..src_data[emblem_level as usize].engaged_skills.list.size {
                     let skill = src_data[emblem_level as usize].engaged_skills[z as usize].get_skill().unwrap();
-                    level_data[y as usize ].engaged_skills.add_skill(skill, 5, 0);
+                    level_data[y as usize ].engaged_skills.add_skill(skill, 5, 0); 
                 }
                 level_data[y].engage_skills.add_skill(engage_skill, 5, 0);
                 for z in 0..9 {
@@ -106,4 +109,16 @@ fn change_enemy_emblem_data(enemy_god: &mut GodData, index: i32, different_order
             }
         }
     }
+}
+
+// Nerfing some skills for pre-chapter 12
+fn get_enemy_version_of_skills(skill: &SkillData) -> Option<&'static SkillData> {
+    if !GameVariableManager::get_bool("G_Cleared_M020") {
+        if skill.sid.contains("SID_迅走") {  return SkillData::get("SID_迅走_闇")  }
+        if skill.sid.contains("SID_増幅") {  return SkillData::get("SID_増幅_闇")  } 
+        if skill.sid.contains("SID_超越") {  return SkillData::get("SID_超越_闇") }  // Rise Above -> Sink Below
+        if skill.sid.contains("SID_踏ん張り") { return SkillData::get("SID_踏ん張り")  } // Hold Out -> Lowest Tier Hold Out
+        if skill.sid.contains("SID_アイクエンゲージスキル") { return SkillData::get("SID_無し") }   // Laguz Friend -> None
+    }
+    None
 }

@@ -21,6 +21,11 @@ use super::CONFIG;
 pub static mut SET: i32 = 0;
 use std::sync::Mutex;
 pub static PLAYABLE: Mutex<Vec<i32>> = Mutex::new(Vec::new());
+pub static mut INDEX: i32 = -1;
+pub static mut INDEX2: i32 = -1;
+pub static mut SELECTION: i32 = 0;
+pub static mut SELECTION2: i32 = 0;
+pub static mut IS_EMBLEM: bool = false;
 
 pub struct RandomPersonMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomPersonMod {
@@ -90,13 +95,11 @@ pub fn get_playable_list() {
     if PLAYABLE.lock().unwrap().len() != 0 { return; }
     let mut list = PLAYABLE.lock().unwrap();
     // Add the 41 units first
-    for x in PIDS {
-        let index = PersonData::get(&x).unwrap().parent.index;
-        list.push(index);
-    }
+    PIDS.iter().for_each(|&pid| list.push(PersonData::get(pid).unwrap().parent.index));
     // Add all others that have non zero SP
     let person_list = PersonData::get_list().unwrap(); 
     let mut count = 0;
+
     for x in 0..person_list.len() { 
         let person = &person_list[x as usize];
         if person.get_sp() == 0 { continue; }
@@ -113,17 +116,31 @@ pub fn get_playable_list() {
             if person.get_sp() < 300 { person.set_sp(300); }
             if list.iter().find(|r| **r == index).is_none() { 
                 list.push(index);
-                println!("Person #{}: {} was added", index, Mess::get_name(person.pid).get_string().unwrap());
+                println!("Person #{}: {} was added", index, Mess::get_name(person.pid).to_string());
             }
         }
     }
     println!("Total of {} Playable Units", list.len());
 }
 
+pub fn check_playable_classes() {
+    // Set valid classes to Sword Fighter or Swordmaster
+    let list = PLAYABLE.lock().unwrap();
+    list.iter().for_each(|&index|{
+        if let Some(person) = PersonData::try_index_get_mut(index) {
+            if person.get_job().is_none() {
+                if person.get_sp() >= 1000 { person.set_jid("JID_ソードマスター".into()); }
+                else {  person.set_jid("JID_ソードファイター".into()); }
+                person.on_completed();
+            }
+        }
+    });
+}
+
 fn create_reverse() {
     for x in 0..41 {
         let key = format!("G_R_{}",PIDS[x as usize]);
-        let pid = GameVariableManager::get_string(&key).get_string().unwrap();
+        let pid = GameVariableManager::get_string(&key).to_string();
         for y in 0..41 {
             if pid == PIDS[y as usize] {
                 GameVariableManager::make_entry_str(&format!("G_R2_{}",PIDS[y as usize]), PIDS[x as usize]);
@@ -191,7 +208,7 @@ fn set_hub_facilities() {
             facility.condition_cid = format!("CID_{}", RECRUIT_CID[ a_index as usize] ).into() ;
             for y in 0..hub_dispos[1].len() {
                 let hub_locator = hub_dispos[1][y as usize].get_locator();
-                if hub_locator.get_string().unwrap() == locator[ x as usize] {
+                if hub_locator.to_string() == locator[ x as usize] {
                     hub_dispos[1][y as usize].set_chapter(RECRUIT_CID[ a_index as usize].into() );
                     break;
                 }
@@ -234,7 +251,7 @@ pub fn randomize_person() {
                     }
                 }
                 let person_list = PersonData::get_list().unwrap();
-                let pids: Vec<String> = list.iter().map(|&x| person_list[x as usize].pid.get_string().unwrap() ).collect();
+                let pids: Vec<String> = list.iter().map(|&x| person_list[x as usize].pid.to_string() ).collect();
 
             // Alear and somniel royals must be switched with non-dlc units
                 let royals = [0, 23, 4, 17, 14, 27];
@@ -247,7 +264,7 @@ pub fn randomize_person() {
                         GameVariableManager::set_string(&format!("G_R2_{}", PIDS[x_i as usize]), PIDS[x_j as usize]);
                         if let Some(index1) = to_replace_list.iter().position(|&i| i == x_j) { to_replace_list.remove(index1); }
                         if let Some(index2) = playable_list.iter().position(|&i| i == x_i) {  playable_list.remove(index2);  }
-                        println!("#{}: {} -> {}", x_j, Mess::get_name(PIDS[x_j as usize]).get_string().unwrap(),  Mess::get_name(PIDS[x_i as usize]).get_string().unwrap());
+                        println!("#{}: {} -> {}", x_j, Mess::get_name(PIDS[x_j as usize]).to_string(),  Mess::get_name(PIDS[x_i as usize]).to_string());
                         break;
                     }
                 }
@@ -269,7 +286,7 @@ pub fn randomize_person() {
                     GameVariableManager::make_entry_str(&key_pid_j, &pids[x_i as usize]);
                     GameVariableManager::set_string(&key_pid_j, &pids[x_i as usize]);
                     if let Some(index) = playable_list.iter().position(|&i| i == x_j) {  playable_list.remove(index);  }
-                    println!("#{}: {} -> {}", x_i, Mess::get_name(pids[x_i as usize].clone()).get_string().unwrap(),  Mess::get_name(pids[x_j as usize].clone()).get_string().unwrap());
+                    println!("#{}: {} -> {}", x_i, Mess::get_name(pids[x_i as usize].clone()).to_string(),  Mess::get_name(pids[x_j as usize].clone()).to_string());
                 }
             },
             2 => {   //Reverse
@@ -311,12 +328,12 @@ pub fn randomize_person() {
 
 pub fn find_pid_replacement(pid: &String, reverse: bool) -> Option<String>{
     if PIDS.iter().position(|&x| x == *pid).is_some() {
-        if reverse { return Some( GameVariableManager::get_string(&format!("G_R2_{}", pid)).get_string().unwrap()); }   
-        else { return Some( GameVariableManager::get_string(&format!("G_R_{}", pid)).get_string().unwrap()); }
+        if reverse { return Some( GameVariableManager::get_string(&format!("G_R2_{}", pid)).to_string()); }   
+        else { return Some( GameVariableManager::get_string(&format!("G_R_{}", pid)).to_string()); }
     }
     else if EMBLEM_GIDS.iter().position(|&x| x == *pid).is_some() {
-        if reverse { return Some( GameVariableManager::get_string(&format!("G_R2_{}", pid)).get_string().unwrap()); }   
-        else { return Some( GameVariableManager::get_string(&format!("G_R_{}", pid)).get_string().unwrap()); }
+        if reverse { return Some( GameVariableManager::get_string(&format!("G_R2_{}", pid)).to_string()); }   
+        else { return Some( GameVariableManager::get_string(&format!("G_R_{}", pid)).to_string()); }
     }
     return None;
 }
@@ -325,43 +342,36 @@ pub fn change_hub_dispos(revert: bool) {
     let t_list = HubDisposData::get_array_mut().expect("Me");
     for x in 0..t_list.len() {
         for y in 0..t_list[x].len() {
-            let aid = t_list[x][y].get_aid();
-            if aid.is_some() { 
-                if str_contains(aid.unwrap(), "GID_") && str_contains(t_list[x][y].parent.array_name, "Fld_S0") { continue; }
-                let pid = aid.unwrap().get_string().unwrap();
-                let new_pid = find_pid_replacement(&pid, revert);
-                if new_pid.is_some() { 
-                    let n_pid = new_pid.unwrap();
-                    t_list[x][y].set_aid(n_pid.into());
-                 }
+            if let Some(aid) = t_list[x][y].get_aid() {
+                if aid.contains("GID_") && t_list[x][y].parent.array_name.contains("Fld_S0") { continue; }
+                if t_list[x][y].parent.array_name.contains("Fld_M0") {
+                    if let Some(new_pid) = find_pid_replacement(&aid.to_string(), revert) { t_list[x][y].set_aid(new_pid.clone().into()); }
+                }
             }
         }
     }
-    if GameVariableManager::get_string("G_R_PID_リュール").get_string().unwrap() == "PID_リュール" { return;  }
-    let replacement = GameVariableManager::get_string("G_R_PID_リュール").get_string().unwrap();
+    if GameVariableManager::get_string("G_R_PID_リュール").to_string() == "PID_リュール" { return;  }
+    let replacement = GameVariableManager::get_string("G_R_PID_リュール");
     let hublist = super::item::shop::HubRandomSet::get_list_mut().unwrap();
-    for x in 0..hublist.len() {
-        let list = &mut hublist[x]; 
-        for y in 0..list.len() {
-            if list.parent.list[y].iid.get_string().unwrap() == replacement {
-                list.parent.list[y].iid = "PID_リュール".into();
-            }
+    hublist.iter_mut().for_each(|list|{
+        if let Some(old_person) = list.parent.iter_mut().find(|p| p.iid ==  replacement ) {
+            old_person.iid = "PID_リュール".into();
         }
-    }
+    });
 }
 
 pub fn change_map_dispos() {
     let list = DisposData::get_list_mut();
     if list.is_none() || !can_rand() { return; }
     let t_list = list.unwrap();
-    let cid = GameUserData::get_chapter().cid.get_string().unwrap();
+    let cid = GameUserData::get_chapter().cid.to_string();
 // Framme and Clanne Replacement
     if cid == "CID_M002" ||  cid == "CID_M001" || cid == "CID_M003" { GameVariableManager::make_entry("DDFanClub", 1); }
     for x in 0..t_list.len() {
         for y in 0..t_list[x].len() {
             let aid = t_list[x][y].get_pid();
             if aid.is_none() { continue; }
-            let pid = aid.unwrap().get_string().unwrap();
+            let pid = aid.unwrap().to_string();
             if pid == "PID_リュール" { 
                 let new_pif = GameVariableManager::get_string("G_R_PID_リュール");
                 t_list[x][y].set_pid(new_pif); 
@@ -380,13 +390,13 @@ pub fn change_map_dispos() {
 
 pub fn change_lueur_for_recruitment(is_start: bool) {
     if !crate::utils::can_rand() { return; }
-    if GameVariableManager::get_string("G_R_PID_リュール").get_string().unwrap() == "PID_リュール" { return;  }
+    if GameVariableManager::get_string("G_R_PID_リュール").to_string() == "PID_リュール" { return;  }
     if GameVariableManager::get_number("G_Random_Recruitment") == 0 { return; }
         // remove hero status on alear and place it on the replacement and add alear skills on the replacement
     let person_lueur = PersonData::get(PIDS[0]).unwrap();
     let lueur_sids = person_lueur.get_common_sids().unwrap();
-    for x in 0..lueur_sids.len() {
-       if lueur_sids[x].get_string().unwrap() == "SID_主人公" { lueur_sids[x] = "SID_無し".into(); }
+    if let Some(hero_sid) = lueur_sids.iter_mut().find(|x| x.contains("SID_主人公")) {
+        *hero_sid =  "SID_無し".into();
     }
     person_lueur.on_complete();
     let new_hero = switch_person(person_lueur);
@@ -400,9 +410,7 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
     new_hero.set_common_sids(new_sids);
     new_hero.on_complete();
     if is_start {   // Move alear to force 5
-        let lueur = unsafe { crate::deployment::force_get_unit_from_pid(PIDS[0].into(), true, None) };
-        if lueur.is_some() { 
-            let lueur_unit = lueur.unwrap();
+        if let Some(lueur_unit) = unsafe { crate::deployment::force_get_unit_from_pid(PIDS[0].into(), true, None) } {
             unit::change_unit_autolevel(lueur_unit, true);
             if GameVariableManager::get_number("G_Random_Job") == 1 ||  GameVariableManager::get_number("G_Random_Job") == 3  {
                 super::job::unit_change_to_random_class(lueur_unit);
@@ -414,12 +422,10 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
             crate::utils::get_lueur_name_gender(); // grab gender and name
             GameVariableManager::make_entry("G_Lueur_Gender2", lueur_unit.edit.gender);
         }
-        let new_unit =  unsafe { join_unit(new_hero, None) };
-        if new_unit.is_some() {
-            let unit = new_unit.unwrap();
+        if let Some(unit) = unsafe { join_unit(new_hero, None) }{
             unit.edit.set_name( Mess::get( new_hero.get_name().unwrap()) );
             unit.edit.set_gender( new_hero.get_gender() );
-            println!("{} unit edit set", new_hero.get_name().unwrap().get_string().unwrap());
+            println!("{} unit edit set", new_hero.get_name().unwrap().to_string());
             unit.transfer(3, false);
         }
     }
@@ -472,26 +478,25 @@ pub fn get_low_class_index(this: &PersonData) -> usize {
 }
 
 pub fn switch_person(person: &PersonData) -> &'static PersonData {
-    let pid = person.pid.get_string().unwrap();
+    let pid = person.pid.to_string();
     if GameVariableManager::get_number("G_Random_Recruitment") == 0 { return PersonData::get(&pid).unwrap(); }
     let var_str = format!("G_R_{}", pid);
     let new_pid = GameVariableManager::get_string(&var_str);
     unsafe { if is_null_empty(new_pid, None) { return PersonData::get(&pid).unwrap(); } }
-    let new_person = PersonData::get(&new_pid.get_string().unwrap());
-    if new_person.is_some() { return new_person.unwrap(); }
+    if let Some(new_person) = PersonData::get(&new_pid.to_string()) { return new_person; }
     else { return PersonData::get(&pid).unwrap(); }
 }
 pub fn switch_person_reverse(person: &PersonData) -> &'static PersonData {
-    let pid = person.pid.get_string().unwrap();
-    let reverse = GameVariableManager::get_string(&format!("G_R2_{}", pid)).get_string().unwrap();
-    return PersonData::get(&reverse).unwrap();
+    let pid = person.pid.to_string();
+    let reverse = GameVariableManager::get_string(&format!("G_R2_{}", pid));
+    return PersonData::get(reverse).unwrap();
 }
 
 // Handle the case of Chapter 11 ends with not escape
 pub fn m011_ivy_recruitment_check(){
     if !crate::utils::can_rand() { return; }
     if GameVariableManager::get_number("G_Random_Recruitment") == 0 { return; }
-    if GameUserData::get_chapter().cid.get_string().unwrap() == "CID_M011" && crate::utils::lueur_on_map() {
+    if GameUserData::get_chapter().cid.to_string() == "CID_M011" && crate::utils::lueur_on_map() {
         GameVariableManager::make_entry("MapRecruit", 1);
         GameVariableManager::set_bool("MapRecruit", true);
     }
@@ -502,19 +507,16 @@ pub fn m011_ivy_recruitment_check(){
 fn join_unit(person: &PersonData, method_info: OptionalMethod) -> Option<&'static mut Unit>;
 
 #[skyline::hook(offset=0x02d51d80)]
-pub fn get_thumb_face(this: &Unit, method_info: OptionalMethod) -> &Il2CppString {
-    let pid = this.person.pid.get_string().unwrap();
-    if pid == "PID_リュール" {
-        if this.person.get_name().unwrap().get_string().unwrap() == "MPID_Lueur" {
-            if GameVariableManager::exist("G_Lueur_Gender2") { 
-                if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "LueurW".into(); }
-                else { return "Lueur".into(); }
-            }
-        }
+pub fn get_thumb_face(this: &Unit, _method_info: OptionalMethod) -> &Il2CppString {
+    let name = this.person.get_name().unwrap().to_string();
+    if let Some(pos) = MPIDS.iter().position(|&x| name == x ) {
+        if pos == 0 { return get_gender_lueur_ascii(false).into(); }
+        let new_name = &MPIDS[pos][5..];
+        return new_name.into();
     }
-    let name = this.person.get_name().unwrap();
-    if let Some(pos) = RINGS.iter().position(|&x| str_contains(name, x)) {
-        if pos > 11 { return format!("{}_DLC", RINGS[pos]).into();  }
+    let il2 = this.person.get_name().unwrap();
+    if let Some(pos) = RINGS.iter().position(|&x| str_contains( il2, x)) {
+        if pos > 11 && pos < 21{ return format!("{}_DLC", RINGS[pos]).into();  }
         else { return RINGS[pos].into();  }
     }
     return this.person.get_ascii_name().unwrap();
@@ -522,79 +524,114 @@ pub fn get_thumb_face(this: &Unit, method_info: OptionalMethod) -> &Il2CppString
 #[skyline::hook(offset=0x02d52340)]
 pub fn get_god_thumb_face(this: &GodData, method_info: OptionalMethod) -> &Il2CppString {
     let name = this.mid;
-    if this.gid.get_string().unwrap() == "GID_リュール" {
-        if name.get_string().unwrap() == "MPID_Lueur" {
-            if GameVariableManager::exist("G_Lueur_Gender2") { 
-                if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "LueurW".into(); }
-                else { return "Lueur".into(); }
-            }
-        }
+    if this.gid.to_string() == "GID_リュール" {
+        if this.mid.contains("Lueur") { return get_gender_lueur_ascii(true).into(); }
     }
     if let Some(pos) = MPIDS.iter().position(|&x| str_contains(name, x)) {
+        if pos == 0 { return get_gender_lueur_ascii(false).into(); }
         let new_name = &MPIDS[pos][5..];
         return new_name.into();
     }
-    return call_original!(this, method_info);
+    call_original!(this, method_info)
 }
 #[skyline::hook(offset=0x021e1250)]
-pub fn get_bond_face(this: &Unit, method_info: OptionalMethod) -> &Il2CppString {
-    let name = this.person.get_name().unwrap().get_string().unwrap();
-    if this.person.pid.get_string().unwrap() == "PID_リュール" {
-        if this.person.get_name().unwrap().get_string().unwrap() == "MPID_Lueur" {
-            if GameVariableManager::exist("G_Lueur_Gender2") { 
-                if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "Telop/LevelUp/FaceThumb/LueurW".into(); }
-                else { return "Telop/LevelUp/FaceThumb/Lueur".into(); }
-            }
-        }
+pub fn get_bond_face(this: &Unit, _method_info: OptionalMethod) -> &Il2CppString {
+    let name = this.person.get_name().unwrap().to_string();
+    if let Some(old) = MPIDS.iter().position(|&x| x == name) { 
+        if old == 1 { return format!("Telop/LevelUp/FaceThumb/{}", get_gender_lueur_ascii(false)).into(); }
+        let new_name = &MPIDS[old][5..]; 
+        return format!("Telop/LevelUp/FaceThumb/{}", new_name).into();
     }
-    if MPIDS.iter().position(|&x| x == name).is_some() { call_original!(this, method_info) }
+    else if let Some(pos) = RINGS.iter().find(|&x| str_contains(this.person.get_name().unwrap(), x)) {
+        format!("Telop/LevelUp/FaceThumb/{}", pos).into()
+    } 
     else {
+        let size = if dlc_check() { 42 } else { 37 };
+        if this.person.parent.index == unsafe { INDEX } && unsafe { SELECTION != -1 } {
+            let sel = unsafe { SELECTION};
+            let new_name = if sel == size - 1 { "LueurW" }
+            else  { &MPIDS[sel as usize][5..] };
+            let path = format!("Telop/LevelUp/FaceThumb/{}", new_name);
+            return path.into();
+        }
+        unsafe { INDEX = this.person.parent.index };
         let rng = Random::get_system();
-        let size = if dlc_check() { 41 } else { 36 };
-        let new_name = &MPIDS[rng.get_value(size) as usize][5..];
+        let sel = rng.get_value(size);
+        let new_name = if sel == size - 1 { "LueurW" }
+            else  { &MPIDS[sel as usize][5..] };
         let path = format!("Telop/LevelUp/FaceThumb/{}", new_name);
-        println!("{}", path);
+        unsafe { SELECTION = sel };
         return path.into();
     }
 }
 
 #[skyline::hook(offset=0x01a22eb0)]
 pub fn get_unit_ascii_name(unit: &Unit, method_info: OptionalMethod) -> &'static Il2CppString {
-    let pid = unit.person.pid.get_string().unwrap();
+    let pid = unit.person.pid.to_string();
     if let Some(pos) = PIDS.iter().position(|&x| x == pid) {  il2_str_substring(MPIDS[pos].into(), 5) }
     else { call_original!(unit, method_info)  }
 }
+
+pub fn get_gender_lueur_ascii(god: bool) -> String {
+    let is_female = 
+        if GameVariableManager::exist("G_Lueur_Gender2") {  GameVariableManager::get_number("G_Lueur_Gender2") == 2  }
+        else if let Some(lueur_unit) = unsafe { crate::deployment::force_get_unit_from_pid(PIDS[0].into(), true, None) } {
+            if lueur_unit.edit.is_enabled() { lueur_unit.edit.gender == 2  }
+            else { false }
+        }
+        else { false };
+    match (god, is_female) {
+        (true, true) => { "LueurW_God"}
+        (false, true) =>  { "LueurW"}
+        (true, false) => { "Lueur_God"}
+        (false, false) => {"Lueur"}
+    }.to_string()
+}
+
 
 #[skyline::hook(offset=0x021e16f0)]
 pub fn get_god_face(this: &GodData, method_info: OptionalMethod) -> &Il2CppString {
     let mid = this.mid;
     let result = call_original!(this, method_info);
-    println!("Result: {}", result.get_string().unwrap());
-    if str_contains(mid, "Lueur") {
-        if GameVariableManager::exist("G_Lueur_Gender2") { 
-            if GameVariableManager::get_number("G_Lueur_Gender2") == 2 { return "Telop/LevelUp/FaceThumb/God/LueurW".into(); }
-            else { return "Telop/LevelUp/FaceThumb/God/Lueur".into(); }
-        }
+    if str_contains(mid, "Lueur") && str_contains(this.gid, "GID_リュール") {
+        return format!("Telop/LevelUp/FaceThumb/God/{}", get_gender_lueur_ascii(false)).into();
     }
     if let Some(pos) = MPIDS.iter().position(|&x| str_contains(mid, x)) {
         let new_name = &MPIDS[pos][5..];
         let path = format!("Telop/LevelUp/FaceThumb/{}", new_name);
-        println!("{}", path);
         return path.into();
     }
     if RINGS.iter().any(|&x| str_contains(mid, x)) {  return result;  }
     else {
-        let rng = Random::get_system();
         let dlc = dlc_check();
-        let size = if dlc { 61 } else { 47 };
-        let emblem_range = if dlc { 22 } else { 12 };
-        let person_limit = if dlc { 41 } else { 36 };
-        let index = rng.get_value(size) as usize + 1;
-        let new_name = 
-            if index < person_limit { &MPIDS[rng.get_value(size) as usize][5..] }
-            else { RINGS[ rng.get_value(emblem_range) as usize ] };
-        let path = format!("Telop/LevelUp/FaceThumb/{}", new_name);
-        println!("{}", path);
-        return path.into();
+        let emblem_range = if dlc { 23 } else { 12 };
+        let person_limit = if dlc { 40 } else { 35 };
+
+        if this.parent.index == unsafe { INDEX2 } && unsafe { SELECTION2 != -1 } {
+            let sel = unsafe { SELECTION2} as usize;
+            if unsafe {IS_EMBLEM} {
+                return format!("Telop/LevelUp/FaceThumb/{}", RINGS[sel]).into();
+            }
+            else {
+                let new_name = &MPIDS[sel][5..];
+                return format!("Telop/LevelUp/FaceThumb/{}", new_name).into();
+            }
+        }
+        unsafe { INDEX2 = this.parent.index; }
+        let rng = Random::get_system();
+        if rng.get_value(4) < 2 {
+            unsafe { IS_EMBLEM = true }
+            let index = rng.get_value(emblem_range) as usize;
+            unsafe { SELECTION2 = index as i32 };
+            return format!("Telop/LevelUp/FaceThumb/{}", RINGS[index]).into();
+        }
+        else {
+            unsafe {IS_EMBLEM = false; }
+            let index = rng.get_value(person_limit)  as usize + 1;
+            unsafe { SELECTION2 = index as i32};
+            let new_name = &MPIDS[index][5..];
+            return format!("Telop/LevelUp/FaceThumb/{}", new_name).into();
+        }
     }
 }
+
