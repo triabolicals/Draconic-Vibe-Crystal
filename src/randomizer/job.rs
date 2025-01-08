@@ -1,8 +1,29 @@
 use super::*;
 use crate::randomizer::person::unit::fixed_unit_weapon_mask;
 use assets::animation::MONSTERS;
-use engage::menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItemGaugeMethods, ConfigBasicMenuItem}};
+use engage::force::*;
+use engage::util::get_instance;
+use engage::menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItemGaugeMethods, ConfigBasicMenuItem}};
 use utils::can_rand;
+
+pub const JOB_HASH: [i32; 111] = [ 
+    1367578960, -1369632991, 689554073, -1369626630, 185671037, 1499787884, 185670709, -1998645787, 
+    185677222, 1463244270, -1274089237, 730392094, -121798307, -1165634998, 1133576057, -362221162, 
+    511515477, 1766556981, -1517502902, 748907755, -1955176032, -910371360, 1977191031, 7727229, 
+    -1536732910, -1706110952, 1462565615, 229381663, 1443627162, 624511329, 167430752, -1257479603, 
+    -1097089283, 1784856681, -274348868, 2019899510, -1700828674, -2114661299, 1694508683, -116808589, 
+    -1521107381, -463737354, -999305939, -1864726869, -932121231, -673485317, -1768549784, -412226531, 
+    -1008556160, 49655521, -897692291, 215311336, -828118047, -765055509, -1377297555, -2055769334, 
+    -1820313133, -1308218306, 742712801, 1549244198, -2126214230, -1001243599, 1942863689, 1881805028, 
+    -1116401495, 1156629411, 499211320, 1455055960, -22101593, 1057745236, 1992190012, 578347357, 
+    1196308869, 475113468, 595125119, 1851723759, 1503228531, 1749933065, 1860731459, 30291080, 
+    30291392, 2021853286, 1445776173, 746034087, -1028496122, -631685449, 1398652429, -1116399479, 
+    1156631427, -290620106, 704942064, -149285011, 1848240617, -1241492235, 352107958, 5510888, 
+    1982073595, -1406772370, -974713853, 266659697, -158341635, 577339931, 1316562832, -573263642, 
+    355160656, 842455118, 692959593, 1534528826, 877759506, -1361615043, -1095679653
+];
+
+
 #[unity::class("App", "ClassChange.ChangeJobData")]
 pub struct ChangeJobData {
     pub job: &'static JobData,
@@ -50,6 +71,42 @@ impl ConfigBasicMenuItemSwitchMethods for RandomJobMod {
         }.into();
     }
 }
+pub struct CustomJobs;
+impl ConfigBasicMenuItemSwitchMethods for CustomJobs {
+    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let value = CONFIG.lock().unwrap().get_custom_jobs();
+        let result = ConfigBasicMenuItem::change_key_value_b(value);
+        if value != result {
+            CONFIG.lock().unwrap().set_custom_jobs(result);
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        } else {return BasicMenuResult::new(); }
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = if CONFIG.lock().unwrap().get_custom_jobs() { "Allows customs classes in the randomization pool." }
+        else { "Only vanilla classes in the randomization pool" }.into();
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.command_text = if CONFIG.lock().unwrap().get_custom_jobs() { "Include"} else { "Exclude"}.into();
+    }
+}
+
+fn custom_job_build_attr(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
+    if JobData::get_count() <= 111 { BasicMenuItemAttribute::Hide }
+    else if GameUserData::get_sequence() == 0 { BasicMenuItemAttribute::Enable }
+    else if GameVariableManager::get_number("G_Random_Job") > 0 { BasicMenuItemAttribute::Enable }
+    else { BasicMenuItemAttribute::Hide }
+}
+
+pub extern "C" fn vibe_custom_job() -> &'static mut ConfigBasicMenuItem {  
+    let switch = ConfigBasicMenuItem::new_switch::<CustomJobs>("Custom Classes"); 
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = custom_job_build_attr as _);
+    switch
+} 
+
 pub struct EnemyJobGauge;
 impl ConfigBasicMenuItemGaugeMethods for EnemyJobGauge {
     fn init_content(this: &mut ConfigBasicMenuItem){
@@ -85,13 +142,10 @@ pub struct RandomCC;
 impl ConfigBasicMenuItemSwitchMethods for RandomCC {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let previous = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_reclass }
-            else { GameVariableManager::get_bool("G_RandomCC")};
-
+        let previous = CONFIG.lock().unwrap().get_random_cc();
         let result = ConfigBasicMenuItem::change_key_value_b(previous);
         if previous != result {
-            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_reclass = result; }
-            else { GameVariableManager::set_bool("G_RandomCC", result); }
+            CONFIG.lock().unwrap().set_random_cc(result);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -99,30 +153,101 @@ impl ConfigBasicMenuItemSwitchMethods for RandomCC {
         } else {return BasicMenuResult::new(); }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let state = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_reclass }
-            else { GameVariableManager::get_bool("G_RandomCC")};
-        this.help_text = if state { "When reclassing, the new class will be determined randomly." }
+        this.help_text = if CONFIG.lock().unwrap().get_random_cc() { "When reclassing, the new class will be determined randomly." }
             else { "Default reclassing behavior."}.into();
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let state = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_reclass }
-        else { GameVariableManager::get_bool("G_RandomCC")};
-        this.command_text = if state { "Random" } else { "Default" }.into();
+        this.command_text = if CONFIG.lock().unwrap().get_random_cc() { "Random" } else { "Default" }.into();
     }
 }
 
-fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, player: bool) -> bool {
+pub struct RerandomizeJobs;
+impl ConfigBasicMenuItemCommandMethods for  RerandomizeJobs {
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let pad_instance = get_instance::<Pad>();
+        if pad_instance.npad_state.buttons.a() {
+            YesNoDialog::bind::<RerandomizeJobsConfirm>(this.menu, "Randomize Classes for Ally Units?\nItems will be replaced.", "Do it!", "Nah..");
+            BasicMenuResult::se_cursor()
+        }
+        else { BasicMenuResult::new() }
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { this.command_text = "Randomize".into(); }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { this.help_text = "Re-randomize ally units' classes.".into();  }
+}
+
+pub struct RerandomizeJobsConfirm;
+impl TwoChoiceDialogMethods for RerandomizeJobsConfirm {
+    extern "C" fn on_first_choice(_this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
+        rerandomize_jobs();
+        BasicMenuResult::se_cursor().with_close_this(true)
+    }
+    extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
+}
+
+pub fn re_randomize_build_attr(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
+    if GameVariableManager::get_number("G_Random_Job") & 1 == 0 { return  BasicMenuItemAttribute::Hide; }
+    if GameVariableManager::get_bool("G_Cleared_M003") {
+        let count = if Force::get(ForceType::Ally).is_some() { Force::get(ForceType::Ally).unwrap().get_count() } else { 0 };
+        if GameUserData::get_sequence() == 2 && count > 0 { BasicMenuItemAttribute::Enable }
+        else {  BasicMenuItemAttribute::Hide  }
+    }
+    else if GameUserData::get_sequence() == 3 && GameVariableManager::get_number("G_Random_Job") & 1 != 0 { BasicMenuItemAttribute::Enable }
+    else {  BasicMenuItemAttribute::Hide  }
+}
+
+pub extern "C" fn vibe_job_rerand() -> &'static mut ConfigBasicMenuItem {  
+    let class_gauge = ConfigBasicMenuItem::new_command::<RerandomizeJobs>("Re-Randomize Classes"); 
+    class_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = re_randomize_build_attr as _);
+    class_gauge
+}
+fn rerandomize_jobs() {
+    if GameVariableManager::get_bool("G_Cleared_M003") {
+        Il2CppClass::from_name("App", "UnitPool").unwrap().get_static_fields_mut::<crate::deployment::fulldeploy::UnitPoolStaticFields>().s_unit
+        .iter_mut().filter(|unit| unit.force.filter(|f| f.force_type == 2  ).is_some()).for_each(|unit|{
+            if unit.person.get_asset_force() == 0 && GameVariableManager::get_number("G_Random_Job") & 1 != 0 {
+                unit_change_to_random_class(unit);
+                super::person::unit::adjust_unit_items(unit);
+                unsafe { super::person::unit::unit_update_auto_equip(unit, None);  }
+                unsafe { unit_reload_actor(unit, None); }
+            }
+        });
+    }
+    else {
+        Il2CppClass::from_name("App", "UnitPool").unwrap().get_static_fields_mut::<crate::deployment::fulldeploy::UnitPoolStaticFields>().s_unit
+        .iter_mut().filter(|unit| unit.force.filter(|f| f.force_type == 0 || f.force_type == 2 ).is_some()).for_each(|unit|{
+            if unit.person.get_asset_force() == 0 && GameVariableManager::get_number("G_Random_Job") & 1 != 0 {
+                unit_change_to_random_class(unit);
+                super::person::unit::adjust_unit_items(unit);
+                unsafe { super::person::unit::unit_update_auto_equip(unit, None);  }
+                unsafe { unit_reload_actor(unit, None); }
+            }
+        });
+    }
+
+}
+
+
+#[skyline::from_offset(0x01a19ed0)]
+pub fn unit_reload_actor(this: &Unit, method_info: OptionalMethod);
+
+
+fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, player: bool, emblem: bool) -> bool {
+    if !CONFIG.lock().unwrap().get_custom_jobs() {
+        if !JOB_HASH.iter().any(|&hash| hash == job.parent.hash ) { return false;}
+    }
     let jid = job.jid.to_string();
     if let Some(pos) = MONSTERS.iter().position(|&j| j == jid) { 
-        if player { return true; }  // Allow all
-        return  ( pos == 2 || pos == 3 || pos == 5 || pos == 6 );   // No Wyverns + Fell Dragon
+        if !GameVariableManager::get_bool("G_Cleared_M011") || emblem { return false; }
+        if player { 
+            if !crate::utils::dlc_check() { return pos == 5 || pos == 6 ; } // Wyrms Only
+            else { return pos != 4 && pos != 7; }  // No Fell Dragons
+        }  
+        return  pos == 2 || pos == 3 || pos == 5 || pos == 6 ;  // Wolfs and Wyrms
     }
-    if jid.contains("_紋章士_") { return true; }
+    if jid.contains("_紋章士_") { return false; }     // Prevent Emblem Classes
     let job_flags = job.flag.value;
-    if ( player && ( job_flags & 3 == 0 || job_flags == 0 ) ) || (job_flags & 16 != 0 && is_female ) || (job_flags & 4 != 0 && !is_female) { return false; }    // Wrong Gender / Player Can't reclass
+    if job_flags == 0 || ( player && job_flags & 3 == 0  ) || (job_flags & 16 != 0 && is_female ) || (job_flags & 4 != 0 && !is_female) { return false; }    // Wrong Gender / Player Can't reclass
     if high_class && (job.is_low() && job.max_level == 20 ) || ( !high_class && job.is_high() ) { return false; }   // Wrong Job Tier
-
-    // Prevent Emblem Classes
 
     if jid == "JID_村人" { return false; }  // No Villager
     if jid == "JID_マージカノン" { return GameVariableManager::get_bool("G_CC_マージカノン"); } // FX Checks for Mage Cannoner / Enchanter
@@ -132,7 +257,6 @@ fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, pla
 
 pub fn unit_change_to_random_class(unit: &mut Unit){
     let rng = Random::get_game();
-    let job_count = JobData::get_count();
     let mut is_female = 
         if unit.person.pid.to_string() == "PID_リュール" && GameVariableManager::exist("G_Lueur_Gender2") { GameVariableManager::get_number("G_Lueur_Gender2") == 2 }
         else if unit.edit.is_enabled() { unit.edit.gender == 2 }
@@ -146,10 +270,9 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
 
     let unit_level = unit.level as i32;
     let internal_level = unit.internal_level as i32;
-    let mut count = 0;
     println!("Unit Level {} / Internal {} (Current Job: {})", unit_level, internal_level, Mess::get(current_job.name));
 
-    let class_list: Vec<_> = job_list.iter().filter(|&job| unit_random_can_reclass(job, is_female, is_high, true) ).collect();
+    let class_list: Vec<_> = job_list.iter().filter(|&job| unit_random_can_reclass(job, is_female, is_high, true, false) ).collect();
     if class_list.len() == 0 { return; }
 
     let new_job = class_list[ rng.get_value( class_list.len() as i32) as usize ];
@@ -179,7 +302,7 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
     unit.set_weapon_mask_from_person(); 
     fixed_unit_weapon_mask(unit);
     randomize_selected_weapon_mask(unit);
-
+    crate::autolevel::unit_update_learn_skill(unit);
     println!("{} changed to {} (Lv {}/{})", Mess::get_name(unit.person.pid), Mess::get(new_job.name), unit.level, unit.internal_level);
     
 }
@@ -206,7 +329,7 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
     let internal_level = unit.internal_level as i32;
     let has_emblem = unit.get_god_unit().is_some() || ( GameUserData::get_chapter().cid.to_string() != "CID_M011" );
 
-    let class_list: Vec<_> = JobData::get_list().unwrap().iter().filter(|&job| unit_random_can_reclass(job, is_female, is_high, true) ).collect();
+    let class_list: Vec<_> = JobData::get_list().unwrap().iter().filter(|&job| unit_random_can_reclass(job, is_female, is_high, false, has_emblem) ).collect();
     if class_list.len() == 0 { return false; }
 
     let new_job = class_list[ rng.get_value( class_list.len() as i32) as usize ];
@@ -253,9 +376,6 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
 #[skyline::hook(offset=0x019c6700)]
 pub fn add_job_list_unit(this: &mut ChangeJobData, unit: &Unit, method_info: OptionalMethod) -> bool {
     let result = call_original!(this, unit, method_info);
-    this.is_gender = true;
-    this.is_default_job = true;
-    return true;
     if !can_rand() { return result; }
     if CONFIG.lock().unwrap().debug {
         this.is_gender = true;
@@ -339,7 +459,7 @@ pub fn get_weapon_for_asset_table(job: &JobData) -> Option<&'static ItemData> {
             weapon_level = job.get_max_weapon_level(x);
         }
     }
-    return crate::randomizer::item::item_rando::WEAPONDATA.lock().unwrap().get_random_weapon(weapon_type);
+    return crate::randomizer::item::item_rando::WEAPONDATA.lock().unwrap().get_random_weapon(weapon_type - 1 );
 }
 
 pub fn correct_job_base_stats() {
@@ -364,6 +484,23 @@ pub fn correct_job_base_stats() {
                     if h_cap[10] < cap[10] { h_cap[10] = cap[10]; }
                 }
             );
+        }
+    );
+    ["JID_邪竜", "JID_不明", "JID_邪竜ノ子", "JID_M002_神竜ノ王", "JID_邪竜ノ王", "JID_M000_邪竜ノ王"].iter().for_each(|jid| 
+        if let Some(job) = JobData::get_mut(jid) {job.get_flag().value = 0;}
+    );
+    ["JID_フロラージュ下級", "JID_フロラージュ", "JID_フロラージュ_E", "JID_リンドブルム下級", "JID_リンドブルム", "JID_リンドブルム_E", "JID_スレイプニル下級", "JID_スレイプニル", "JID_スレイプニル_E", "JID_ピッチフォーク下級", "JID_ピッチフォーク", "JID_ピッチフォーク_E",
+    "JID_メリュジーヌ_味方", "JID_メリュジーヌ", "JID_裏邪竜ノ娘"].iter()
+    .for_each(|jid| 
+        if let Some(job) = JobData::get_mut(jid) {job.get_flag().value |= 4;}
+    );
+
+    [ "JID_アヴニール下級", "JID_アヴニール", "JID_アヴニール_E", "JID_スュクセサール下級", "JID_スュクセサール", "JID_スュクセサール_E", "JID_ティラユール下級", "JID_ティラユール", "JID_ティラユール_E", "JID_クピードー下級", "JID_クピードー", "JID_クピードー_E",
+    "JID_裏邪竜ノ子", "JID_ダンサー"].iter()
+    .for_each(|jid|
+        if let Some(job) = JobData::get_mut(jid) {
+            job.get_flag().value |= 16;
+            if job.get_flag().value & 4 != 0 {job.get_flag().value -= 4; }
         }
     );
 }
@@ -426,41 +563,46 @@ fn add_to_list(this: &ChangeJobData, unit: &Unit, cc_type: i32) -> bool {
     return false;
 }
 
-#[unity::hook("App", "UnitGrowSequence", "ClassChange")]
-pub fn unit_grow_class_change(this: &mut UnitGrowSequence, method_info: OptionalMethod) {
-    if !GameVariableManager::get_bool("G_RandomCC") || !can_rand() || CONFIG.lock().unwrap().debug {
-        call_original!(this, method_info);
-        return;
+#[unity::class("App", "ClassChangeJobMenuItem")]
+pub struct ClassChangeJobMenuItem {
+    pub menu: u64,
+    pub junk: [u8; 0x4c],
+    pub job_data: &'static mut ChangeJobData,
+    pub atr: i32,
+}
+pub fn class_change_a_call_random_cc(item: &ClassChangeJobMenuItem, _method_info: OptionalMethod) -> i32 {
+    if item.atr != 1 { return 0x800; }
+    if !GameVariableManager::get_bool("G_RandomCC") || !can_rand() {
+        if item.atr == 1 {
+            unsafe { class_change_confirm_bind(item.menu, item.job_data, None); }
+            return 0x80;
+        }
+        return 0x800;
     }
-    let change_job_list = unsafe { get_job_list(None) };
-     // for CCCheck to get classes.
-
-    if let Some(item) = this.cc_item {
-        let proof_type = match item.usetype {
-            23 => { 0 },
-            24|40|41 => { 1 },
-            _ => { call_original!(this, None); return; },
-        };
-        let original_apt = this.unit.aptitude.value;
-        this.unit.aptitude.value = -1; 
+    else {
+        let unit = unsafe { class_change_get_unit(None) };
+        let change_job_list = unsafe { get_job_list(None) };
+        // for CCCheck to get classes.
+        let proof = if item.job_data.proof_type > 0 { 1 } else { 0 };
+        unit.aptitude.value = -1; 
         let pool: Vec<_> = change_job_list.iter().filter(|&cc_job|{
-            if unsafe { cc_check(cc_job, this.unit, None) } { add_to_list(cc_job, this.unit, proof_type) }
+            if unsafe { cc_check(cc_job, unit, None) } { add_to_list(cc_job, unit, proof) }
             else { false } 
-
-        }).collect();
-
-        this.unit.aptitude.value = original_apt;
+           }).collect();
         let rng = Random::instantiate().unwrap();
-        let seed = this.unit.grow_ssed; 
-        rng.ctor(seed as u32);
-        this.unit.grow_ssed = rng.value();
-
+        let seed = unit.grow_ssed; 
+        rng.initialize(seed as u32);
         if pool.len() > 1 { 
             let pool_size = pool.len() as i32;
             let class = rng.get_value(pool_size) as usize;
-            this.cc_job = Some( pool[class].job );
-            this.cc_weapon_mask = Some( pool[class].equippable_weapon_mask );
+            unsafe { class_change_confirm_bind(item.menu, pool[class], None); }
         }
+        else { unsafe { class_change_confirm_bind(item.menu, item.job_data, None); } }
     }
-    call_original!(this, method_info);
+    return 0x80;
 }
+#[skyline::from_offset(0x019c76c0)]
+fn class_change_confirm_bind(this: u64, data: &ChangeJobData, method_info: OptionalMethod);
+
+#[skyline::from_offset(0x01ea4680)]
+pub fn class_change_get_unit(method_info: OptionalMethod) -> &'static mut Unit;

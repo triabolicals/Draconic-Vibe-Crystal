@@ -83,7 +83,7 @@
 聖王女の衣装	2	Luc0AF
 賢王の衣装	1	Lei0AM
 未来を選びし者の衣装	2	Cor0AF
-碧き風空の衣装	2	Eir0AF
+碧き風空の衣装	2	Eir0AF  1   Eph0AM
 導き手の衣装	1	Byl0AM
 ノーマル眼鏡	3	uAcc_head_StandardGlassX1
 四角い下縁メガネ	3	uAcc_head_SquareGlassX1

@@ -6,7 +6,7 @@ pub use engage::{
     random::*,
     gamedata::{*, unit::*, item::*},
 };
-use engage::gamedata::skill::SkillData;
+use unity::system::*;
 use std::sync::Mutex;
 pub mod unit_items;
 pub mod shop;
@@ -21,18 +21,20 @@ pub static RANDOM_ITEM_POOL: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 pub fn create_item_pool() {
     if RANDOM_ITEM_POOL.lock().unwrap().len() != 0 { return; }
     let item_list = ItemData::get_list_mut().unwrap();
-    item_list.iter_mut().for_each(|item|{
-        if item.flag.value == 16 {
-            let iid = item.iid.to_string();
-            if iid != "IID_メティオ_G004" { item.get_flag().value = 0;  }
-            if iid == "IID_メティオ" {  item.endurance = 1;  }
+    item_list.iter_mut()
+        .for_each(|item|{
+            if item.flag.value == 16 {
+                let iid = item.iid.to_string();
+                if iid != "IID_メティオ_G004" { item.get_flag().value = 0;  }
+                if iid == "IID_メティオ" {  item.endurance = 1;  }
+            }
+            if item.flag.value & 251822590 == 0 && has_name(item, true) && !enums::ITEM_BLACK_LIST.lock().unwrap().iter().any(|y| *y == item.parent.index) 
+                && !crate::utils::str_contains(item.name, "MIID_Ring") && !item.is_unknown()
+            {
+                RANDOM_ITEM_POOL.lock().unwrap().push(item.parent.hash);
+            }
         }
-        if item.flag.value & 251822590 == 0 && has_name(item, true) && !enums::ITEM_BLACK_LIST.lock().unwrap().iter().any(|y| *y == item.parent.index) 
-            && !crate::utils::str_contains(item.name, "MIID_Ring") && !item.is_unknown()
-        {
-            RANDOM_ITEM_POOL.lock().unwrap().push(item.parent.index);
-        }
-    });
+    );
     println!("{} items are in the Random Item Pool", RANDOM_ITEM_POOL.lock().unwrap().len());
     item_rando::WEAPONDATA.lock().unwrap().intitalize();
 }
@@ -41,37 +43,35 @@ pub fn random_item(item_type: i32, allow_rare: bool) -> &'static Il2CppString {
     let item_list_size = RANDOM_ITEM_POOL.lock().unwrap().len();
     let rng = Random::get_system();
     let base_price = 2500 - 50*GameVariableManager::get_number("G_ItemDropGauge"); 
-
+    let exploration = GameVariableManager::get_number("G_HubItem");
     loop {
-        let item_index = RANDOM_ITEM_POOL.lock().unwrap()[rng.get_value( item_list_size as i32 ) as usize];
-        let item = ItemData::try_index_get(item_index);
-        if item.is_none() { continue; }
-        let random_item = item.unwrap();
-        if item_type == 0 || item_type == 4 { //Item Script Replacement
-            if random_item.is_inventory() || random_item.is_material() { continue; }
-            if item_type == 4 && random_item.price < base_price { continue; } 
+        let item_hash = RANDOM_ITEM_POOL.lock().unwrap()[rng.get_value( item_list_size as i32 ) as usize];
+        if let Some(random_item) = ItemData::try_get_hash(item_hash) {
+            if item_type == 0 || item_type == 4 { //Item Script Replacement
+                if random_item.is_inventory() || random_item.is_material() { continue; }
+                if item_type == 4 && random_item.price < base_price { continue; } 
+            }
+            else if item_type == 1 {    // Gift/Reward Items
+                if random_item.usetype >= 32 && random_item.usetype <= 39 { continue; }
+                if random_item.usetype == 0 && ( random_item.kind != 17 && random_item.kind != 18 ){ continue; }  
+            }
+            else if item_type == 2 {    // Exploration Drops
+                let iid = random_item.iid.to_string();
+                if iid == "IID_スキルの書・離" || iid == "IID_スキルの書・破" {  continue; }    // No Adept/Expert Book
+                let kind = random_item.kind;
+                if kind == 17 && random_item.price > 5000 { continue; }     // Bond limited to 1000
+                if kind == 18 && random_item.price >= 1000 { continue; }    // Limit Money to 1000g
+                if kind == 13 || ( kind < 10 && kind != 0 ) { continue; }   // No Key Item or Weapon/Staff Related Items
+                if ( kind < 17 && kind > 13 ) || (kind == 10 && random_item.usetype == 21) { continue; } // No Ores or Stat Boosters
+                if exploration & 1 != 0 && random_item.usetype == 33 { continue; } 
+                if exploration & 2 != 0 && random_item.usetype == 32 { continue; }
+                if random_item.usetype == 35 { continue; }
+            }
+            if random_item.get_flag().value & 1 != 0 && !allow_rare { continue; }
+            return random_item.iid;
         }
-        else if item_type == 1 {    // Gift/Reward Items
-            if random_item.usetype >= 32 && random_item.usetype <= 39 { continue; }
-            if random_item.usetype == 0 && ( random_item.kind != 17 && random_item.kind != 18 ){ continue; }  
-        }
-        else if item_type == 2 {    // Exploration Drops
-            let exploration = GameVariableManager::get_number("G_HubItem");
-            let iid = random_item.iid.to_string();
-            if iid == "IID_スキルの書・離" || iid == "IID_スキルの書・破" {  continue; }    // No Adept/Expert Book
-            let kind = random_item.kind;
-            if kind == 17 && random_item.price > 5000 { continue; }     // Bond limited to 1000
-            if kind == 18 && random_item.price >= 1000 { continue; }    // Limit Money to 1000g
-            if kind == 13 || ( kind < 10 && kind != 0 ) { continue; }   // No Key Item or Weapon/Staff Related Items
-            if ( kind < 17 && kind > 13 ) || (kind == 10 && random_item.usetype == 21) { continue; } // No Ores or Stat Boosters
-            if exploration == 1  && random_item.usetype == 33 { continue; } 
-            if exploration == 2 && random_item.usetype == 32 { continue; }
-            if exploration == 3 && ( random_item.usetype == 33 || random_item.usetype == 32 ) { continue; }
-            if random_item.usetype == 35 { continue; }
-        }
-        if random_item.get_flag().value & 1 != 0 && !allow_rare { continue; }
-        return random_item.iid;
     }
+
 }
 
 // For item replacement
@@ -80,18 +80,19 @@ pub fn get_random_item(item: &'static Il2CppString, allow_rare: bool) -> &'stati
         let flag = item_check.get_flag().value;
         if flag & 1 == 1 { return item;  }
         if enums::ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == item_check.parent.index).is_some() { return item; }
+        let price = item_check.price;
+        let mut count = 0;
+        loop {
+            count += 1;
+            let new_iid = random_item(0, allow_rare);
+            let new_price = ItemData::get(new_iid).unwrap().price;
+            if new_price < price * CONFIG.lock().unwrap().replaced_item_price / 100 { continue; }
+            if count >= 150 { return new_iid; }
+            return new_iid;
+        }
     }
     else { return item; }
-    let price = ItemData::get(&item.to_string()).unwrap().price;
-    let mut count = 0;
-    loop {
-        count += 1;
-        let new_iid = random_item(0, allow_rare);
-        let new_price = ItemData::get(new_iid).unwrap().price;
-        if new_price < price * CONFIG.lock().unwrap().replaced_item_price / 100 { continue; }
-        if count >= 150 { return new_iid; }
-        return new_iid;
-    }
+
 }
 
 pub fn has_name(this: &ItemData, include_money: bool) -> bool {
@@ -103,24 +104,44 @@ pub fn has_name(this: &ItemData, include_money: bool) -> bool {
     }
     return false; 
 }
+#[skyline::hook(offset=0x0293c890)]
+pub fn random_well_item(proc: u64, level: i32, random: &Random, method_info: OptionalMethod) -> &'static mut List<ItemData> {
+    let list = call_original!(proc, level, random, method_info);
+    if GameVariableManager::get_number("G_Random_Item") & 1 == 0  { return list; }  
+    let mut sum = 0;
+    list.iter().for_each(|item| sum += item.price + (random.get_value(10) + level) * 100);
+    let count = list.iter().count() as i32;
+    let rare_item = CONFIG.lock().unwrap().random_gift_items == 2;
+    list.clear();
+    println!("Total Price of Items: {}", sum);
+    let min_price = ( 1 + level ) * 5000 + 1000 * (1 + random.get_value(count) );
+    if sum < min_price { sum = min_price; }
+    let mut total_price = 0;
+    while total_price < sum {
+        let iid = random_item(1, rare_item);
+        if let Some(item) = ItemData::get_mut(iid) {
+            if item.price > 20000 { continue; }
+            total_price += item.price;
+            println!("Add: {}", item.name);
+            list.add(item);
+        }
+    }
+    println!("Total Cost: {} / {}", total_price, min_price);
+    return list;
+}
 pub fn randomize_well_rewards() {
     if GameVariableManager::get_number("G_Random_Item") == 0  { return; }
+    if unsafe { super::STATUS.well_randomized } { return; }
     if CONFIG.lock().unwrap().random_gift_items != 0 {
         let rare_item = CONFIG.lock().unwrap().random_gift_items == 2;
         let rlist = RewardData::get_list_mut().unwrap();
         rlist.iter_mut().for_each(|reward|{
             reward.iter_mut().for_each(|ritem|{
-                if let Some(item) = ItemData::get(ritem.iid) {
-                    let price = item.price;
-                    let mut count = 0;
+                if ItemData::get(ritem.iid).is_some() {
                     loop {
-                        let new_iid = random_item(1, rare_item);
-                        if let Some(new_item) = ItemData::get(new_iid){
-                            let new_price = new_item.price;
-                            if new_item.equip_condition.is_some() { continue; }
-                            count += 1;
-                            if new_price < 3*price || count >= 50 { 
-                                ritem.set_iid(new_iid);  
+                        if let Some(new_item) = ItemData::get(random_item(1, rare_item)){
+                            if new_item.equip_condition.is_none() { 
+                                ritem.set_iid(new_item.iid);  
                                 break;
                             }
                         }
@@ -129,129 +150,90 @@ pub fn randomize_well_rewards() {
             });
         });
     }
-    ["アイテム交換_期待度１", "アイテム交換_期待度２", "アイテム交換_期待度３", "アイテム交換_期待度４", "アイテム交換_期待度５" ].iter().for_each(|&x|{
-        if let Some(well_items) = RewardData::try_get_mut(x) {
-            let mut in_set: [bool; 1000] = [false; 1000];
-            let list_size = well_items.len();
-            for y in 0..list_size {
-                if let Some(item) = ItemData::get(well_items[y as usize].iid){
-                    let price = item.price;
-                    let mut new_price; 
-                    let mut item_index;
-                    let mut new_iid; 
-                    let curent_reward = &well_items[y as usize];
-                    let mut count = 0;
-                    loop {
-                        new_iid = random_item(1, true);
-                        if let Some(new_item) = ItemData::get(new_iid) {
-                            new_price = new_item.price;
-                            item_index = new_item.parent.index;
-                            if new_item.equip_condition.is_some() { continue; }
-                            if new_price > 3*price { count += 1; continue; }
-                            if count < 100 && in_set[item_index as usize] { count += 1; continue; }
-                            if count >= 100 { break; }
-                            if !in_set[item_index as usize] { break; }
-                        }
-                    }
-                    let new_reward = RewardData::instantiate().unwrap();
-                    new_reward.ctor();
-                    new_reward.set_iid(new_iid);
-                    let new_item = ItemData::get(new_iid).unwrap();
-                    if new_item.get_flag().value & 1 != 0 || ( new_item.kind == 18 || new_item.kind == 17 ) {   // If rare or money / bond
-                        new_reward.ratio = 5.0;
-                        new_reward.min = 5.0;
-                        new_reward.max = 5.0;
-                    }
-                    else {
-                        new_reward.ratio = 2.5*curent_reward.ratio;
-                        new_reward.min = 2.5*curent_reward.min;
-                        new_reward.max = 2.5*curent_reward.max;
-                    }
-                    well_items.add(new_reward);
-                    in_set[item_index as usize] = true; 
-                }
-            }
-        }
-    }
-);
     println!("Complete Randomization of Gift/Well Items");
     shop::randomize_hub_random_items();
+    unsafe { super::STATUS.well_randomized = true };
 }
 
 pub fn change_liberation_type() {
     if !GameVariableManager::get_bool("G_Cleared_M002") { return; }
     let liberation = ItemData::get_mut("IID_リベラシオン").unwrap();
-    if GameVariableManager::get_number("G_Liberation_Type") != 0 { 
-        let l_type = GameVariableManager::get_number("G_Liberation_Type") as u32;
-        liberation.kind = l_type;
-        if l_type == 4 {
+    let l_type =  if GameVariableManager::get_number("G_Liberation_Type") != 0 {  GameVariableManager::get_number("G_Liberation_Type") }
+        else if let Some(hero_unit) = unsafe { utils::unit_pool_get_hero(false, None) } {
+            let mut liberation_type = 1;
+            hero_unit.get_job().get_equippable_item_kinds().iter().for_each(|&k| if k != 7 && k < 9 && k > 0 { liberation_type = k });
+            GameVariableManager::make_entry("G_Liberation_Type", liberation_type);
+            GameVariableManager::set_number("G_Liberation_Type", liberation_type);
+            liberation_type
+        }
+        else { 
+            GameVariableManager::make_entry("G_Liberation_Type", 1);
+            GameVariableManager::set_number("G_Liberation_Type", 1);
+            1
+        } as u32;
+    liberation.kind = l_type;
+    match l_type {
+        4 => {
             liberation.range_i = 2;
             liberation.range_o = 3;
             liberation.set_cannon_effect("弓砲台".into());
-            liberation.on_complete();
-            liberation.get_equip_skills().add_sid("SID_飛行特効",4, 0);
+            liberation.get_equip_skills().add_sid("SID_飛行特効",4, 0); // Flier Effectiveness
         }
-        else if l_type == 5 || l_type == 6 {
-            liberation.range_o = 2;
+        5 => {
             liberation.range_i = 1;
-            if l_type == 6 {
-                liberation.set_cannon_effect("魔砲台炎".into());
-                liberation.set_hit_effect( "エルファイアー".into());
-                liberation.on_complete();
-            }
-            else { liberation.get_give_skills().add_sid("SID_毒",3, 0); }
+            liberation.range_o = 2;
+            liberation.get_give_skills().add_sid("SID_毒",3, 0);    // Poison for Dagger
         }
-        else if l_type == 8 {
-            liberation.get_equip_skills().add_sid("SID_気功",4, 0);
-            liberation.get_equip_skills().add_sid("SID_２回行動",4,0);
+        6 => {
+            liberation.range_i = 1;
+            liberation.range_o = 2;
+            liberation.set_cannon_effect("魔砲台炎".into());
+            liberation.set_hit_effect( "エルファイアー".into());    
         }
-        else {
+        8 => {
+            //liberation.get_equip_skills().add_sid("SID_気功",4, 0);
+            liberation.get_equip_skills().add_sid("SID_２回行動",4,0);  // Brave for Fist
+        }
+        _ => {
             liberation.range_i = 1;
             liberation.range_o = 1;
         }
-        return; 
     }
+    liberation.on_completed();
+    println!("Liberation changed to weapon type {}", l_type);
+}
 
-    let hero_unit = unsafe { utils::unit_pool_get_hero(false, None) };
-    if hero_unit.is_none() { return; }
-
-    let kinds = hero_unit.unwrap().get_job().get_equippable_item_kinds();
-    let mut liberation_type = 1; //Sword
-    for i in 0..kinds.len() {
-        if kinds[i] == 7 || kinds[i] >= 9 { continue; }
-        if kinds[i] == 0 { continue; }
-        liberation_type = kinds[i];
-    }
-
-    liberation.kind = liberation_type as u32;
-    if liberation_type == 4 {
-        liberation.range_o = 3;
-        liberation.range_i = 2;
-        liberation.set_cannon_effect("弓砲台".into());
-        liberation.on_complete();
-        liberation.get_equip_skills().add_skill(SkillData::get("SID_飛行特効").unwrap(),4, 0);
-    }
-    else if liberation_type == 5 || liberation_type == 6 {
-        liberation.range_i = 1;
-        liberation.range_o = 2;
-        if liberation_type == 6 {
-            liberation.set_cannon_effect("魔砲台炎".into());
-            liberation.set_hit_effect( "エルファイアー".into());
-            liberation.on_complete();
+pub fn change_misercode_type(){
+    let value = GameVariableManager::get_number("G_Misercode_Type");
+    let misercode_type = if value == 0 || value == 7 || value >= 9 {
+        GameVariableManager::make_entry("G_Misercode_Type", 5);
+        GameVariableManager::set_number("G_Misercode_Type", 5);  
+        5
+    } else { value };
+    let misercode = ItemData::get_mut("IID_ミセリコルデ").unwrap();
+    misercode.get_give_skills().clear();
+    misercode.get_equip_skills().clear();
+    misercode.range_o = 2; 
+    misercode.range_i = 1;
+    misercode.kind = misercode_type as u32;
+    match misercode_type  {
+        4 => {
+            misercode.set_cannon_effect("弓砲台".into());
+            misercode.get_equip_skills().add_sid("SID_飛行特効",4, 0);
         }
-        else { liberation.get_give_skills().add_sid("SID_毒",4, 0); }
+        5 => { misercode.get_give_skills().add_sid("SID_毒",3, 0); }
+        6 => {                     
+            misercode.set_cannon_effect("魔砲台炎".into());
+            misercode.set_hit_effect( "オヴスキュリテ".into());
+        }
+        8 => {
+            misercode.range_o = 1;
+            misercode.get_equip_skills().add_sid("SID_２回行動",4,0); 
+        }
+        _ => {}
     }
-    else if liberation_type == 8 {
-        liberation.get_equip_skills().add_sid("SID_気功",4, 0);
-        liberation.get_equip_skills().add_sid("SID_２回行動",4,0);
-    }
-    else {
-        liberation.range_i = 1;
-        liberation.range_o = 1;
-    }
-    GameVariableManager::make_entry("G_Liberation_Type", liberation_type);
-    GameVariableManager::set_number("G_Liberation_Type", liberation_type);
-    println!("Liberation changed to weapon type {}", liberation_type);
+    misercode.on_completed();
+
 }
 
 pub struct EnemyDropGauge;

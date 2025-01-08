@@ -12,7 +12,7 @@ use engage::{
 };
 use super::CONFIG;
 use crate::{randomizer::*, utils::*};
-
+const DLC_CIDS: [&str; 14] = ["M005", "S001", "M006", "G001", "S002", "G002", "M007", "G003", "M008", "G004", "M009", "G005", "G006", "M010"];
 #[unity::class("App", "GodBond")]
 pub struct GodBond {
     pub god: &'static GodData,
@@ -46,47 +46,56 @@ pub struct CommonRewardSequence {
 // Continious Mode Stuff
 pub fn do_continious_mode() {
     if GameVariableManager::get_number("G_Continuous") != 0 && !GameVariableManager::get_bool("G_Cleared_M026")  {
-        let current_chapter = GameUserData::get_chapter();
-        let flag = current_chapter.get_flag();
+        if GameVariableManager::get_number("G_Continuous") == 2 && !dlc_check() { GameVariableManager::set_number("G_Continuous", 3); }
         let current_chapter = GameUserData::get_chapter();
         let current_cid = current_chapter.cid.to_string();
-        if current_cid == "CID_G006" { current_chapter.set_next_chapter("CID_M010"); }
-        let mut new_flag = flag;
-        if flag & 16 != 0 { new_flag -= 16; }   // hub  disable
-        if flag & 32 != 0 { new_flag -= 32; }   // gmap  disable
-        if flag & 2 != 0 { new_flag -= 2; } // can back disable
-        current_chapter.set_flag(new_flag);
-        set_next_chapter();
+        if GameVariableManager::get_bool("G_Cleared_M004") {
+            current_chapter.set_flag(current_chapter.get_flag() & !114 );
+            if GameVariableManager::get_number("G_Continuous") == 3 { 
+                crate::deployment::fulldeploy::adjust_miasma_tiles();
+                GameUserData::get_status().value &= !12352;
+                crate::utils::return_true(0x028a80d0);
+            }
+            else {
+                if current_cid == "CID_G006" && GameVariableManager::get_bool("G_Cleared_G006")  { current_chapter.set_next_chapter("CID_M010"); }
+            }
+        }
         Patch::in_text(0x02533768).bytes(&[0xE0,0x03, 0x1F, 0xAA]).unwrap();    //  Prevent Fade out after EXP screen
         Patch::in_text(0x02533770).bytes(&[0x14,0xA0, 0x0B, 0x94]).unwrap();    //  Prevent Fade out after EXP screen
         Patch::in_text(0x01f7e9c8).bytes(&[0xE0, 0x03, 0x15, 0x2A ]).unwrap(); // Forces SP = EXP for all cases
         Patch::in_text(0x01f7eab8).bytes(&[0xE0, 0x03, 0x01, 0x2A ]).unwrap();
         crate::utils::return_4(0x01d76320); // Hides Back menu item in Sortie
         crate::utils::mov_x0_0(0x01d78ee4); // Can return disable sortie b call
+
+
     }
-    else {
+     else {
         Patch::in_text(0x01d76320).bytes(&[0xfd, 0x7b, 0xbd, 0xa9]).unwrap();   // Revert Back menu item in Sortie
         Patch::in_text(0x01d76324).bytes(&[0xf6, 0x57, 0x01, 0xa9]).unwrap(); 
-        // Revert to normal exp -> sp
+            // Revert to normal exp -> sp
         Patch::in_text(0x01f7e9c8).bytes(&[0x86, 0xed, 0xea, 0x97 ]).unwrap(); // 86 ed ea 97
         Patch::in_text(0x01f7eab8).bytes(&[0x4a, 0xed, 0xea, 0x97 ]).unwrap();  // 4a ed ea 97
         Patch::in_text(0x01d78ee4).bytes(&[0x8b, 0xe9, 0x1d, 0x94]).unwrap(); 
+    
+        Patch::in_text(0x028a80d0).bytes(&[0xff, 0x43, 0x01, 0xd1 ]).unwrap();  // HubFac IsComplete
+        Patch::in_text(0x028a80d4).bytes(&[0xfd, 0x7b, 0x01, 0xa9]).unwrap(); 
     }
+    /*
+    ["Vandre", "Diamand", "Ivy", "Fogato", "Hortensia", "Alfred", "Yunaka", "Seadas", "Staluke", "Misutira", "Goldmary", "Celine"].iter().for_each(|g|{
+        if let Some(god) = GodData::get(format!("GID_{}", g)) {
+            unsafe { godpool_create(god, None); }
+        }
+    });
+    */
 }
 
 pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
     if GameVariableManager::get_number("G_Continuous") == 0 { return; }
     if GameUserData::get_chapter().cid.to_string() == "CID_M026" { return; }
     if GameVariableManager::get_bool("G_Cleared_M026") { return; }
-    let chapter = GameUserData::get_chapter();
-    let flag = chapter.get_flag();
-    let mut new_flag = flag;
-    if flag & 16 != 0 { new_flag = new_flag - 16; } // Hub Removal
-    if flag & 32 != 0 { new_flag = new_flag - 32; } // Gmap Removal
-    if flag & 2 != 0 { new_flag -= 2; } // Back Removal
-    chapter.set_flag(new_flag);
+    GameVariableManager::set_bool(GameUserData::get_chapter().get_cleared_flag_name(), true);
+    do_continious_mode();
     add_support_points();
-    set_next_chapter();
     do_dlc();
     update_bonds();
     create_bond_rings();
@@ -105,33 +114,48 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
             let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
             let mut base_exp_gain = 10*(3 + 2*(2 - (GameUserData::get_difficulty(false) as i32 )) );
             let mut level_cap = get_recommended_level_main() as i32;
+            let random_map = GameVariableManager::get_number("G_Continuous") == 3;
+            if random_map { 
+                let map_completed = crate::continuous::get_story_chapters_completed();
+                base_exp_gain = 50 - (GameUserData::get_difficulty(false) as i32)*10; 
+                level_cap = if map_completed < 7  {1 + map_completed    }
+                    else { crate::utils::max( (crate::continuous::get_story_chapters_completed()-6)*2, crate::continuous::get_story_chapters_completed()+4) }
+            }
             for ff in force_type {
                 let force_iter = Force::iter(Force::get(ff).unwrap());
                 for unit in force_iter {
-                    if unit.person.pid.to_string() == "PID_残像" { continue; }    // Lyn doubles are a no-no
+                    if unit.status.value & 35184372088832 != 0 { continue; }    // Lyn doubles are a no-no
                     if unit.level == unit.job.max_level { 
-                        unit.add_sp(base_exp_gain);
-                        continue; 
-                    }
-                    // level scaling    
-                    let total_level = unit.level as i32 + unit.internal_level as i32;
-                    if total_level < level_cap { 
-                        e_list.add(unit, base_exp_gain); 
-                        unit.add_sp(base_exp_gain);
+                        if random_map { unit.add_sp( base_exp_gain * 2 ); }
+                        else { unit.add_sp(base_exp_gain); }
                     }
                     else {
-                        let diff = total_level - level_cap;
-                        let exp_gain = base_exp_gain / (  2 + diff );
-                        e_list.add(unit, exp_gain);
-                        unit.add_sp(exp_gain);
+                        let total_level = unit.level as i32 + unit.internal_level as i32;
+                        if total_level < level_cap { 
+                            if random_map {
+                                let scale_exp = clamp_value(base_exp_gain * ( level_cap - 1 ) / total_level, base_exp_gain, 99);
+                                e_list.add(unit, scale_exp );
+                                unit.add_sp(scale_exp);
+                            }
+                            else {
+                                e_list.add(unit, base_exp_gain); 
+                                unit.add_sp(base_exp_gain);
+                            }
+                        }
+                        else {
+                            let diff = total_level - level_cap;
+                            let exp_gain = base_exp_gain / (  2 + diff );
+                            e_list.add(unit, exp_gain);
+                            unit.add_sp(exp_gain);
+                        }
                     }
                 }
-                base_exp_gain = clamp_value(base_exp_gain * 5 / 3 , base_exp_gain, 100);
-                level_cap -= 5; 
-                if base_exp_gain == 0 { break; }
+                base_exp_gain = clamp_value(base_exp_gain * 5 / 3 , base_exp_gain, 99);
+                level_cap -= 3; 
+                if base_exp_gain <= 0 { break; }
             }
             // Heroes DLC
-            if !GameVariableManager::get_bool("G_拠点_コンテンツ報酬受け取り済") && has_content(1, None) {
+            if !GameVariableManager::get_bool("G_拠点_コンテンツ報酬受け取り済") && GameVariableManager::get_bool("G_Cleared_M004") && has_content(1, None) {
                 item_list.add(ItemData::get_mut( "IID_フェンサリル" ).unwrap());
                 item_list.add(ItemData::get_mut( "IID_ノーアトゥーン" ).unwrap());
                 item_list.add(ItemData::get_mut( "IID_フォルクヴァング" ).unwrap());
@@ -140,10 +164,6 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
                 add_ring_to_pool( "RNID_DLC1コモン_3_S".into(), None, 1, None);
                 GameVariableManager::make_entry("G_拠点_コンテンツ報酬受け取り済", 1);
                 GameVariableManager::set_bool("G_拠点_コンテンツ報酬受け取り済", true);
-            }
-            if GameUserData::get_chapter().cid.to_string() == "CID_S015" {
-                GameVariableManager::make_entry("G_所持_IID_約束の指輪", 40);
-                GameVariableManager::set_number("G_所持_IID_約束の指輪", 40);
             }
             create_common_reward_bind(proc, e_list, item_list, 0, false, None);
         }
@@ -159,33 +179,34 @@ fn generate_item_list(proc: &ProcInst) -> &'static mut List<ItemData> {
         let seed = Random::get_system().value() as u32;
         let random = Random::instantiate().unwrap();
         random.ctor(seed);
-        if !GameVariableManager::get_bool("G_Cleared_M006") {
+        let rand_map = GameVariableManager::get_number("G_Continuous") == 3;
+        let completed = get_number_main_chapters_completed2();
+        if (!rand_map && !GameVariableManager::get_bool("G_Cleared_M006")) || (rand_map && completed <= 7 ) {
             if current_cid == "CID_M004" {
                 let patch_items = calc_rewards("Patch0特典".into(), None);
                 if continuous_mode_dlc_allowed() {
-                    let dlc_items = calc_rewards("DLC購入特典0".into(), None);
-                    let n_items = dlc_items.len();
-                    for x in 0..n_items {
-                        let item = dlc_items[x].iid;
-                        patch_items.add(ItemData::get_mut(&item.to_string()).unwrap());
-                    } 
+                    calc_rewards("DLC購入特典0".into(), None).iter().for_each(|item|{
+                        if let Some(item1) = ItemData::get_mut(item.iid) { patch_items.add(item1); }
+                    });
+                    set_patch_flag("G_拠点_DLC特典アイテム0受け取り済み");
                 }
+                set_patch_flag("G_拠点_Patch0特典アイテム受け取り済み");
                 return patch_items;
             }
-            else if current_cid == "CID_M005" {
+            else if (!rand_map && current_cid == "CID_M005") ||  (rand_map && completed == 6 ) {
                 let patch_items = calc_rewards("Patch3特典".into(), None);
                 if continuous_mode_dlc_allowed() {
-                    let dlc_items = calc_rewards("DLC購入特典1".into(), None);
-                    for x in 0..dlc_items.len() {
-                        let item = dlc_items[x].iid;
-                        patch_items.add(ItemData::get_mut(&item.to_string()).unwrap());
-                    } 
+                    calc_rewards("DLC購入特典1".into(), None).iter().for_each(|item|{
+                        if let Some(item1) = ItemData::get_mut(item.iid) { patch_items.add(item1); }
+                    });
+                    set_patch_flag("G_拠点_DLC特典アイテム1受け取り済み"); 
                 }
+                set_patch_flag("G_拠点_Patch3特典アイテム受け取り済み");
                 return patch_items;
             }
             else {
                 let well_items = calc_well_item(proc, 1, random, None);
-                if current_cid == "CID_M006" {
+                if (!rand_map && current_cid == "CID_M006") ||  (rand_map && completed == 7 ) {
                     well_items.add(ItemData::get_mut("IID_トライゾン").unwrap());
                     well_items.add(ItemData::get_mut("IID_ルヴァンシュ").unwrap());
                     if continuous_mode_dlc_allowed() { well_items.add(ItemData::get_mut("IID_マスタープルフ").unwrap()); }
@@ -193,7 +214,7 @@ fn generate_item_list(proc: &ProcInst) -> &'static mut List<ItemData> {
                 return well_items;
             }
         }
-        if !GameVariableManager::get_bool("G_Cleared_M010") {
+        if (!rand_map && !GameVariableManager::get_bool("G_Cleared_M010") ) || (rand_map && completed < 9){
             let well_items = calc_well_item(proc, 2, random, None);
             if current_cid == "CID_M008" || ( current_cid == "CID_G002" || current_cid == "CID_G005" ) {
                 well_items.add(ItemData::get_mut("IID_マスタープルフ").unwrap());
@@ -201,66 +222,62 @@ fn generate_item_list(proc: &ProcInst) -> &'static mut List<ItemData> {
             }
             return well_items;
         }
-        else if !GameVariableManager::get_bool("G_Cleared_M017") { return calc_well_item(proc, 3, random, None); }
-        else if !GameVariableManager::get_bool("G_Cleared_M022") { return calc_well_item(proc, 4, random, None); }
+        else if (!rand_map && !GameVariableManager::get_bool("G_Cleared_M017")) || ( rand_map && completed < 16 ) { return calc_well_item(proc, 3, random, None); }
+        else if (!rand_map && !GameVariableManager::get_bool("G_Cleared_M022")) || ( rand_map && completed < 21 ) { return calc_well_item(proc, 4, random, None); }
         else { return calc_well_item(proc, 5, random, None);  }
     }
 }
 
 // When loading save at exploration
 pub fn update_next_chapter() {
-    if GameVariableManager::get_number("G_Continuous") != 0 && GameUserData::get_sequence() == 5 { set_next_chapter(); }
+    if GameVariableManager::get_number("G_Continuous") != 0 { 
+        set_next_chapter(); 
+        continous_rand_emblem_adjustment();
+    }
 }
 // DLC Check for continous mode
 fn continuous_mode_dlc_allowed() -> bool {
     if dlc_check() {
-        if GameVariableManager::get_number("G_Continuous") == 1 { return true; }
-        else { return false; }
+        return GameVariableManager::get_number("G_Continuous") == 1 || GameVariableManager::get_number("G_Continuous")  == 3;
     }
     return false;
 }
-
+fn set_patch_flag(flag: &str) {
+    GameVariableManager::make_entry(flag, 1);
+    GameVariableManager::set_bool(flag, true);
+}
 fn set_next_chapter() {
-    if GameVariableManager::get_number("G_Continuous") == 0 { return; }
-    if !GameVariableManager::get_bool("G_Cleared_M004") { return; }
-    emblem::emblem_gmap_spot_adjust();
+    let mode = GameVariableManager::get_number("G_Continuous");
+    if mode == 0 || !GameVariableManager::get_bool("G_Cleared_M004") { return; }
     let current_chapter = GameUserData::get_chapter();
     let current_cid = current_chapter.cid.to_string();
-    if current_cid == "CID_M005" { current_chapter.set_next_chapter("CID_S001"); }
-    if current_cid == "CID_S001" { current_chapter.set_next_chapter("CID_M006"); }
-    let dlc = continuous_mode_dlc_allowed();
-    if current_cid == "CID_M006" {
-        if dlc { current_chapter.set_next_chapter("CID_G001"); }
-        else { current_chapter.set_next_chapter("CID_S002"); }
+    if mode == 3 && GameVariableManager::get_bool("G_Cleared_M004") {
+        GameVariableManager::set_bool("G_初回アクセス_錬成屋", true);
+        set_next_random_chapter(current_chapter);
         return;
     }
-    if current_cid == "CID_S002" && !dlc { current_chapter.set_next_chapter("CID_M007"); }
-
-    if !continuous_mode_dlc_allowed() &&  crate::autolevel::str_start_with(&current_chapter.cid, "CID_G") {   //switch or updated without DLC, moves back to main chapters from Divine Paralogue
-        if !GameVariableManager::get_bool("G_Cleared_S002") { current_chapter.set_next_chapter("CID_S002");}
-        else if !GameVariableManager::get_bool("G_Cleared_M007") { current_chapter.set_next_chapter("CID_M007");}
-        else if !GameVariableManager::get_bool("G_Cleared_M008") { current_chapter.set_next_chapter("CID_M008");}
-        else if !GameVariableManager::get_bool("G_Cleared_M009") { current_chapter.set_next_chapter("CID_M009");}
-        else { current_chapter.set_next_chapter("CID_M010");} 
-        return;
+    emblem::emblem_gmap_spot_adjust();
+    let dlc = continuous_mode_dlc_allowed();
+    //switch or updated without DLC, moves back to main chapters from Divine Paralogue
+    if !dlc && current_cid.contains("CID_G") {   
+        if let Some(new_chapter) = DLC_CIDS.iter()
+            .filter(|c| !c.contains("G00"))
+            .find(|&x| !GameVariableManager::get_bool(format!("G_Cleared_{}", x)) && !current_cid.contains(x)) {
+                current_chapter.set_next_chapter(format!("CID_{}", new_chapter).as_str());
+        }
+        else { current_chapter.set_next_chapter("CID_M010") }
     }
     if dlc && !GameVariableManager::get_bool("G_Cleared_G006") {    // Divine Paralogue order with DLC
-        if current_cid == "CID_G001" { current_chapter.set_next_chapter("CID_S002"); }
-        if current_cid == "CID_S002" { current_chapter.set_next_chapter("CID_G002"); }
-        if current_cid == "CID_G002" { current_chapter.set_next_chapter("CID_M007"); }
-        if current_cid == "CID_M007" { current_chapter.set_next_chapter("CID_G003"); }
-        if current_cid == "CID_G003" { current_chapter.set_next_chapter("CID_M008"); }
-        if current_cid == "CID_M008" { current_chapter.set_next_chapter("CID_G004"); }
-        if current_cid == "CID_G004" { current_chapter.set_next_chapter("CID_M009"); }
-        if current_cid == "CID_M009" { current_chapter.set_next_chapter("CID_G005"); }
-        if current_cid == "CID_G005" { current_chapter.set_next_chapter("CID_G006"); }
-        if current_cid == "CID_G006" { current_chapter.set_next_chapter("CID_M010"); }
+        if let Some(new_chapter) = DLC_CIDS.iter().find(|&x| !GameVariableManager::get_bool(format!("G_Cleared_{}", x)) && !current_cid.contains(x)) {
+            current_chapter.set_next_chapter(format!("CID_{}", new_chapter).as_str());
+        }
+        else { current_chapter.set_next_chapter("CID_M010") }
         return;
     }
     if current_cid == "CID_M015" || GameVariableManager::get_bool("G_Cleared_M015") {
         if current_cid == "CID_M021" { return; }
         let rec_level = get_recommended_level_main();
-        let chapter_list = ChapterData::get_list().unwrap();
+        let chapter_list = ChapterData::get_list_mut().unwrap();
         // paralogue check
         let mut min_rec_level = rec_level;
         let mut chapter_index = 0;
@@ -271,8 +288,9 @@ fn set_next_chapter() {
             let paralogue_level = paralogue.get_recommended_level();
             // If map to unlock is divine paralogue and the map required to unlock is cleared
             //println!("{} level: {} and {} level: {}", paralogue.cid.to_string(), paralogue_level, current_cid, rec_level );
-            if crate::utils::str_contains(paralogue.get_gmap_open_condition(), "G00") || 
-               GameVariableManager::get_bool(&format!("G_Cleared_{}", paralogue.get_gmap_open_condition().to_string())) {
+            let open = paralogue.get_gmap_open_condition().to_string();
+            if open.contains("G00") || 
+               GameVariableManager::get_bool(&format!("G_Cleared_{}", open)) {
                 if paralogue_level < rec_level {
                     if paralogue_level < min_rec_level {
                         min_rec_level = paralogue_level;
@@ -298,6 +316,85 @@ fn set_next_chapter() {
         }
     }
 }
+
+fn set_next_random_chapter(current_chapter: &ChapterData) {
+    let prefixless = current_chapter.get_prefixless_cid().to_string();
+    continous_rand_emblem_adjustment();
+    if unsafe { crate::randomizer::STATUS.continious_random_chapter == prefixless } && !GameVariableManager::get_bool(format!("G_Cleared_{}", prefixless)) { return; }
+    let dlc = continuous_mode_dlc_allowed();
+
+    let completed = GameVariableManager::find_starts_with("G_Cleared_").iter().filter(|key| GameVariableManager::get_bool(key.to_string())).count();
+    let mut available: Vec<String> = Vec::new();
+    let m011_cleared = GameVariableManager::get_bool("G_Cleared_M011");
+    let m011 = GameVariableManager::get_bool("G_Cleared_M006") && GameVariableManager::get_bool("G_Cleared_M008");
+    ["M005", "M006", "M007", "M008", "M009", "M010", "M012", "M013", "M014", "M015", "M016", "M018", "S001", "S002"].iter()
+        .for_each(|key| if !GameVariableManager::get_bool(format!("G_Cleared_{}", key)) {available.push(key.to_string());} );
+
+    if m011_cleared { ["M017", "M019", "M020", "M021"].iter().for_each(|key| if !GameVariableManager::get_bool(format!("G_Cleared_{}", key)) { available.push(key.to_string()); } ); }
+    else if m011 { available.push("M011".to_string());  }
+
+    if completed >= 15 {    // Paralogues
+        for x in 0..12 {
+            let e_index = crate::randomizer::person::pid_to_index(&EMBLEM_GIDS[x as usize].to_string(), false);
+            let para = EMBELM_PARA[ x as usize ];
+            if e_index == 13 {
+                if is_god_available(EMBLEM_GIDS[x as usize], false) && m011_cleared {
+                    if !GameVariableManager::get_bool(format!("G_Cleared_{}", para)) { available.push(para.to_string()); }
+                }
+            }
+            else if ( ( x < 6 && m011_cleared ) || x >= 6 ) && is_god_available(EMBLEM_GIDS[x as usize], false) {
+                if !GameVariableManager::get_bool(format!("G_Cleared_{}", para)) { available.push(para.to_string()); } 
+            }
+        }
+    }
+    let m022 = ["M011", "M013", "M014", "M015", "M016", "M017", "M019", "M020", "M021"].iter().filter(|&x|GameVariableManager::get_bool(format!("G_Cleared_{}", x))).count();
+    if m022 == 9 { 
+        if !GameVariableManager::get_bool("G_Cleared_M022") { available.push("M022".to_string()); }
+        else if !GameVariableManager::get_bool("G_Cleared_S015") { available.push("S015".to_string()); }
+    }
+    if completed >= 20 && GameVariableManager::get_bool("G_Cleared_M022") { 
+        ["M023", "M024", "M025"].iter().for_each(|key| if !GameVariableManager::get_bool(format!("G_Cleared_{}", key)) {available.push(key.to_string());} );
+    }
+    if dlc {
+        for x in 1..7 {
+            let god = format!("G00{}", x);
+            if !GameVariableManager::get_bool(format!("G_Cleared_{}", god)) {available.push(god); }
+        }
+    }
+    if let Some(pos) = available.iter().position(|key| *key == prefixless) { available.remove(pos); }
+    if available.len() == 0 {
+        current_chapter.set_next_chapter("CID_M026");
+        return; 
+    }
+    let rng = Random::get_game();
+    let mut key= available[ rng.get_value( available.len() as i32 ) as usize ].to_string();
+
+    if dlc {
+        let mut count = 0;
+        while count < 3 {
+            key = available[ rng.get_value( available.len() as i32 ) as usize ].to_string();
+            if key.contains("G00") { count += 1; }
+            else { break; }
+        }
+    }
+    let cid = format!("CID_{}", key);
+
+    if GameUserData::get_sequence() == 7 {
+        let chapter = current_chapter.cid;
+        if chapter.contains("M011") && !m011 || chapter.contains("M022") && m022 < 9 {
+            GameUserData::set_chapter(ChapterData::get(cid).unwrap());
+            return;
+        }
+    }
+    println!("Current Chapter: {}", current_chapter.cid);
+    println!("New Random Chapter: {} out of {} Possible", cid, available.len() );
+    println!("Number of Map Completed: {}", completed);
+    println!("Number of Story Maps Completed: {}", get_story_chapters_completed());
+    unsafe { crate::randomizer::STATUS.continious_random_chapter = prefixless.to_string() };
+    available.iter().for_each(|cid| println!("{}", cid));
+    current_chapter.set_next_chapter(cid.as_str());
+}
+
 // Function to auto collect bond frags
 fn bond_frags_from_achievement(this: &AchieveData) -> i32 {
     let status = unsafe { achieve_status(this, None) };
@@ -309,11 +406,7 @@ fn bond_frags_from_achievement(this: &AchieveData) -> i32 {
 }
 
 fn collect_bond_frags_from_achievements() {
-    let list = AchieveData::get_list().unwrap();
-    for x in 0..list.len() {
-        let bond = bond_frags_from_achievement(list[x]);
-        GameUserData::add_bond(bond);
-    }
+    AchieveData::get_list().unwrap().iter().for_each(|achieve| { GameUserData::add_bond( bond_frags_from_achievement( achieve ) ); });
 }
 
 pub fn update_bonds() {
@@ -446,7 +539,9 @@ fn add_ring(ring_id: &Il2CppString) { unsafe { add_ring_to_pool(ring_id, None, 1
 fn do_dlc() {
     if !continuous_mode_dlc_allowed() { return; }
     let current_cid = GameUserData::get_chapter().cid.to_string();
-    if current_cid == "CID_M006" {
+    let random = GameVariableManager::get_number("G_Continuous") == 3;
+    let completed = get_story_chapters_completed();
+    if (!random && current_cid == "CID_M006" ) || ( random && completed >= 4 ) {
         let god;
         if GameVariableManager::get_number("G_Emblem_Mode") != 1 { god = GodData::get("GID_エーデルガルト").unwrap(); }
         else {
@@ -455,14 +550,14 @@ fn do_dlc() {
         }
         unsafe { godpool_create(god, None); }
     }
-    if current_cid == "CID_M017" {
+    if (!random && current_cid == "CID_M017" ) || ( random && completed == 16 ) {
         GameVariableManager::set_bool("G_CC_エンチャント", true);   // enable dlc seals
         GameVariableManager::set_bool("G_CC_マージカノン", true);
         GameVariableManager::set_number("G_所持_IID_マージカノン専用プルフ", GameVariableManager::get_number("G_所持_IID_マージカノン専用プルフ") + 1); // add dlc deals
         GameVariableManager::set_number("G_所持_IID_エンチャント専用プルフ", GameVariableManager::get_number("G_所持_IID_エンチャント専用プルフ") + 1);
         let persons = ["PID_エル", "PID_ラファール", "PID_セレスティア", "PID_グレゴリー", "PID_マデリーン"];
         for x in persons {
-            if GameVariableManager::get_bool("G_Random_Recruitment") {
+            if GameVariableManager::get_number("G_Random_Recruitment") != 0 {
                 let new_person = GameVariableManager::get_string(&format!("G_R_{}", x)).to_string();
                 let person_data = PersonData::get(&new_person).unwrap();
                 GameVariableManager::make_entry("MapRecruit", 1);
@@ -483,26 +578,53 @@ pub fn update_ignots(){
     let mut add_steel = 0;
     let mut add_silver = 0;
     GameUserData::add_iron( add_iron );
-    if GameVariableManager::get_bool("G_Cleared_M004") { add_steel += 1;} 
-    if GameVariableManager::get_bool("G_Cleared_M005") { add_steel += 5; } 
-    if GameVariableManager::get_bool("G_Cleared_M006") { add_steel += 5; } 
     if GameVariableManager::get_bool("G_Cleared_G001") { add_silver += 1; } 
-    if GameVariableManager::get_bool("G_Cleared_M007") { add_silver += 1; } 
-    if GameVariableManager::get_bool("G_Cleared_M009") { add_silver += 1; } 
-    if GameVariableManager::get_bool("G_Cleared_M011") { add_silver += 1; } 
-    if GameVariableManager::get_bool("G_Cleared_M016") { 
-        add_silver += 1;
-        add_steel += 5;
+    if GameVariableManager::get_bool("G_Cleared_M004") { add_steel += 1;} 
+    if GameVariableManager::get_number("G_Continuous") < 3 {
+        if GameVariableManager::get_bool("G_Cleared_M005") { add_steel += 5; } 
+        if GameVariableManager::get_bool("G_Cleared_M006") { add_steel += 5; } 
+        if GameVariableManager::get_bool("G_Cleared_M007") { add_silver += 1; } 
+        if GameVariableManager::get_bool("G_Cleared_M009") { add_silver += 1; } 
+        if GameVariableManager::get_bool("G_Cleared_M011") { add_silver += 1; } 
+        if GameVariableManager::get_bool("G_Cleared_M016") { 
+            add_silver += 1;
+            add_steel += 5;
+        }
+    }
+    else {
+        let cleared = get_story_chapters_completed();
+        if cleared >= 5 { add_steel += 1;} 
+        if cleared >= 6 { add_steel += 1;} 
+        if cleared >= 7 { add_silver += 1; } 
+        if cleared >= 9 { add_silver += 1; } 
+        if cleared >= 11 { add_silver += 1 }
+        if cleared >= 16 { 
+            add_silver += 1;
+            add_steel += 5;
+        }
     }
     GameUserData::add_steel( add_steel );
     GameUserData::add_silver( add_silver );
 }
 pub fn get_number_main_chapters_completed2() -> i32 {
     let mut number = 0;
-    let chapters = ChapterData::get_list_mut().expect(":D");
-    for x in 0..chapters.len() { if GameUserData::is_chapter_completed(chapters[x]) { number += 1; } }
+    ChapterData::get_list().unwrap().iter()
+        .for_each(|chapter| if GameUserData::is_chapter_completed(chapter) { number += 1; });
     number
 }
+pub fn get_story_chapters_completed() -> i32 {
+    let mut number = 0;
+    GameVariableManager::find_starts_with("G_Cleared_M0").iter()
+        .for_each(|cleared| if GameVariableManager::get_bool(cleared.to_string()) { number += 1 });
+    number
+}
+
+pub fn get_story_completed_prefix(next: bool) -> String {
+    let value = if next { 1 } else { 0 } + get_story_chapters_completed();
+    if value < 10 { format!("M00{}", value) }
+    else { format!("M0{}", value) }
+}
+
 fn get_recommended_level_main() -> u8 {
     let chapters = ChapterData::get_list_mut().expect(":D");
     let current_cid = GameUserData::get_chapter().cid.to_string();
@@ -577,6 +699,56 @@ impl ConfigBasicMenuItemSwitchMethods for ContiniousMode {
     }
 }
 
+pub fn continous_rand_emblem_adjustment() {
+    if GameVariableManager::get_number("G_Continuous") < 3 { return; }
+    // if !in_map_chapter() { return; }
+    unsafe { enable_map_rewind(None); }
+    if GameVariableManager::get_bool("G_Cleared_M022") { for x in 0..12 { escape_god(EMBLEM_GIDS[x], false); }   return; }
+    let current_chapter = GameUserData::get_chapter().cid.to_string();
+    if current_chapter.contains("M011") && !GameVariableManager::get_bool("G_Cleared_M011") {
+        for x in 0..6 { escape_god(EMBLEM_GIDS[x], true); }  
+        return;
+    }
+    if current_chapter.contains("M022") {
+        escape_god(EMBLEM_GIDS[0], false);
+        for x in 1..12 { escape_god(EMBLEM_GIDS[x], true); } 
+        return;
+    }
+    if GameVariableManager::get_bool("G_Cleared_M010") && !GameVariableManager::get_bool("G_Cleared_M011"){
+        for x in 0..6 { escape_god(EMBLEM_GIDS[x], false); }  
+    }
+    if GameVariableManager::get_bool("G_Cleared_M021") && !GameVariableManager::get_bool("G_Cleared_M022"){
+        for x in 0..12 { escape_god(EMBLEM_GIDS[x], false); }  
+    }
+
+}
+
+pub fn escape_god(gid: &str , escape: bool) {
+    if let Some(god_data) = if GameVariableManager::get_number("G_Emblem_Mode") == 0 { GodData::get(gid) }
+        else { GodData::get( GameVariableManager::get_string(format!("G_R_{}", gid)))} {
+        if let Some(god_unit) = unsafe { try_get_god(god_data, true, None) } {
+            unsafe { god_unit_set_escape(god_unit, escape, None) };
+            if escape {
+                if let Some(parent) = unsafe {god_unit_get_parent(god_unit, None) } {
+                    unsafe { unit_clear_parent(parent, None);}
+                }
+            }
+        }
+    }
+}
+fn is_god_available(gid: &str, randomized: bool) -> bool {
+    if let Some(god_data) = if GameVariableManager::get_number("G_Emblem_Mode") == 0 || !randomized { GodData::get(gid) }
+        else { GodData::get( GameVariableManager::get_string(format!("G_R_{}", gid)))} {
+        if let Some(god_unit) = unsafe { try_get_god(god_data, true, None) } {
+            return !god_unit.get_escape();   
+        }
+        else { return false; }
+    }
+    false
+}
+#[skyline::from_offset(0x01ddfc50)]
+fn enable_map_rewind(method_info: OptionalMethod);
+
 #[skyline::from_offset(0x02280c20)]
 fn get_game_parameter(value: &Il2CppString, method_info: OptionalMethod) -> i32;
 
@@ -599,13 +771,22 @@ fn calc_rewards(name: &Il2CppString, method_info: OptionalMethod) -> &'static mu
 fn get_bond(this: &GodUnit, unit: &Unit, method_info: OptionalMethod) -> Option<&'static mut GodBond>;
 
 #[skyline::from_offset(0x02334600)]
-fn try_get_god(gid: &GodData, included_reserved: bool,  method_info: OptionalMethod) -> Option<&GodUnit>;
+pub fn try_get_god(gid: &GodData, included_reserved: bool,  method_info: OptionalMethod) -> Option<&GodUnit>;
 
 #[skyline::from_offset(0x02b4dff0)]
 fn level_up_bond(this: &GodBond, method_info: OptionalMethod);
 
 #[skyline::from_offset(0x023349c0)]
 fn godpool_create(this: &GodData, method_info: OptionalMethod) -> Option<&'static GodUnit>;
+
+#[skyline::from_offset(0x0233eaf0)]
+fn god_unit_set_escape(this: &GodUnit, escape: bool, method_info: OptionalMethod);
+
+#[skyline::from_offset(0x01a4f4c0)]
+pub fn unit_clear_parent(this: &Unit, method_info: OptionalMethod);
+
+#[skyline::from_offset(0x0233ffb0)]
+fn god_unit_get_parent(this: &GodUnit, method_info: OptionalMethod) -> Option<&'static Unit>;
 
 #[skyline::from_offset(0x02939dc0)]
 pub fn set_exchange_level(level: i32, method_info: OptionalMethod);

@@ -82,8 +82,6 @@ fn is_valid_skill(sid: &str ) -> bool {
 }
 fn is_valid_person(pid: &str) -> i32 {
     let mut out = 0;
-    let string = String::new();
-    let test: &Il2CppString = string.into();
     for x in PIDS {
         if pid == x { return out; } // by pid
         let person = PersonData::get(x).expect("Invalid person.");
@@ -179,7 +177,7 @@ pub fn generate_black_list() {
                         if person_index == -1 { continue; }
                         let new_person_index = is_valid_person(spilt[2]);
                         if new_person_index == -1 { continue; }
-                        if person_index <= 0 && new_person_index > 35 { continue; }
+                        if person_index == 0 && new_person_index > 35 { continue; }
                         if ( person_index >= 36 || new_person_index >= 36 ) && !crate::utils::dlc_check() { continue; }
                         SET_RECRUITMENT.lock().unwrap().push( (person_index, new_person_index, false));
                         println!("Unit {} is swapped with Unit {}", person_index, new_person_index);

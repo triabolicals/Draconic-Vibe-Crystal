@@ -14,7 +14,7 @@ pub use engage::{
     gamedata::{*, unit::*, item::RewardData, skill::*, item::*, god::*, dispos::*},
 };
 pub use super::enums::*;
-use std::{fs, fs::File, io::Write};
+use std::{fs::{self, File}, io::Write};
 use crate::utils::{self, fnv_hash_string};
 
 pub mod bgm;
@@ -32,8 +32,50 @@ use engage::proc::*;
 use engage::proc::desc::ProcDesc;
 use super::{VERSION, CONFIG, DeploymentConfig};
 pub static mut LINKED: [i32; 20] = [-1; 20];
+pub static mut STATUS: RandomizerStatus = RandomizerStatus{
+    well_randomized: false,
+    enemy_emblem_randomized: false,
+    enemy_unit_randomized: false,
+    emblem_unit_skill_randomized: false,
+    skill_randomized: false,
+    emblem_data_randomized: false,
+    emblem_apt_randomized: false,
+    emblem_inherit: false,
+    shop_randomized: false,
+    randomized: false,
+    continious_random_chapter: String::new(),
+};
+
 pub static mut CURRENT_SEED: i32 = -1;
 
+pub struct RandomizerStatus {
+    pub well_randomized: bool,
+    pub enemy_emblem_randomized: bool,
+    pub enemy_unit_randomized: bool,
+    pub emblem_unit_skill_randomized: bool,
+    pub skill_randomized: bool,
+    pub emblem_data_randomized: bool,
+    pub emblem_apt_randomized: bool,
+    pub emblem_inherit: bool,
+    pub shop_randomized: bool,
+    pub randomized: bool,
+    pub continious_random_chapter: String,
+}
+impl RandomizerStatus {
+    pub fn reset(&mut self) {
+        self.well_randomized = false;
+        self.enemy_emblem_randomized = false;
+        self.enemy_unit_randomized = false;
+        self.emblem_unit_skill_randomized = false;
+        self.skill_randomized = false;
+        self.emblem_data_randomized = false;
+        self.emblem_apt_randomized = false;
+        self.emblem_inherit = false;
+        self.shop_randomized = false;
+        self.randomized = false;
+        self.continious_random_chapter = "".to_string();
+    }
+}
 #[unity::class("App", "SoftwareKeyboard")]
 pub struct SoftwareKeyboard {
     pub proc: ProcInstFields,
@@ -93,7 +135,7 @@ impl ConfigBasicMenuItemCommandMethods for SeedRandomizer {
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { this.command_text = "Set Seed".into(); }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { 
-        let set_seed = unsafe { CONFIG.lock().unwrap().seed };
+        let set_seed = CONFIG.lock().unwrap().seed as i32;
         this.help_text = if set_seed != 0 { format!("Press + to change the set seed. Currently set to: {}", set_seed) }
             else { format!("Press + to manually set seed.") }.into();
 
@@ -481,38 +523,55 @@ pub fn try_get_index(dyn_value: u64, index: i32, method_info: OptionalMethod) ->
     let new_index = PersonData::get_index( new_person.pid );
     return new_index;
 }
+
+pub fn in_map_randomize() {
+    let random = unsafe { STATUS.randomized };
+    let emblem_random = unsafe { STATUS.emblem_data_randomized };
+    println!("Randomizating Stuff in map");
+    if random && emblem_random {
+        skill::replace_enemy_version();
+        emblem::emblem_skill::adjust_emblem_common_skills();
+        emblem::enemy::randomize_enemy_emblems();
+        person::unit::reload_all_actors();
+    }
+}
+
 fn randomize_gamedata(is_new_game: bool) {
-    //GameVariableManager::set_bool("G_RandomCC", CONFIG.lock().unwrap().random_reclass);
+    let sequence = GameUserData::get_sequence();
+    println!("Current Chapter: {}, Sequence: {}", GameUserData::get_chapter().cid, sequence);
     assets::data::add_animation_unique_classes();
-    item::shop::randomize_shop_data();
+
     emblem::randomize_emblems();
     crate::utils::get_lueur_name_gender();
     person::randomize_person();
+    println!("Alear Check");
+    person::change_lueur_for_recruitment(is_new_game);
+
     skill::randomize_skills();
+    item::shop::randomize_shop_data();
     emblem::emblem_skill::randomized_god_data();
-    item::randomize_well_rewards();
+    if !(utils::in_map_chapter() || sequence == 5 ) {   // Some issues when attempting to this when the scene loads
+        skill::replace_enemy_version();
+        emblem::emblem_skill::adjust_emblem_common_skills();
+        emblem::enemy::randomize_enemy_emblems();
+    }
+    emblem::emblem_item::randomized_emblem_apts();
     emblem::engrave::random_engrave_by_setting( GameVariableManager::get_number("G_EngraveSetting"));
     emblem::randomize_engage_links(false);
-    emblem::emblem_item::randomized_emblem_apts();
+    
     interact::change_interaction_data( GameVariableManager::get_number("G_InteractSetting") );
     grow::random_grow();
     battle_styles::randomize_job_styles();
-    println!("Game data randomized");
-    tutorial_check();
-    println!("Alear Check");
-    person::change_lueur_for_recruitment(is_new_game);
-    println!("Replace Enemy Version");
-    skill::replace_enemy_version();
-    emblem::enemy::randomize_enemy_emblems();
-    println!("Name Replacement");
+
     names::give_names_to_generics();
     unsafe { 
         CURRENT_SEED = GameVariableManager::get_number("G_Random_Seed"); 
         LUEUR_CHANGE = true;
     }
     item::shop::add_personal_outfits();
+    item::randomize_well_rewards();
     if GameVariableManager::get_number("G_Random_Job") != 0 { assets::unlock_royal_classes(); }
-    println!("Completed");
+    println!("Game data randomized");
 }
 
 pub fn start_new_game(){
@@ -560,24 +619,21 @@ pub fn reset_gamedata() {
     person::check_playable_classes();
     GodData::unload();
     GodData::load();
-    engage_count();
     GodGrowthData::unload();
     GodGrowthData::load();
     RingData::unload();
     RingData::load_data();
     item::shop::reset_shopdata();
-    let god = GodData::get_list_mut().unwrap();
-    for g in 0..god.len() {
-        god[g].on_complete();
-        if god[g].gid.to_string() == "GID_リュール" {
-            god[g].get_flag().value |= -2147483648; // adding back the hero flag if removed for emblem alear
+    GodData::get_list_mut().unwrap().iter()
+        .for_each(|god|{
+            god.on_completed();
+            if let Some(growth) = GodGrowthData::try_get_from_god_data(god) {
+                growth.iter().for_each(|level| level.on_complete());
+            }
         }
-        let ggd = GodGrowthData::try_get_from_god_data(god[g]);
-        if ggd.is_some() {
-            let growth = ggd.unwrap();
-            for x in 0..growth.len() { growth[x].on_complete(); }
-        }
-    }
+    );
+    engage_count();
+
     GodGrowthData::on_complete_end();
     HubDisposData::unload();
     HubDisposData::load();
@@ -588,6 +644,12 @@ pub fn reset_gamedata() {
     HubFacilityData::load_data();
     ChapterData::unload();
     ChapterData::load_data();
+
+    SkillData::unload();
+    SkillData::load_data();
+    SkillData::get_list().unwrap().iter().for_each(|skill| skill.on_completed() );
+    SkillData::try_index_get(0).unwrap().on_completed_end();
+
 
     emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().reset();
     emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().commit();
@@ -623,8 +685,9 @@ pub fn reset_gamedata() {
         CURRENT_SEED = -1; 
         LUEUR_CHANGE = false;
         item::shop::SHOP_SET = false;
-        for x in 0..20 {  LINKED[x as usize] = -1; }    // Linked Units for Engage+
+        for x in 0..20 {  LINKED[x as usize] = -1; }  
     }
+    unsafe { STATUS.reset() };
     let dummy_god = GodData::get("GID_マルス").unwrap();
     // To remove links from the dictionary, by on_release
     for x in 1..PIDS.len() {
@@ -644,47 +707,24 @@ pub fn randomize_stuff() {
     tutorial_check();
     if !utils::can_rand() {  return;  }
     if GameVariableManager::get_number("G_Random_Seed") != unsafe { CURRENT_SEED } {
-        if GameVariableManager::get_number("G_Random_Shop_Items") == 0 &&  CONFIG.lock().unwrap().random_shop_items {
+        if GameVariableManager::get_number("G_Random_Shop_Items") == 0 && CONFIG.lock().unwrap().random_shop_items {
             GameVariableManager::set_number("G_Random_Shop_Items",  CONFIG.lock().unwrap().random_shop_items as i32 );
         }
         println!("Randomized Stuff with Save File Seed {}", GameVariableManager::get_number("G_Random_Seed"));
         randomize_gamedata(false);
         if GameVariableManager::get_number("G_Liberation_Type") != 0  { item::change_liberation_type(); }
-        if GameVariableManager::get_bool("G_Random_Job") && GameVariableManager::exist("G_Misercode_Type") {
-            let misercode = ItemData::get_mut("IID_ミセリコルデ").unwrap();
-            misercode.kind = GameVariableManager::get_number("G_Misercode_Type") as u32;
-            let misercode_type = GameVariableManager::get_number("G_Misercode_Type");
-            misercode.get_give_skills().clear();
-            misercode.get_equip_skills().clear();
-            if misercode_type == 4 {
-                misercode.range_o = 2; misercode.range_i = 2;
-                misercode.set_cannon_effect("弓砲台".into());
-                misercode.on_complete();
-                misercode.get_equip_skills().add_sid("SID_飛行特効",4, 0);
-            }
-            else if misercode_type == 5 || misercode_type == 6 {
-                misercode.range_i = 1;
-                misercode.range_o = 2;
-                if misercode_type == 6 {
-                    misercode.set_cannon_effect("魔砲台炎".into());
-                    misercode.set_hit_effect( "オヴスキュリテ".into());
-                }
-                else { misercode.get_give_skills().add_sid("SID_毒",3, 0); }
-                misercode.on_complete();
-            }   
-            else if misercode_type == 8 { 
-                misercode.range_i = 1;
-                misercode.range_o = 1;
-                misercode.get_equip_skills().add_sid("SID_２回行動",4,0); 
-            }
-            else {
-                misercode.range_i = 1;
-                misercode.range_o = 2;
-            }
-        }
+        if GameVariableManager::get_bool("G_Random_Job") && GameVariableManager::exist("G_Misercode_Type") { item::change_misercode_type(); }
+
         println!("Randomization Complete");
         println!("Meteor Adjustment");
         item::unit_items::adjust_items();   //Meteor Adjustment
+        unsafe { STATUS.randomized = true }
+    }
+    if utils::can_rand() && unsafe { STATUS.randomized } && !utils::in_map_chapter() && GameUserData::get_sequence() != 5 {
+        println!("Seq: {}", GameUserData::get_sequence());
+        skill::replace_enemy_version();
+        emblem::enemy::randomize_enemy_emblems();
+        emblem::emblem_skill::adjust_emblem_common_skills();
     }
 }
 
@@ -710,7 +750,13 @@ pub fn intitalize_game_data() {
     grow::get_growth_min_max();
     emblem::emblem_skill::get_pid_emblems();
     person::check_playable_classes();
+    person::get_all_enemy_persons();
     CONFIG.lock().unwrap().seed = 0;
+}
+pub fn intialize_added_data() { 
+    // Data that does not depend on game data
+    assets::data::add_head_data();
+
 }
 
 pub fn engage_count() {

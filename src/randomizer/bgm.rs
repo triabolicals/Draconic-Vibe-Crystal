@@ -34,15 +34,11 @@ pub fn get_bgm_pool() {
     if BGM_POOL.lock().unwrap().len() != 0 { return; }
     let music_list = MusicData::get_list().unwrap();
     for x in 6..music_list.len() {
-        if crate::utils::str_contains(music_list[x].event_name, "BGM_Sys_ED") { continue; }
-        if crate::utils::str_contains(music_list[x].event_name, "BGM_Sys") { 
-            BGM_POOL.lock().unwrap().push(music_list[x].event_name.to_string());
-        }
-        else if music_list[x].change_event_name.is_some() {
-            BGM_POOL.lock().unwrap().push(music_list[x].change_event_name.unwrap().to_string());
-        }
+        let event_name = music_list[x].event_name.to_string();
+        if event_name.contains("BGM_Sys") { continue; }
+        else if music_list[x].change_event_name.is_some() { BGM_POOL.lock().unwrap().push(music_list[x].change_event_name.unwrap().to_string());  }
         else if x >= 68 && x <= 74 {
-            BGM_POOL.lock().unwrap().push(music_list[x].event_name.to_string());
+            BGM_POOL.lock().unwrap().push(event_name);
         }
     }
     let chapter_list = ChapterData::get_list().unwrap();
@@ -97,7 +93,25 @@ pub fn randomize_bgm_map() {
         chapter_set_enemy_bgm(chapter, string2, None);
         chapter_set_player_bgm(chapter, string1, None);
     }
+    get_random_special(true);
 }
+#[skyline::hook(offset=0x0228deb0)]
+pub fn special_bgm_hook(calculator: u64, method_info: OptionalMethod) -> Option<&'static Il2CppString> {
+    let result = call_original!(calculator, method_info);
+    if result.is_some() && GameVariableManager::get_bool("G_RandomBGM") { return Some(get_random_special(false)); }
+    else { return result; }
+}
+
+fn get_random_special(set: bool) -> &'static Il2CppString {
+    let rng = Random::get_game();
+    let size = BGM_POOL.lock().unwrap().len() as i32;
+    if !GameVariableManager::exist("SPECIAL_BGM") {
+        GameVariableManager::make_entry_str("SPECIAL_BGM", BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize].as_str());
+    }
+    else if set { GameVariableManager::set_string("SPECIAL_BGM", BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize].as_str()); }
+    GameVariableManager::get_string("SPECIAL_BGM") 
+}
+
 pub fn reset_bgm() {
     let chapter = GameUserData::get_chapter();
     unsafe {
@@ -128,6 +142,7 @@ pub fn change_bgm() {
             field_bgm_play(0, None);
         }
         println!("Bgm: {}", string1.to_string());
+        get_random_special(true);
     }
     else {
         let music_list = MusicData::get_list().unwrap();
@@ -139,7 +154,6 @@ pub fn change_bgm() {
             set_phase_by_chapter(chapter, false, None);
             field_bgm_play(0, None);
         }
-
     }
 }
 
@@ -200,6 +214,7 @@ pub extern "C" fn vibe_bgm() -> &'static mut ConfigBasicMenuItem {
     switch.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = bgm_acall as _ );
     switch
 }
+
 
 #[skyline::from_offset(0x0228c330)]
 pub fn set_phase_bgm(player: &Il2CppString, enemy: &Il2CppString,ally: &Il2CppString, method_info: OptionalMethod);

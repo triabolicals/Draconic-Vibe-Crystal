@@ -156,6 +156,7 @@ pub fn emblem_selection_menu_enable(enabled: bool) {
 
 pub fn get_emblem_paralogue_level() {
     if !crate::utils::can_rand() { return; }
+    if !GameVariableManager::get_bool("G_CustomEmblem") { return; }
     let cid = GameUserData::get_chapter().get_prefixless_cid().to_string();
     GameVariableManager::make_entry("G_Paralogue_Level", 0);
 
@@ -185,7 +186,8 @@ pub fn get_emblem_paralogue_level() {
 #[unity::hook("App", "MapDispos", "CreatePlayerTeam")]
 pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
     if GameVariableManager::get_number("G_DeploymentMode") == 4 { fulldeploy::load_extra_deployment_slots();  }
-    if crate::utils::str_contains(GameUserData::get_chapter().cid, "CID_S0") && GameVariableManager::get_number("G_Emblem_Mode") != 0 { get_emblem_paralogue_level(); }
+    fulldeploy::randomized_emblem_power_spots();
+    if GameUserData::get_chapter().cid.to_string().contains("CID_S0") && GameVariableManager::get_number("G_Emblem_Mode") != 0 { get_emblem_paralogue_level(); }
 
     let absent_force = Force::get(ForceType::Absent).unwrap();
     let hero_unit = absent_force.get_hero_unit();
@@ -296,11 +298,6 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
     }
 }
 
-pub fn engage_plus_remove_rings() {
-    if GameVariableManager::get_bool("G_Cleared_M004") && GameVariableManager::get_bool("G_EngagePlus") {
-        unsafe { remove_all_rings(0, None); }
-    }
-}
 #[skyline::from_offset(0x01c616f0)]
 pub fn remove_all_rings(this: u64, method_info: OptionalMethod);
 

@@ -96,11 +96,12 @@ pub extern "C" fn vibe_styles() -> &'static mut ConfigBasicMenuItem {
 }
 
 pub fn randomize_job_styles(){
+    if !crate::utils::can_rand() { return; }
     let job_list = JobData::get_list_mut().unwrap();
     let rng = crate::utils::get_rng();
     match GameVariableManager::get_number("G_BattleStyles") {
         1 => {  // Random
-            if !crate::utils::can_rand() { return; }
+            println!("Randomizing Battle Styles");
             job_list.iter_mut()
                 .for_each(|job|{
                     if job.parent.index > 0 {
@@ -122,6 +123,7 @@ pub fn randomize_job_styles(){
             );
         },
         0 => {  //Default
+            println!("Battle Styles set to default");
             job_list.iter_mut()
                 .for_each(|job|{
                     if job.parent.index > 0 {

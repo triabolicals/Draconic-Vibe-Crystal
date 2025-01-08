@@ -20,8 +20,7 @@ use crate::config::DeploymentConfig;
 use unity::prelude::OptionalMethod;
 use engage::proc::ProcInst;
 pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| DeploymentConfig::new().into() );
-pub const VERSION: &str = "2.8.7";
-
+pub const VERSION: &str = "2.9.8";
 #[skyline::from_offset(0x02285890)]
 pub fn autosave_proc_inst(this: &ProcInst, kind: i32, index: i32, stuff: Option<&ProcInst>, method_info: OptionalMethod);
 
@@ -38,85 +37,113 @@ fn disable_support_restriction() {
 pub fn set_personal_caps(){
     let persons = PersonData::get_list_mut().expect("triabolical is 'None'");
     let jobs = JobData::get_list_mut().expect("triabolical2 is 'None'");
-    let mut is_max_limit = false;
-    for x in 0..jobs.len() {
-        let cap = jobs[x].get_limit();
-        if cap[1] >= 127 {
-            is_max_limit = true; 
-            break;
-        }
-    }
-    if !is_max_limit { return; }
-    for x in 0..persons.len() {
-        let personal_limits = persons[x].get_limit();
-        for y in 0..11 { personal_limits[y] = 0; } 
+    if CONFIG.lock().unwrap().max_stat_caps {
+        jobs.iter().for_each(|job|{
+            let base = job.get_base();
+            let cap = job.get_limit();
+            for x in 0..10 { cap[x] = base[x] + 125; }
+            cap[10] = 99;
+        });
+        persons.iter_mut().for_each(|person|{ let limits = person.get_limit(); for y in 0..11 { limits[y] = 0; }});
     }
 }
 extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
         match ev {
             SystemEvent::ProcInstJump {proc, label } => {
-                if proc.hashcode == 1650205480 && *label == 17 {    // map ending
-                    randomizer::person::m011_ivy_recruitment_check();
-                    continuous::update_ignots();
-                    continuous::continous_mode_post_battle_stuff(proc);
-                    //deployment::engage_plus_remove_rings(); 
-                    randomizer::assets::accessory::clear_generic_acc();
-                    autolevel::autolevel_party();
-                    randomizer::bgm::reset_bgm();
-                }
+                // println!("Proc: {}, Label: {}, Code: {}", proc.name.unwrap(), label, proc.hashcode);
                 if proc.hashcode == -988690862 && *label == 0 { // On Initial Title Screen Load
-                    enums::generate_black_list();
+                    println!("Proc: {}, Label: {}, Code: {}", proc.name.unwrap(), label, proc.hashcode);
                     randomizer::intitalize_game_data();
-                    message::replace_hub_fxn();
+                    enums::generate_black_list();
                     set_personal_caps();
+                    message::replace_hub_fxn();
                     randomizer::assets::ASSET_DATA.lock().unwrap().apply_bust_changes();
                 }
-                if proc.hashcode == -339912801 && *label == 1 {
+                if proc.hashcode == -1912552174 && *label == 19  {
                     CONFIG.lock().unwrap().correct_rates();
                     CONFIG.lock().unwrap().save();
                 }
-                if proc.hashcode == -1912552174 && *label == 19 {
-                    CONFIG.lock().unwrap().correct_rates();
-                    CONFIG.lock().unwrap().save();
-                }
-                //Reset things
-                if proc.hashcode == -339912801 && *label == 2 { randomizer::reset_gamedata(); }
                 // randomized stuff
-                if proc.hashcode == -1118443598 && *label == 0 { 
+                if proc.hashcode == -1118443598 && *label == 0 { // ProcScene
+                    println!("Proc: {}, Label: {}, Code: {}", proc.name.unwrap(), label, proc.hashcode);
+                    randomizer::assets::install_dvc_outfit();
                     continuous::do_continious_mode();
-                    randomizer::randomize_stuff(); 
+                    continuous::update_next_chapter();
+                    randomizer::randomize_stuff();
                     randomizer::tutorial_check();
                     autolevel::update_learn_skills();
-                    continuous::update_next_chapter();
-                    ironman::ironman_code_edits();  
+                    ironman::ironman_code_edits();
                     randomizer::emblem::emblem_gmap_spot_adjust();
+                    deployment::fulldeploy::adjust_miasma_tiles();
                     if engage::gamevariable::GameVariableManager::get_number("G_Random_Recruitment") != 0 { 
                         randomizer::person::change_map_dispos(); 
                         deployment::inspectors::replace_lueur_chapter22();
                     }
-                    randomizer::assets::accessory::clear_generic_acc();
                 }
                 // New Game After Character Creation
-                if proc.hashcode == -1912552174 && *label == 28 { randomizer::start_new_game();  }
-                // when map starts, iron code edits activate
-                if proc.hashcode == -339912801 && *label == 12 { 
-                    ironman::ironman_code_edits();
-                    randomizer::item::shop::randomize_hub_random_items();
-                    autolevel::calculate_player_cap(); 
-                    continuous::update_bonds();
-                    randomizer::bgm::randomize_bgm_map(); 
-                    randomizer::assets::accessory::clear_generic_acc();
-                    unsafe { crate::enums::LUEUR_CHANGE = true; }
+                if proc.hashcode == -1912552174 && *label == 28 {
+                    println!("Proc: {}, Label: {}, Code: {}", proc.name.unwrap(), label, proc.hashcode);
+                    randomizer::start_new_game();  
+                }  // MainMenuSequence
+                if proc.hashcode == -339912801 {    // MainSequence
+                    println!("Proc: {}, Label: {}, Code: {}", proc.name.unwrap(), label, proc.hashcode);
+                    match *label {
+                        1 => {
+                            CONFIG.lock().unwrap().correct_rates();
+                            CONFIG.lock().unwrap().save();
+                        }
+                        12 => { // Map Loading
+                            continuous::update_next_chapter();  // For Chapter 11/22 Continue Flag 
+                            ironman::ironman_code_edits();
+                            randomizer::item::shop::randomize_hub_random_items();
+                            autolevel::calculate_player_cap(); 
+                            continuous::update_bonds();
+                            randomizer::bgm::randomize_bgm_map(); 
+                            continuous::continous_rand_emblem_adjustment();
+                            unsafe { crate::enums::LUEUR_CHANGE = true; }
+                        }
+                        16 => {
+                            continuous::do_continious_mode();
+                            continuous::update_next_chapter();
+                        },
+                        2 => {
+                            randomizer::reset_gamedata(); 
+                            set_personal_caps();
+                        }   //Reset gamedata
+                        _ => {}
+                    }
                 }
-                //if proc.hashcode == 1650205480
-               // {  println!("Proc: {}, Hash {}, label {}", proc.name.unwrap().get_string().unwrap(), proc.hashcode, label); }
-                if proc.hashcode == 1650205480 && *label == 12 {    //MapSequence TurnHuman
-                    unsafe { autosave_proc_inst(proc, 5, 0, None, None); }
+               // if ( proc.hashcode == 1811932770 && *label == 7 ) || (proc.hashcode == 570083351 && *label == 30)  { continuous::update_next_chapter(); }
+                if proc.hashcode == 1650205480 {    // MapSequence
+                    println!("Proc: {}, Label: {}, Code: {}", proc.name.unwrap(), label, proc.hashcode);
+                    match *label {
+                        12 => {
+                            deployment::fulldeploy::power_spot();
+                            randomizer::emblem::player_emblem_check();
+                            unsafe { autosave_proc_inst(proc, 5, 0, None, None); }
+                        }
+                        17 => { // Map Ending
+                            randomizer::emblem::post_map_emblem_adjustment();
+                            randomizer::person::m011_ivy_recruitment_check();
+                            continuous::update_ignots();
+                            continuous::continous_mode_post_battle_stuff(proc);
+                            autolevel::autolevel_party();
+                            deployment::fulldeploy::adjust_miasma_tiles();
+                            randomizer::bgm::reset_bgm()
+                        }
+                        4|10 => { randomizer::in_map_randomize(); }
+                        _ => {},
+                    }
                 }
                 if proc.hashcode == -1624221522 && *label == 14 { // sortie sequence ends
+                    println!("Proc: {}, Label: {}, Code: {}", proc.name.unwrap(), label, proc.hashcode);
                     deployment::inspectors::adjust_map_inspectors();
+                    randomizer::emblem::pre_map_emblem_adjustment();
                 }
+                if proc.hashcode == 1525873615 && *label == 3 {
+                    println!("Proc: {}, Label: {}, Code: {}", proc.name.unwrap(), label, proc.hashcode);
+                     randomizer::emblem::player_emblem_check(); }
                 // iron man auto-saving
                 /*
                 if proc.hashcode == -813168385 && *label == 3 {    // UnitGrowSeuence
@@ -136,20 +163,26 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
 #[skyline::main(name = "vibe")]
 pub fn main() {
     let _ = std::fs::create_dir_all("sd:/Draconic Vibe Crystal/");
+    randomizer::intialize_added_data();
     cobapi::register_system_event_handler(initalize_random_persons);
-    CONFIG.lock().unwrap().debug = true; //false;
     CONFIG.lock().unwrap().save();
     skyline::install_hooks!( 
         randomizer::job::add_job_list_unit, 
         randomizer::try_get_index, 
         deployment::create_player_team, 
         message::script_get_string,
+        //deseralized_save,
+        randomizer::item::random_well_item,
         randomizer::person::unit::unit_create_impl_2_hook, 
         randomizer::person::unit::create_from_dispos_hook,
         randomizer::assets::animation::asset_table_result_setup_hook,
         randomizer::assets::emblem::asset_table_result_god_setup,
+        randomizer::assets::emblem::asset_table_robin_hook,
         randomizer::assets::transform::asset_table_result_setup_person_hook,
         randomizer::assets::transform::change_dragon,
+        randomizer::emblem::arena_emblem_weapon,
+        randomizer::bgm::special_bgm_hook,
+        randomizer::assets::transform::combat_character_game_status_import,
         event::get_cmd_info_from_cmd_lines_hook,
         event::get_active_character_hook,
         message::mess_get_impl_hook, 
@@ -158,14 +191,12 @@ pub fn main() {
         randomizer::person::get_thumb_face,
         randomizer::person::get_god_face,
         randomizer::person::get_god_thumb_face,
-        randomizer::job::unit_grow_class_change,
         randomizer::assets::emblem::asset_table_result_get_preset_name,
         //get_file_count,
         event::talk_ptr,
         event::calculate_str_width,
     ); 
-    // Fixes the emblem weapons arena issue
-    Patch::in_text(0x01ca9afc).nop().unwrap();
+    Patch::in_text(0x01bb24a8).nop().unwrap();
     Patch::in_text(0x01e41118).bytes(&[0x3f, 0x0d, 0x00,0x71]).unwrap();
     Patch::in_text(0x02677308).bytes(&[0x1f, 0x15, 0x00,0x71]).unwrap();
     Patch::in_text(0x01e40d7c).bytes(&[0x3F,0x0d,0x00,0x71]).unwrap();
@@ -206,6 +237,9 @@ pub fn main() {
         );
     }));
 }
+
+
+
 
 fn remove_skill_equip_restrictions() {
     Patch::in_text(0x01a379b4).bytes(&[0x09, 0x00, 0x00, 0x14]).unwrap();

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use super::VERSION;
-use engage::gamevariable::*;
+use engage::{gameuserdata::GameUserData, gamevariable::*};
 use crate::utils;
 
 #[derive(Default, Serialize, Deserialize)]
@@ -53,7 +53,9 @@ pub struct DeploymentConfig {
     pub apply_rando_post_new_game: bool,
     pub auto_adjust_asset_table: bool,
     pub enable_tradables_item: bool, 
+    pub custom_jobs: bool,
     pub debug: bool,
+    pub max_stat_caps: bool,
     pub misc_option_1 : f32,
     pub misc_option_2 : f32,
 }
@@ -135,8 +137,10 @@ impl DeploymentConfig {
             apply_rando_post_new_game: false,
             auto_adjust_asset_table: false,
             custom_units: false,
+            custom_jobs: false,
             enable_tradables_item: false,
             debug: false,
+            max_stat_caps: false,
             misc_option_1 : 0.0,
             misc_option_2 : 1.0,
         };
@@ -215,6 +219,7 @@ impl DeploymentConfig {
         GameVariableManager::make_entry("G_PlayerOutfit", 0);
         GameVariableManager::make_entry("G_AutoBench", 0);
         GameVariableManager::make_entry("G_PGMode", 0);
+        GameVariableManager::make_entry("G_CJobs", self.custom_jobs as i32);
         if include_non_change {
             GameVariableManager::make_entry("G_EmblemWepProf", self.emblem_weap_prof_mode as i32); 
             GameVariableManager::make_entry("G_Random_Shop_Items",  self.random_shop_items as i32 );
@@ -257,8 +262,23 @@ impl DeploymentConfig {
         if !GameVariableManager::get_bool("G_Random_Names") { GameVariableManager::set_number("G_Random_Names", self.random_names as i32); }
         if !GameVariableManager::get_bool("G_RandomCC") { GameVariableManager::set_bool("G_RandomCC", self.random_reclass); }
         if GameVariableManager::get_number("G_SPCost") == 0 { GameVariableManager::set_number("G_SPCost", self.random_skill_cost); }
-    
+        if !GameVariableManager::get_bool("G_CJobs") { GameVariableManager::set_bool("G_CJobs", self.custom_jobs); }
     }
-    
+
+
+    pub fn get_custom_jobs(&self) -> bool {
+        if GameUserData::get_sequence() == 0 { self.custom_jobs } else { GameVariableManager::get_bool("G_CJobs") }
+    }
+    pub fn set_custom_jobs(&mut self, value: bool) {
+        if GameUserData::get_sequence() == 0 { self.custom_jobs = value; }
+        else { GameVariableManager::set_bool("G_CJobs", value); }
+    }
+    pub fn get_random_cc(&self) -> bool {
+        if GameUserData::get_sequence() == 0 { self.random_reclass} else { GameVariableManager::get_bool("G_RandomCC") }
+    }
+    pub fn set_random_cc(&mut self, value: bool) {
+        if GameUserData::get_sequence() == 0 { self.random_reclass = value; }
+        else { GameVariableManager::set_bool("G_RandomCC", value); }
+    }
 
 }

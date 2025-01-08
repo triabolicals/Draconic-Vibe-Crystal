@@ -10,7 +10,6 @@ use concat_string::concat_string;
 
 use crate::CONFIG;
 
-use super::person::PLAYABLE;
 pub struct RandomGrowMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomGrowMod {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
@@ -107,7 +106,7 @@ pub fn growth_mode_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: O
     return BasicMenuResult::new();
 }
 
-fn growth_mode_build_attr(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
+fn growth_mode_build_attr(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
     if GameVariableManager::get_number("G_Random_Grow_Mode") & 1 == 1 { BasicMenuItemAttribute::Enable }
     else { BasicMenuItemAttribute::Hide }
 }
@@ -131,14 +130,13 @@ pub fn get_growth_min_max() {
     }
     let person_list = PersonData::get_list_mut().unwrap();
     person_list.iter()
+        .filter(|person| !person.get_grow().is_zero())
         .for_each(|person|{
             let grow = person.get_grow();
-            if !grow.is_zero() {
-                for y in 0..9 {
-                    let v: i32 = grow[y as usize] as i32;
-                    if v > grow_range[10 + y as usize] { grow_range[10 + y as usize] = v; }
-                    if v < grow_range[y as usize] { grow_range[ y as usize ] = v; }
-                }
+            for y in 0..9 {
+                let v: i32 = grow[y as usize] as i32;
+                if v > grow_range[10 + y as usize] { grow_range[10 + y as usize] = v; }
+                if v < grow_range[y as usize] { grow_range[y as usize] = v; }
             }
         }
     );
@@ -160,7 +158,7 @@ pub fn get_growth_min_max() {
 }
 
 pub fn randomize_person_grow(){
-    if GameVariableManager::get_number("G_Random_Grow_Mode") & 1 == 0 { return; }
+    println!("Randomization Personal Growth Rates");
     let person_list = PersonData::get_list_mut().unwrap();
     let rng = crate::utils::get_rng();
 
@@ -168,7 +166,7 @@ pub fn randomize_person_grow(){
     let grow_range = unsafe { &GROW_RANGE };
     let limits: (i32, i32) =
         if mode == 0 { (150, 400) }
-        else { (0, 1000) };
+        else { (0, 2000) };
 
     person_list.iter_mut()
         .for_each(|person|{
@@ -178,7 +176,8 @@ pub fn randomize_person_grow(){
                 while total < limits.0 || total > limits.1 {
                     total = 0;
                     for y in 0..9 {
-                        let v = rng.get_min_max(grow_range[y as usize], grow_range[10 + y as usize]) as u8;
+                        let mut v = rng.get_min_max(grow_range[y as usize], grow_range[10 + y as usize]) as u8;
+                        if v > 24 { v = 24 };
                         total += 5*(v as i32);
                         grow[y as usize] = v*5;
                     }
@@ -192,18 +191,18 @@ pub fn randomize_person_grow(){
 pub fn adaptive_growths(unit: &Unit) {
     if GameVariableManager::get_number("G_PGMode") != 2 { return; }
     let seed = GameVariableManager::get_number("G_Random_Seed");
-    let index = unit.person.parent.index;
     let grow_range = unsafe { &GROW_RANGE };
-    let playable = PLAYABLE.lock().unwrap();
 
-    if playable.iter().any(|&i| i == index) {
+    if crate::randomizer::person::is_playable_person(unit.person) {
         let key = concat_string!("G_JG_", unit.person.pid.to_string());
-        if !GameVariableManager::exist(key.as_str()) || GameVariableManager::get_number(key.as_str()) == 0 { 
-            let current_job = unit.get_job();
+        let current_job = unit.get_job();
+        if !GameVariableManager::exist(key.as_str()) { 
             GameVariableManager::make_entry(key.as_str(), current_job.parent.hash); 
         }
-        else if JobData::try_index_get(GameVariableManager::get_number(key.as_str())).is_none() {
-            let current_job = unit.get_job();
+        else if GameVariableManager::get_number(key.as_str()) == 0 {
+            GameVariableManager::set_number(key.as_str(), current_job.parent.hash); 
+        }
+        if JobData::try_index_get(GameVariableManager::get_number(key.as_str())).is_none() {
             GameVariableManager::set_number(key.as_str(), current_job.parent.hash); 
         }
         let job = JobData::try_get_hash( GameVariableManager::get_number(key.as_str())).unwrap();
@@ -214,7 +213,8 @@ pub fn adaptive_growths(unit: &Unit) {
         let grow = unit.person.get_grow();
 
         for y in 0..9 {
-            let v = rng.get_min_max(grow_range[y as usize], grow_range[10 + y as usize]) as u8;
+            let mut v = rng.get_min_max(grow_range[y as usize], grow_range[10 + y as usize]) as u8;
+            if v > 24 { v = 24 };
             grow[y as usize] = v*5;
         }
         let str = grow[1];
@@ -236,8 +236,8 @@ pub fn player_pool_adaptive_growths() {
     }
 }
 
-
 pub fn randomize_job_grow(){
+    println!("Randomization Class Modifier Growth Rates");
     let grow_range = unsafe { &mut GROW_RANGE };
     let job_list = JobData::get_list_mut().unwrap();
     let rng = crate::utils::get_rng();
@@ -246,19 +246,34 @@ pub fn randomize_job_grow(){
             let grow = job.get_diff_grow();
             if !grow.is_zero() {
                 for y in 0..9 {
-                    let v = rng.get_min_max(grow_range[20 + y as usize] , grow_range[30 + y as usize]) as i8;
+                    let mut v = rng.get_min_max(grow_range[20 + y as usize] , grow_range[30 + y as usize]) as i8;
+                    if v < -10 { v = -10;}
+                    else if v > 10 { v = 10; } 
                     grow[y as usize] = v*5;
                 }
             }
         }
     );
+    job_list.iter_mut()
+    .for_each(|job|{
+        let grow = job.get_diff_grow();
+        if grow.is_zero() {
+            for y in 0..9 {
+                let mut v = rng.get_min_max(grow_range[20 + y as usize] , grow_range[30 + y as usize]) as i8;
+                if v < -10 { v = -10;}
+                else if v > 10 { v = 10; } 
+                grow[y as usize] = v*5;
+            }
+        }
+    }
+);
 }
 
 
 pub fn random_grow(){
     if !crate::utils::can_rand() { return; }
     match GameVariableManager::get_number("G_Random_Grow_Mode") {
-        1 => { randomize_person_grow(); },
+        1 => { randomize_person_grow();  },
         2 => { randomize_job_grow(); }, 
         3 => { 
             randomize_person_grow();

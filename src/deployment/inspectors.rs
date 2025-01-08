@@ -36,13 +36,9 @@ pub fn change_g_pid_lueur() {
     let replacement_pid = GameVariableManager::get_string("G_R_PID_リュール");
     if unsafe { crate::utils::is_null_empty(replacement_pid, None) } { return; }
     println!("Replacing Lueur with replacement"); 
-    if crate::utils::str_contains(replacement_pid, "PID_") {
-        if replacement_pid.to_string() != "PID_リュール" {
-            let dyn_value = unsafe { crate::message::dynvalue_new_string(replacement_pid, None) };
-            crate::message::set_script_variable("g_pid_lueur", dyn_value);
-            println!("Lueur PID was replaced for Chapter 22"); 
-        }
-    }
+    let dyn_value = unsafe { crate::message::dynvalue_new_string(replacement_pid, None) };
+    crate::message::set_script_variable("g_pid_lueur", dyn_value);
+    println!("Lueur PID was replaced for Chapter 22"); 
 }
 
 pub fn replace_lueur_chapter22() {

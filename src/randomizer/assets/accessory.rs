@@ -1,6 +1,40 @@
+use engage::gameuserdata::GameUserData;
 use super::*;
 
-pub static mut GENERIC_ACC: Vec<(i32, i32, String)> = Vec::new();
+
+pub struct RandomAssets;
+impl ConfigBasicMenuItemSwitchMethods for RandomAssets {
+    fn init_content(_this: &mut ConfigBasicMenuItem){
+        GameVariableManager::make_entry("G_RandAsset", 0);
+    }
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let value = GameVariableManager::get_number("G_RandAsset");
+        let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
+        if value != result {
+            GameVariableManager::set_number("G_RandAsset", result);
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        } else {return BasicMenuResult::new(); }
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = match GameVariableManager::get_number("G_RandAsset") {
+            1 => { "Weapons assets are randomized"  }
+            2 => { "Info animations are randomized for player units."}
+            3 => { "Weapons / player info animations are randomized"}
+            _ => { "No assets are randomized." }
+        }.into();
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.command_text =  match GameVariableManager::get_number("G_RandAsset") {
+            1 => { "Weapons"}
+            2 => { "Info"}
+            3 => { "Weapon+Info"}
+            _ => { "None"}
+        }.into();
+    }
+}
 
 pub struct PlayerOutfits;
 impl ConfigBasicMenuItemSwitchMethods for PlayerOutfits {
@@ -91,7 +125,7 @@ impl TwoChoiceDialogMethods for OutfitConfirm {
 
 pub fn gather_all_accesories(){
     let accessory_list = AccessoryData::get_list().unwrap(); 
-    let asset_table = AssetTable::get_list_mut().unwrap();
+    /*
     if asset_table.len() < 5000 {
         for x2 in 3500..asset_table.len() {
             let asset_entry = &asset_table[x2];
@@ -103,6 +137,7 @@ pub fn gather_all_accesories(){
         }
         unsafe { asset_table_on_completed_end(asset_table[0], None); }
     }
+    */
     println!("Adding Accessory Assets...");
     let assets = include_str!("data/accessories.txt").lines();
     let mut asset_data = ASSET_DATA.lock().unwrap();
@@ -115,6 +150,10 @@ pub fn gather_all_accesories(){
         // Skipping Character unique outfits
         for x in 43..accessory_list.len() { asset_data.add_data(accessory_list[x]);  }
     }
+    for x in 0..8 {
+        println!("Male Entries for Accessory Type {}, {}", x, asset_data.male.n_entries[x]);
+        println!("Female Entries for Accessory Type {}, {}", x, asset_data.female.n_entries[x]);
+    }
 
 
 }
@@ -122,13 +161,12 @@ pub fn gather_all_accesories(){
 pub fn accesorize_enemy_unit(enemy: &Unit) {
     let accessory_list = &mut unsafe { unit_get_accessory_list(enemy, None) }.unit_accessory_array;
     let length = accessory_list.len();
-    if !GameVariableManager::get_bool("G_EnemyOutfits") { 
+    if !GameVariableManager::get_bool("G_EnemyOutfits") && enemy.person.get_asset_force() != 0 { 
         for x in 0..length { accessory_list[x].index = 0; }
         return;
     }
     let rng = Random::get_game();
-    let gender = if enemy.edit.is_enabled() { enemy.edit.gender  } 
-    else { enemy.person.get_gender() };
+    let gender = unit_dress_gender(enemy);
     match gender  {
         1 => { 
             for x in 0..length {
@@ -145,6 +183,7 @@ pub fn accesorize_enemy_unit(enemy: &Unit) {
         _ => {}, 
     }
 }
+
 fn change_enemy_outfits() {
     let force_type = [ForceType::Enemy, ForceType::Ally];
     for ff in force_type {
@@ -162,9 +201,25 @@ pub fn set_accessories_for_unit(unit: &Unit, result: &mut AssetTableResult) {
     let gender = unit_dress_gender(unit);
     if gender > 2 || gender == 0 { return; }
     let gen_str = if gender == 1 { "M" } else { "F" };
-    if let Some(data) = asset_data.assets.iter().find(|x| x.index == index) {
-        let asset = data.asset.replace("X", &gen_str);
-        result.dress_model = asset.into();
+    let mode = get_unit_outfit_mode(unit);
+    if mode != 0 || GameUserData::get_sequence() == 4 || unit.person.get_asset_force() != 0 {
+        for x in 1..unit.accessory_list.unit_accessory_array.len() {
+            if unit.accessory_list.unit_accessory_array[x].index <= 0 { continue; }
+            let index = unit.accessory_list.unit_accessory_array[x].index;
+            if let Some(data) = asset_data.assets.iter().find(|l| l.index == index) {
+                if data.locator == 1 { change_accessory(result.accessory_list, data.asset.replace("X", &gen_str).as_str(), "c_head_loc"); }
+                else if data.locator == 2 { change_accessory(result.accessory_list, data.asset.replace("X", &gen_str).as_str(), "c_head2_loc"); }
+            }
+        }
+    }
+    if ( mode == 2 || unit.person.get_asset_force() != 0 ) && GameUserData::get_sequence() != 4 { return; } 
+    if mode == 1 || GameUserData::get_sequence() == 4 || unit.person.get_asset_force() != 0 {
+        if unit.accessory_list.unit_accessory_array[0].index > 0 {
+            if let Some(data) = asset_data.assets.iter().find(|x| x.index == index && x.gender == gender) {
+                let asset = data.asset.replace("X", &gen_str);
+                result.dress_model = asset.into();
+            }
+        }
     }
 }
 
@@ -182,8 +237,8 @@ pub fn set_accessories_generic(result: &mut AssetTableResult, aid: &Il2CppString
 pub fn add_accessory_to_list(list: &mut List<AssetTableAccessory>, model: &str, location: &str) {
     let accessory_class = Il2CppClass::from_name("App", "AssetTable").unwrap().get_nested_types().iter().find(|x| x.get_name() == "Accessory").unwrap();
     let new_accessory = Il2CppObject::<AssetTableAccessory>::from_class( accessory_class ).unwrap();
-    new_accessory.model = Some(model.clone().into() );
-    new_accessory.locator = Some(location.clone().into());
+    new_accessory.model = Some(model.into() );
+    new_accessory.locator = Some(location.into());
     unsafe { try_add_accessory_list(list, new_accessory, None); }
 }
 pub fn clear_accessory_from_list(list: &mut List<AssetTableAccessory>, model: &str) {
@@ -191,21 +246,25 @@ pub fn clear_accessory_from_list(list: &mut List<AssetTableAccessory>, model: &s
         if let Some(accessory_model) = list[x].model {
             if accessory_model.contains(model) {
                 list[x].model = Some("null".into());
-                //list[x].locator = Some("null".into());
             }
         }
     }
 }
 
 pub fn change_accessory(list: &mut List<AssetTableAccessory>, model: &str, locator: &str){
-    if let Some(acc) = list.iter_mut().find(|f| if f.locator.is_some() { f.locator.unwrap().contains(locator) } else { false }) {
+    if model != "null" {
+        // check if accessory exists 
+        if list.iter_mut().any(|f| f.model.filter(|m| m.to_string().contains(model)).is_some() ) { return; }
+    }
+    // check if locator exists then replace the model
+    if let Some(acc) = list.iter_mut().find(|f| f.locator.filter(|m| m.to_string().contains(locator)).is_some() ) {
         acc.model = Some(model.clone().into());
     }
     else { add_accessory_to_list(list, model, locator); }
 }
 
 pub fn accessory_at_locator(list: &List<AssetTableAccessory>, locator: &str) -> Option<String> {
-    if let Some(acc) = list.iter().find(|f| if f.locator.is_some() { f.locator.unwrap().contains(locator) } else { false }) {
+    if let Some(acc) = list.iter().find(|f| f.locator.filter(|m| m.to_string().contains(locator)).is_some() ) {
         if let Some(model) = acc.model {
             let str = model.to_string();
             if str.len() == 0 { return None; }
@@ -215,32 +274,43 @@ pub fn accessory_at_locator(list: &List<AssetTableAccessory>, locator: &str) -> 
     None
 }
 
-pub fn add_generic_unit_acc(unit: &Unit, list: &mut List<AssetTableAccessory>) {
-    let ident = unit.ident;
-    let generic_list = unsafe { &mut GENERIC_ACC };
-    let locators = ["c_head_loc", "c_spine2_jnt", "c_head2_loc", "c_spine1_jnt"];
-
-    if generic_list.iter().any(|v| v.0 == ident) {
-        generic_list.iter()
-            .filter(|v| v.0 == ident)
-            .for_each(|v|{
-                change_accessory(list, v.2.as_str(), locators[ v.1 as usize]);
-                //println!("Replace acc with {} for #{}, {}", v.2, ident, Mess::get(unit.get_job().jid));
-            }
-        );
-        return;
-    }
-    println!("Searching for #{}, {} at {}, {}", ident, Mess::get(unit.get_job().name), unit.x, unit.z);
-    for x in 0..4 {
-        if let Some(model) = accessory_at_locator(list, locators[x]) {
-            println!("Added: {} for #{}, {} at {}, {}", model, ident, Mess::get(unit.get_job().name), unit.x, unit.z);
-            if !generic_list.iter().any(|v| v.0 == ident && v.1 == x as i32) {
-                generic_list.push( ( ident, x as i32, model.clone() ) ); 
-            }
+pub fn next_unit_accessory(unit: &Unit, kind: i32, increase: bool) -> bool {
+    let accessory = unsafe { unit_get_accessory_list(unit, None)};
+    let index = accessory.unit_accessory_array[kind as usize].index;
+    let accessories = AccessoryData::get_list().unwrap();
+    if increase {
+        if let Some(new_index) = accessories.iter()
+            .filter(|acc| acc.get_num() > 0 && acc.can_equip(unit) && acc.kind == kind && acc.parent.index > index )
+            .map(|acc| acc.parent.index).min() 
+        {
+            accessory.unit_accessory_array[kind as usize].index = new_index;
+            return true;
+        }
+        else if index != 0 {
+            accessory.unit_accessory_array[kind as usize].index = 0;
+            return true;
         }
     }
-}
-pub fn clear_generic_acc() {
-    println!("Clearing Generic Accessory List");
-    unsafe { GENERIC_ACC.clear() };
+    else if index == 0 {
+        if let Some(new_index) = accessories.iter()
+            .filter(|acc| acc.get_num() > 0 && acc.can_equip(unit) && acc.kind == kind && acc.parent.index > index )
+            .map(|acc| acc.parent.index).max() 
+            {
+                accessory.unit_accessory_array[kind as usize].index = new_index;
+                return true;
+            }
+    }
+    else {
+        if let Some(new_index) = accessories.iter()
+            .filter(|acc| acc.get_num() > 0 && acc.can_equip(unit) && acc.kind == kind && acc.parent.index < index )
+            .map(|acc| acc.parent.index).max() {
+                accessory.unit_accessory_array[kind as usize].index = new_index;
+                return true;
+            }
+        else if index != 0 {
+            accessory.unit_accessory_array[kind as usize].index = 0;
+            return true;
+        }
+    }
+    return false;
 }

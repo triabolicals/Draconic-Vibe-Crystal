@@ -1,43 +1,31 @@
 use super::*;
 use crate::randomizer::emblem;
-use crate::utils;
-
 static mut AISET: bool = false;
 
 pub fn adjust_dispos_person_ai(data: &mut DisposData) {
     if GameVariableManager::get_number("G_Random_Recruitment") == 0 { return; }
-    if data.ai_action_value.is_some() {
-        let string = data.ai_action_value.unwrap().to_string();
-        let found = PIDS.iter().position(|x| *x == string);
-        if found.is_some() {
-            let new_pid = GameVariableManager::get_string(format!("G_R_{}", string).as_str());
-            data.ai_action_value = Some(new_pid);
+    if let Some(value) = data.ai_action_value {
+        let string = value.to_string();
+        if PIDS.iter().any(|x| *x == string) {
+            data.ai_action_value = Some(GameVariableManager::get_string(format!("G_R_{}", string)));
         }
     }
-    if data.ai_mind_value.is_some() {
-        let string = data.ai_mind_value.unwrap().to_string();
-        let found = PIDS.iter().position(|x| *x == string);
-        if found.is_some() {
-            let new_string = format!("G_R_{}", string);
-            let new_pid = GameVariableManager::get_string(&new_string);
-            data.ai_mind_value = Some(new_pid);
+    if let Some(value) = data.ai_mind_value {
+        let string = value.to_string();
+        if PIDS.iter().any(|x| *x == string) {
+            data.ai_mind_value = Some(GameVariableManager::get_string(format!("G_R_{}", string)));
         }
     }
-    if data.ai_move_value.is_some() {
-        let string = data.ai_move_value.unwrap().to_string();
-        let found = PIDS.iter().position(|x| *x == string);
-        if found.is_some() {
-            let new_string = format!("G_R_{}", string);
-            let new_pid = GameVariableManager::get_string(&new_string);
-            data.ai_move_value = Some(new_pid);
+    if let Some(value) = data.ai_move_value {
+        let string = value.to_string();
+        if PIDS.iter().any(|x| *x == string) {
+            data.ai_move_value = Some(GameVariableManager::get_string(format!("G_R_{}", string)));
         }
     }
-    if data.ai_attack_value.is_some() {
-        let string = data.ai_attack_value.unwrap().to_string();
-        if let Some(found) = PIDS.iter().position(|x| *x == string){
-            let new_string = format!("G_R_{}", string);
-            let new_pid = GameVariableManager::get_string(&new_string);
-            data.ai_attack_value = Some(new_pid);
+    if let Some(value) = data.ai_attack_value {
+        let string = value.to_string();
+        if PIDS.iter().any(|x| *x == string) {
+            data.ai_attack_value = Some(GameVariableManager::get_string(format!("G_R_{}", string)));
         }
     }
 }
@@ -49,23 +37,27 @@ pub fn engage_attack_ai(unit: &Unit, data:& mut DisposData) {
         if engage_atk_ai == 4 { data.ai_attack_value = Some("255, 255, 3, 3".into()); }
         else if engage_atk_ai == 8 { data.ai_attack_value = Some("2, 2, 255, 255".into()); }
         else { data.ai_attack_value = Some("2,2".into()); }
-        if str_contains(data.ai_action_name, "AC_Null") {  data.ai_action_name = "AI_AC_AttackRange".into(); }
+        if data.ai_action_name.to_string().contains("AC_Null") {  data.ai_action_name = "AI_AC_AttackRange".into(); }
     }
     unsafe { unit_set_dispos_ai(unit, data, None) };
 }
 
 pub fn adjust_unit_ai(unit: &Unit, data: &mut DisposData) {
+    println!("Adjusting AI");
     let job = unit.get_job();
     let m022 = GameUserData::get_chapter().cid.to_string() == "CID_M022";
     let jid = job.jid.to_string();
-    let old_ai_names: [&Il2CppString; 4] = [data.ai_action_name, data.ai_mind_name, data.ai_attack_name, data.ai_move_name];
+    let old_ai_names: [String; 4] = [data.ai_action_name.to_string(), data.ai_mind_name.to_string(), data.ai_attack_name.to_string(), data.ai_move_name.to_string()];
     let old_ai_values: [Option<&Il2CppString>; 4] = [data.ai_action_value, data.ai_mind_value, data.ai_attack_value, data.ai_move_value];
-    let not_ac_every_time = !utils::str_contains(data.ai_action_name, "AC_Everytime");
+    let not_ac_every_time = data.ai_action_name.to_string().contains("AC_Everytime");
 
-    // Allow Non-thieves to open doors if they have treasure AI
-    if str_contains(old_ai_names[1], "Treasure") || str_contains(old_ai_names[3], "Treasure") {
-        unit.private_skill.add_sid("SID_鍵開け", 10, 0); 
+    if unit.person.get_asset_force() == 2 {
+        data.ai_attack_name = "AI_AT_Attack".into();
+        data.ai_move_name = "AI_MV_NearestEnemy".into();
     }
+    // Allow Non-thieves to open doors if they have treasure AI
+    if old_ai_names[1].contains("Treasure") || old_ai_names[3].contains("Treasure") { unit.private_skill.add_sid("SID_鍵開け", 10, 0);  }
+
     if old_ai_names[3].contains("Retreat") { data.ai_move_name = "AI_MV_NearestEnemy".into(); }
     if jid == "JID_ダンサー" {
         data.ai_mind_name = "AI_MI_Irregular".into();
@@ -107,18 +99,18 @@ pub fn adjust_unit_ai(unit: &Unit, data: &mut DisposData) {
         }
     }
     else {
-        if str_contains(data.ai_action_name, "Guard") || str_contains(data.ai_mind_name, "Guard") { //Chain Guarder Unit
+        if old_ai_names[0].contains("Guard") || old_ai_names[1].contains("Guard") { //Chain Guarder Unit
             unit.private_skill.add_sid("SID_チェインガード許可", 10, 0); 
         }
         // Healer turned non healer
-        if str_contains(data.ai_action_name, "Heal") && not_ac_every_time { data.ai_action_name = "AI_AC_AttackRange".into(); }
-        if str_contains(data.ai_attack_name, "Heal") {  
+        if  old_ai_names[1].contains("Heal") && not_ac_every_time { data.ai_action_name = "AI_AC_AttackRange".into(); }
+        if  old_ai_names[2].contains("Heal") {  
             if m022 { data.ai_attack_name = "AI_AT_ForceOnly".into(); }
             else {  data.ai_attack_name = "AI_AT_Attack".into(); }
         }
-        if str_contains(data.ai_move_name, "Heal") {  data.ai_move_name = "AI_MV_WeakEnemy".into(); }
+        if  old_ai_names[3].contains( "Heal") {  data.ai_move_name = "AI_MV_WeakEnemy".into(); }
         // No offensive staffs
-        if str_contains(data.ai_action_name, "Interference") || str_contains(data.ai_attack_name, "Interference") {
+        if  old_ai_names[1].contains("Interference") || old_ai_names[2].contains("Interference") {
             data.ai_action_name =  "AI_AC_AttackRange".into();
             data.ai_action_value = None;
             if m022 { data.ai_attack_name = "AI_AT_ForceOnly".into(); }
@@ -126,16 +118,16 @@ pub fn adjust_unit_ai(unit: &Unit, data: &mut DisposData) {
             data.ai_attack_value = None;
             data.ai_move_name =  "AI_MV_WeakEnemy".into();
         }
-        if str_contains(data.ai_attack_name, "RodWarp") { 
+        if  old_ai_names[2].contains("RodWarp") { 
             if m022 { data.ai_attack_name = "AI_AT_ForceOnly".into(); }
             else {  data.ai_attack_name = "AI_AT_Attack".into(); }
             data.ai_attack_value = None;
         }
     }
 
-    if str_contains(old_ai_names[3], "Terrain") {  data.ai_move_name = old_ai_names[3]; }
-    if data.get_flag().value & 16 != 0 ||  str_contains(old_ai_names[0], "Turn") { 
-        data.ai_action_name = old_ai_names[0]; 
+    if  old_ai_names[3].contains( "Terrain") {  data.ai_move_name = old_ai_names[3].as_str().into(); }
+    if data.get_flag().value & 16 != 0 || old_ai_names[0].contains("Turn") { 
+        data.ai_action_name = old_ai_names[0].as_str().into();
         data.ai_action_value = old_ai_values[0];
     }
     let engage_atk_ai = unsafe { emblem::get_engage_attack_type(unit_get_engage_atk(unit, None)) };
@@ -144,7 +136,7 @@ pub fn adjust_unit_ai(unit: &Unit, data: &mut DisposData) {
         if engage_atk_ai == 4 { data.ai_attack_value = Some("255, 255, 3, 3".into()); }
         else if engage_atk_ai == 8 { data.ai_attack_value = Some("2, 2, 255, 255".into()); }
         else { data.ai_attack_value = Some("2,2".into()); }
-        if str_contains(data.ai_action_name, "AC_Null") {  data.ai_action_name = "AI_AC_AttackRange".into(); }
+        if old_ai_names[1].contains("AC_Null") {  data.ai_action_name = "AI_AC_AttackRange".into(); }
     }
     if m022 {
         data.ai_move_name = "AI_MV_ForceOnly".into();
@@ -152,14 +144,15 @@ pub fn adjust_unit_ai(unit: &Unit, data: &mut DisposData) {
         data.ai_attack_value = Some("FORCE_PLAYER".into());
     }
     unsafe { unit_set_dispos_ai(unit, data, None) };
-    data.ai_action_name = old_ai_names[0];
-    data.ai_mind_name = old_ai_names[1];
-    data.ai_attack_name = old_ai_names[2];
-    data.ai_move_name = old_ai_names[3];
+    data.ai_action_name = old_ai_names[0].as_str().into();
+    data.ai_mind_name = old_ai_names[1].as_str().into();
+    data.ai_attack_name = old_ai_names[2].as_str().into();
+    data.ai_move_name = old_ai_names[3].as_str().into();
     data.ai_action_value = old_ai_values[0];
     data.ai_mind_value = old_ai_values[1];
     data.ai_attack_value = old_ai_values[2];
     data.ai_move_value = old_ai_values[3];
+    println!("Finshed adjusting AI");
 }
 
 #[unity::from_offset("App", "Unit", "SetDisposAi")]
@@ -188,26 +181,28 @@ pub fn create_custom_ai() {
     if unsafe { AISET} { return; }
     AIData::get_list_mut().unwrap().iter_mut()
         .for_each(|ai|{
-            if ai.array_name.contains("Engage") || ai.array_name.contains("AI_AT") {
-                add_to_ai_data(ai, 0, 3, 50, -128, "2", "2", true);  
-                 // Engage Attack
-                if ai.array_name.contains("Interference") || ai.array_name.contains("Rod") {
-                    add_to_ai_data(ai, 0, 3, 20, -128, "1", "1", false);    // Warp
-                    add_to_ai_data(ai, 0, 3, 23, -128, "1", "1", false);    // Rescue
-                    add_to_ai_data(ai, 0, 3, 108, -128, "V_Default", "V_Default", false);    // Rewrap
+            let name = ai.array_name.to_string();
+            if name.contains("AI_AT") && !name.contains("Engage") {                 // Engage Attack
+                add_to_ai_data(ai, 0, 3, -3, -128, "V_Default", "V_Default", true);  
+                if name.contains("Interference") || name.contains("Rod") || name.contains("Heal") {
+                    add_to_ai_data(ai, 0, 3, 21, -128, "1", "1", true);    // Warp
+                    add_to_ai_data(ai, 0, 3, 23, -128, "1", "1", true);    // Rescue
                 }
-                add_to_ai_data(ai, 0, 3, -12, -128, "V_Default", "V_Default", false);   // Let Fly  
-                add_to_ai_data(ai, 0, 3, -8, -128, "V_Default", "V_Default", false);  // Use Cannons
-                add_to_ai_data(ai, 0, 3, 110, -128, "V_Default", "V_Default", false); //Battle Commands
                 add_to_ai_data(ai, 0, 3, 117, -128, "V_Default", "V_Default", false);   // Gambit
                 add_to_ai_data(ai, 0, 3, 120, -128, "V_Default", "V_Default", false);   // Rally
                 add_to_ai_data(ai, 0, 3, 119, -128, "V_Default", "V_Default", false); // Contract
                 add_to_ai_data(ai, 0, 3, -6, -128, "V_Default", "V_Default", false);    // Dance
                 add_to_ai_data(ai, 0, 3, 52, -128, "V_Default", "V_Default", false); // Call Doubles
+                add_to_ai_data(ai, 0, 3, 110, -128, "V_Default", "V_Default", false); //Battle Commands
+                add_to_ai_data(ai, 0, 3, -3, -128, "V_Default", "V_Default", true);  
                 add_to_ai_data(ai, 0, 3, -5, -128, "0", "V_Default", false);    // Command
                 add_to_ai_data(ai, 0, 3, -5, -128, "1", "V_Default", false);    // Command
                 add_to_ai_data(ai, 0, 3, -3, -128, "V_Default", "V_Default", false); 
                 add_to_ai_data(ai, 0, 0, 0, -128, "V_Default", "V_Default", false);  
+            }
+            else if ai.array_name.contains("MV") {
+                add_to_ai_data(ai, 0, 3, 108, -128, "V_Default", "V_Default", true); 
+                add_to_ai_data(ai, 0, 3, 108, -128, "1", "1", true);    // Rewrap
             }
         }
     );

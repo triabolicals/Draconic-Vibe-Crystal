@@ -15,8 +15,8 @@ pub struct EngageAttackIndex {
 }
 impl EngageAttackIndex {
     pub fn new(value_1: i32, value_2: i32) -> Self { Self { index_1: value_1, index_2: value_2, in_use:false, linked_use: false,}}
-
 }
+
 #[derive(Clone, Copy)]
 pub struct SynchoSkill {
     pub index: i32,
@@ -380,13 +380,10 @@ impl SynchoList {
         self.sync_list_size = self.sync_list.len() as i32; 
     }
     pub fn randomized_skill_cost(&self, rng: &Random) {
-        if GameVariableManager::get_number("G_SPCost") != 0 { return; }
-        let pool_size = self.inherit_cost.len() as i32;
+        if GameVariableManager::get_number("G_SPCost") == 0 { return; }
         // Make all 0
         self.inherit_cost.iter().for_each(|x|{
-            if let Some(skill) = SkillData::try_index_get_mut(x.0) {
-                skill.set_inherit_cost(0);
-            }
+            if let Some(skill) = SkillData::try_index_get_mut(x.0) { skill.set_inherit_cost(0); }
         });
         self.inherit_cost.iter().for_each(|x|{
             if let Some(skill) = SkillData::try_index_get_mut(x.0) {
@@ -423,23 +420,26 @@ impl SynchoList {
         self.chaos_inherit_list.iter().for_each(|x|{
             if let Some(skill) = SkillData::try_index_get_mut(x.1) {
                 if skill.get_inheritance_cost() == 0 {
-                    let mut current_cost = 500  + 150 * rng.get_value(30) ;  // Base
+                    let current_cost = 500  + 150 * rng.get_value(30) ;  // Base
                     skill.set_inherit_cost(current_cost as u16);
                 }
             }
         });
     }
     pub fn reset_skill_cost(&self) {
-        self.inherit_cost.iter().for_each(|x|{
-            if let Some(skill) = SkillData::try_index_get_mut(x.0) {
-                skill.set_inherit_cost(x.1);
+        self.inherit_cost.iter()
+            .for_each(|x|{
+                if let Some(skill) = SkillData::try_index_get_mut(x.0) {
+                    skill.set_inherit_cost(x.1);
+                }
             }
-        });
-        self.chaos_inherit_list.iter().for_each(|x|{
-            if let Some(skill) = SkillData::try_index_get_mut(x.1) {
-                if x.2 { skill.set_inherit_cost(0);
+        );
+        self.chaos_inherit_list.iter()
+            .for_each(|x|{
+                if let Some(skill) = SkillData::try_index_get_mut(x.1) {
+                    if x.2 { skill.set_inherit_cost(0); }
+                }
             }
-        }
-        });
+        );
     }
 }

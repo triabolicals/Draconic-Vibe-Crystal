@@ -1,6 +1,12 @@
 use unity::prelude::*;
 use engage::{
-    dialog::yesno::*, gameuserdata::*, gamevariable::*, menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItemSwitchMethods}, BasicMenuResult, *}, pad::Pad, proc::ProcInst, random, util::get_instance
+    dialog::yesno::*, 
+    gameuserdata::*, 
+    gamevariable::*, 
+    menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItemSwitchMethods}, BasicMenuResult, *}, 
+    pad::Pad, 
+    proc::ProcInst, 
+    util::get_instance
 };
 use crate::{deployment, randomizer, ironman, continuous, autolevel};
 use super::CONFIG;
@@ -80,6 +86,7 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalMenu {
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::RandomEmblemMod>("Emblem Recruitment Order"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::RandomJobMod>("Random Classes"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::RandomCC>("Random Reclassing"));
+                config_menu.add_item(randomizer::job::vibe_custom_job());
                 config_menu.add_item(randomizer::job::vibe_job_gauge());
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::grow::RandomGrowMod>("Random Growth Mode"));
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::battle_styles::RandomBattleStyles>("Randomize Class Types"));
@@ -189,13 +196,17 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalInGameMenu {
                 config_menu.full_menu_item_list.clear();
                 config_menu.add_item(deployment::vibe_deployment());
                 config_menu.add_item(deployment::vibe_emblem_deployment());
+                config_menu.add_item(deployment::fulldeploy::vibe_energy());
                 config_menu.add_item(randomizer::assets::accessory::vibe_enemy_outfit());
-                config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::assets::accessory::PlayerOutfits>("Player Battle Outfits Mode"));
+                config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::assets::accessory::RandomAssets>("Randomized Assets"));
+                config_menu.add_item(randomizer::job:: vibe_job_rerand());
+                config_menu.add_item(randomizer::item::unit_items::vibe_prw());
                 config_menu.add_item(randomizer::assets::bust::vibe_bust());
                 config_menu.add_item(randomizer::names::vibe_generic());
                 config_menu.add_item(randomizer::grow::vibe_pgmode());
                 config_menu.add_item(autolevel::vibe_autolevel());
                 config_menu.add_item(autolevel::autobench());
+                config_menu.add_item(randomizer::job::vibe_custom_job());
                 config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::RandomCC>("Random Reclassing"));
                 config_menu.add_item(randomizer::skill::vibe_skill_gauge());
                 config_menu.add_item(randomizer::job::vibe_job_gauge());
@@ -209,6 +220,7 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalInGameMenu {
                 config_menu.add_item(autolevel::vibe_enemy_emblem());
                 config_menu.add_item(autolevel::vibe_enemy_stones());
                 config_menu.add_item(randomizer::emblem::vibe_engage_links());
+
                 config_menu.add_item(randomizer::vibe_reseed());
                 BasicMenuResult::se_cursor()
             }   

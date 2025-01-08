@@ -46,7 +46,6 @@ impl TwoChoiceDialogMethods for BustConfirm {
     extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
 }
 
-
 pub fn bust_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
     if !GameVariableManager::get_bool("BustSettingChange") { return BasicMenuResult::new();}
     YesNoDialog::bind::<BustConfirm>(this.menu, "Change value?", "Do it!", "Nah..");
@@ -61,11 +60,13 @@ pub extern "C" fn vibe_bust() -> &'static mut ConfigBasicMenuItem {
 
 pub fn get_bust_values() {
     let static_fields = &Il2CppClass::from_name("App", "AssetTable").unwrap().get_static_fields::<AssetTableStaticFields>().search_lists[2];
-    ASSET_DATA.lock().unwrap().bust_values.clear();
+    if ASSET_DATA.lock().unwrap().bust_values.len() > 0 { return; }
     for x in 0..static_fields.len() {
         let volume_bust = static_fields[x as usize].scale_stuff[11];
-        if volume_bust > 0.10 {
+        if volume_bust > 0.6 {
             ASSET_DATA.lock().unwrap().bust_values.push( (x as i32, volume_bust) ); 
         }
+        if  ASSET_DATA.lock().unwrap().bust_values.len() > 550 { break; }
     }
+    println!("Bust List Size: {}", ASSET_DATA.lock().unwrap().bust_values.len());
 }

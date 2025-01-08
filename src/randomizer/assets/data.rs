@@ -1,27 +1,30 @@
 use accessory::change_accessory;
-
-use crate::utils::{dlc_check, str_contains};
+use crate::utils::dlc_check;
 use super::*;
 use std::sync::Mutex;
+
 static mut NAME_SET: bool  = false;
 pub static UNIQUE_JOB_DATA: Mutex<Vec<UniqueJobAssets>> = Mutex::new(Vec::new());
 pub static NAME_DATA: Mutex<NameData> = Mutex::new( NameData{female: Vec::new(), male: Vec::new(), act_replace: Vec::new() } );
 pub static WEAPON_ASSET: Mutex<Vec<WeaponAsset>> = Mutex::new(Vec::new());
-pub static mut HEAD_DATA: HeadData = HeadData{male_head: Vec::new(), female_head: Vec::new(), hair: Vec::new(),  acc_list: Vec::new(), skin: Vec::new() };
+pub static mut HEAD_DATA: HeadData = HeadData{male_head: Vec::new(), female_head: Vec::new(), hair: Vec::new(),  acc_list: Vec::new(), skin: Vec::new(), aoc_f: Vec::new(), aoc_m: Vec::new() };
 pub struct WeaponAsset {
     pub iid_index: i32,
     pub right_hand: String,
     pub left_hand: String,
+    pub kind: u8,
 }
+
 impl WeaponAsset {
     pub fn new(line: String) -> Self {
         let values: Vec<_> = line.split_whitespace().collect();
         let right_hand = values[1];
         let left_hand = if values.len() == 3 { values[2] } else { "none" };
         let index = ItemData::get(values[0]).unwrap().parent.index;
-
+        let kind = ItemData::get(values[0]).unwrap().kind;
         Self {
             iid_index: index, 
+            kind: kind as u8,
             right_hand: right_hand.to_string(),
             left_hand: left_hand.to_string()
         }
@@ -35,12 +38,14 @@ pub struct UniqueJobAssets {
     pub act_prefix: String,
     pub act_suffix: String,
     pub rig: String,
+    pub alt_act: String,
+    pub alt_weapon_mask: i32,
 }
 pub struct AccessoryAssets {
     pub index: i32,
     pub gender: i32,
     pub asset: String,
-    pub is_head: bool,
+    pub locator: i32,
 }
 impl UniqueJobAssets {
     pub fn new(line: String) -> Self {
@@ -51,17 +56,45 @@ impl UniqueJobAssets {
             let flag = job.get_flag();
             if dlc_check() && job.jid.contains("_E") {  //Avoiding adding FX enemy classes if FX isn't available
                 if gender == 2 { flag.value |= 4;}
-                else { flag.value |= 16; }
+                else { 
+                    flag.value |= 16; 
+                    if flag.value & 4 != 0 { flag.value -= 4; }
+                }
                 flag.value |= 2;
                 if flag.value & 20 == 20 { flag.value -= 20; }
             }
             else {
                 if gender == 2 { flag.value |= 4;}
-                else { flag.value |= 16; }
-                flag.value |= 2;
+                else { 
+                    flag.value |= 16; 
+                    if flag.value & 4 != 0 { flag.value -= 4; }
+                }
+                // flag.value |= 2;
                 if flag.value & 20 == 20 { flag.value -= 20; }
             }
+            println!("Adding Job Assets for {}", Mess::get(job.name));
         }
+        let mask2;
+        let act2;
+        let rig;
+
+        match values.len() {
+            8 => {
+                mask2 = values[7].parse::<i32>().unwrap();
+                act2 = values[6].to_string();
+                rig = "none".to_string();
+            }
+            7 => {
+                mask2 = 0;
+                act2 = "-".to_string();
+                rig = values[6].to_string();
+            }
+            _ => {
+                mask2 = 0;
+                act2 = "-".to_string();
+                rig = "none".to_string();
+            }
+        };
         Self {
             jid: values[0].to_string(),
             gender: values[1].parse::<i32>().unwrap(),
@@ -69,16 +102,17 @@ impl UniqueJobAssets {
             act_type: values[3].parse::<i32>().unwrap(),
             act_prefix: values[4].to_string(),
             act_suffix: values[5].to_string(),
-            rig: if values.len() > 6 { values[6] } else { "none" }.to_string()
+            rig: rig,
+            alt_act: act2,
+            alt_weapon_mask: mask2,
         }
     }
 }
 
 impl AccessoryAssets {
-    pub fn new(index: i32, gen: i32, asset: String, is_head: bool) -> Self {
-        Self { index: index, gender: gen, asset: asset.clone(), is_head: is_head }
+    pub fn new(index: i32, gen: i32, asset: String, loc: i32) -> Self {
+        Self { index: index, gender: gen, asset: asset.clone(), locator: loc }
     }
-
 }
 
 
@@ -133,6 +167,8 @@ pub struct HeadData {
     pub hair: Vec<(u16, bool)>,
     pub acc_list: Vec<(u16, i32, String)>,
     pub skin: Vec<SkinData>,
+    pub aoc_m: Vec<String>,
+    pub aoc_f: Vec<String>,
 }
 
 pub struct SkinData {
@@ -165,7 +201,6 @@ impl HeadData {
     pub fn reset_head_list(&mut self) {}
     pub fn add(&mut self, line: String){
         let values: Vec<_> = line.split_whitespace().collect();
-        println!("Parsing {}", line);
         if values[0].contains("body"){
             let id = values[1].parse::<u16>().unwrap();
             if let Some(found) = self.skin.iter_mut().find(|s| s.id == id ) {
@@ -194,6 +229,10 @@ impl HeadData {
                     _ => { return; }
                 }
             }
+        }
+        else if values[0].contains("aoc") {
+            if values[0].contains("aoc_m") { for x in 1..values.len() { self.aoc_m.push(values[x].to_string());} }
+            else { for x in 1..values.len() { self.aoc_f.push(values[x].to_string()); } }
         }
         else {
             let id = values[0].parse::<u16>().unwrap();
@@ -273,11 +312,11 @@ impl HeadData {
             if skin.scale[10] > 0.0 { result.scale_stuff[13] = skin.scale[10]; }
 
             if skin.is_unique { // AOC_Inf
-                let number = if skin.voice == "_Blank" { head - 7 } else { head };
-                if let Some(voice) = result.sound.voice {
+                // let number = if skin.voice == "_Blank" { head - 7 } else { head };
+                if result.sound.voice.is_some() {
                     if !skin.voice.is_empty() { result.sound.voice = Some ( skin.voice.clone().into() ); }
                 }
-                if skin.body.len() > 2 { 
+                if skin.body.len() > 2 && !GameVariableManager::get_bool("G_EnemyOutfits") {
                     let body = concat_string!("uBody_", skin.body, "_c", head_str);
                     // println!("Body Model: {} replacing {}", body, result.dress_model);
                     result.dress_model = body.clone().into(); 
@@ -304,6 +343,30 @@ impl HeadData {
         else if number  < 100 { format!("0{}", number ) }
         else { format!("{}", number )}
     }
+    pub fn random_aoc(&self, unit: &Unit, result: &mut AssetTableResult) {
+        let hash = unit.person.parent.hash;
+        let rng = crate::utils::create_rng(hash, 1);
+        if unit.status.value & 8388608 != 0 { rng.get_value(100); }
+        let aoc = if unit_dress_gender(unit) == 1 { &self.aoc_m[ rng.get_value( self.aoc_m.len() as i32 ) as usize] }
+            else { &self.aoc_f[ rng.get_value( self.aoc_f.len() as i32 ) as usize] };
+
+        result.info_anims = Some(concat_string!("AOC_Info_c", aoc).into());
+
+    }
+    /*
+    pub fn get_emblem_assets(&self, emblem_index: i32) {
+            if let Some(pos) = [0, 1, 4, 5, 8, 9, 23].iter().position(|x| x == emblem_index) { 530 + pos }
+            else if let Some(pos) = [14, 16, 18, 24, 21, 22].iter().position(|x| x == emblem_index) { 510 + pos }
+            else if let Some(pos) = [2,3,]
+
+            }         // Marth Sigurd Leif Roy Ike Byleth Eph 530 /537
+
+
+        }
+
+
+    }
+    */
 }
 
 
@@ -352,7 +415,7 @@ pub fn add_weapon_assets() {
     });
 }
 pub fn add_head_data() {
-    let mut head_stuff = unsafe { &mut HEAD_DATA };
+    let head_stuff = unsafe { &mut HEAD_DATA };
     if head_stuff.male_head.len() > 0 { return; }
     let data = include_str!("data/heads.txt").lines();
     data.into_iter().for_each(|line|{
@@ -363,23 +426,8 @@ pub fn add_head_data() {
 }
 
 pub fn initalize_asset_data(){
-    add_head_data();
-    add_weapon_assets();
     add_animation_unique_classes();
     add_names();
+    add_weapon_assets();
 }
 
-pub fn get_dragon_stone_actor(item: &ItemData, job: &JobData) -> (Option<&'static PersonData>, f32) {
-    if str_contains(item.iid, "IID_チキ") && item.flag.value & 128 == 0 { return (PersonData::get("PID_E001_Boss_竜化"), 1.0); }    //Tiki
-    let i_item = item.iid.to_string();
-
-    match i_item.as_str() {
-        "IID_氷のブレス"|"IID_氷塊" => { return (PersonData::get("PID_遭遇戦_異形飛竜"), 1.0); },   //Corrupted Wyvern
-        "IID_炎塊"|"IID_火のブレス" => { return (PersonData::get("PID_M011_異形竜"), 1.0); }  //Corrupted Wyrm
-        _ => {},
-    }
-    let jid = job.jid.to_string();
-    if jid == "JID_裏邪竜ノ娘" { (PersonData::get("PID_エル_竜化"), 0.4) }
-    else if jid ==  "JID_裏邪竜ノ子" { (PersonData::get("PID_ラファール_竜化"), 0.4) }
-    else { (None, 0.0) }
-}

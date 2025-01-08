@@ -2,17 +2,18 @@ use data::AccessoryAssets;
 use concat_string::concat_string;
 use unity::prelude::*;
 use engage::{
-    dialog::yesno::*,
-    force::*,
-    random::Random,
-    gamevariable::GameVariableManager,
+    sortie::SortieSelectionUnitManager,
+    dialog::yesno::*, 
+    force::*, 
+    gamedata::{assettable::*, accessory::*, item::ItemData, skill::*, unit::*, *}, 
+    gamevariable::GameVariableManager, 
+    menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemGaugeMethods, ConfigBasicMenuItemSwitchMethods}, *}, 
     mess::Mess,
-    gamedata::{*, accessory::*, item::ItemData},
-    menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItemGaugeMethods, ConfigBasicMenuItem}},
-    gamedata::{unit::*, skill::*,},
+    proc::Bindable, 
+    random::Random,
 };
-use super::names::EMBLEM_NAMES;
-use std::{fs, fs::File, io::Write};
+use itertools::Itertools;
+use super::{names::EMBLEM_NAMES, person::PLAYABLE};
 
 pub mod accessory;
 pub mod data;
@@ -47,9 +48,38 @@ impl AccessoryList {
         if let Some(found) = self.list.iter().find(|&x| x.1 == index && x.2 == position) { found.0 } 
         else { 0 }
     }
+    pub fn get_next_index(&self, index: i32, current: i32, increase: bool) -> i32 {
+        if index < 0 || index > 7 || self.n_entries[ index as usize ] == 0 { return 0; }
+        let list: Vec<_> = self.list.iter().filter(|&x| x.1 == index).sorted_by(|a,b| Ord::cmp(&a.0, &b.0) ).map(|c| c.0 ).collect();
+        let length = list.len();
+        if length == 0 { return 0; }
+        let new_acc = 
+            if current == 0 {
+                if increase { 
+                    if list[0] == 0 { list[1] }
+                    else { list[0] }
+                }
+                else { list[length-1] }
+            }
+            else if list.iter().any(|&x| x == current) {
+                if increase {
+                    if let Some(&new) = list.iter().find(|&&x| current < x) { new }
+                    else { 0 }
+                }
+                else {
+                    if let Some(&new) = list.iter().filter(|&&x| x < current).max() {
+                        new
+                    }
+                    else { 0 }
+                }
+            }
+            else {
+                if increase { list[0] }
+                else { list[length-1] }
+            };
+        return new_acc;
+    }
 }
-
-
 
 pub struct AssetData {
     pub male: AccessoryList,
@@ -60,7 +90,7 @@ pub struct AssetData {
 
 pub static ASSET_DATA: Mutex<AssetData> = Mutex::new(
     AssetData{
-        male: AccessoryList { list: Vec::new(), n_entries: [0; 8] },
+        male: AccessoryList { list: Vec::new(), n_entries: [0; 8]},
         female: AccessoryList { list: Vec::new(), n_entries: [0; 8] },
         bust_values: Vec::new(),
         assets: Vec::new(),
@@ -84,14 +114,14 @@ impl AssetData {
         let args: Vec<_> = line.split_whitespace().collect();
         let aid = concat_string!("AID_", args[0]);
         if let Some(acc) = list.iter().find(|&x| str_contains(&x.aid, aid.as_str())) {
+            // println!("Accessory Name/ Index: {} / {}, LINE: {}", Mess::get(acc.name), acc.parent.index, line);
             let index = acc.parent.index;
             let gen = args[1].parse::<i32>().unwrap();
             let gstr = if gen == 1 { "M" } else if gen == 2 {"F"} else { "X" };
             if acc.mask == 1 {
                 let asset = if index < 43 { concat_string!("uBody_Wear", gstr, "_", args[2]) }
                 else { concat_string!("uBody_", args[2], "_c000") };
-                println!("AID {}: {}", index, asset);
-                self.assets.push(AccessoryAssets::new(index, gen, asset, false));
+                self.assets.push(AccessoryAssets::new(index, gen, asset, 0));
                 if gen == 1 {
                     let entry_index = self.male.n_entries[0];
                     self.male.n_entries[0] = entry_index + 1;
@@ -102,18 +132,40 @@ impl AssetData {
                     self.female.n_entries[0] = entry_index + 1;
                     self.female.list.push((index, 0, entry_index));
                 }
+                if args.len() == 5 {
+                    let gen2 =  args[3].parse::<i32>().unwrap();
+                    let asset2 = concat_string!("uBody_", args[4], "_c000");
+                    self.assets.push(AccessoryAssets::new(index, gen2, asset2, 0));
+                    if gen2 == 1 {
+                        let entry_index = self.male.n_entries[0];
+                        self.male.n_entries[0] = entry_index + 1;
+                        self.male.list.push((index, 0, entry_index));
+                    }
+                    else {
+                        let entry_index = self.female.n_entries[0];
+                        self.female.n_entries[0] = entry_index + 1;
+                        self.female.list.push((index, 0, entry_index));
+                    }
+                }
             }
             else {
-                self.assets.push(AccessoryAssets::new(index, gen, args[2].to_string(), true));
+                self.assets.push(AccessoryAssets::new(index, gen, args[2].to_string(), 1));
             }
         }
     }
-
-
-
-
+    pub fn change_accessory(&self, unit: &Unit, kind: i32, up: bool) {
+        let gender = unit_dress_gender(unit);
+        let accessory_list = &mut unsafe { unit_get_accessory_list(unit, None) }.unit_accessory_array;
+        match gender {
+            1 => { accessory_list[kind as usize].index = self.male.get_next_index(kind, accessory_list[kind as usize].index, up); },
+            2 => { accessory_list[kind as usize].index = self.female.get_next_index(kind, accessory_list[kind as usize].index, up); },
+            _ => {},
+        }
+    }
     pub fn apply_bust_changes(&self) {
-        if CONFIG.lock().unwrap().misc_option_1 <= 0.4 { self.reset_busts(); }
+        let value = CONFIG.lock().unwrap().misc_option_1;
+        if value  <= 0.4 { self.reset_busts(); }
+        else if value >= 4.75 { self.randomized_busts(); }
         else { self.set_busts(); }
     }
     pub fn reset_busts(&self) {
@@ -125,164 +177,17 @@ impl AssetData {
         let static_fields = &mut Il2CppClass::from_name("App", "AssetTable").unwrap().get_static_fields_mut::<AssetTableStaticFields>().search_lists[2];
         self.bust_values.iter().for_each(|x| static_fields[x.0 as usize].scale_stuff[11] = value );
     }
-}
-
-#[unity::class("App", "AssetTable")]
-pub struct AssetTable {
-    pub parent: StructBaseFields,
-    pub preset_name: Option<&'static Il2CppString>,
-    pub mode: i32,
-    __: i32,
-    pub conditions: Option<&'static mut Array<&'static mut Il2CppString>>,
-    pub body_model: Option<&'static Il2CppString>,
-    pub dress_model: Option<&'static Il2CppString>,
-    pub head_model: Option<&'static Il2CppString>,
-    pub hair_model: Option<&'static Il2CppString>,
-    pub ride_model: Option<&'static Il2CppString>,
-    pub ride_dress_model: Option<&'static Il2CppString>,
-    pub left_hand: Option<&'static Il2CppString>,
-    pub right_hand: Option<&'static Il2CppString>,
-    pub trail: Option<&'static Il2CppString>,
-    pub magic: Option<&'static Il2CppString>,
-    pub body_anim: Option<&'static Il2CppString>, 
-    pub ride_anim: Option<&'static Il2CppString>,
-    pub info_anim: Option<&'static Il2CppString>,
-    pub talk_anim: Option<&'static Il2CppString>,
-    pub demo_anim: Option<&'static Il2CppString>,
-    pub hub_anim: Option<&'static Il2CppString>,
-    pub hair_r: u8,
-    pub hair_g: u8,
-    pub hair_b: u8,
-    pub grad_r: u8,
-    pub grad_g: u8,
-    pub grad_b: u8,
-    pub skin_r: u8,
-    pub skin_g: u8,
-    pub skin_b: u8,
-    pub toon_r: u8,
-    pub toon_g: u8,
-    pub toon_b: u8,
-    pub mask_color_100_r: u8,
-    pub mask_color_100_g: u8,
-    pub mask_color_100_b: u8,
-    pub mask_color_075_r: u8,
-    pub mask_color_075_g: u8,
-    pub mask_color_075_b: u8,
-    pub mask_color_050_r: u8,
-    pub mask_color_050_g: u8,
-    pub mask_color_050_b: u8,
-    pub mask_color_025_r: u8,
-    pub mask_color_025_g: u8,
-    pub mask_color_025_b: u8,
-    pub unity_colors: [UnityColor; 8],
-    pub accessories: [&'static mut AssetTableAccessory; 8],
-    pub accessory_list: &'static List<AssetTableAccessory>,
-    pub scale_stuff: [f32; 19], 
-    ___: i32,
-    pub voice: Option<&'static Il2CppString>,
-    pub foot_steps: Option<&'static Il2CppString>,
-    pub material: Option<&'static Il2CppString>,
-    pub comment: Option<&'static Il2CppString>,
-    //ConditionIndexes
-}
-#[unity::class("App", "AsssetTable.ConditionFlags")]
-pub struct AssetTableConditionFlags {}
-
-impl Gamedata for AssetTable {}
-#[repr(C)]
-pub struct AssetTableStaticFields { 
-    preset_name: &'static List<Il2CppString>,
-    pub search_lists: &'static mut Array<&'static mut List<AssetTable>>,
-    condition_indexes: *const u8,
-    pub condition_flags: &'static AssetTableConditionFlags,
-
-}
-
-impl AssetTableConditionFlags {
-    pub fn add_by_key<'a>(&self, key: impl Into<&'a Il2CppString>) {
-        unsafe { condition_add_by_key(self, key.into(), None);}
-    }
-    pub fn add_unit(&self, unit: &Unit ) {
-        unsafe { condition_add_unit(self, unit, None);}
+    pub fn randomized_busts(&self) {
+        let rng = Random::get_game();
+        let static_fields = &mut Il2CppClass::from_name("App", "AssetTable").unwrap().get_static_fields_mut::<AssetTableStaticFields>().search_lists[2];
+        self.bust_values.iter()
+            .for_each(|x|
+                static_fields[x.0 as usize].scale_stuff[11] = 1.0 + rng.get_value(50) as f32 * 0.03
+        );
     }
 
 }
-#[derive(Clone, Copy)]
-pub struct UnityColor {
-    pub r: f32,
-    pub g: f32,
-    pub b: f32,
-    pub a: f32,
-}
-impl UnityColor {
-    pub fn set(&mut self, r: f32, g: f32, b: f32) {
-        self.r = r;
-        self.g = g;
-        self.b = b;
-    }
-}
 
-pub struct AssetTableSound {
-    pub voice: Option<&'static Il2CppString>,
-    pub footstep: Option<&'static Il2CppString>,
-    pub material: Option<&'static Il2CppString>,
-}
-#[unity::class("App", "AssetTable.Result")]
-pub struct AssetTableResult {
-    pub pid: &'static Il2CppString,
-    pub jid: &'static Il2CppString,
-    pub body_model: &'static Il2CppString,
-    pub dress_model: &'static Il2CppString,
-    pub head_model: &'static Il2CppString,
-    pub hair_model: &'static Il2CppString,
-    pub ride_model: &'static Il2CppString,
-    pub ride_dress_model: &'static Il2CppString,
-    pub left_hand: &'static Il2CppString,
-    pub right_hand: &'static Il2CppString,
-    pub trail: &'static Il2CppString,
-    pub magic: &'static Il2CppString,
-    pub body_anim: Option<&'static Il2CppString>,
-    pub ride_anim: Option<&'static Il2CppString>,
-    pub unity_colors: [UnityColor; 8],
-    pub scale_stuff: [f32; 19], 
-    __ : i32,
-    pub sound: AssetTableSound,
-    pub info_anims: Option<&'static Il2CppString>,
-    pub talk_anims: Option<&'static Il2CppString>,
-    pub demo_anims: Option<&'static Il2CppString>,
-    pub hub_anims: Option<&'static Il2CppString>,
-    pub force_id: Option<&'static Il2CppString>,
-    pub weapon_id: Option<&'static Il2CppString>,
-    pub body_anims: &'static mut List<Il2CppString>,
-    pub accessory_list: &'static mut List<AssetTableAccessory>,
-}
-
-
-#[unity::class("App", "AssetTableAccessory")]
-pub struct AssetTableAccessory {
-    pub locator: Option<&'static Il2CppString>,
-    pub model: Option<&'static Il2CppString>, 
-}
-#[unity::from_offset("App","AssetTable", "set_Conditions")]
-pub fn asset_table_set_conditions(this: &AssetTable, value: &Array<&Il2CppString>, method_info: OptionalMethod);
-
-#[unity::from_offset("App","AssetTable", "set_Conditions")]
-pub fn asset_table_mut_set_conditions(this: &mut AssetTable, value: &Array<&Il2CppString>, method_info: OptionalMethod);
-
-#[unity::from_offset("App","AssetTable", "get_Conditions")]
-pub fn asset_table_get_conditions(this: &AssetTable, method_info: OptionalMethod) -> &'static mut Array<&'static Il2CppString>;
-
-#[unity::from_offset("App","AssetTable", ".ctor")]
-pub fn asset_table_ctor(this: &AssetTable, method_info: OptionalMethod);
-
-#[unity::from_offset("App","AssetTable", ".cctor")]
-pub fn asset_table_cctor( method_info: OptionalMethod);
-
-#[unity::from_offset("App","AssetTable", "OnCompletedEnd")]
-pub fn asset_table_on_completed_end(this: &AssetTable, method_info: OptionalMethod);
-
-#[unity::from_offset("App","AssetTable", "OnBuild")]
-pub fn asset_table_on_build(this: &AssetTable, method_info: OptionalMethod);
 
 
 //Unlock royal classes if asset table entry is found
@@ -374,7 +279,7 @@ pub fn auto_adjust_asset_table(is_ghast: bool) {
             }
         }
     });
-    unsafe { asset_table_on_completed_end(list[0], None); }
+    list[0].on_completed_end();
 }
 
 pub fn unit_dress_gender(unit: &Unit) -> i32 {
@@ -422,78 +327,191 @@ fn get_volume_legs(this: &AssetTableResult, method_info: OptionalMethod) -> f32;
 #[skyline::from_offset(0x01a4dff0)]
 fn unit_get_accessory_list(this: &Unit, method_info: OptionalMethod) -> &'static mut UnitAccessoryList;
 
-#[skyline::from_offset(0x01bafdd0)]
-fn condition_add_by_key(condition: &AssetTableConditionFlags, key: &Il2CppString, method_info: OptionalMethod);
 
-#[skyline::from_offset(0x01bb0200)]
-fn condition_add_unit(condition: &AssetTableConditionFlags, unit: &Unit, method_info: OptionalMethod);
 
 #[skyline::from_offset(0x01f266a0)]
 fn get_dress_gender(person: &PersonData, method_info: OptionalMethod) -> i32; 
 
-pub fn get_weapon_mode_2_hands() {
+pub fn get_weapon_mode_2_hands() {}
 
-    let asset_table: Vec<_> = AssetTable::get_list().unwrap().iter().filter(|asset| 
-        {
-            let mut sum = 0.0;
-            for x in 0..14 { sum += asset.scale_stuff[x]; }
-            sum > 1.0 && asset.mode != 1
+#[unity::class("App", "UnitMenuItem")]
+pub struct UnitMenuItem {
+    pub menu: u64,
+    pub junk: [u8; 0x4c],
+    pub unit: &'static mut Unit,
+}
 
+pub fn reload_unit_info(unit: &Unit) -> i32 {
+    unsafe {
+        help_set_unit(0, None, false, false, false, None, None);
+        help_set_unit(1, None, false, false, false, None, None);
+        help_set_unit(0, Some(unit), false, false, false, None, None);
+    }
+    return 0x80;
+}
+
+#[skyline::from_offset(0x01f61b10)]
+pub fn accessory_count(lol: u64, method_info: OptionalMethod) -> i32; 
+
+pub fn get_unit_outfit_mode(unit: &Unit) -> i32 {
+    if unit.person.get_asset_force() != 0 { return 0; }
+    if !PLAYABLE.lock().unwrap().iter().any(|&x| x == unit.person.parent.index) { return 0;}
+
+    let key = format!("G_O{}", unit.person.pid);
+    if !GameVariableManager::exist(key.as_str()) { GameVariableManager::make_entry(key.as_str(), 1); return 0; }
+    return GameVariableManager::get_number(key.as_str());
+}
+
+#[skyline::from_offset(0x01f86a50)]
+fn help_set_unit(side: i32, unit: Option<&Unit>, relax: bool, reverse_rotation: bool, is_delay_load: bool, action: OptionalMethod, method_info: OptionalMethod);
+
+#[skyline::from_offset(0x024622f0)]
+fn create_basic_menu_content(method_info: OptionalMethod) -> &'static BasicMenuContent; 
+
+#[skyline::from_offset(0x0245e330)]
+fn transform_as_sub_menu(this: &BasicMenu<BasicMenuItem>, parent: &BasicMenu<BasicMenuItem>, parent_item: &BasicMenuItem, method_info: OptionalMethod);
+
+fn unit_accessory_sub_menu_create_bind(menu: &mut BasicMenuItem){
+    let list = menu.menu.full_menu_item_list.get_class();
+    let new_list = il2cpp::instantiate_class::<List<BasicMenuItem>>(list).unwrap();
+    let count;
+    if unsafe { accessory_count(0, None) >= 6 } {
+        new_list.items = Il2CppArray::new(10).unwrap();
+        count = 7;
+    }
+    else {
+        new_list.items = Il2CppArray::new(4).unwrap();
+        count = 4;
+    }
+    for _x in 0..count {
+        let cock = get_base_menu_item_class().clone();
+        let new_menu_item = il2cpp::instantiate_class::<BasicMenuItem>(cock).unwrap();
+        // new_menu_item.get_class_mut().get_virtual_method_mut("CustomCall").map(|method| method.method_ptr = as _);
+        new_menu_item.get_class_mut().get_virtual_method_mut("GetName").map(|method| method.method_ptr = unit_access_sub_menu_name as _);
+        new_menu_item.get_class_mut().get_virtual_method_mut("LCall").map(|method| method.method_ptr = unit_access_sub_menu_l_call as _);
+        new_menu_item.get_class_mut().get_virtual_method_mut("RCall").map(|method| method.method_ptr = unit_access_sub_menu_r_call as _);
+        new_menu_item.get_class_mut().get_virtual_method_mut("PlusCall").map(|method| method.method_ptr = unit_access_sub_menu_plus_call as _);
+        new_menu_item.get_class_mut().get_virtual_method_mut("YCall").map(|method| method.method_ptr = unit_access_sub_menu_y_call as _);
+        new_menu_item.get_class_mut().get_virtual_method_mut("MinusCall").map(|method| method.method_ptr = unit_access_sub_menu_minus_call as _);
+        new_list.add(new_menu_item);
+    }
+    let content = unsafe { create_basic_menu_content(None) };
+    let new_menu = BasicMenu::new(new_list, content);
+    let descs = new_menu.create_default_desc();
+    new_menu.bind_parent_menu();
+    new_menu.create_bind(menu.menu, descs, "UnitAccessorySubMenu");
+    new_menu.set_transform_as_sub_menu(menu.menu, menu);
+    new_menu.set_show_row_num(count);
+}
+
+fn get_base_menu_item_class() -> &'static mut Il2CppClass {
+    let menu = Il2CppClass::from_name("App", "UnitSelectSubMenu").unwrap().get_nested_types().iter().find(|x| x.get_name() == "BaseMenuItem").unwrap();
+    Il2CppClass::from_il2cpptype(menu.get_type()).unwrap()
+}
+
+pub fn y_call(this: &mut BasicMenuItem, _method_info: OptionalMethod) -> i32 {
+    unit_accessory_sub_menu_create_bind(this);
+    return 0x80;
+}
+
+pub fn unit_access_sub_menu_name(this: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString {
+    let accessory_index = if this.index < 4 { this.index } else { this.index + 1 };
+    let unit = SortieSelectionUnitManager::get_unit();
+    let mode = get_unit_outfit_mode(unit);
+    let slot = &unit.accessory_list.unit_accessory_array[accessory_index as usize];
+    if slot.index == 0 { return "--------".into(); }
+    if let Some(acc) = AccessoryData::try_index_get(slot.index) { 
+        if ( mode == 1 && accessory_index != 5) || (mode == 2 && accessory_index != 0 ) { return format!("[{}]: {}", Mess::get("MID_SORTIE_SKILL_CATEGORY_EQUIPED"), Mess::get(acc.name)).into(); }
+        else {
+            return Mess::get(acc.name);
         }
-        
-        ).collect();
+    }
+    else { return "--------".into(); }
+}
 
-    let filename = "sd:/Draconic Vibe Crystal/Scale.txt";
-    let mut file = File::options().create(true).write(true).truncate(true).open(filename).unwrap();
-    asset_table.iter()
-        .for_each(|asset|{
-            let sum = asset.unity_colors[0].r + asset.unity_colors[0].g + asset.unity_colors[0].b;
-            let skin: [i32; 3] = [ (asset.unity_colors[0].r * 255.0 ) as i32, (asset.unity_colors[0].g * 255.0 ) as i32, (asset.unity_colors[0].b * 255.0 ) as i32 ];
-            let mut hands = "Scale: ".to_string();
-            for x in 0..14 {
-                hands = format!("{} {}", hands, asset.scale_stuff[x]);
-            }
-            if let Some(head) = asset.head_model {
-                hands = format!("{}\tHead: {}", hands, head);
-            }
-            if sum > 1.0 {
-                hands = format!("{}\tSkin: {} {} {}", hands, skin[0], skin[1], skin[2]);
-            }
-            if let Some(conditions) = &asset.conditions {
-                hands = format!("{}\tConditions: ", hands);
-                conditions.iter().for_each(|con|{
-                    hands = format!("{} {}", hands, con);
-                });
-            }
-            writeln!(&mut file, "Mode: {} | {}", asset.mode, hands).unwrap();
+pub fn unit_access_sub_menu_r_call(this: &BasicMenuItem, _method_info: OptionalMethod) -> i32{
+    let kind = if this.index < 4 { this.index }
+        else { this.index + 1 };
+
+    let unit = SortieSelectionUnitManager::get_unit();
+    if GameVariableManager::get_number("G_Continuous") !=  0 {
+        ASSET_DATA.lock().unwrap().change_accessory(unit, kind, true);
+        this.rebuild_text();
+        return reload_unit_info(unit);
+    }
+    else if accessory::next_unit_accessory(unit, kind, true) {
+        this.rebuild_text();
+        return reload_unit_info(unit);
+    }
+    else { return 0x800; }
+}
+
+pub fn unit_access_sub_menu_l_call(this: &BasicMenuItem, _method_info: OptionalMethod) -> i32 {
+    let kind = if this.index < 4 { this.index }
+        else { this.index + 1 };
+
+    let unit = SortieSelectionUnitManager::get_unit();
+    if GameVariableManager::get_number("G_Continuous") !=  0 {
+        ASSET_DATA.lock().unwrap().change_accessory(unit, kind, false);
+        this.rebuild_text();
+        return reload_unit_info(unit);
+    }
+    else if accessory::next_unit_accessory(unit, kind, false) {
+        this.rebuild_text();
+        return reload_unit_info(unit);
+    }
+    else { return 0x800; }
+}
+
+pub fn unit_access_sub_menu_plus_call(this: &BasicMenuItem, _method_info: OptionalMethod) -> i32 {
+    let unit = SortieSelectionUnitManager::get_unit();
+    let mode = get_unit_outfit_mode(unit);
+    let key = format!("G_O{}", unit.person.pid);
+    match mode {
+        0 => { GameVariableManager::set_number(key.as_str(), 1); }
+        1 => {
+            if unsafe { accessory_count(0, None) >= 6 } { GameVariableManager::set_number(key.as_str(), 2); }
+            else { GameVariableManager::set_number(key.as_str(), 0); }
         }
-    );
+        _ => { GameVariableManager::set_number(key.as_str(), 0); }
+    }
+    this.menu.full_menu_item_list.iter().for_each(|item| item.rebuild_text());
 
-    /* 
-    ItemData::get_list().unwrap().iter().for_each(|item|{
-        let iid = item.iid.to_string();
-        let mut hands = String::new();
-        if let Some(found) = asset_table.iter().find(|&asset|{
-            if let Some(cons) = &asset.conditions {
-                cons.iter().any(|str| str.contains(iid.as_str()))
-            }
-            else { false }
-        }){
-            if let Some(right) = found.right_hand {
-                if let Some(left) = found.left_hand {
-                    hands = format!("{}\t{}", right.to_string(), left.to_string());
-                }
-                else {
-                    hands = right.to_string();
-                }
-                writeln!(&mut file, "{}\t{}", iid, hands).unwrap();
-            }
-            else if let Some(left) = found.left_hand {
-                hands = left.to_string();
-                writeln!(&mut file, "{}\t{}", iid, hands).unwrap();
-            }
+    return reload_unit_info(unit);
+}
 
-        }
-    }); 
-    */
+pub fn unit_access_sub_menu_minus_call(this: &BasicMenuItem, _method_info: OptionalMethod) -> i32 {
+    let unit = SortieSelectionUnitManager::get_unit();
+    let accessory_list = &mut unsafe { unit_get_accessory_list(unit, None) }.unit_accessory_array;
+    let kind = if this.index < 4 { this.index } else { this.index + 1 };
+    if accessory_list[kind as usize].index != 0 {
+        accessory_list[kind as usize].index = 0;
+        this.rebuild_text();
+        return reload_unit_info(unit);
+    }
+    else {  return 0;  }
+
+}
+
+pub fn unit_access_sub_menu_y_call(this: &BasicMenuItem, _method_info: OptionalMethod) -> i32 {
+    if GameVariableManager::get_number("G_Continuous") ==  0 { return 0; } 
+    let unit = SortieSelectionUnitManager::get_unit();
+    let accessory_list = &mut unsafe { unit_get_accessory_list(unit, None) }.unit_accessory_array;
+    let rng = Random::get_game();
+    let kind = if this.index < 4 { this.index } else { this.index + 1 };
+    match unit_dress_gender(unit) {
+        1 => { accessory_list[kind as usize].index = ASSET_DATA.lock().unwrap().male.get_index(kind, rng);},
+        2 => { accessory_list[kind as usize].index = ASSET_DATA.lock().unwrap().female.get_index(kind, rng); }
+        _ => {}, 
+    }
+    this.rebuild_text();
+    return reload_unit_info(unit);
+}
+
+pub fn install_dvc_outfit() {
+    if let Some(cc) = Il2CppClass::from_name("App", "SortieUnitSelect").unwrap().get_nested_types().iter().find(|x| x.get_name() == "UnitMenuItem") {
+        let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
+        menu_mut.get_virtual_method_mut("YCall").map(|method| method.method_ptr = crate::randomizer::assets::y_call as _);
+        println!("Replaced Added YCall to UnitMenuItem");
+    }
 }

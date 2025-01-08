@@ -5,10 +5,9 @@ use engage::{
     hub::*,
     script::*,
 };
-use skyline::patching::Patch;
 use crate::{
     enums::*,
-    randomizer::{*, emblem::{emblem_item::ENGAGE_ITEMS, emblem_skill::EIRIKA_INDEX}},
+    randomizer::{emblem::{emblem_item::ENGAGE_ITEMS, emblem_skill::EIRIKA_INDEX}, *},
     utils::*,
 };
 #[unity::hook("App", "Mess", "GetImpl")]
@@ -58,10 +57,9 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                 },
                 _ => {},
             }
-            if mess_label.contains("MTID_Ring_") {
+            if mess_label.contains("MTID_Ring_") && !GameVariableManager::get_bool("G_CustomEmblem")  {
                 for x in 1..12 {
-                    let tid_label = format!("MTID_Ring_{}",  RINGS[x as usize ]);
-                    if mess_label == tid_label { 
+                    if mess_label.contains(RINGS[x as usize ]) { 
                         let index = crate::randomizer::person::pid_to_index(&EMBLEM_GIDS[x].to_string(), false);
                         return Mess::get(format!("MGID_Ring_{}", RINGS[ index as usize ]));
                      }
@@ -128,7 +126,7 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
     let result = call_original!(dyn_value, method_info);
     if result.is_none() || !crate::utils::can_rand() { return result; }
     let result_string = result.unwrap();
-    if str_contains(result_string, "Kengen") {
+    if str_contains(result_string, "Kengen") && !GameVariableManager::get_bool("G_CustomEmblem") {
         if GameVariableManager::get_number("G_Emblem_Mode") == 0 { return result; }
         let str1 = result_string.to_string();
         let emblem_index = KENGEN.iter().position(|x| *x == str1);
@@ -196,6 +194,12 @@ pub fn replace_hub_fxn() {
     let cooking_menu_mut = Il2CppClass::from_il2cpptype(cooking_menu.get_type()).unwrap();
     cooking_menu_mut.get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = cooking_menu_build_attribute as _);
     println!("Replaced Virtual Method of CookingMenu");
+
+    if let Some(cc) = Il2CppClass::from_name("App", "ClassChangeJobMenu").unwrap().get_nested_types().iter().find(|x| x.get_name() == "ClassChangeJobMenuItem"){
+        let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
+        menu_mut.get_virtual_method_mut("ACall").map(|method| method.method_ptr = crate::randomizer::job::class_change_a_call_random_cc as _);
+        println!("Replaced ACall of ClassChangeJobMenuItem");
+    }
 }
 
 pub fn set_script_variable<'a>(key: impl Into<&'a Il2CppString>, value: &DynValue) {
@@ -211,3 +215,4 @@ pub fn dynvalue_new_string(string: &Il2CppString, method_info: OptionalMethod) -
 
 #[skyline::from_offset(0x02d24990)]
 pub fn moonsharp_table_set(this: *const u8, key: &Il2CppString, value: &DynValue, method_info: OptionalMethod);
+

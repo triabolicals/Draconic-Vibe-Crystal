@@ -76,7 +76,7 @@ pub struct EngageItemList {
 impl EngageItemList {
     pub fn add_list(&mut self, item: &ItemData, god: i32, is_first: bool, emblem_index: i32) {
         let index = item.parent.index;
-        if self.item_list.iter_mut().find(|x| x.item_index == index).is_some() { return; } // Already in the List
+        if self.item_list.iter_mut().any(|x| x.item_index == index) { return; } // Already in the List
 
         let is_bow = item.kind == 4;
         let weapon = !(item.kind == 7 || item.kind >= 9);
@@ -85,7 +85,6 @@ impl EngageItemList {
         let mess = Mess::get(item.help);
         new_item.miid = item.help.to_string();
         
-
         for x in 0..RINGS.len() {
             let mgid = Mess::get(format!("MGID_{}", RINGS[x])).to_string();
             if mess.contains(mgid) { new_item.mess_emblem = x as i32; }
@@ -101,11 +100,7 @@ impl EngageItemList {
             if item.is_bow { bow_weapons.push((x, false)) }
             x += 1;
         });
-
-        //for x in 0..s_list.len() { if s_list[x].is_bow { bow_weapons.push( (x, false) ); }  }   // make bow list
-
         let list_size = bow_weapons.len();
-
         for x in 0..20 {
             let god = GodData::get(format!("GID_{}", EMBLEM_ASSET[x])).unwrap();
             if god.get_engage_attack().contains("リンエンゲージ技") {
@@ -127,7 +122,6 @@ impl EngageItemList {
                         while bow_weapons[index].1 { index = rng.get_value(list_size as i32) as usize; }
                         bow_weapons[index].1 = true;
                         s_list[starting_index].replaced_index = bow_weapons[index].0 as i32;
-        
                         s_list[ bow_weapons[index].0 ].in_used = true;
                         s_list[ bow_weapons[index].0 ].reverse_index = starting_index as i32;
                         s_list[ bow_weapons[index].0 ].new_emblem = s_list[starting_index].original_emblem;
@@ -295,7 +289,6 @@ impl EngageItemList {
             replacement_item.iid
         }
         else {  iid  }
-
     }
     pub fn add_weapon_flag(&mut self, god_index: i32, item: &ItemData){
         if item.kind == 0 { return; }
@@ -433,15 +426,14 @@ pub fn can_equip_non_weapons(engage_atk: &String) -> bool {
     if engage_atk == "SID_エイリークエンゲージ技" { return false; }
     if engage_atk == "SID_リンエンゲージ技" { return false; }
     if engage_atk == "SID_クロムエンゲージ技" || engage_atk == "SID_クロムエンゲージ技＋" {return false;}
-    if engage_atk == "SID_カミラエンゲージ技" || engage_atk == "SID_カミラエンゲージ技＋" { return false;}
-    if engage_atk == "SID_ヘクトルエンゲージ技" || engage_atk == "SID_ヘクトルエンゲージ技＋" { return false; }
-    if engage_atk == "SID_リュールエンゲージ技" || engage_atk == "SID_リュールエンゲージ技共同" { return false;}
+    if engage_atk.contains("リュール") || engage_atk.contains("ヘクトル") || engage_atk.contains("カミラ") { return false;}
     return true;
 }
 
 pub fn randomized_emblem_apts() {
+    if unsafe { super::super::STATUS.emblem_apt_randomized } { return; }
     let mode = GameVariableManager::get_number("G_EmblemWepProf");
-    if mode == 0 { return; }
+    if mode == 0  { return; }
     let rng = crate::utils::get_rng();
     for x in EMBLEM_ASSET {
         if x == "ディミトリ" { break; }
@@ -458,6 +450,7 @@ pub fn randomized_emblem_apts() {
         let god = &god_list[index];
         randomize_god_apts(god, mode, rng);
     }
+    unsafe { super::super::STATUS.emblem_apt_randomized = true };
 }
 
 fn randomize_god_apts(god: &GodData, mode: i32, rng: &Random) {

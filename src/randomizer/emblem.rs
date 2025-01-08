@@ -1,17 +1,16 @@
 use unity::prelude::*;
 use engage::{
-    dialog::yesno::*,
-    menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}},
-    gamevariable::*,
-    gameuserdata::GameUserData,
-    gamedata::{*, skill::SkillData, dispos::*},
+    force::*,
+    gamedata::unit::Unit,
+    dialog::yesno::*, force::ForceType, gamedata::{dispos::*, skill::SkillData, *}, gameuserdata::GameUserData, gamevariable::*, menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemSwitchMethods}, BasicMenuResult}
 };
 use engage::dialog::yesno::TwoChoiceDialogMethods;
+use skyline::patching::Patch;
+
 use super::CONFIG;
 use super::person::pid_to_index;
-use crate::{utils::*, enums::*};
+use crate::{autolevel::unit_connect_god_unit, continuous::{try_get_god, unit_clear_parent}, enums::*, utils::*};
 use std::sync::Mutex;
-use skyline::patching::Patch;
 
 pub mod emblem_item;
 pub mod emblem_structs;
@@ -21,59 +20,67 @@ pub mod enemy;
 //pub static mut RANDOMIZED_INDEX: [i32; 38] = [0; 38];
 pub static mut CURRENT_SEED: i32 = -1;
 pub static ENGRAVE_STATS: Mutex<[i8; 132]> = Mutex::new([0; 132]);
+pub static mut EMBLEM_LIST: Vec<i32> = Vec::new();
 pub static RECOMMENED_LVL: Mutex<[u8; 12]> = Mutex::new([0; 12]);
-pub static CUSTOM_EMBLEMS: Mutex<[i32; 20]> = Mutex::new([-1; 20]);
-pub static EMBLEM_ORDER: Mutex<[i32; 21]> = Mutex::new([-1; 21]);
-
-pub fn fill_emblem_order() {
-    if GameVariableManager::get_number("G_Emblem_Mode") == 0 {
-        for x in 0..19 { EMBLEM_ORDER.lock().unwrap()[x as usize] = x; }
-        return; 
-    }
-    for x in 0..19 {
-        let key = format!("G_R_{}",EMBLEM_GIDS[x as usize]);
-        let pid = GameVariableManager::get_string(&key).to_string();
-        for y in 0..19 {
-            if pid == EMBLEM_GIDS[y as usize] { EMBLEM_ORDER.lock().unwrap()[x as usize] = y; }
-        }
-    }
-}
+pub static CUSTOM_EMBLEMS: Mutex<[i32; 21]> = Mutex::new([-1; 21]);
 
 pub fn get_god_from_index(index: i32, randomized: bool) -> Option<&'static GodData> {
-    if index < 0 || index >= 19 { return None; }
-    if GameVariableManager::get_number("G_Emblem_Mode") == 0 || !randomized { return (GodData::get(EMBLEM_GIDS[index as usize]));  }
-    else { return GodData::get(EMBLEM_GIDS[ EMBLEM_ORDER.lock().unwrap()[index as usize] as usize]); }
+    if index as usize >=  unsafe { EMBLEM_LIST.len() } { return None; }
+    let hash = unsafe { EMBLEM_LIST[index as usize] };
+    if GameVariableManager::get_number("G_Emblem_Mode") == 0 || !randomized { return GodData::try_get_hash(hash);  }
+    else { 
+        let key = format!("G_R_{}", GodData::try_get_hash(hash).unwrap().gid);
+        return GodData::get(GameVariableManager::get_string(key));
+    }
 }
 
-
-
 pub fn get_custom_emblems() {
-    if CUSTOM_EMBLEMS.lock().unwrap()[0] != -1 { return; }
-    let god_list = GodData::get_list().unwrap(); 
+    let emblem_list = unsafe { &mut EMBLEM_LIST };
+    if emblem_list.len() > 0 { return; }
     let mut count = 0;
-    for x in 0..god_list.len() {
-        if god_list[x].get_flag().value & 64 != 0 && count < 20 {
-            count += 1;
-            CUSTOM_EMBLEMS.lock().unwrap()[count as usize] = god_list[x].parent.index as i32;
+
+    EMBLEM_GIDS.iter()
+        .for_each(|gid|{
+            let hash = GodData::get(gid).unwrap().parent.hash;
+            emblem_list.push(hash);
         }
-    }
-    if count > 0 { 
-        CUSTOM_EMBLEMS.lock().unwrap()[0] = count; 
-        println!("Found {} Custom Emblems", count);
-    }
+    );
+
+    if CUSTOM_EMBLEMS.lock().unwrap()[0] != -1 { return; }
+    GodData::get_list().unwrap().iter()
+        .filter(|god|
+            {
+                let gid = god.gid.to_string();
+                !EMBLEM_ASSET.iter().any(|asset| gid.contains(asset)) && !gid.contains("M0") && !gid.contains("E00") && !gid.contains("GID_相手") && god.force_type == 0
+            }
+        ).for_each(|god|{
+            if let Some(grow) = god.get_level_data() {
+                if grow.len() >= 20 {
+                    println!("Custom Emblem {}: Adding Emblem #{}: {}", count+1, god.parent.index, Mess::get(god.mid));
+                    if count < 20 {
+                        count += 1;
+                        CUSTOM_EMBLEMS.lock().unwrap()[0] = count;
+                        CUSTOM_EMBLEMS.lock().unwrap()[count as usize] = god.parent.index as i32; 
+                        emblem_list.push(god.parent.hash);
+                    }
+                }
+            }
+        }
+    );
 }
 
 pub fn emblem_gmap_spot_adjust(){
-    if GameUserData::get_sequence() != 6 { return; }
+    if GameUserData::get_sequence() != 6 || !crate::utils::can_rand() { return; }
+    if GameVariableManager::get_bool("G_CustomEmblem") { return; }  // Ignore if custom emblems
     let edelgard_obtain = GameVariableManager::get_bool("G_拠点_神竜導入イベント再生済み");
-    if edelgard_obtain && GameVariableManager::get_number("G_Emblem_Mode") == 0  {
+    if edelgard_obtain  {
         for x in 1..7 {
             let gmap_flag = format!("G_GmapSpot_G00{}", x);
-            if GameVariableManager::get_number(&gmap_flag) <= 2  && GameVariableManager::get_number(&gmap_flag) != 0 {  GameVariableManager::set_number(&gmap_flag, 3);  }
+            let flag_value = GameVariableManager::get_number(&gmap_flag);
+            if flag_value == 1 || flag_value == 2 {  GameVariableManager::set_number(&gmap_flag, 3);  }
         }
-        return;
     }
-    if !crate::utils::can_rand() { return; }
+    if GameVariableManager::get_number("G_Emblem_Mode") == 0 { return; }
     for x in 0..19 {
         let e_index = pid_to_index(&EMBLEM_GIDS[x as usize].to_string(), false);
         let cid = EMBELM_PARA[ e_index as usize ];
@@ -211,11 +218,11 @@ fn create_reverse_emblem() {
 }
 pub fn randomize_emblems() {
     if !crate::utils::can_rand() { return; }
+    GameVariableManager::make_entry("G_CustomEmblem", 0);
     if !GameVariableManager::exist("G_Random_Emblem_Set") { GameVariableManager::make_entry("G_Random_Emblem_Set", 0); }
     if GameVariableManager::get_bool("G_Random_Emblem_Set") {
         set_emblem_paralogue_unlock();
         set_m022_emblem_assets();
-        fill_emblem_order();
         return; 
     }
     if GameVariableManager::exist(&format!("G_R_{}",EMBLEM_GIDS[0])){
@@ -269,26 +276,49 @@ pub fn randomize_emblems() {
                     set_emblems[index] = true;
                 }
             },
+            4 => {
+                let mut list = unsafe { EMBLEM_LIST.clone() };
+                let mut available = list.clone();
+                if !dlc_check() {
+                    available.drain(12..19);
+                    list.drain(12..19);
+                }
+                list.iter()
+                    .for_each(|&hash|{
+                        let gid = GodData::try_get_hash(hash).unwrap().gid;
+                        let key = format!("G_R_{}", gid);
+                        if available.len() != 0 {
+                            let index = rng.get_value(available.len() as i32) as usize;
+                            let gid2 = GodData::try_get_hash( available[ index ] ).unwrap().gid;
+                            if GameVariableManager::exist(key.as_str()) { GameVariableManager::set_string(key.as_str(), gid2.to_string().as_str()); }
+                            else { GameVariableManager::make_entry_str(key.as_str(), gid2.to_string().as_str()); }
+                            available.remove(index);
+                        }
+                    }
+                );
+                GameVariableManager::set_bool("G_CustomEmblem", true);
+            },
             _ => {},
         }
     }
     set_m022_emblem_assets();
     set_emblem_paralogue_unlock();
-    fill_emblem_order();
     GameVariableManager::set_bool("G_Random_Emblem_Set", true);
 }
 fn set_emblem_paralogue_unlock() {
+    if GameVariableManager::get_bool("G_CustomEmblem") { return; } 
     for x in 0..19 {
         let index = pid_to_index(&EMBLEM_GIDS[x as usize].to_string(), false);
         let string2 = format!("CID_{}",EMBELM_PARA[index as usize]);
         if let Some(emblem_chapter) = ChapterData::get(&string2){
             emblem_chapter.set_gmap_open_condition(UNLOCK_PARA[x as usize]);
             if UNLOCK_PARA[index as usize] == "" { emblem_chapter.set_gmap_open_condition("G001");  }
-            println!("#{} - {} gmap open condition: {}", x, string2, emblem_chapter.get_gmap_open_condition().to_string());
+            // println!("#{} - {} gmap open condition: {}", x, string2, emblem_chapter.get_gmap_open_condition().to_string());
         }
     }
 }
 pub fn set_m022_emblem_assets() {
+    // if GameVariableManager::get_bool("G_CustomEmblem") { return; } 
     for x in 1..12 {
         if let Some(person) = PersonData::get_mut(format!("PID_M022_紋章士_{}", EMBLEM_ASSET[x])) {
             let replacement_gid = GameVariableManager::get_string(&format!("G_R_GID_{}", EMBLEM_ASSET[x])).to_string();
@@ -299,6 +329,12 @@ pub fn set_m022_emblem_assets() {
                 person.gender = gender;
                 person.name = Some( format!("MPID_{}", RINGS[index]).into());
                 person.jid = Some( jid.into());
+            }
+            else {
+                if let Some(god) = GodData::get(replacement_gid) {
+                    person.name = Some(god.mid.clone());
+                    person.gender = if god.female == 2 { 2 } else { 1 };
+                }
             }
         }
     }
@@ -373,14 +409,162 @@ pub fn randomize_engage_links(reset: bool) {
         pid_set[index] = true;
     }
 }
+use engage::mess::*;
 
+pub fn pre_map_emblem_adjustment() {
+    if !GameVariableManager::get_bool("G_EngagePlus") { return; }
+    for x in EMBLEM_GIDS {
+        let god = GodData::get(x).unwrap();
+        if let Some(god_unit) = unsafe { try_get_god(god, false, None) } {
+            let key = format!("E_{}", god_unit.data.gid);
+            if let Some(parent) = god_unit.parent_unit {
+                println!("{}'s parent is {}",  Mess::get(god.mid), Mess::get_name(parent.person.pid));
+                GameVariableManager::make_entry(key.as_str(), parent.person.parent.hash);
+            }
+        }
+    }
+}
+
+
+pub fn post_map_emblem_adjustment() {
+    if !GameVariableManager::get_bool("G_EngagePlus") { return; }
+    let mut god_unit_pair: Vec<(i32, i32)> = Vec::new();
+
+    let variables = GameVariableManager::find_starts_with("E_GID");
+    let god_hashes: Vec<_> = variables.iter().map(|key| {
+        let gid_key = key.to_string();
+        let gid = &gid_key.as_str()[2..];
+        GodData::get(gid).unwrap().parent.hash
+    }).collect();
+    // Adding any emblems obtained during the map and the current unit that has it
+    EMBLEM_GIDS.iter()
+        .for_each(|gid|{
+            let god = GodData::get(gid).unwrap();
+            if let Some(god_unit) = unsafe { try_get_god(god, false, None) } {
+                if let Some(parent) = god_unit.parent_unit {
+                    if !god_hashes.iter().any(|&hash| hash == god.parent.hash) {
+                        god_unit_pair.push( (parent.person.parent.hash, god.parent.hash) );
+                        println!("Adding 1 {} to {}", Mess::get_name(parent.person.pid), Mess::get(god.mid));
+                    }
+                }
+            }
+        }
+    );
+    // Adding any emblem set from the start of the map
+    variables.iter()
+        .for_each(|key|{
+            let gid_key = key.to_string();
+            let person = PersonData::try_get_hash(GameVariableManager::get_number(gid_key.as_str())).unwrap();
+            let gid = &gid_key.as_str()[2..];
+            let god_data = GodData::get(gid).unwrap();
+            println!("Variable: {} and {}", Mess::get_name(person.pid), Mess::get(god_data.mid));
+            if let Some(god_unit) = unsafe { try_get_god(god_data, false, None) } {
+                if let Some(parent) = god_unit.parent_unit {
+                    if parent.person.parent.hash == person.parent.hash { 
+                        println!("Adding 2 {} to {}", Mess::get_name(parent.person.pid), Mess::get(god_data.mid));
+                        // unsafe { unit_set_engage(parent, false, None, None);}
+                        god_unit_pair.push( (parent.person.parent.hash, god_data.parent.hash));
+                     }
+                    else if let Some(unit) = unsafe { crate::deployment::force_get_unit_from_pid(person.pid, false, None) } {
+                        god_unit_pair.push( (unit.person.parent.hash, god_data.parent.hash));
+                        println!("Adding 3 {} to {}", Mess::get_name(unit.person.pid), Mess::get(god_data.mid));
+                    }
+                }
+            }
+        }
+    );
+    let force_type = [ForceType::Player, ForceType::Ally, ForceType::Dead];
+    // Removing all Emblems from all units
+    for f in force_type {
+        if let Some(force) = Force::get(f){
+            let iter = Force::iter(force);
+            for unit in iter {
+                if let Some(unit2) = unsafe { crate::deployment::force_get_unit_from_pid(unit.person.pid, false, None) } {
+                    unit2.god_link = None;
+                    unit2.god_unit = None;
+                    if unit2.status.value & 0x800000 != 0 { unit2.status.value -= 0x800000; }
+                    unsafe { unit_clear_parent(unit, None); }
+                    unsafe { unit_update(unit, None); }
+                }
+            }
+        }
+    }
+    god_unit_pair.iter()
+        .for_each(|pair|{
+            let person = PersonData::try_get_hash(pair.0).unwrap();
+            let god = GodData::try_get_hash(pair.1).unwrap();
+            if let Some(god_unit) =  unsafe { try_get_god(god, false, None) } {
+                god_unit.set_parent(None, 0);
+                god_unit.set_child(None);
+                if let Some(unit) = unsafe { crate::deployment::force_get_unit_from_pid(person.pid, false, None) } {
+                    if let Some(force) = unit.force {
+                        if force.force_type == 0 || force.force_type == 3 {
+                            unsafe { unit_connect_god_unit(unit, god_unit, None) };
+                            println!("Connecting {} to {}", Mess::get_name(unit.person.pid), Mess::get(god.mid));
+                        }
+                    }
+                }
+            }
+        }
+    );
+}
+pub fn player_emblem_check() {
+    if let Some(force) = Force::get(ForceType::Player){
+        for unit in Force::iter(force) {
+            // if unit.status.value & 0x800000 != 0 { println!("Person {} is engaged", Mess::get_name(unit.person.pid)); }
+            if let Some(god_unit) = unit.god_unit {
+               // println!("{} equipped with Emblem {}", Mess::get_name(unit.person.pid), emblem);
+              //  if let Some(parent) = god_unit.parent_unit { println!("{}'s Parent Unit: {}", emblem, Mess::get_name(parent.person.pid)); }
+                if god_unit.child.is_none() && god_unit.parent_unit.is_none() {
+                    god_unit.set_parent(Some(unit), 0);
+                    // println!("Set {}'s Parent to {}", emblem, Mess::get_name(unit.person.pid));
+                }
+            }
+            if let Some(god_link) = unit.god_link {
+                if god_link.child.is_none() {
+                    // println!("{} Linked with Emblem {} but no child", Mess::get_name(unit.person.pid), emblem);
+                    if let Some(unit2) = unsafe { crate::deployment::force_get_unit_from_pid(unit.person.pid, false, None) } {
+                        unit2.god_link = None;
+                        unit2.status.value &= !0x800000;
+                        unsafe { play_map_effect("エンゲージOff".into(), unit2, None); }
+                        unsafe { super::job::unit_reload_actor(unit2, None); }
+                    }
+                }
+            }
+        }
+    }
+}
+#[unity::hook("App", "ArenaOrderSequence", "SetEmblemWeapon")]
+pub fn arena_emblem_weapon(this: u64, unit: &mut Unit, god: &engage::gamedata::unit::GodUnit, bond_level: i32, method_info: OptionalMethod) {
+    if !GameVariableManager::get_bool("G_Random_Engage_Weps") { 
+        call_original!(this, unit, god, bond_level, method_info);
+        return;
+    }
+    println!("Emblem Job: {}", Mess::get(unit.job.name));
+    if let Some(item) = super::job::get_weapon_for_asset_table(unit.job) {
+        println!("Item: {}", Mess::get(item.name));
+        unit.put_off_all_item();
+        unit.add_item(item);
+        unit.item_list.add_item_no_duplicate(item);
+        unsafe { unit_equip(unit, None); }
+        unsafe { super::person::unit::unit_update_auto_equip(unit, None); }
+    }
+}
+#[skyline::from_offset(0x01a19ba0)]
+fn unit_set_engage(this: &Unit, enable: bool, link: Option<&Unit>, method_info: OptionalMethod);
+#[skyline::from_offset(0x01a0c730)]
+fn unit_update(this: &Unit, method_info: OptionalMethod);
+#[skyline::from_offset(0x01a21530)]
+fn unit_equip(this: &Unit, method_info: OptionalMethod);
+#[skyline::from_offset(0x01dbb6c0)]
+fn play_map_effect(effect: &Il2CppString, unit: &Unit, method_info: OptionalMethod);
 // Menu Items
-
 pub struct RandomEmblemMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomEmblemMod {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().emblem_mode, 0, 3, 1);
+        let max = if CUSTOM_EMBLEMS.lock().unwrap()[0] > 0 { 4 } else { 3 };
+        let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().emblem_mode, 0, max, 1);
         if CONFIG.lock().unwrap().emblem_mode != result {
             CONFIG.lock().unwrap().emblem_mode = result;
             Self::set_command_text(this, None);
@@ -394,6 +578,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEmblemMod {
             1 => { "Emblem recruitment will be randomized." },
             2 => { "Emblem recruitment will be in reversed order" },
             3 => { "Emblem recruitment will determined by list."},
+            4 => { "Random recruitment with custom emblems."},
             _ => { "Default recruitment order for emblems." },
         }.into();
     }
@@ -402,6 +587,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEmblemMod {
             1 => { "Random" },
             2 => { "Reverse" },
             3 => { "Custom" },
+            4 => { "Custom Emblems"},
             _ => { "Standard"},
         }.into();
     }

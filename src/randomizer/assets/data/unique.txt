@@ -15,12 +15,12 @@ JID_スュクセサール_E		1	10	8	Scs1A	c200
 JID_ティラユール下級	1	16	8	Trl0A	c201
 JID_ティラユール	1	16	8	Trl1A	c201
 JID_ティラユール_E	1	16	8	Trl1A	c201
-JID_リンドブルム下級	2	192	3	Lnd0D	c350
-JID_リンドブルム	2	192	3	Lnd1D	c350
-JID_リンドブルム_E	2	192	3	Lnd1D	c350
-JID_スレイプニル下級	2	192	4	Slp0E	c351
-JID_スレイプニル	2	192	4	Slp1E	c351
-JID_スレイプニル_E	2	192	4	Slp1E	c351
+JID_リンドブルム下級	2	192	3	Lnd0D	c350    Wng2D 14
+JID_リンドブルム	2	192	3	Lnd1D	c350    Wng2D 14
+JID_リンドブルム_E	2	192	3	Lnd1D	c350    Wng2D 14
+JID_スレイプニル下級	2	192	4	Slp0E	c351 Wng0E 14
+JID_スレイプニル	2	192	4	Slp1E	c351    Wng0E 14
+JID_スレイプニル_E	2	192	4	Slp1E	c351    Wng0E 14
 JID_ピッチフォーク下級	2	4	8	Pcf0A	c450
 JID_ピッチフォーク	2	4	8	Pcf1A	c450
 JID_ピッチフォーク_E	2	4	8	Pcf1A	c450
@@ -30,5 +30,5 @@ JID_クピードー_E	1	18	0	Cpd1B	c400
 JID_ダンサー	1	256	8	Dnc0A	c403
 JID_裏邪竜ノ娘	2	516	8	Sds0A	c099
 JID_裏邪竜ノ子	1	520	8	Sds0A	c049
-JID_メリュジーヌ_味方	2	66	3	Msn0D	c553b
-JID_メリュジーヌ 2		66	3	Msn0D	c553
+JID_メリュジーヌ_味方	2	66	3	Msn0D	c553b   Wng2D 12
+JID_メリュジーヌ 2		66	3	Msn0D	c553    Wng2D 12

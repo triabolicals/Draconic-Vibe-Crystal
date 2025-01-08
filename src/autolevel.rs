@@ -1,11 +1,11 @@
 use unity::prelude::*;
 use engage::{
-    menu::{BasicMenuResult, config::*},
-    gamevariable::*,
-    gameuserdata::*,
-    force::*,
+    force::*, 
+    gamedata::{dispos::*, skill::*, unit::*, *}, 
+    gameuserdata::*, 
+    gamevariable::*, 
+    menu::{config::*, BasicMenuItemAttribute, BasicMenuResult}, 
     mess::*,
-    gamedata::{unit::*, dispos::*, skill::*, *},
 };
 use super::CONFIG;
 use crate::utils::*;
@@ -79,7 +79,10 @@ pub fn calculate_player_cap() -> i32 {
         println!("Rank {}: {}/{} with rating {}", i+1, Mess::get(unit_name[i]).to_string(), unit_name[i].to_string(), max_cap[i]);
     }
     println!("{} unit Average is {}", count_average, average);
-    GameVariableManager::set_number("G_Player_Rating_Average", average);
+    if average > GameVariableManager::get_number("G_Player_Rating_Average") {
+        GameVariableManager::set_number("G_Player_Rating_Average", average);
+    }
+
     average
 }
 
@@ -114,20 +117,20 @@ pub fn unit_cap_total(this: &Unit, with_hp: bool) -> i32 {
     let mut total = 0;
     if with_hp {
         if this.get_capability(CapabilityType::Str.value(), false) < this.get_capability(CapabilityType::Mag.value(), false) {
-            total += 2*this.get_capability(CapabilityType::Mag.value(), false);
+            total += 2*this.get_capability(CapabilityType::Mag.value(), true) + this.get_capability(CapabilityType::Str.value(), true);
         }
-        else { total += 2*this.get_capability(CapabilityType::Str.value(), false); }
+        else { total += 2*this.get_capability(CapabilityType::Str.value(), true) + this.get_capability(CapabilityType::Mag.value(), true); }
         total += this.get_capability(CapabilityType::Hp.value(), false);
         total += this.get_capability(CapabilityType::Dex.value(), false);
         total += this.get_capability(CapabilityType::Luck.value(), false);
-        total += this.get_capability(CapabilityType::Def.value(), false);
-        total += this.get_capability(CapabilityType::Res.value(), false);
-        total += this.get_capability(CapabilityType::Spd.value(), false);
-        total += 2*this.get_capability(CapabilityType::Sight.value(), false);
-        total += 2*this.get_capability(CapabilityType::Move.value(), false);
-        total += 2*this.get_capability(CapabilityType::Build.value(), false);
+        total += this.get_capability(CapabilityType::Def.value(), false) * 5 / 4;
+        total += this.get_capability(CapabilityType::Res.value(), false) * 5 / 4;
+        total += this.get_capability(CapabilityType::Spd.value(), true) * 3 / 2;
+        total += this.get_capability(CapabilityType::Sight.value(), false) * 3 / 2;
+        total += this.get_capability(CapabilityType::Move.value(), true) * 4;
+        total += this.get_capability(CapabilityType::Build.value(), false) * 2;
     }
-    else { for x in 1..8 { total = total + this.get_capability(x, false); } }
+    else { for x in 1..8 { total += this.get_capability(x, false); } }
     total
 }
 
@@ -169,6 +172,41 @@ pub fn promote_unit(this: &Unit, level: i32){
         this.set_internal_level(job_max_level);
         if this.person.get_unit_icon_id().to_string() == "702MorphLC" {
             this.person.set_unit_icon_id("702Morph".into());
+        }
+    }
+}
+
+pub fn demote_unit(this: &Unit, level: i32) {
+    let job = this.get_job();
+    let job_max_level = job.get_max_level() as i32;
+    let current_level = this.level as i32 + this.internal_level as i32; 
+  
+    if level < current_level {
+        if job_max_level == 40 { 
+            this.set_level(level); 
+            this.auto_grow_capability(level, level);
+        }
+        else if job.is_high(){
+            if level < 20 {
+                let low_jobs = job.get_low_jobs();
+                if low_jobs.len() == 3 { 
+                    let rnd = engage::random::Random::get_game();
+                    this.class_change(low_jobs[rnd.get_value(3) as usize]);
+                }
+                else if low_jobs.len() == 1 { this.class_change(low_jobs[0]); }
+                this.auto_grow_capability(level, level);
+                this.set_level(level);
+                this.set_internal_level(0);
+                this.set_weapon_mask_from_person();
+            }
+            else {
+                this.auto_grow_capability(level-20, level);
+                this.set_level(level-20);
+                this.set_internal_level(20);
+            }
+        }
+        else {  // base class that stays a base class
+            this.auto_grow_capability(level, level);
         }
     }
 }
@@ -221,9 +259,57 @@ pub fn auto_level_unit(unit: &mut Unit){
         unit.level = unit_level;
         count += 1;
     }
-    if starting_cap != enemy_cap { 
-        println!("{} {} gain {} stat points to {} ( {} Ups )", Mess::get(unit.get_job().name).to_string(), Mess::get(unit.person.get_name().unwrap()).to_string(), enemy_cap-starting_cap, enemy_cap, count);
+    if starting_cap != enemy_cap { println!("{} {} gain {} stat points to {} ( {} Ups )", Mess::get(unit.get_job().name).to_string(), Mess::get(unit.person.get_name().unwrap()).to_string(), enemy_cap-starting_cap, enemy_cap, count); }
+    unit.set_hp(unit.get_capability(0, true));
+    return;
+}
+
+pub fn auto_level_unit_for_random_map(unit: &mut Unit, leader: bool){
+    if !GameVariableManager::get_bool( "G_Cleared_M004") { return; } 
+    let diff = GameUserData::get_difficulty(false);
+    let player = unit.person.get_asset_force() == 0;
+    let mut level = crate::utils::max( (crate::continuous::get_story_chapters_completed()-6)*2, crate::continuous::get_story_chapters_completed() + 4);
+    level = crate::utils::max( calculate_average_level(14 - diff*2) + diff - 1, level);
+    if is_boss(unit.person) || leader { level += 3; }
+    if player { level -= diff; }
+    let current_level = unit.level as i32 + unit.internal_level as i32;
+    for _x in 0..(level - current_level) { unit.level_up(3); }
+    if current_level < level { promote_unit(unit, level); }
+    else if level < current_level { demote_unit(unit, level); }
+
+    let offset = unit.person.get_offset_by_difficulty();
+    let maps = crate::continuous::get_number_main_chapters_completed2() + diff;
+
+    unit.auto_grow_capability(unit.level as i32, level + maps / 4 );
+
+    if unit.job.max_level == 20 {
+        let div = level / 20;
+        unit.set_internal_level(div*20);
+        if div > 0 { unit.set_level( crate::utils::max(1, level - div*20));  }
+        else { unit.set_level(level); }
     }
+    else {
+        if level > 40 {
+            unit.set_level(level-20);
+            unit.set_internal_level(20);
+        }
+        else { unit.set_level(level); }
+    }
+    for x in 0..10 { unit.base_capability.capability[x] -= offset[x]; }
+
+    if GameVariableManager::get_number("G_Player_Rating_Average") == 0 { calculate_player_cap(); }
+    let player_cap = GameVariableManager::get_number("G_Player_Rating_Average");
+
+    let unit_level = unit.level;
+
+    let floor_cap = if player { player_cap }
+        else { player_cap + diff * ( maps - 10 )  } - 5;
+
+    let ceil = floor_cap + maps;
+    while ceil <  unit_cap_total(unit, true) {
+        unit.level = unit_level + 1;
+        unit.level_down();
+    } 
     unit.set_hp(unit.get_capability(0, true));
     return;
 }
@@ -272,8 +358,8 @@ pub fn get_sortie_unit_count(method_info: OptionalMethod) -> i32;
 
 pub fn get_difficulty_adjusted_average_level() -> i32 {
     unsafe {
-        if get_sortie_unit_count(None) == 0 { return get_average_level(1, 8, None); }
-        else { return get_average_level(1, get_sortie_unit_count(None), None); }
+        if get_sortie_unit_count(None) == 0 { return get_average_level(0, 10, None); }
+        else { return get_average_level(0, get_sortie_unit_count(None), None); }
     }
 }
 
@@ -391,7 +477,7 @@ pub fn multiple_level_ups(unit: &Unit, number_of_levels: i32){
 
 pub struct BenchAutoLevelOption;
 impl ConfigBasicMenuItemSwitchMethods for BenchAutoLevelOption {
-    fn init_content(this: &mut ConfigBasicMenuItem){ GameVariableManager::make_entry("G_AutoBench", 0); } 
+    fn init_content(_this: &mut ConfigBasicMenuItem){ GameVariableManager::make_entry("G_AutoBench", 0); } 
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let toggle =  GameVariableManager::get_bool("G_AutoBench");
         let result = ConfigBasicMenuItem::change_key_value_b(toggle);
@@ -444,9 +530,13 @@ impl ConfigBasicMenuItemSwitchMethods for AutolevelMod {
     }
 }
 
+pub fn auto_level_build(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
+    if GameVariableManager::get_number("G_Continuous") == 3 { return BasicMenuItemAttribute::Hide }
+    else { crate::menus::build_attribute_not_in_map(this, None) }
+}
 pub extern "C" fn vibe_autolevel() -> &'static mut ConfigBasicMenuItem { 
     let switch = ConfigBasicMenuItem::new_switch::<AutolevelMod>("Level Scale Units");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_not_in_map as _);
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = auto_level_build as _);
     switch
 } 
 

@@ -9,7 +9,6 @@ pub use engage::{
 };
 use unity::il2cpp::object::Array;
 use crate::enums::*;
-use crate::randomizer::emblem::EMBLEM_ORDER;
 use crate::utils::*;
 use engage::gamedata::{Gamedata, PersonData, GodData};
 
@@ -67,9 +66,6 @@ pub fn fill_name_array() {
      }
 }
 
-
-
-
 static TEXT_REPLACE: Mutex<TextReplacer> = Mutex::new(
     TextReplacer{ mid: String::new(), replace: Vec::new(), current_position: 0, is_enabled: false, is_start: false, first_char: 0, diff: 0});
 
@@ -100,24 +96,24 @@ fn get_current_mid(method_info: OptionalMethod) -> &'static Il2CppString;
 
 fn is_character_specific() -> bool {
     let mid = unsafe { get_current_mid(None) };
-    if str_contains(mid, "MID_KR_") { return true; }
-    if str_contains(mid, "MID_GR_") { return true; }
-    if str_contains(mid, "MID_DIE") { return true; }
-    if str_contains(mid, "MID_RELIANCE") { return true; }
-    if str_contains(mid, "MID_LVUP") { return true; }
-    if str_contains(mid, "MID_HUB") { 
-        if str_contains(mid, "MID_HUB_DLC") { return false; }
-        if str_contains(mid, "MID_HUB_Mascot") { return false; }    
+    if mid.contains( "MID_KR_") { return true; }
+    if mid.contains( "MID_GR_") { return true; }
+    if mid.contains( "MID_DIE") { return true; }
+    if mid.contains( "MID_RELIANCE") { return true; }
+    if mid.contains( "MID_LVUP") { return true; }
+    if mid.contains( "MID_HUB") { 
+        if mid.contains( "MID_HUB_DLC") { return false; }
+        if mid.contains( "MID_HUB_Mascot") { return false; }    
         return true; 
     }
     return false; 
 }
 fn is_emblem_paralogue() -> bool {
     let chapter = GameUserData::get_chapter().cid;
-    if str_contains(chapter, "CID_S015") || str_contains(chapter, "CID_S001") || str_contains(chapter, "CID_S002") {
+    if chapter.contains("CID_S015") || chapter.contains("CID_S001") || chapter.contains("CID_S002") {
         return false
     }
-    return str_contains(chapter, "CID_S0") || str_contains(chapter, "CID_G00");
+    return chapter.contains("CID_S0") || chapter.contains("CID_G00");
 }
 
 
@@ -335,57 +331,36 @@ pub fn do_replacement(mid: &Il2CppString) {
     replacer.first_char = mess.to_u16().to_vec()[0];
     let mut new_str = Il2CppString::new_static(original_str.clone());
     let names = NAMES.lock().unwrap();
-
     // Persons
+    let mut persons = Vec::new();
+    let mut others: Vec<usize> = Vec::new();
+// Replacement old text -> Replacement Label
     if GameVariableManager::get_number("G_Random_Recruitment") != 0 && !is_character_specific() {
-        let mut persons = Vec::new();
-        for x in 0..41 {
-            if new_str.contains(names.original_names[x].as_str()) { persons.push(x); }
-        }
+        for x in 0..41 { if new_str.contains(names.original_names[x].as_str()) { persons.push(x); } }
         persons.iter().for_each(|&x|{
             if GameVariableManager::get_string(format!("G_R2_{}", PIDS[x]).as_str()).to_string() != PIDS[0] {
-                let old_name = names.original_names[x].clone().into();
-                let new_name = format!("PERSON{}",x).into();
-                new_str = unsafe { replace_str(new_str, old_name, new_name, None) };
+                new_str = unsafe { replace_str(new_str, names.original_names[x].clone().into(), format!("PERSON{}",x).into(), None) };
             }
-        });
-        persons.iter().for_each(|&x|{
-            let old_name = format!("PERSON{}",x).into();
-            let new_name = Mess::get_name(GameVariableManager::get_string(format!("G_R_{}", PIDS[x]).as_str()));
-            new_str = unsafe { replace_str(new_str, old_name, new_name, None) };
         });
     }
     else if names.is_custom {
         let mut persons = Vec::new();
         for x in 1..41 { if new_str.contains(names.original_names[x].as_str()){ persons.push(x); } }
-
         persons.iter().for_each(|&x|{
-            let old_name = names.original_names[x].clone().into();
-            new_str = unsafe { replace_str(new_str, old_name, format!("PERSON{}",x).into(), None) };
+            new_str = unsafe { replace_str(new_str,  names.original_names[x].clone().into(), format!("PERSON{}",x).into(), None) };
         });
-        let mut others: Vec<usize> = Vec::new();
     // NPCs
         for x in 0..9 { if new_str.contains(names.other_names[x].1.as_str()){ others.push(x); } }
         others.iter().for_each(|&x|{
-            let old_name = names.other_names[x].1.clone().into();
-            new_str = unsafe { replace_str(new_str, old_name, format!("OTHER{}",x).into(), None) };
-        });
-
-        persons.iter().for_each(|&x|{
-            let old_name = format!("PERSON{}",x).into();
-            let new_name = Mess::get_name(PIDS[x]);
-            new_str = unsafe { replace_str(new_str, old_name, new_name, None) };
-        });
-    // NPCs
-        others.iter().for_each(|&x|{
-            let old_name = format!("OTHERS{}",x).into();
-            let person = PersonData::try_index_get(names.other_names[x].0).unwrap();
-            let new_name = Mess::get_name(person.pid);
-            new_str = unsafe { replace_str(new_str, old_name, new_name, None) };
+            new_str = unsafe { replace_str(new_str, names.other_names[x].1.clone().into(), format!("OTHERS{}",x).into(), None) };
         });
     }
-    if GameVariableManager::get_number("G_Emblem_Mode") != 0 && !is_character_specific() && !is_emblem_paralogue() {
-        let mut emblems = Vec::new();
+    let mut emblems = Vec::new();
+    let mut rings = Vec::new();
+    let mut nick = Vec::new();
+
+    let random_emblem_order = GameVariableManager::get_number("G_Emblem_Mode") != 0 && !is_character_specific() && !is_emblem_paralogue();
+    if random_emblem_order{
         for x in 0..23 {
             if new_str.contains(names.original_emblem_names[x].as_str()){
                 if x == 19 || x == 20 {  emblems.push(12); }
@@ -395,75 +370,73 @@ pub fn do_replacement(mid: &Il2CppString) {
             }
         }
         emblems.iter().for_each(|&x|{
-            let old = names.original_emblem_names[x].clone().into();
-            let new = format!("EMBLEM{}",x).into();
-            new_str = unsafe { replace_str(new_str, old, new, None) };
+            new_str = unsafe { replace_str(new_str,  names.original_emblem_names[x].clone().into(), format!("EMBLEM{}",x).into(), None) };
         });
-
-        emblems.iter().for_each(|&x|{
-            let old = format!("EMBLEM{}",x).into();
-            let gid = GameVariableManager::get_string(format!("G_R_{}", EMBLEM_GIDS[x]).as_str());
-            let new = Mess::get(GodData::get(gid).unwrap().mid);
-            new_str = unsafe { replace_str(new_str, old, new, None) };
-        });
-        emblems.clear();
     //Rings
         for x in 0..23 {
             if new_str.contains(names.original_emblem_rings[x].as_str()){
-                if x == 19 || x == 20 {  emblems.push(12); }
-                else if x == 21 {  emblems.push(18); }
-                else if x == 22 {  emblems.push(11); }
-                else {  emblems.push(x)}
+                if x == 19 || x == 20 {  rings.push(12); }
+                else if x == 21 {  rings.push(18); }
+                else if x == 22 {  rings.push(11); }
+                else {  rings.push(x)}
             }
         }
-        emblems.iter().for_each(|&x|{
-            let old = names.original_emblem_rings[x].clone().into();
-            let new = format!("RING{}",x).into();
-            new_str = unsafe { replace_str(new_str, old, new, None) };
+        rings.iter().for_each(|&x|{
+            new_str = unsafe { replace_str(new_str, names.original_emblem_rings[x].clone().into(), format!("RING{}",x).into(), None) };
         });
-
+    // NickNames
+        for x in 0..19 { if new_str.contains(names.original_emblem_nickname[x].as_str()){ nick.push(x); } }
+        nick.iter().for_each(|&x|{
+            new_str = unsafe { replace_str(new_str, names.original_emblem_nickname[x].clone().into(), format!("NICK{}",x).into(), None) };
+        });
+    }
+    else if names.is_custom {
+        let mut emblems = Vec::new();
+        for x in 0..23 { if new_str.contains(names.original_emblem_names[x].as_str()){ emblems.push(x); } }
         emblems.iter().for_each(|&x|{
-            let old = format!("RING{}",x).into();
+                new_str = unsafe { replace_str(new_str, names.original_emblem_names[x].clone().into(), format!("EMBLEM{}", x).into(), None) };
+        });
+    }
+// Replacement Label -> New Text
+    if names.is_custom {
+        persons.iter().for_each(|&x|{
+            new_str = unsafe { replace_str(new_str, format!("PERSON{}",x).into(), Mess::get_name(PIDS[x]), None) };
+        });
+        others.iter().for_each(|&x|{
+            let person = PersonData::try_index_get(names.other_names[x].0).unwrap();
+            let new_name = Mess::get_name(person.pid);
+            new_str = unsafe { replace_str(new_str,  format!("OTHERS{}",x).into(), new_name, None) };
+        });
+    }
+    else {
+        persons.iter().for_each(|&x|{
+            let new_name = Mess::get_name(GameVariableManager::get_string(format!("G_R_{}", PIDS[x]).as_str()));
+            new_str = unsafe { replace_str(new_str, format!("PERSON{}",x).into(), new_name, None) };
+        });
+    }
+
+    if random_emblem_order {
+        emblems.iter().for_each(|&x|{
+            let gid = GameVariableManager::get_string(format!("G_R_{}", EMBLEM_GIDS[x]).as_str());
+            let new = Mess::get(GodData::get(gid).unwrap().mid);
+            new_str = unsafe { replace_str(new_str, format!("EMBLEM{}",x).into(), new, None) };
+        });
+        rings.iter().for_each(|&x|{
             let gid = GameVariableManager::get_string(format!("G_R_{}", EMBLEM_GIDS[x]).as_str());
             let god = GodData::get(gid).unwrap();
             let new = Mess::get(god.ring_name.unwrap());
-            new_str = unsafe { replace_str(new_str, old, new, None) };
+            new_str = unsafe { replace_str(new_str, format!("RING{}",x).into(), new, None) };
         });
-        emblems.clear();
-    // NickNames
-        for x in 0..19 { if new_str.contains(names.original_emblem_nickname[x].as_str()){ emblems.push(x); } }
-
-        emblems.iter().for_each(|&x|{
-            let old = names.original_emblem_nickname[x].clone().into();
-            let new = format!("NICK{}",x).into();
-            new_str = unsafe { replace_str(new_str, old, new, None) };
+        nick.iter().for_each(|&x|{
+            if let Some(god)  = crate::randomizer::emblem::get_god_from_index(x as i32 , true) {
+                if let Some(engrave) = god.engrave_word {
+                    let new = Mess::get(engrave);
+                    new_str = unsafe { replace_str(new_str, format!("NICK{}",x).into(), new, None) };
+                }
+            }
         });
-
-        emblems.iter().for_each(|&x|{
-            let old = format!("NICK{}",x).into();
-            let gid = EMBLEM_ORDER.lock().unwrap()[x] as usize;
-            let new = Mess::get(format!("MGEID_{}", RINGS[gid]));
-            new_str = unsafe { replace_str(new_str, old, new, None) };
-        });
-
     }
-    else {
-        let mut emblems = Vec::new();
-        for x in 0..23 {
-            if new_str.contains(names.original_emblem_names[x].as_str()){ emblems.push(x); }
-        }
-        emblems.iter().for_each(|&x|{
-            let gid = match x {
-                19 => { "GID_ディミトリ"}
-                20 => { "GID_クロード" }
-                21 => { "GID_ルフレ" }
-                22 => { "GID_エフラム" }
-                _ => { EMBLEM_GIDS[x] }
-            };
-            let old = names.original_emblem_names[x].clone().into();
-            let new = format!("EMBLEM{}", x);
-                new_str = unsafe { replace_str(new_str, old, new.into(), None) };
-        });
+    else if names.is_custom {
         emblems.iter().for_each(|&x|{
             let gid = match x {
                 19 => { "GID_ディミトリ"}
@@ -476,8 +449,9 @@ pub fn do_replacement(mid: &Il2CppString) {
             let new = Mess::get(GodData::get(gid).unwrap().mid);
             new_str = unsafe { replace_str(new_str, old.into(), new, None) };
         });
-
     }
+
+
     let new_string = new_str.to_string();
     if new_string != original_str {
         replacer.replace = new_str.to_u16().to_vec();

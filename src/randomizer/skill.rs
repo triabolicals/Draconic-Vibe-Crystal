@@ -13,6 +13,8 @@ use crate::{enums::*, utils::*};
 pub static SKILL_POOL: Mutex<Vec<SkillIndex>> = Mutex::new(Vec::new());
 pub static MADDENING_POOL: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 
+
+
 //#[repr(C)]
 pub struct SkillIndex {
     pub index: i32,
@@ -101,11 +103,12 @@ pub extern "C" fn vibe_skill_gauge() -> &'static mut ConfigBasicMenuItem {
 
 fn add_skill_to_pool(skill: &SkillData) {
     let index = skill.parent.index;
+    let sid = skill.sid.to_string();
+    if sid.contains("E00") || sid.contains("G00") { return; }
     if skill.help.is_none() ||  skill.name.is_none() || skill.is_style_skill() || SKILL_BLACK_LIST.lock().unwrap().iter().any(|&y| y == index ) { return; }
     if Mess::get(skill.name.unwrap()).to_string().len() < 1 || Mess::get(skill.help.unwrap()).to_string().len() < 1 { return; }
     if skill.get_inheritance_cost() != 0 && skill.get_inheritance_sort() != 0 { SYNCHO_RANDOM_LIST.lock().unwrap().add_list(skill, false); }
     if skill.get_flag() & 511 == 0 {
-        if str_contains(skill.sid ,"E00") && str_contains(skill.sid ,"G00"){ return; }
         SKILL_POOL.lock().unwrap().push(SkillIndex::new(index as i32));
         SYNCHO_RANDOM_LIST.lock().unwrap().add_list(skill, false); // Chaos Skills
         if MADDENING_BLACK_LIST.iter().find(|lol| **lol == skill.sid.to_string() ).is_none() {
@@ -262,8 +265,12 @@ pub fn reset_skills() {
     reset_emblem_skills();
 }
 
-pub fn replace_all_sid_person(person: &PersonData) {
-    if person.pid.to_string() == "PID_ヴェイル" { return; } // ignore Veyle swaps
+pub fn replace_all_sid_person(person_index: i32) {
+    let enemy_list: Vec<_> = unsafe { &super::person::ENEMY_PERSONS }.iter().filter(|x| x.0 == person_index).collect();
+    if enemy_list.len() == 0 { return; }
+
+    let person = PersonData::get(PIDS[person_index as usize]).unwrap();
+    //if person.pid.to_string() == "PID_ヴェイル" { return; } // ignore Veyle swaps
     let new_person = switch_person(person);
     let old_job = person.get_job().expect(
         format!("Person #{}: {} does not have a valid class.\nPlease change the JID of Person #{} in Person.xml.", person.parent.index, Mess::get_name(person.pid), person.parent.index).as_str()
@@ -283,50 +290,20 @@ pub fn replace_all_sid_person(person: &PersonData) {
     let new_flag_value = if new_person.pid.to_string() == "PID_リュール" { new_person.get_flag().value | 1536  }  
         else { new_person.get_flag().value | 512 };
 
-    let person_list = PersonData::get_list_mut().unwrap();
     let grow = new_person.get_grow();
     let personal_sids = new_person.get_common_sids().unwrap();
-    let mut new_sid = personal_sids[0];
-    if GameVariableManager::get_number(&format!("G_P_{}", new_person.pid.to_string())) != 0 {
-        let new_skill_index = GameVariableManager::get_number(&format!("G_P_{}", new_person.pid.to_string()));
-        let new_skill = SkillData::try_get_hash(new_skill_index);
-        if new_skill.is_none() { 
-            for y in 0..personal_sids.len() {
-                let skill = SkillData::get( &personal_sids[y as usize].to_string() ).unwrap();
-                if skill.get_flag() & 1 == 0 {
-                    new_sid = personal_sids[y as usize];
-                    break;
-                }
-            }
-        }
-        else { new_sid = new_skill.unwrap().sid; }
+    let new_skill_index = if GameVariableManager::get_number(&format!("G_P_{}", new_person.pid.to_string())) != 0 {
+        GameVariableManager::get_number(&format!("G_P_{}", new_person.pid.to_string()))
     }
     else {
-        if let Some(personal_slot) = personal_sids.iter_mut().find(|sid|{
-            if let Some(skill) = SkillData::get( sid.to_string() ) { skill.get_flag() & 1 == 0 } else { false }
-        }){
-            *personal_slot = new_sid.clone();
-        }
-    }
+        SkillData::get(personal_sids.iter().find(|&sid|SkillData::get(sid.to_string()).unwrap().get_flag() & 1 == 0 ).unwrap().to_string()).unwrap().parent.hash
+    };
     let icon_name = new_person.get_unit_icon_id().to_string();
     let help_name = new_person.get_help().to_string();
-
-    person_list.iter_mut()
-        .filter(|person_x|{
-            if person_x.pid.contains("_竜化") || person_x.parent.index == person.parent.index || person_x.get_common_sids().is_none() || person_x.get_job().is_none() || person_x.get_flag().value & 2690 != 0 { return false; }
-            if let Some(name) = person_x.get_name() {
-                name == person.get_name().unwrap()
-            }
-            else { false }
-        }
-    )
-        .for_each(|person_x|{
-            let personal_sid = person_x.get_common_sids().unwrap();
-            if let Some(personal_slot) = personal_sid.iter_mut().find(|sid|{
-                if let Some(skill) = SkillData::get( sid.to_string() ) { skill.get_flag() & 1 == 0 } else { false }
-            }){
-                *personal_slot = new_sid.clone();
-            }
+    
+    enemy_list.iter().for_each(|enemy|{
+        if let Some(person_x) = PersonData::get_mut(format!("PID_{}", enemy.1)){
+            change_personal_sid(person_x, SkillData::try_get_hash(new_skill_index).unwrap());
             let job_x = person_x.get_job().unwrap();
             let level = person_x.get_level();
             if ( job_x.is_low() && job_x.max_level == 20 ) && new_job.is_high() { person_x.set_level(level); }
@@ -341,6 +318,7 @@ pub fn replace_all_sid_person(person: &PersonData) {
                 person_x.set_level( total ); 
                 person_x.set_internal_level(0); 
             }
+            person_x.set_name(new_person.get_name().unwrap());
             person_x.get_flag().value = new_flag_value;
             let grow_x = person_x.get_grow();
             person_x.set_jid(jid);
@@ -354,71 +332,25 @@ pub fn replace_all_sid_person(person: &PersonData) {
                     if grow_x[x as usize] < grow[x as usize] {  grow_x[x as usize] = grow[x as usize];  }
                 } // Growths
             }
-            person_x.on_complete();
+            //person_x.on_complete();
+            println!("Person #{}: {} replaced with {}", person_x.parent.index, person_x.get_name().unwrap(), person.get_name().unwrap());
         }
-    );
-    /* 
-    for x in 2..person_list.len() {
-        let person_x = &person_list[x as usize];
-        if person_x.pid.contains("_竜化") { continue; }
-        if person_x.get_flag().value & 2178 != 0 { continue; }
-        if person_x.parent.index == person.parent.index { continue;}
-        if person_x.get_name().is_none() { continue; }
-        if person_x.get_name().unwrap() != person.get_name().unwrap() { continue; }
-        if person_x.get_common_sids().is_none() { continue; }
-        if person_x.get_flag().value & 512 != 0 { continue; }   // prevents already changed from changing again
-        person_x.set_name(new_person.get_name().unwrap());
-        let personal_sid = person_x.get_common_sids().unwrap();
-        if let Some(personal_slot) = personal_sid.iter_mut().find(|sid|{
-            if let Some(skill) = SkillData::get( sid.to_string() ) { skill.get_flag() & 1 == 0 } else { false }
-        }){
-            *personal_slot = new_sid.clone();
-        }
-
-        if person_x.get_job().is_none() {
-            println!("Person #{}: {} does not have a valid class.", person_x.parent.index, Mess::get_name(person_x.pid));
-            continue;
-        }
-        let job_x = person_x.get_job().unwrap();
-        let level = person_x.get_level();
-        if ( job_x.is_low() && job_x.max_level == 20 ) && new_job.is_high() { person_x.set_level(level); }
-        else if ( job_x.is_low() && job_x.max_level == 40 ) && new_job.is_high() {
-            if level > 20 { 
-                person_x.set_level(level - 20 ); 
-                person_x.set_internal_level(20); 
-            }
-        }
-        else if job_x.is_high() && new_job.max_level == 40 { 
-            let total = if person_x.get_internal_level() == 0 { 20 } else { person_x.get_internal_level() } as u8 + level;
-            person_x.set_level( total ); 
-            person_x.set_internal_level(0); 
-        }
-        person_x.get_flag().value = new_flag_value;
-        let grow_x = person_x.get_grow();
-        person_x.set_jid(jid);
-        person_x.set_gender(new_person.get_gender());
-        person_x.set_attrs(new_person.get_attrs());
-        person_x.set_unit_icon_id(icon_name.clone().into());
-        person_x.set_help(help_name.clone().into());
-        if !grow_x.is_zero() {
-            for x in 0..11 { 
-                if grow_x[x as usize] == 0 { continue; }
-                if grow_x[x as usize] < grow[x as usize] {  grow_x[x as usize] = grow[x as usize];  }
-            } // Growths
-        }
-        person_x.on_complete();
-        println!("Person # {} has been swapped with job: {}", person_x.parent.index, Mess::get_name(jid));
-        //println!("Enemy {} is now: {}", person_x.parent.index, name);
-    }
-    */
+    } );
 }
 
 pub fn replace_enemy_version() {
     if GameVariableManager::get_number("G_Random_Recruitment") == 0 || !GameVariableManager::get_bool("G_Random_Skills") { return; } 
-    PIDS.iter().for_each(|&x| replace_all_sid_person(PersonData::get(x).unwrap()));
+    if GameUserData::get_chapter().cid.contains("G00") && crate::utils::in_map_chapter() { return; }
+    if unsafe { !super::STATUS.skill_randomized }{ return; }
+    if unsafe { !super::STATUS.enemy_unit_randomized } {
+        println!("Replacing Enemy Character's Skills");
+        for x in 1..41 { replace_all_sid_person(x); }
+        unsafe { super::STATUS.enemy_unit_randomized = true };
+    }
 }
 pub fn randomize_skills() {
     if !GameVariableManager::get_bool("G_Random_Skills") || !crate::utils::can_rand() { return; }
+    if unsafe { super::STATUS.skill_randomized } { return; }
     println!("Randomizing skills");
     let skill_list = SkillData::get_list().unwrap();
     let rng = Random::instantiate().unwrap();
@@ -567,6 +499,7 @@ pub fn randomize_skills() {
         });   
     }
     randomize_bond_ring_skills();
+    unsafe { super::STATUS.skill_randomized = true };
 }
 pub fn randomize_bond_ring_skills(){
     let maddening_pool_size = MADDENING_POOL.lock().unwrap().len() as i32;
@@ -606,7 +539,7 @@ pub fn randomize_bond_ring_skills(){
                     index2 = rng_rings.get_value(maddening_pool_size) as usize; 
                     s_high2 = get_highest_priority(MADDENING_POOL.lock().unwrap()[index2]);
                     count += 1;
-                    if count > 50 &&  s_high != s_high2 { break; }
+                    if count > 50 && s_high != s_high2 { break; }
                 }
                 equip_skills.add_skill(&skill_list[s_high2 as usize],6, 0);
                 ring_skill_set[ index2 ] = true;
@@ -625,9 +558,12 @@ fn change_personal_sid(person: &mut PersonData, skill: &SkillData) {
         if let Some(skill2) = SkillData::get(sid.to_string()) { skill2.get_flag() & 1 == 0 }
         else { false }
     }){
-        *sid = skill.sid.clone();
+        person.get_common_skills().replace_sid(sid, skill);
+        person.get_normal_skills().replace_sid(sid, skill);
+        person.get_hard_skills().replace_sid(sid, skill);
+        person.get_lunatic_skills().replace_sid(sid, skill);
+        *sid = skill.sid;
     }
-    person.on_complete();
 } 
 
 fn fixed_skill_inherits() {

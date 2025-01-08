@@ -3,6 +3,7 @@ use engage::{
     random::*,
     force::*,
     mess::*,
+    gameuserdata::GameUserData,
     gamedata::{*, unit::Unit, item::*, skill::*},
 };
 use engage::gamevariable::GameVariableManager;
@@ -17,6 +18,16 @@ pub fn get_rng() -> &'static Random {
 }
 pub fn can_rand() -> bool { return GameVariableManager::get_number("G_Random_Seed") != 0; }
 
+pub fn create_rng(seed: i32, rng_mode: i32) -> &'static Random {
+    let rng = Random::instantiate().unwrap();
+    let r_seed = GameVariableManager::get_number("G_Random_Seed");
+    let rng_seed = match rng_mode {
+        1 => { ( seed >> 1 ) + ( r_seed >> 1 ) }
+        _ => { r_seed }
+    };
+    rng.ctor(rng_seed as u32);
+    rng
+}
 pub fn class_count(jid: &str) -> i32 {
     let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
     let mut count = 0;
@@ -79,7 +90,7 @@ pub fn get_lueur_name_gender(){
     }
 }
 
-pub fn str_contains(this: &Il2CppString, value: &str) -> bool { unsafe {string_contains(this, value.into(), None) } }
+pub fn str_contains(this: &Il2CppString, value: &str) -> bool { this.to_string().contains(value)  }
 pub fn str_contains2<'a>(this: &Il2CppString, value: impl Into<&'a Il2CppString>) -> bool { unsafe {string_contains(this, value.into(), None) } }
 
 pub fn get_person_name(person: &PersonData) -> String {
@@ -287,8 +298,6 @@ pub fn return_true(address: usize){
 pub fn dlc_check() -> bool {
     unsafe {
         if has_content(0, None) {
-            //mov_1(0x0253d7c0);
-            //mov_1(0x0253d8b0);
         return true;
         }
         return false;
@@ -331,6 +340,13 @@ pub fn il2_str_substring(this: &Il2CppString, start: i32) -> &'static Il2CppStri
 #[skyline::from_offset(0x032dfb20)]
 pub fn clamp(value: i32, min: i32, max: i32, method_info: OptionalMethod) -> i32;
 
+pub fn max(v1: i32, v2: i32) -> i32 {
+    if v1 > v2 { v1 } else { v2 }
+}
+pub fn min(v1: i32, v2: i32) -> i32 {
+    if v1 > v2 { v1 } else { v2 }
+}
+pub fn in_map_chapter() -> bool { GameUserData::get_sequence() == 3 }
 //
 // Unity Functions from Engage
 //DLC Check 

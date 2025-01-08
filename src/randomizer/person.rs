@@ -8,6 +8,7 @@ pub use engage::{
     gamevariable::*, gameuserdata::*, hub::access::*, random::*, mess::*,
     gamedata::{*, item::*, skill::SkillData, dispos::*, unit::*},
 };
+use std::sync::Mutex;
 use skyline::patching::Patch;
 use unity::il2cpp::object::Array;
 use crate::{
@@ -19,13 +20,13 @@ pub mod unit;
 
 use super::CONFIG;
 pub static mut SET: i32 = 0;
-use std::sync::Mutex;
 pub static PLAYABLE: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 pub static mut INDEX: i32 = -1;
 pub static mut INDEX2: i32 = -1;
 pub static mut SELECTION: i32 = 0;
 pub static mut SELECTION2: i32 = 0;
 pub static mut IS_EMBLEM: bool = false;
+pub static mut ENEMY_PERSONS: Vec<(i32, String)> = Vec::new();
 
 pub struct RandomPersonMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomPersonMod {
@@ -105,10 +106,10 @@ pub fn get_playable_list() {
         if person.get_sp() == 0 { continue; }
         count += 1;
     }
-    if count > 150 { return; }
+    if count > 100 { return; }
     for x in 1..person_list.len() { 
         let person = &person_list[x as usize];
-        if str_contains(person.pid, "_竜化") { continue; }  //No Dragons
+        if person.pid.contains("_竜化") { continue; }  //No Dragons
         if person.get_common_sids().is_none() { continue; }
         let index = person.parent.index; 
         if str_contains(person.pid, "PLAYABLE") || str_contains(person.pid, "layable") { person.set_asset_force(0); } 
@@ -122,7 +123,7 @@ pub fn get_playable_list() {
     }
     println!("Total of {} Playable Units", list.len());
 }
-
+pub fn is_playable_person(person: &PersonData) -> bool { PLAYABLE.lock().unwrap().iter().any(|&x| person.parent.index == x) }
 pub fn check_playable_classes() {
     // Set valid classes to Sword Fighter or Swordmaster
     let list = PLAYABLE.lock().unwrap();
@@ -235,10 +236,10 @@ pub fn randomize_person() {
         }
         let rng = get_rng();
         let mut set_emblems: [bool; 41] = [false; 41];
+        println!("Recruitment Mode: {}", GameVariableManager::get_number("G_Random_Recruitment") );
         match GameVariableManager::get_number("G_Random_Recruitment") {
             1 => {
-                let playable_size = if CONFIG.lock().unwrap().custom_units && PLAYABLE.lock().unwrap().len() > 41 { 
-                    PLAYABLE.lock().unwrap().len() }
+                let playable_size = if CONFIG.lock().unwrap().custom_units && PLAYABLE.lock().unwrap().len() > 41 { PLAYABLE.lock().unwrap().len() }
                     else { 41 };
         
                 let list = PLAYABLE.lock().unwrap();
@@ -250,9 +251,10 @@ pub fn randomize_person() {
                         if let Some(index) = to_replace_list.iter().position(|&i| i == x) {  to_replace_list.remove(index);  }
                     }
                 }
+                
                 let person_list = PersonData::get_list().unwrap();
                 let pids: Vec<String> = list.iter().map(|&x| person_list[x as usize].pid.to_string() ).collect();
-
+                println!("Playable Unit Size: {}", pids.len());
             // Alear and somniel royals must be switched with non-dlc units
                 let royals = [0, 23, 4, 17, 14, 27];
                 for x_i in royals {
@@ -264,7 +266,7 @@ pub fn randomize_person() {
                         GameVariableManager::set_string(&format!("G_R2_{}", PIDS[x_i as usize]), PIDS[x_j as usize]);
                         if let Some(index1) = to_replace_list.iter().position(|&i| i == x_j) { to_replace_list.remove(index1); }
                         if let Some(index2) = playable_list.iter().position(|&i| i == x_i) {  playable_list.remove(index2);  }
-                        println!("#{}: {} -> {}", x_j, Mess::get_name(PIDS[x_j as usize]).to_string(),  Mess::get_name(PIDS[x_i as usize]).to_string());
+                        println!("#{}: {} -> {}", x_j, Mess::get_name(PIDS[x_j as usize]),  Mess::get_name(PIDS[x_i as usize]));
                         break;
                     }
                 }
@@ -331,7 +333,7 @@ pub fn find_pid_replacement(pid: &String, reverse: bool) -> Option<String>{
         if reverse { return Some( GameVariableManager::get_string(&format!("G_R2_{}", pid)).to_string()); }   
         else { return Some( GameVariableManager::get_string(&format!("G_R_{}", pid)).to_string()); }
     }
-    else if EMBLEM_GIDS.iter().position(|&x| x == *pid).is_some() {
+    if EMBLEM_GIDS.iter().position(|&x| x == *pid).is_some() {
         if reverse { return Some( GameVariableManager::get_string(&format!("G_R2_{}", pid)).to_string()); }   
         else { return Some( GameVariableManager::get_string(&format!("G_R_{}", pid)).to_string()); }
     }
@@ -344,7 +346,7 @@ pub fn change_hub_dispos(revert: bool) {
         for y in 0..t_list[x].len() {
             if let Some(aid) = t_list[x][y].get_aid() {
                 if aid.contains("GID_") && t_list[x][y].parent.array_name.contains("Fld_S0") { continue; }
-                if t_list[x][y].parent.array_name.contains("Fld_M0") {
+                if t_list[x][y].parent.array_name.contains("Fld_M0") || aid.contains("GID_") {
                     if let Some(new_pid) = find_pid_replacement(&aid.to_string(), revert) { t_list[x][y].set_aid(new_pid.clone().into()); }
                 }
             }
@@ -538,7 +540,7 @@ pub fn get_god_thumb_face(this: &GodData, method_info: OptionalMethod) -> &Il2Cp
 pub fn get_bond_face(this: &Unit, _method_info: OptionalMethod) -> &Il2CppString {
     let name = this.person.get_name().unwrap().to_string();
     if let Some(old) = MPIDS.iter().position(|&x| x == name) { 
-        if old == 1 { return format!("Telop/LevelUp/FaceThumb/{}", get_gender_lueur_ascii(false)).into(); }
+        if old == 0 { return format!("Telop/LevelUp/FaceThumb/{}", get_gender_lueur_ascii(false)).into(); }
         let new_name = &MPIDS[old][5..]; 
         return format!("Telop/LevelUp/FaceThumb/{}", new_name).into();
     }
@@ -593,10 +595,10 @@ pub fn get_gender_lueur_ascii(god: bool) -> String {
 pub fn get_god_face(this: &GodData, method_info: OptionalMethod) -> &Il2CppString {
     let mid = this.mid;
     let result = call_original!(this, method_info);
-    if str_contains(mid, "Lueur") && str_contains(this.gid, "GID_リュール") {
-        return format!("Telop/LevelUp/FaceThumb/God/{}", get_gender_lueur_ascii(false)).into();
+    if mid.contains("Lueur") && this.gid.contains("リュール") {
+        return format!("Telop/LevelUp/FaceThumb/God{}", get_gender_lueur_ascii(false)).into();
     }
-    if let Some(pos) = MPIDS.iter().position(|&x| str_contains(mid, x)) {
+    if let Some(pos) = MPIDS.iter().position(|&x| mid.contains(x)) {
         let new_name = &MPIDS[pos][5..];
         let path = format!("Telop/LevelUp/FaceThumb/{}", new_name);
         return path.into();
@@ -635,3 +637,62 @@ pub fn get_god_face(this: &GodData, method_info: OptionalMethod) -> &Il2CppStrin
     }
 }
 
+pub fn get_all_enemy_persons() {
+    if unsafe { ENEMY_PERSONS.len() > 0 } { return; }
+    let enemy_list = unsafe{&mut ENEMY_PERSONS};
+    if let Some(pos) = PIDS.iter().position(|p| p.contains("オルテンシア")){
+        let index = pos as i32;
+        enemy_list.push((index, "M007_オルテンシア".to_string()));
+        enemy_list.push((index, "M010_オルテンシア".to_string()));
+        enemy_list.push((index, "M014_オルテンシア".to_string()));
+        enemy_list.push((index, "E005_Hide1".to_string()));
+        enemy_list.push((index, "E006_Hide6".to_string()));
+    }
+    if let Some(pos) = PIDS.iter().position(|p| p.contains("ロサード")){
+        let index = pos as i32;
+        enemy_list.push((index, "M007_ロサード".to_string()));
+        enemy_list.push((index, "M010_ロサード".to_string()));
+    }
+    if let Some(pos) = PIDS.iter().position(|p| p.contains("ゴルドマリー")){
+        let index = pos as i32;
+        enemy_list.push((index, "M007_ゴルドマリー".to_string()));
+        enemy_list.push((index, "M010_ゴルドマリー".to_string()));
+    }
+    if let Some(pos) = PIDS.iter().position(|p| p.contains("アイビー")){
+        let index = pos as i32;
+        enemy_list.push((index, "M008_アイビー".to_string()));
+        enemy_list.push((index, "M009_アイビー".to_string()));
+        enemy_list.push((index, "E004_Boss".to_string()));
+        enemy_list.push((index, "E006_Hide5".to_string()));
+    }
+    if let Some(pos) = PIDS.iter().position(|p| p.contains("PID_モーヴ")) {
+        let index = pos as i32;
+        enemy_list.push((index, "M011_モーヴ".to_string()));
+        enemy_list.push((index, "M014_モーヴ".to_string()));
+        enemy_list.push((index, "M016_モーヴ".to_string()));
+        enemy_list.push((index, "M017_モーヴ".to_string()));
+        enemy_list.push((index, "M019_モーヴ".to_string()));
+
+    }
+    ["カゲツ", "ゼルコバ"].iter().for_each(|p|{
+        if let Some(pos) = PIDS.iter().position(|pid| pid.contains(p)) {
+            let index = pos as i32;
+            enemy_list.push( (index, format!("M008_{}", p)));
+            enemy_list.push( (index, format!("M009_{}", p)));
+        }
+    });
+    for x in 36..41 {
+        if x == 37 { continue; }
+        let sub = &PIDS[x][4..];
+        for y in 1..7 {
+            let pid = format!("PID_E00{}_{}", y, sub);
+            if PersonData::get(pid).is_some() { enemy_list.push( (x as i32, format!("E00{}_{}", y, sub).to_string())); }
+        }
+    }
+    enemy_list.push((20, "E001_Boss".to_string())); enemy_list.push((20, "E005_Hide2".to_string()));  enemy_list.push((20, "E006_Hide8".to_string()));
+    enemy_list.push((4, "E002_Boss".to_string()));  enemy_list.push((4, "E006_Hide1".to_string()));
+    enemy_list.push((7, "E002_Hide".to_string()));  enemy_list.push((7, "E006_Hide2".to_string()));
+    enemy_list.push((14, "E003_Boss".to_string())); enemy_list.push((14, "E006_Hide3".to_string()));
+    enemy_list.push((11, "E003_Hide".to_string())); enemy_list.push((11, "E006_Hide4".to_string()));
+    enemy_list.push((23, "E004_Hide".to_string())); enemy_list.push((23, "E006_Hide7".to_string()));
+}

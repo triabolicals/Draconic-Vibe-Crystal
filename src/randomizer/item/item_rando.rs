@@ -1,4 +1,3 @@
-use enums::RINGS;
 use utils::str_contains;
 use std::sync::Mutex;
 use super::*;
@@ -214,6 +213,11 @@ impl WeaponDatabase {
         }
         self.intialize = true;
         println!("Total of {} weapons in the database.", self.weapon_list.len());
+        let kinds = ["Swords", "Lance", "Axes", "Bows", "Daggers", "Tomes", "Rods", "Fists", "Others"];
+        for x in 0..9 {
+            let count = self.weapon_list.iter().filter(|w| w.weapon_type == x as u8).count();
+            println!("{} {}", count, kinds[x as usize]);
+        }
         println!("Total of {} staffs in the database.", self.staff_list.len());
         println!("Total of {} dragonstones in database", self.dragonstones.len());
     }
@@ -375,16 +379,21 @@ pub fn check_effectiveness(item: &ItemData) -> bool {
     return false; 
 }
 pub fn get_min_rank() -> u8 {
-    if GameVariableManager::get_bool("G_Cleared_M025") { return 5;}
-    if GameVariableManager::get_bool("G_Cleared_M017") { return 3;}
-    if GameVariableManager::get_bool("G_Cleared_M006") { return 2;}
+    let story_chapter = crate::continuous::get_story_chapters_completed();
+    let continous = GameVariableManager::get_number("G_Continuous") == 3;
+    if GameVariableManager::get_bool("G_Cleared_M025") || (continous && story_chapter >= 25 ) { return 5;}
+    if GameVariableManager::get_bool("G_Cleared_M017") || (continous && story_chapter >= 16 && GameVariableManager::get_bool("G_Cleared_M011")) { return 3;}
+    if GameVariableManager::get_bool("G_Cleared_M006") || (continous && story_chapter >= 6)  { return 2;}
     return 1;
 }
 
 pub fn get_magic_staff() -> usize {
+    let story_chapter = crate::continuous::get_story_chapters_completed();
+    let continous = GameVariableManager::get_number("G_Continuous") == 3;
+
     if GameVariableManager::get_bool("G_Cleared_M021") { return 4;}
-    if GameVariableManager::get_bool("G_Cleared_M017") { return 3;}
+    if GameVariableManager::get_bool("G_Cleared_M017") || (continous && story_chapter >= 16 && GameVariableManager::get_bool("G_Cleared_M011")) { return 3;}
     if GameVariableManager::get_bool("G_Cleared_M011") { return 2;}
-    if GameVariableManager::get_bool("G_Cleared_M006") { return 1;}
+    if GameVariableManager::get_bool("G_Cleared_M006") || (continous && story_chapter >= 6) { return 1;}
     return 0;
 }
