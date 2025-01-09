@@ -81,7 +81,7 @@ pub fn generic_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMetho
     let msg; 
     match mode {
         1 => { msg = "Reseed generic enemy appearance?" }
-        2 => { msg = "Ressed generic enemy colors?"}
+        2 => { msg = "Reseed generic enemy colors?"}
         3 => { msg = "Reseed generic enemy appearance/colors?"}
         _ => { 
             return BasicMenuResult::new() }

@@ -1,6 +1,6 @@
 use super::*;
 use animation::MONSTERS;
-use engage::gamedata::item::*;
+use engage::gamedata::{*, item::*};
 
 pub const MONSTER_PERSONS: [&str; 8] = ["PID_G000_幻影飛竜", "PID_E004_異形兵_異形飛竜", "PID_G000_幻影狼", "PID_E001_異形兵_異形狼", "PID_E006_Boss", "PID_S006_幻影竜", "PID_M019_異形竜", "PID_M026_ソンブル_竜型"];
 pub const SCALE: [f32; 8] = [  1.0, 1.0, 1.0, 1.0, 0.40, 1.0, 1.0, 0.40];
@@ -48,7 +48,7 @@ pub struct CombatRecordDisplayClass85 {
 }
 pub fn is_monster_class(unit: &Unit) -> bool {
     let jid = unit.get_job().jid.to_string();
-    if unsafe { crate::randomizer::person::unit::get_bmap_size( unit.person, None) > 1 } { false }
+    if unit.person.get_bmap_size() > 1 { false }
     else { super::animation::MONSTERS.iter().any(|&monster| monster == jid)  }
 
 }
@@ -57,7 +57,7 @@ pub fn is_emblem_class(unit: &Unit) -> bool {
     let jid = unit.get_job().jid.to_string();
     let hash = unit.get_job().parent.hash;
     if !crate::randomizer::job::JOB_HASH.iter().any(|&h| h == hash) { return false; }
-    if unsafe { crate::randomizer::person::unit::get_bmap_size( unit.person, None) > 1 } { return false; }
+    if unit.person.get_bmap_size() > 1  { return false; }
     if let Some(pos1) = EMBLEM_ASSET.iter().position(|&x1| format!("JID_紋章士_{}", x1) == jid) {
         if pos1 == 23 || pos1 == 19 { return false; }   // No Lueur / Ephiram
         if let Some(pos2) = EMBLEM_ASSET.iter().position(|&x2| pid.contains(x2)) { return pos1 != pos2;  }
@@ -97,10 +97,10 @@ pub fn change_dragon(this: &mut CombatRecord, calc_side: i32, param_3: &CombatRe
                 println!("Tiki Transform Person Replacement");
                 if item_mut.flag.value & 67108864 == 0 {
                     let flag = item_mut.flag.value;
-                    item_mut.get_flag().value |= 67108864;
+                    item_mut.flag.value |= 67108864;
                     this.game_status[side as usize].person = PersonData::get_mut("PID_闘技場_チキ").unwrap();
                     call_original!(this, calc_side, param_3, method_info);
-                    item_mut.get_flag().value = flag;
+                    item_mut.flag.value = flag;
                     this.game_status[side as usize].person = PersonData::try_index_get_mut(person_index).unwrap();
                     return;
                 }
@@ -119,9 +119,9 @@ pub fn change_dragon(this: &mut CombatRecord, calc_side: i32, param_3: &CombatRe
                     let item_mut = ItemData::try_index_get_mut(item).unwrap();
                     if item_mut.flag.value & 67108864 == 0 {
                         let flag = item_mut.flag.value;
-                        item_mut.get_flag().value |= 67108864;
+                        item_mut.flag.value |= 67108864;
                         call_original!(this, calc_side, param_3, method_info);
-                        item_mut.get_flag().value = flag;
+                        item_mut.flag.value = flag;
                         return;
                     }
                 }

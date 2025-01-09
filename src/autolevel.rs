@@ -368,9 +368,6 @@ pub fn str_start_with(this: &Il2CppString, value: &str) -> bool { unsafe { strin
 #[skyline::from_offset(0x023349c0)]
 pub fn god_pool_create(data: &GodData, method_info: OptionalMethod) -> &'static GodUnit;
 
-#[unity::from_offset("App", "Unit", "TryConnectGodUnit")]
-pub fn unit_connect_god_unit(this: &Unit, god_unit: &GodUnit, method_info: OptionalMethod) -> &'static GodUnit;
-
 pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
     // triabolical config check
     println!("Attempting to equip emblems for enemies");
@@ -397,20 +394,18 @@ pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
             match emblem {
                 0 | 1 | 5 | 6 | 11 | 12 | 13 => { false }
                 _ => { 
-                    unsafe {
-                        let god_unit = god_pool_create(god_data, None);
-                        unit_connect_god_unit(unit, god_unit, None);
+                    if let Some(god_unit) = engage::godpool::GodPool::create(god_data) {
+                        unit.try_connect_god(god_unit).is_some()
                     }
-                    true
+                    else { false }
                 },
             }
         }
         else {
-            unsafe {
-                let god_unit = god_pool_create(god_data, None);
-                unit_connect_god_unit(unit, god_unit, None);
+            if let Some(god_unit) = engage::godpool::GodPool::create(god_data) {
+                unit.try_connect_god(god_unit).is_some()
             }
-            true
+            else { false }
         }
     }
     else { false }

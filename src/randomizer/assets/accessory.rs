@@ -113,7 +113,7 @@ impl TwoChoiceDialogMethods for OutfitConfirm {
         GameVariableManager::set_bool("G_EnemyOutfits", GameVariableManager::get_bool("EnemyOutfits"));
         change_enemy_outfits();
         unsafe { 
-            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent);
+            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap());
             let index = menu.select_index;
             RandomEnemyOutfits::set_help_text(menu.menu_item_list[index as usize], None);
             menu.menu_item_list[index as usize].update_text();

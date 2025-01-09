@@ -7,21 +7,12 @@ use engage::{
     force::*,
     proc::ProcInst,
     random::*,
-    gamedata::{unit::*, item::ItemData, god::RingData, dispos::ChapterData, *},
+    gamedata::{unit::*, god::*, item::ItemData, ring::*, dispos::ChapterData, *},
     godpool::GodPool,
 };
 use super::CONFIG;
 use crate::{randomizer::*, utils::*};
 const DLC_CIDS: [&str; 14] = ["M005", "S001", "M006", "G001", "S002", "G002", "M007", "G003", "M008", "G004", "M009", "G005", "G006", "M010"];
-#[unity::class("App", "GodBond")]
-pub struct GodBond {
-    pub god: &'static GodData,
-    reliance_s: u64,
-    pub pid: &'static Il2CppString,
-    pub level: u8,
-    __: u8,
-    pub exp: u16,
-}
 
 #[unity::class("App", "UnitRelianceData")]
 pub struct UnitRelianceData {
@@ -159,9 +150,9 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
                 item_list.add(ItemData::get_mut( "IID_フェンサリル" ).unwrap());
                 item_list.add(ItemData::get_mut( "IID_ノーアトゥーン" ).unwrap());
                 item_list.add(ItemData::get_mut( "IID_フォルクヴァング" ).unwrap());
-                add_ring_to_pool( "RNID_DLC1コモン_1_S".into(), None, 1, None);
-                add_ring_to_pool( "RNID_DLC1コモン_2_S".into(), None, 1, None);
-                add_ring_to_pool( "RNID_DLC1コモン_3_S".into(), None, 1, None);
+                UnitRingPool::add_ring("RNID_DLC1コモン_1_S".into(), None, 1 );
+                UnitRingPool::add_ring("RNID_DLC1コモン_2_S".into(), None, 1 );
+                UnitRingPool::add_ring("RNID_DLC1コモン_3_S".into(), None, 1 );
                 GameVariableManager::make_entry("G_拠点_コンテンツ報酬受け取り済", 1);
                 GameVariableManager::set_bool("G_拠点_コンテンツ報酬受け取り済", true);
             }
@@ -369,13 +360,8 @@ fn set_next_random_chapter(current_chapter: &ChapterData) {
     let rng = Random::get_game();
     let mut key= available[ rng.get_value( available.len() as i32 ) as usize ].to_string();
 
-    if dlc {
-        let mut count = 0;
-        while count < 3 {
-            key = available[ rng.get_value( available.len() as i32 ) as usize ].to_string();
-            if key.contains("G00") { count += 1; }
-            else { break; }
-        }
+    if dlc && key.contains("G00") {
+        key = available[ rng.get_value( available.len() as i32 ) as usize ].to_string();
     }
     let cid = format!("CID_{}", key);
 
@@ -413,44 +399,41 @@ pub fn update_bonds() {
     if GameVariableManager::get_number("G_Continuous") == 0 { return; }
     for x in 0..19 {
         let gid = format!("GID_{}", EMBLEM_ASSET[x]);
-        let god = GodData::get(&gid).unwrap();
-        let god_unit = unsafe { try_get_god(god, true, None) };
-
-        if god_unit.is_none() { continue; }
-        let g_unit = god_unit.unwrap();
-        let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
-        let mut max_level = 1;
-        let mut bond_exp: u16 = 0;
-    // Get highest bond level 
-        for ff in force_type {
-            let force_iter = Force::iter(Force::get(ff).unwrap());
-            for unit in force_iter {
-                let god_bond = unsafe { get_bond(g_unit, unit, None) };
-                if god_bond.is_none() { continue; } 
-                let g_bond = god_bond.unwrap();
-                if g_bond.level == 4 { unsafe { level_up_bond(g_bond, None) }; }   // C Bond
-                if g_bond.level == 19 { unsafe { level_up_bond(g_bond, None) }; }  // A Bond
-                if max_level < g_bond.level { 
-                    max_level = g_bond.level;
-                    bond_exp = g_bond.exp;
+        if let Some(g_unit) = GodPool::try_get_gid(gid.as_str(), true) {
+            let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
+            let mut max_level = 1;
+            let mut bond_exp: u16 = 0;
+        // Get highest bond level 
+            for ff in force_type {
+                let force_iter = Force::iter(Force::get(ff).unwrap());
+                for unit in force_iter {
+                    let god_bond = g_unit.get_bond(unit);
+                    if god_bond.is_none() { continue; } 
+                    let g_bond = god_bond.unwrap();
+                    if g_bond.level == 4 { g_bond.level_up(); }
+                    if g_bond.level == 19 { g_bond.level_up(); }
+                    if max_level < g_bond.level { 
+                        max_level = g_bond.level;
+                        bond_exp = g_bond.exp;
+                    }
                 }
             }
-        }
-                // level up to highest bond level
-        let force_type2: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
-        for ff2 in force_type2 {
-            let force_iter2 = Force::iter(Force::get(ff2).unwrap());
-            for unit in force_iter2 {
-                let god_bond = unsafe { get_bond(g_unit, unit, None) };
-                if god_bond.is_none() { continue; } 
-                let g_bond = god_bond.unwrap();
-                if g_bond.level < max_level {
-                    let n_levels = max_level - g_bond.level;
-                    for _x in 0..n_levels { unsafe { level_up_bond(g_bond, None) }; }
-                    g_bond.exp = bond_exp;
-                    unsafe { inherit_apt_from_god(unit, g_unit, None) };   
-                }   
-            }  
+                    // level up to highest bond level
+            let force_type2: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
+            for ff2 in force_type2 {
+                let force_iter2 = Force::iter(Force::get(ff2).unwrap());
+                for unit in force_iter2 {
+                    let god_bond = g_unit.get_bond(unit);
+                    if god_bond.is_none() { continue; } 
+                    let g_bond = god_bond.unwrap();
+                    if g_bond.level < max_level {
+                        let n_levels = max_level - g_bond.level;
+                        for _x in 0..n_levels { g_bond.level_up(); }
+                        g_bond.exp = bond_exp;
+                        unit.inherit_apt(g_unit);  
+                    }  
+                }
+            }
         }
     }
 }
@@ -509,16 +492,16 @@ fn create_bond_rings() {
             for z in 0..3 {    //Rank Index
                 let index = x*40 + y*4 + z;
                 let ring = &ring_list[index];
-                let count =  unsafe { unit_ring_pool_stock_count(ring, None) };
+                let count = UnitRingPool::get_ring_stock(ring);
                 if count == 0 { continue; }
                 if count >= ring_cost[z] {
-                    unsafe { sub_ring_to_pool(ring.rid, None, ring_cost[z], None) };
-                    add_ring(ring_list[index + 1].rid); 
+                    UnitRingPool::sub_ring(ring.rid, None, ring_cost[z]);
+                    add_ring(ring_list[index + 1].rid);
                 }
             }
         }
     }
-    for x in 0..ring_list.len()-3 {  unsafe { ring_count += unit_ring_pool_stock_count(ring_list[x], None); } } // getting new count of bond rings
+    for x in 0..ring_list.len()-3 {  ring_count += UnitRingPool::get_ring_stock(ring_list[x as usize]); } // getting new count of bond rings
 }
 
 fn get_ring_rank() -> i32 {
@@ -534,7 +517,7 @@ fn get_ring_rank() -> i32 {
 }
 
 fn game_parameter(value: &str) -> i32 { unsafe { get_game_parameter(value.into(), None) } }
-fn add_ring(ring_id: &Il2CppString) { unsafe { add_ring_to_pool(ring_id, None, 1, None); } }
+fn add_ring(ring_id: &Il2CppString) { UnitRingPool::add_ring(ring_id, None, 1 ); }
 
 fn do_dlc() {
     if !continuous_mode_dlc_allowed() { return; }
@@ -548,7 +531,7 @@ fn do_dlc() {
             let gid = GameVariableManager::get_string("G_R_GID_エーデルガルト").to_string(); 
             god = GodData::get(&gid).unwrap();
         }
-        unsafe { godpool_create(god, None); }
+        GodPool::create(god);
     }
     if (!random && current_cid == "CID_M017" ) || ( random && completed == 16 ) {
         GameVariableManager::set_bool("G_CC_エンチャント", true);   // enable dlc seals
@@ -562,12 +545,12 @@ fn do_dlc() {
                 let person_data = PersonData::get(&new_person).unwrap();
                 GameVariableManager::make_entry("MapRecruit", 1);
                 GameVariableManager::set_bool("MapRecruit", true);
-                unsafe { join_unit(person_data, None); }
+                UnitUtil::join_unit_person(person_data);
                 GameVariableManager::set_bool("MapRecruit", false);
             }
             else {
                 let person_data = PersonData::get(x).unwrap();
-                unsafe { join_unit(person_data, None); }
+                UnitUtil::join_unit_person(person_data);
             }
         }
     }
@@ -726,11 +709,11 @@ pub fn continous_rand_emblem_adjustment() {
 pub fn escape_god(gid: &str , escape: bool) {
     if let Some(god_data) = if GameVariableManager::get_number("G_Emblem_Mode") == 0 { GodData::get(gid) }
         else { GodData::get( GameVariableManager::get_string(format!("G_R_{}", gid)))} {
-        if let Some(god_unit) = unsafe { try_get_god(god_data, true, None) } {
-            unsafe { god_unit_set_escape(god_unit, escape, None) };
+        if let Some(god_unit) = GodPool::try_get(god_data, true){
+            god_unit.set_escape(escape);
             if escape {
-                if let Some(parent) = unsafe {god_unit_get_parent(god_unit, None) } {
-                    unsafe { unit_clear_parent(parent, None);}
+                if let Some(parent) = god_unit.parent_unit {
+                    parent.clear_parent();
                 }
             }
         }
@@ -739,7 +722,7 @@ pub fn escape_god(gid: &str , escape: bool) {
 fn is_god_available(gid: &str, randomized: bool) -> bool {
     if let Some(god_data) = if GameVariableManager::get_number("G_Emblem_Mode") == 0 || !randomized { GodData::get(gid) }
         else { GodData::get( GameVariableManager::get_string(format!("G_R_{}", gid)))} {
-        if let Some(god_unit) = unsafe { try_get_god(god_data, true, None) } {
+        if let Some(god_unit) = GodPool::try_get(god_data, true) {
             return !god_unit.get_escape();   
         }
         else { return false; }
@@ -752,41 +735,8 @@ fn enable_map_rewind(method_info: OptionalMethod);
 #[skyline::from_offset(0x02280c20)]
 fn get_game_parameter(value: &Il2CppString, method_info: OptionalMethod) -> i32;
 
-#[skyline::from_offset(0x01c5cf40)]
-fn unit_ring_pool_stock_count(data: &RingData, method_info: OptionalMethod) -> i32;
-
-#[skyline::from_offset(0x01c5d420)]
-fn add_ring_to_pool(rnid: &Il2CppString, owner: Option<&Unit>, count: i32, method_info: OptionalMethod) -> &'static UnitRing;
-
-#[skyline::from_offset(0x01c5d5b0)]
-fn sub_ring_to_pool(rnid: &Il2CppString, owner: Option<&Unit>, count: i32, method_info: OptionalMethod);
-
-#[skyline::from_offset(0x01c73960)]
-fn join_unit(person: &PersonData, method_info: OptionalMethod) -> Option<&Unit>;
-
 #[skyline::from_offset(0x020193e0)]
 fn calc_rewards(name: &Il2CppString, method_info: OptionalMethod) -> &'static mut List<ItemData>;
-
-#[skyline::from_offset(0x023405b0)]
-fn get_bond(this: &GodUnit, unit: &Unit, method_info: OptionalMethod) -> Option<&'static mut GodBond>;
-
-#[skyline::from_offset(0x02334600)]
-pub fn try_get_god(gid: &GodData, included_reserved: bool,  method_info: OptionalMethod) -> Option<&GodUnit>;
-
-#[skyline::from_offset(0x02b4dff0)]
-fn level_up_bond(this: &GodBond, method_info: OptionalMethod);
-
-#[skyline::from_offset(0x023349c0)]
-fn godpool_create(this: &GodData, method_info: OptionalMethod) -> Option<&'static GodUnit>;
-
-#[skyline::from_offset(0x0233eaf0)]
-fn god_unit_set_escape(this: &GodUnit, escape: bool, method_info: OptionalMethod);
-
-#[skyline::from_offset(0x01a4f4c0)]
-pub fn unit_clear_parent(this: &Unit, method_info: OptionalMethod);
-
-#[skyline::from_offset(0x0233ffb0)]
-fn god_unit_get_parent(this: &GodUnit, method_info: OptionalMethod) -> Option<&'static Unit>;
 
 #[skyline::from_offset(0x02939dc0)]
 pub fn set_exchange_level(level: i32, method_info: OptionalMethod);
@@ -796,9 +746,6 @@ fn create_common_reward_bind(proc: &ProcInst, exp: &Dictionary<&Unit, i32>, item
 
 #[skyline::from_offset(0x0293c890)]
 fn calc_well_item(proc: &ProcInst, level: i32, random: &Random, method_info: OptionalMethod) -> &'static mut List<ItemData>;
-
-#[skyline::from_offset(0x01a3dd90)]
-fn inherit_apt_from_god(this: &Unit, god: &GodUnit, method_info: OptionalMethod);
 
 #[skyline::from_offset(0x027c7380)]
 fn achieve_status(this: &AchieveData, method_info: OptionalMethod) -> i32;

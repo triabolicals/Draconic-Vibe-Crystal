@@ -78,7 +78,7 @@ impl TwoChoiceDialogMethods for BattleStyleConfirm {
         GameVariableManager::set_number("G_BattleStyles", GameVariableManager::get_number("BattleStyles"));
         randomize_job_styles();
         unsafe { 
-            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent);
+            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap());
             let index = menu.select_index;
             RandomBattleStyles::set_help_text(menu.menu_item_list[index as usize], None);
             menu.menu_item_list[index as usize].update_text();

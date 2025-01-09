@@ -82,7 +82,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     unit_items::remove_duplicates(this.item_list);
     println!("Finish with Create2Impl for {}", this.person.get_name().unwrap().to_string());
     set_unit_edit_name(this);
-    unsafe { unit_update_auto_equip(this, None); }
+    this.auto_equip();
     grow::adaptive_growths(this);
 }
 
@@ -145,7 +145,7 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
                 unit_items::add_generic_weapons(this);
                 unit_items::adjust_melee_weapons(this);
                 unit_items::remove_duplicates(this.item_list);
-                unsafe { unit_update_auto_equip(this, None); }
+                this.auto_equip();
             }
             else { adjust_unit_items(this);  }
             if data.flag.value & 16 != 0 {  // If leader then add seal
@@ -164,7 +164,7 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
         }
         else if GameVariableManager::get_bool("G_DVC_Autolevel") { auto_level_unit(this); }
         if ( GameVariableManager::get_number("G_Random_Job") & 2 != 0 )  && GameVariableManager::get_bool("G_Cleared_M004"){
-            if ( unsafe { get_bmap_size(this.person, None) } == 1 && rng.get_value(100) < GameVariableManager::get_number("G_EnemyJobGauge") ) {
+            if ( this.person.get_bmap_size()  == 1 && rng.get_value(100) < GameVariableManager::get_number("G_EnemyJobGauge") ) {
                 if job::enemy_unit_change_to_random_class(this){ 
                     fixed_unit_weapon_mask(this);
                     adjust_unit_items(this); 
@@ -182,10 +182,10 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
        if GameUserData::get_chapter().cid.contains("CID_S0") && GameVariableManager::get_number("G_Emblem_Mode") != 0 { emblem_paralogue_level_adjustment(this); } 
        if GameVariableManager::get_number("G_Random_Item") >= 2 { unit_items::random_items_drops(this); }
        if !GameVariableManager::get_bool("G_Cleared_M004") { 
-            unsafe { unit_update_auto_equip(this, None); }
+            this.auto_equip();
             return; 
         }
-       if GameVariableManager::get_bool("G_Random_Skills") && rng.get_value(100) < GameVariableManager::get_number("G_EnemySkillGauge") && this.person.get_engage_sid().is_none() {
+        if GameVariableManager::get_bool("G_Random_Skills") && rng.get_value(100) < GameVariableManager::get_number("G_EnemySkillGauge") && this.person.get_engage_sid().is_none() {
            let mut valid_skill = false;
            let mut count = 0;
            while !valid_skill && count < 5 {
@@ -211,14 +211,17 @@ pub fn create_from_dispos_hook(this: &mut Unit, data: &mut DisposData, method_in
            }
        } 
    }
-   unit_items::adjust_enemy_meteor(this);
-   if has_master {  this.item_list.add_iid_no_duplicate("IID_マスタープルフ"); }    // Add Seal if lost seal
-   unit_set_drop_seals(this);    // Drop Seals
+    unit_items::adjust_enemy_meteor(this);
+    if has_master {  this.item_list.add_iid_no_duplicate("IID_マスタープルフ"); }    // Add Seal if lost seal
+    unit_set_drop_seals(this);    // Drop Seals
 
    // Prevent Green Emblems from dying in Chapter 22 if AI is changed
-   if this.person.pid.contains("PID_M022_紋章士") { this.private_skill.add_sid("SID_死亡回避", 10, 0);  }  
-   else { unit_items::adjust_missing_weapons(this); }
-   unsafe { unit_update_auto_equip(this, None); }
+    if this.person.pid.contains("PID_M022_紋章士") {
+        this.private_skill.add_sid("SID_死亡回避", 10, 0);  
+        this.put_off_all_item();
+    } 
+    else { unit_items::adjust_missing_weapons(this); }
+   this.auto_equip();
 }
 
 fn unit_set_drop_seals(this: &mut Unit) {
@@ -317,7 +320,7 @@ pub fn adjust_unit_items(unit: &mut Unit) {
     unit_items::adjust_staffs(unit);
     unit_items::adjust_melee_weapons(unit);
     unit_items::remove_duplicates(unit.item_list);
-    unsafe { unit_update_auto_equip(unit, None); }
+    unit.auto_equip();
    // println!("Finished adjusting items");
 }
 
@@ -485,7 +488,7 @@ pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
 }
 
 
-fn random_map_unit_level(unit: &mut Unit) {
+pub fn random_map_unit_level(unit: &mut Unit) {
     if GameVariableManager::get_number("G_Continuous") < 3 || !GameVariableManager::get_bool("G_Cleared_M004") { return; }
     let story = crate::utils::max( (crate::continuous::get_story_chapters_completed()-6)*2, crate::continuous::get_story_chapters_completed() + 4); 
     let level =  crate::utils::max( unsafe{ calculate_average_level(get_sortie_unit_count(None)) }, story );
@@ -633,11 +636,6 @@ fn adjust_emblem_paralogue_items(data: &mut DisposData) {
     }
 }
 
-#[unity::from_offset("App", "Unit", "UpdateStateWithAutoEquip")]
-pub fn unit_update_auto_equip(this: &Unit, method_info: OptionalMethod);
-
-#[unity::from_offset("App", "Unit", "set_Person")]
-pub fn unit_set_person(this: &Unit, person: &PersonData, method_info: OptionalMethod);
 
 #[unity::from_offset("App", "Unit", "SetSelectedWeaponFromOriginalAptitude")]
 fn unit_set_select_weapon_from_original_aptitude(this: &Unit, mask: &WeaponMask, method_info: OptionalMethod);
@@ -646,16 +644,15 @@ fn unit_set_select_weapon_from_original_aptitude(this: &Unit, mask: &WeaponMask,
 fn unit_add_apt_from_weapon_mask(this: &Unit, method_info: OptionalMethod);
 
 // done in Unit$$CreateImpl1
-#[skyline::from_offset(0x01f25ec0)]
-pub fn get_bmap_size(this: &PersonData, method_info: OptionalMethod) -> u8;
+
 
 #[skyline::from_offset(0x01a3c290)]
 fn unit_learn_job_skill(this: &Unit, method_info: OptionalMethod) -> &'static engage::gamedata::skill::SkillData;
 
 pub fn reload_all_actors() {
-    Il2CppClass::from_name("App", "UnitPool").unwrap().get_static_fields_mut::<crate::deployment::fulldeploy::UnitPoolStaticFields>().s_unit
+    engage::unitpool::UnitPool::class().get_static_fields_mut::<crate::randomizer::job::UnitPoolStaticFieldsMut>().s_unit
     .iter_mut().filter(|unit| unit.force.filter(|f| f.force_type < 3  ).is_some()).for_each(|unit|{
-        unsafe { super::super::job:: unit_reload_actor(unit, None); } 
-        unsafe { unit_update_auto_equip(unit, None);  }
+        unit.reload_actor();
+        unit.auto_equip();
     });
 }

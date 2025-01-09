@@ -1,5 +1,6 @@
 use unity::prelude::*;
 use engage::{
+    godpool::GodPool,
     force::*,
     gamedata::unit::Unit,
     dialog::yesno::*, force::ForceType, gamedata::{dispos::*, skill::SkillData, *}, gameuserdata::GameUserData, gamevariable::*, menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemSwitchMethods}, BasicMenuResult}
@@ -9,7 +10,7 @@ use skyline::patching::Patch;
 
 use super::CONFIG;
 use super::person::pid_to_index;
-use crate::{autolevel::unit_connect_god_unit, continuous::{try_get_god, unit_clear_parent}, enums::*, utils::*};
+use crate::{enums::*, utils::*};
 use std::sync::Mutex;
 
 pub mod emblem_item;
@@ -415,7 +416,7 @@ pub fn pre_map_emblem_adjustment() {
     if !GameVariableManager::get_bool("G_EngagePlus") { return; }
     for x in EMBLEM_GIDS {
         let god = GodData::get(x).unwrap();
-        if let Some(god_unit) = unsafe { try_get_god(god, false, None) } {
+        if let Some(god_unit) =GodPool::try_get(god, false) {
             let key = format!("E_{}", god_unit.data.gid);
             if let Some(parent) = god_unit.parent_unit {
                 println!("{}'s parent is {}",  Mess::get(god.mid), Mess::get_name(parent.person.pid));
@@ -440,7 +441,7 @@ pub fn post_map_emblem_adjustment() {
     EMBLEM_GIDS.iter()
         .for_each(|gid|{
             let god = GodData::get(gid).unwrap();
-            if let Some(god_unit) = unsafe { try_get_god(god, false, None) } {
+            if let Some(god_unit) = GodPool::try_get(god, false) {
                 if let Some(parent) = god_unit.parent_unit {
                     if !god_hashes.iter().any(|&hash| hash == god.parent.hash) {
                         god_unit_pair.push( (parent.person.parent.hash, god.parent.hash) );
@@ -458,7 +459,7 @@ pub fn post_map_emblem_adjustment() {
             let gid = &gid_key.as_str()[2..];
             let god_data = GodData::get(gid).unwrap();
             println!("Variable: {} and {}", Mess::get_name(person.pid), Mess::get(god_data.mid));
-            if let Some(god_unit) = unsafe { try_get_god(god_data, false, None) } {
+            if let Some(god_unit) = GodPool::try_get(god_data, false) {
                 if let Some(parent) = god_unit.parent_unit {
                     if parent.person.parent.hash == person.parent.hash { 
                         println!("Adding 2 {} to {}", Mess::get_name(parent.person.pid), Mess::get(god_data.mid));
@@ -483,8 +484,8 @@ pub fn post_map_emblem_adjustment() {
                     unit2.god_link = None;
                     unit2.god_unit = None;
                     if unit2.status.value & 0x800000 != 0 { unit2.status.value -= 0x800000; }
-                    unsafe { unit_clear_parent(unit, None); }
-                    unsafe { unit_update(unit, None); }
+                    unit.clear_parent();
+                    unit.update();
                 }
             }
         }
@@ -493,13 +494,13 @@ pub fn post_map_emblem_adjustment() {
         .for_each(|pair|{
             let person = PersonData::try_get_hash(pair.0).unwrap();
             let god = GodData::try_get_hash(pair.1).unwrap();
-            if let Some(god_unit) =  unsafe { try_get_god(god, false, None) } {
+            if let Some(god_unit) =  GodPool::try_get(god, false) {
                 god_unit.set_parent(None, 0);
                 god_unit.set_child(None);
                 if let Some(unit) = unsafe { crate::deployment::force_get_unit_from_pid(person.pid, false, None) } {
                     if let Some(force) = unit.force {
                         if force.force_type == 0 || force.force_type == 3 {
-                            unsafe { unit_connect_god_unit(unit, god_unit, None) };
+                            unit.try_connect_god(god_unit);
                             println!("Connecting {} to {}", Mess::get_name(unit.person.pid), Mess::get(god.mid));
                         }
                     }
@@ -527,7 +528,7 @@ pub fn player_emblem_check() {
                         unit2.god_link = None;
                         unit2.status.value &= !0x800000;
                         unsafe { play_map_effect("エンゲージOff".into(), unit2, None); }
-                        unsafe { super::job::unit_reload_actor(unit2, None); }
+                        unit2.reload_actor();
                     }
                 }
             }
@@ -547,13 +548,11 @@ pub fn arena_emblem_weapon(this: u64, unit: &mut Unit, god: &engage::gamedata::u
         unit.add_item(item);
         unit.item_list.add_item_no_duplicate(item);
         unsafe { unit_equip(unit, None); }
-        unsafe { super::person::unit::unit_update_auto_equip(unit, None); }
+        unit.auto_equip();
     }
 }
 #[skyline::from_offset(0x01a19ba0)]
 fn unit_set_engage(this: &Unit, enable: bool, link: Option<&Unit>, method_info: OptionalMethod);
-#[skyline::from_offset(0x01a0c730)]
-fn unit_update(this: &Unit, method_info: OptionalMethod);
 #[skyline::from_offset(0x01a21530)]
 fn unit_equip(this: &Unit, method_info: OptionalMethod);
 #[skyline::from_offset(0x01dbb6c0)]
@@ -715,7 +714,7 @@ impl TwoChoiceDialogMethods for EngageLinkConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
         randomize_engage_links(true);
         GameVariableManager::set_number("G_EngagePlus", GameVariableManager::get_number("EngagePlus"));
-        let menu = unsafe {  std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent) };
+        let menu = unsafe {  std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap()) };
         let index = menu.select_index;
         RandomEmblemLinkMod::set_help_text(menu.menu_item_list[index as usize], None);
         menu.menu_item_list[index as usize].update_text();

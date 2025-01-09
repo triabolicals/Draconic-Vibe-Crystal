@@ -11,7 +11,7 @@ pub use engage::{
     mess::*,
     pad::Pad,
     random::*,
-    gamedata::{*, unit::*, item::RewardData, skill::*, item::*, god::*, dispos::*},
+    gamedata::{*, unit::*, ring::RingData, item::RewardData, skill::*, item::*, god::*, dispos::*},
 };
 pub use super::enums::*;
 use std::{fs::{self, File}, io::Write};
@@ -178,7 +178,7 @@ impl TwoChoiceDialogMethods for SeedConfirm {
         unsafe {
             CONFIG.lock().unwrap().seed = new_seed as u32;
             CONFIG.lock().unwrap().save();
-            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent);
+            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap());
             let index = menu.select_index;
             SeedRandomizer::set_help_text(menu.menu_item_list[index as usize], None);
             menu.menu_item_list[index as usize].update_text();
@@ -193,7 +193,7 @@ impl TwoChoiceDialogMethods for ReseedConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
         reseed();
         unsafe { 
-            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent);
+            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap());
             let index = menu.select_index;
             ReseedRandomizer::set_help_text(menu.menu_item_list[index as usize], None);
             menu.menu_item_list[index as usize].update_text();

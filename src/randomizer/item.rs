@@ -25,7 +25,7 @@ pub fn create_item_pool() {
         .for_each(|item|{
             if item.flag.value == 16 {
                 let iid = item.iid.to_string();
-                if iid != "IID_メティオ_G004" { item.get_flag().value = 0;  }
+                if iid != "IID_メティオ_G004" { item.flag.value = 0;  }
                 if iid == "IID_メティオ" {  item.endurance = 1;  }
             }
             if item.flag.value & 251822590 == 0 && has_name(item, true) && !enums::ITEM_BLACK_LIST.lock().unwrap().iter().any(|y| *y == item.parent.index) 

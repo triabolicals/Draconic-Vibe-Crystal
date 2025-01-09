@@ -41,7 +41,7 @@ impl TwoChoiceDialogMethods for EngraveConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
         random_engrave_by_setting( GameVariableManager::get_number("EngraveSetting") );
         GameVariableManager::set_number("G_EngraveSetting", GameVariableManager::get_number("EngraveSetting"));
-        let menu = unsafe {  std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent) };
+        let menu = unsafe {  std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap()) };
         let index = menu.select_index;
         EngraveSettings::set_help_text(menu.menu_item_list[index as usize], None);
         menu.menu_item_list[index as usize].update_text();

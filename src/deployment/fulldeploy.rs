@@ -1,6 +1,8 @@
 use super::*;
 use engage::gamedata::dispos::DisposData;
 use engage::gamedata::dispos::DisposDataFlag;
+use engage::gamedata::terrain::TerrainData;
+use engage::unitpool::UnitPool;
 const TERRAIN: [&str; 5] = ["TID_氷の床", "TID_火炎砲台_対戦", "TID_煙", "TID_アロマ", "TID_水溜まり"];
 
 #[unity::class("App", "MapTerrain")]
@@ -18,28 +20,9 @@ const TERRAIN: [&str; 5] = ["TID_氷の床", "TID_火炎砲台_対戦", "TID_煙
  pub fn get_map_terrain(method_info: OptionalMethod) -> Option<&'static MapTerrain>;
 #[skyline::from_offset(0x01dfe300)]
 fn can_create(attacker: Option<&Unit>, x: i32, y: i32, terrain: &TerrainData, method_info: OptionalMethod) -> bool;
+
 #[skyline::from_offset(0x01decd40)]
 fn mapoverlap_set(x: i32, z: i32, tid: &Il2CppString, turn: i32, phase: i32,  method_info: OptionalMethod) -> bool;
-
- #[unity::class("App", "TerrainData")]
- pub struct TerrainData {
-    pub parent: StructBaseFields,
-    pub tid: &'static Il2CppString,
-    pub name: &'static Il2CppString,
-    pub cost_name: &'static Il2CppString,
-    pub cost_type: i32,
-    pub layer: i32,
-    pub prohibition: i32,
-    pub command: i32,
-    pub sight: u8,
-    pub destroyer: i32,
-    pub hp: [i32; 3],
-    pub defense: i8,
-    pub avoid: i8,
-    pub player_defense: i8,
-    pub enemy_defense: i8,
- }
- impl Gamedata for TerrainData  {}
 
  pub fn is_tile_good(tid: &Il2CppString) -> bool{
     if let Some(terrain) = TerrainData::get(&tid.to_string()) {
@@ -109,17 +92,14 @@ pub extern "C" fn vibe_energy() -> &'static mut ConfigBasicMenuItem {
     switch
 }
 
-pub struct UnitPoolStaticFields {
-    pub s_unit: &'static mut Array<&'static mut Unit>,
-    pub forces: &'static mut Array<&'static Force>,
-}
+
 
 pub fn power_spot() {
     let value = GameVariableManager::get_number("G_RandomEnergy");
     if value == 0 { return; }
     let rng = Random::get_system();
     let v = rng.get_value(100);
-    let pool = &Il2CppClass::from_name("App", "UnitPool").unwrap().get_static_fields_mut::<UnitPoolStaticFields>().s_unit;
+    let pool = &Il2CppClass::from_name("App", "UnitPool").unwrap().get_static_fields_mut::<crate::randomizer::job::UnitPoolStaticFieldsMut>().s_unit;
     let mut iter = pool.iter().filter(|unit| unit.force.filter(|f| f.force_type < 3 ).is_some());
     let count = pool.iter().filter(|unit| unit.force.filter(|f| f.force_type < 3 ).is_some()).count();
     if count < 5 { return; }

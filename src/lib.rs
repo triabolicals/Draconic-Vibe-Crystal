@@ -20,7 +20,7 @@ use crate::config::DeploymentConfig;
 use unity::prelude::OptionalMethod;
 use engage::proc::ProcInst;
 pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| DeploymentConfig::new().into() );
-pub const VERSION: &str = "2.9.8";
+pub const VERSION: &str = "2.9.9";
 #[skyline::from_offset(0x02285890)]
 pub fn autosave_proc_inst(this: &ProcInst, kind: i32, index: i32, stuff: Option<&ProcInst>, method_info: OptionalMethod);
 
@@ -171,7 +171,6 @@ pub fn main() {
         randomizer::try_get_index, 
         deployment::create_player_team, 
         message::script_get_string,
-        //deseralized_save,
         randomizer::item::random_well_item,
         randomizer::person::unit::unit_create_impl_2_hook, 
         randomizer::person::unit::create_from_dispos_hook,
@@ -192,7 +191,6 @@ pub fn main() {
         randomizer::person::get_god_face,
         randomizer::person::get_god_thumb_face,
         randomizer::assets::emblem::asset_table_result_get_preset_name,
-        //get_file_count,
         event::talk_ptr,
         event::calculate_str_width,
     ); 

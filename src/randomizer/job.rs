@@ -1,7 +1,10 @@
+use std::f32::consts::E;
+
 use super::*;
 use crate::randomizer::person::unit::fixed_unit_weapon_mask;
 use assets::animation::MONSTERS;
 use engage::force::*;
+use engage::unitpool::*;
 use engage::util::get_instance;
 use engage::menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItemGaugeMethods, ConfigBasicMenuItem}};
 use utils::can_rand;
@@ -23,6 +26,10 @@ pub const JOB_HASH: [i32; 111] = [
     355160656, 842455118, 692959593, 1534528826, 877759506, -1361615043, -1095679653
 ];
 
+pub struct UnitPoolStaticFieldsMut {
+    pub s_unit: &'static mut Array<&'static mut Unit>,
+    pub forces: &'static mut Array<&'static Force>,
+}
 
 #[unity::class("App", "ClassChange.ChangeJobData")]
 pub struct ChangeJobData {
@@ -202,34 +209,35 @@ pub extern "C" fn vibe_job_rerand() -> &'static mut ConfigBasicMenuItem {
 }
 fn rerandomize_jobs() {
     if GameVariableManager::get_bool("G_Cleared_M003") {
-        Il2CppClass::from_name("App", "UnitPool").unwrap().get_static_fields_mut::<crate::deployment::fulldeploy::UnitPoolStaticFields>().s_unit
+        UnitPool::class().get_static_fields_mut::<UnitPoolStaticFieldsMut>().s_unit
         .iter_mut().filter(|unit| unit.force.filter(|f| f.force_type == 2  ).is_some()).for_each(|unit|{
-            if unit.person.get_asset_force() == 0 && GameVariableManager::get_number("G_Random_Job") & 1 != 0 {
-                unit_change_to_random_class(unit);
+            if GameVariableManager::get_number("G_Random_Job") & 1 != 0 {
+                if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit); }
+                else { enemy_unit_change_to_random_class(unit); }
+                if GameVariableManager::get_number("G_Continuous") == 3 { crate::randomizer::person::unit::random_map_unit_level(unit); }
+                else if GameVariableManager::get_bool("G_DVC_Autolevel") { crate::autolevel::auto_level_unit(unit); }
                 super::person::unit::adjust_unit_items(unit);
-                unsafe { super::person::unit::unit_update_auto_equip(unit, None);  }
-                unsafe { unit_reload_actor(unit, None); }
+                unit.auto_equip();
+                unit.reload_actor();
             }
         });
     }
     else {
-        Il2CppClass::from_name("App", "UnitPool").unwrap().get_static_fields_mut::<crate::deployment::fulldeploy::UnitPoolStaticFields>().s_unit
+        UnitPool::class().get_static_fields_mut::<UnitPoolStaticFieldsMut>().s_unit
         .iter_mut().filter(|unit| unit.force.filter(|f| f.force_type == 0 || f.force_type == 2 ).is_some()).for_each(|unit|{
-            if unit.person.get_asset_force() == 0 && GameVariableManager::get_number("G_Random_Job") & 1 != 0 {
-                unit_change_to_random_class(unit);
+            if GameVariableManager::get_number("G_Random_Job") & 1 != 0 {
+                if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit); }
+                else { enemy_unit_change_to_random_class(unit); }
+                if GameVariableManager::get_number("G_Continuous") == 3 { crate::randomizer::person::unit::random_map_unit_level(unit); }
+                else if GameVariableManager::get_bool("G_DVC_Autolevel") { crate::autolevel::auto_level_unit(unit); }
                 super::person::unit::adjust_unit_items(unit);
-                unsafe { super::person::unit::unit_update_auto_equip(unit, None);  }
-                unsafe { unit_reload_actor(unit, None); }
+                unit.auto_equip();
+                unit.reload_actor();
             }
         });
     }
 
 }
-
-
-#[skyline::from_offset(0x01a19ed0)]
-pub fn unit_reload_actor(this: &Unit, method_info: OptionalMethod);
-
 
 fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, player: bool, emblem: bool) -> bool {
     if !CONFIG.lock().unwrap().get_custom_jobs() {
@@ -237,7 +245,7 @@ fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, pla
     }
     let jid = job.jid.to_string();
     if let Some(pos) = MONSTERS.iter().position(|&j| j == jid) { 
-        if !GameVariableManager::get_bool("G_Cleared_M011") || emblem { return false; }
+        if !GameVariableManager::get_bool("G_Cleared_M017") || emblem { return false; }
         if player { 
             if !crate::utils::dlc_check() { return pos == 5 || pos == 6 ; } // Wyrms Only
             else { return pos != 4 && pos != 7; }  // No Fell Dragons
@@ -255,6 +263,26 @@ fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, pla
     return true;
 }
 
+fn get_old_person_data(unit: &Unit) -> (i32, i32, i32) {
+    let key = format!("G_R2_{}", unit.person.pid);
+    if GameVariableManager::exist(key.as_str()) {
+        if let Some(person) = PersonData::get(GameVariableManager::get_string(key.as_str())) {
+            let level = person.get_level() as i32;
+            let internal = person.get_internal_level() as i32;
+            let job = person.get_job().unwrap();
+            if job.is_high() { return (1, level, internal); }
+            else if job.max_level == 40 { return (2, level, internal); }
+            else { return (0, level, internal); }
+        }
+    }
+    let job = unit.person.get_job().unwrap();
+    let level = unit.person.get_level() as i32;
+    let internal = unit.person.get_internal_level() as i32;
+    if job.is_high() { return (1, level, internal); }
+    else if job.max_level == 40 { return (2, level, internal); }
+    else { return (0, level, internal); }
+}
+
 pub fn unit_change_to_random_class(unit: &mut Unit){
     let rng = Random::get_game();
     let mut is_female = 
@@ -265,11 +293,12 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
 
     let job_list = JobData::get_list().unwrap();
     let current_job = unit.get_job();
-    let is_high = if current_job.is_low() { unit.level > 20 }
-        else { current_job.is_high() };
+    
+    let old_data = get_old_person_data(unit);
+    let is_high = old_data.0 > 0;
 
-    let unit_level = unit.level as i32;
-    let internal_level = unit.internal_level as i32;
+    let unit_level = old_data.1;
+    let internal_level = if old_data.0 == 1 && old_data.2 == 0 { 20 } else { old_data.2 };
     println!("Unit Level {} / Internal {} (Current Job: {})", unit_level, internal_level, Mess::get(current_job.name));
 
     let class_list: Vec<_> = job_list.iter().filter(|&job| unit_random_can_reclass(job, is_female, is_high, true, false) ).collect();
@@ -281,17 +310,49 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
     // Keep original level and internal level
     if unit_level > 20 {
         if new_job.is_high() {
-            unit.set_level(unit_level - 20); 
-            unit.set_internal_level(internal_level+20);
+            if internal_level == 0 {
+                if unit_level - internal_level > 20 {
+                    unit.set_level(20);
+                    unit.set_internal_level(internal_level + unit_level - 20);
+                }
+                else {
+                    unit.set_level(crate::utils::max(1, unit_level - internal_level));
+                    unit.set_internal_level(internal_level);
+                }
+            }
+            else {
+                unit.set_level(unit_level - 20); 
+                unit.set_internal_level(internal_level+20);
+            }
+        }
+        else if new_job.max_level == 40 {
+            if unit_level > 40 {
+                unit.set_level(40); 
+                unit.set_internal_level(0);
+            }
+            else {
+                unit.set_level(unit_level + internal_level); 
+                unit.set_internal_level( 40 - unit_level - internal_level);
+            }
         }
         else {
             unit.set_level(unit_level); 
             unit.set_internal_level(internal_level);
         }
     }
-    else if unit_level == 20 && new_job.is_high() {
+    else if unit_level == 20 && new_job.is_high() && old_data.0 == 0 {
         unit.set_level(1); 
         unit.set_internal_level(internal_level+19);
+    }
+    else if new_job.max_level == 40 {
+        if unit_level + internal_level > 40 {
+            unit.set_level( unit_level + internal_level); 
+            unit.set_internal_level( 40 - unit_level - internal_level);
+        }
+        else {
+            unit.set_level(unit_level + internal_level); 
+            unit.set_internal_level(0);
+        }
     }
     else {
         unit.set_level(unit_level); 
@@ -338,8 +399,14 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
     // Keep original level and internal level
     if unit_level > 20 {
         if new_job.is_high() {
-            unit.set_level(unit_level - 20); 
-            unit.set_internal_level(internal_level+20);
+            if unit_level + internal_level > 40 {
+                unit.set_level(40);
+                unit.set_internal_level(40 - unit_level - internal_level);
+            }
+            else {
+                unit.set_level(unit_level - 20); 
+                unit.set_internal_level(internal_level+20);
+            }
         }
         else {
             unit.set_level(unit_level); 
@@ -349,6 +416,16 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
     else if unit_level == 20 && new_job.is_high() {
         unit.set_level(1); 
         unit.set_internal_level(internal_level+19);
+    }
+    else if new_job.max_level == 40 {
+        if unit_level + internal_level > 40 {
+            unit.set_level( unit_level + internal_level); 
+            unit.set_internal_level( 40 - unit_level - internal_level);
+        }
+        else {
+            unit.set_level(unit_level + internal_level); 
+            unit.set_internal_level(0);
+        }
     }
     else {
         unit.set_level(unit_level); 
@@ -459,7 +536,7 @@ pub fn get_weapon_for_asset_table(job: &JobData) -> Option<&'static ItemData> {
             weapon_level = job.get_max_weapon_level(x);
         }
     }
-    return crate::randomizer::item::item_rando::WEAPONDATA.lock().unwrap().get_random_weapon(weapon_type - 1 );
+    return crate::randomizer::item::item_rando::WEAPONDATA.lock().unwrap().get_random_weapon(weapon_type - 1, true);
 }
 
 pub fn correct_job_base_stats() {
@@ -500,7 +577,7 @@ pub fn correct_job_base_stats() {
     .for_each(|jid|
         if let Some(job) = JobData::get_mut(jid) {
             job.get_flag().value |= 16;
-            if job.get_flag().value & 4 != 0 {job.get_flag().value -= 4; }
+            job.get_flag().value &= !4; 
         }
     );
 }
@@ -590,7 +667,7 @@ pub fn class_change_a_call_random_cc(item: &ClassChangeJobMenuItem, _method_info
             else { false } 
            }).collect();
         let rng = Random::instantiate().unwrap();
-        let seed = unit.grow_ssed; 
+        let seed = unit.grow_seed; 
         rng.initialize(seed as u32);
         if pool.len() > 1 { 
             let pool_size = pool.len() as i32;

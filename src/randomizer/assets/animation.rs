@@ -244,7 +244,7 @@ fn unique_class_dress(job: &JobData, result: &mut AssetTableResult, gender: i32,
     if mode == 2 {
         if CONFIG.lock().unwrap().misc_option_1 >= 4.75 && (unit.person.gender == 1 || unit.person.gender == 2 ){   // Bust Rando using Grow Seed
             let rng = Random::instantiate().unwrap();
-            rng.ctor(unit.grow_ssed as u32);
+            rng.ctor(unit.grow_seed as u32);
             result.scale_stuff[9] = 1.0 + rng.get_value(50) as f32 * 0.025;
         }
     }
@@ -654,7 +654,7 @@ fn correct_animations(unit: &Unit, result: &mut AssetTableResult, mode: i32, equ
 
 fn change_hair_change(unit: &Unit, result: &mut AssetTableResult) {
     if unit.person.get_sp() > 100 { return; }
-    let value = unit.grow_ssed;
+    let value = unit.grow_seed;
     let index: [usize; 6] = [0, 1, 4, 5, 6, 7];
     let rng = Random::instantiate().unwrap();
     rng.ctor(value as u32);
@@ -708,7 +708,7 @@ fn illusion_double_assets(mut result: &mut AssetTableResult, unit: &Unit, mode: 
     let size;
     let gender = 
         if let Some(owner) = unsafe { get_vision_owner(unit, None) } {
-            size = unsafe { super::super::person::unit::get_bmap_size(owner.person, None) };
+            size = owner.person.get_bmap_size() as i32;
             if owner.person.get_flag().value & 2048 != 0 && mode == 2 {
                 let generic_mode =  GameVariableManager::get_number("G_GenericMode");
                 if generic_mode & 1 == 1 && mode == 2{  unsafe { HEAD_DATA.replace_by_rng(owner, result); }  }

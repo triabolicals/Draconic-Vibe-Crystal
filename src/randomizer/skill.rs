@@ -3,7 +3,7 @@ use super::{person::{*, PLAYABLE}, emblem::emblem_skill::*};
 use engage::{
     menu::{BasicMenuResult, config::{*, ConfigBasicMenuItem}},
     gameuserdata::GameUserData,
-    gamedata::god::*,
+    gamedata::{ring::RingData, god::*},
 };
 
 use std::sync::Mutex;
@@ -300,7 +300,7 @@ pub fn replace_all_sid_person(person_index: i32) {
     };
     let icon_name = new_person.get_unit_icon_id().to_string();
     let help_name = new_person.get_help().to_string();
-    
+
     enemy_list.iter().for_each(|enemy|{
         if let Some(person_x) = PersonData::get_mut(format!("PID_{}", enemy.1)){
             change_personal_sid(person_x, SkillData::try_get_hash(new_skill_index).unwrap());

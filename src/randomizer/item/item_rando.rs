@@ -77,16 +77,17 @@ impl WeaponData {
             is_crit: crit,
             is_range: range,
             is_effective: check_effectiveness(item),
-            is_rare: flags & 3 != 0,
+            is_rare: flags & 2 != 0,
         }
     }
 
     pub fn can_replace(&self, item2: &WeaponData, kind: u8, enemy: bool) -> bool {
+        if item2.is_rare { 
+            if !enemy || !GameVariableManager::get_bool("G_Cleared_M008") { return false; }
+        }
         if item2.weapon_type != kind { return false; }
         if self.is_slim == item2.is_slim { return true; }
-        if enemy && item2.is_rare { return false; }
         if item2.rank == self.rank { return true; }
-        if item2.is_rare && !GameVariableManager::get_bool("G_Cleared_M007") { return false; }
         else {
             let might_diff = item2.might as i8 - self.might as i8;
             if might_diff > 15 || might_diff < -2 { return false;}
@@ -308,7 +309,9 @@ impl WeaponDatabase {
             let index = possible_staffs[selection].item_index;
             return ItemData::try_index_get(index);
         }
-        else { return None; }
+        else {
+            println!("No available staffs");
+            return None; }
     }
 
     pub fn get_tome(&self, job_rank: i32, enemy: bool) -> Option<&'static ItemData> {
@@ -333,17 +336,20 @@ impl WeaponDatabase {
         else { return None; }
     }
     pub fn get_dragon_stone(&self, is_enemy: bool) -> Option<&'static ItemData> {
-        let possible_weapons: Vec<&DragonStoneData> = self.dragonstones.iter().filter(|&x|  if x.is_enemy_only { is_enemy } else { true } ).collect();
-        if possible_weapons.len() == 0 { return None; }
+        let possible_weapons: Vec<&DragonStoneData> = self.dragonstones.iter().filter(|&x|  if !is_enemy { !x.is_enemy_only} else { true }).collect();
+        if possible_weapons.len() == 0 { 
+            println!("no weapons dragonstone and enemy: {}", is_enemy);
+            return None; }
         let rng = Random::get_system();
         let selection = rng.get_value(possible_weapons.len() as i32) as usize;
         return ItemData::try_index_get( possible_weapons[selection].item_index);
     }
 
-    pub fn get_random_weapon(&self, kind: i32) -> Option<&'static ItemData> {
+    pub fn get_random_weapon(&self, kind: i32, enemy: bool) -> Option<&'static ItemData> {
         let weapon = kind  as u8;
-        let possible_weapons: Vec<&WeaponData>  = self.weapon_list.iter().filter(|x| x.weapon_type == weapon).collect();
+        let possible_weapons: Vec<&WeaponData>  = self.weapon_list.iter().filter(|x| x.weapon_type == weapon && if !enemy { !x.is_rare} else { true }  ).collect();
         if possible_weapons.len() == 0 {
+            println!("no weapons of kind: {} and enemy: {}", kind, enemy);
             return None;
         }
         let rng = Random::get_system();
@@ -362,10 +368,10 @@ pub fn is_generic(item: &ItemData) -> bool {
 }
 pub fn is_vaild_weapon(item: &ItemData) -> bool {
     if item.iid.to_string() == "IID_メティオ" { return false; }
-    if !item.is_weapon() && item.kind != 7 { return false; }
-    if item.icon.is_none() { return false; }
     if item.kind == 0 || item.kind > 9 { return false; }
+    if item.icon.is_none() { return false; }
     if item.flag.value & 128 != 0  { return false; }
+
     return enums::ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == item.parent.index).is_none();
 }
 
