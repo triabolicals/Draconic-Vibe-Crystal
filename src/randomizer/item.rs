@@ -28,7 +28,7 @@ pub fn create_item_pool() {
                 if iid != "IID_メティオ_G004" { item.flag.value = 0;  }
                 if iid == "IID_メティオ" {  item.endurance = 1;  }
             }
-            if item.flag.value & 251822590 == 0 && has_name(item, true) && !enums::ITEM_BLACK_LIST.lock().unwrap().iter().any(|y| *y == item.parent.index) 
+            if item.flag.value & 251822590 == 0 && has_name(item, true) && !enums::ITEM_BLACK_LIST.lock().unwrap().iter().any(|&y| y == item.parent.index) 
                 && !crate::utils::str_contains(item.name, "MIID_Ring") && !item.is_unknown()
             {
                 RANDOM_ITEM_POOL.lock().unwrap().push(item.parent.hash);

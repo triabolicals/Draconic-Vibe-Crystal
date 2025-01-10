@@ -365,9 +365,6 @@ pub fn get_difficulty_adjusted_average_level() -> i32 {
 
 pub fn str_start_with(this: &Il2CppString, value: &str) -> bool { unsafe { string_start_with(this, value.into(), None) } }
 
-#[skyline::from_offset(0x023349c0)]
-pub fn god_pool_create(data: &GodData, method_info: OptionalMethod) -> &'static GodUnit;
-
 pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
     // triabolical config check
     println!("Attempting to equip emblems for enemies");

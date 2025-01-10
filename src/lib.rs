@@ -20,7 +20,7 @@ use crate::config::DeploymentConfig;
 use unity::prelude::OptionalMethod;
 use engage::proc::ProcInst;
 pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| DeploymentConfig::new().into() );
-pub const VERSION: &str = "2.9.9";
+pub const VERSION: &str = "2.9.9A";
 #[skyline::from_offset(0x02285890)]
 pub fn autosave_proc_inst(this: &ProcInst, kind: i32, index: i32, stuff: Option<&ProcInst>, method_info: OptionalMethod);
 
@@ -35,16 +35,16 @@ fn disable_support_restriction() {
 }
 
 pub fn set_personal_caps(){
-    let persons = PersonData::get_list_mut().expect("triabolical is 'None'");
-    let jobs = JobData::get_list_mut().expect("triabolical2 is 'None'");
-    if CONFIG.lock().unwrap().max_stat_caps {
-        jobs.iter().for_each(|job|{
+    if CONFIG.lock().unwrap().max_stat_caps && unsafe { !crate::randomizer::STATUS.stat_caps }{
+        JobData::get_list_mut().unwrap().iter().for_each(|job|{
             let base = job.get_base();
             let cap = job.get_limit();
             for x in 0..10 { cap[x] = base[x] + 125; }
             cap[10] = 99;
         });
-        persons.iter_mut().for_each(|person|{ let limits = person.get_limit(); for y in 0..11 { limits[y] = 0; }});
+        PersonData::get_list_mut().unwrap().iter_mut().for_each(|person|{ let limits = person.get_limit(); for y in 0..11 { limits[y] = 0; }});
+        unsafe { crate::randomizer::STATUS.stat_caps = true; }
+        println!("Stat Caps Maxed out");
     }
 }
 extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
@@ -54,9 +54,8 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                 // println!("Proc: {}, Label: {}, Code: {}", proc.name.unwrap(), label, proc.hashcode);
                 if proc.hashcode == -988690862 && *label == 0 { // On Initial Title Screen Load
                     println!("Proc: {}, Label: {}, Code: {}", proc.name.unwrap(), label, proc.hashcode);
-                    randomizer::intitalize_game_data();
                     enums::generate_black_list();
-                    set_personal_caps();
+                    randomizer::intitalize_game_data();
                     message::replace_hub_fxn();
                     randomizer::assets::ASSET_DATA.lock().unwrap().apply_bust_changes();
                 }
@@ -67,6 +66,7 @@ extern "C" fn initalize_random_persons(event: &Event<SystemEvent>) {
                 // randomized stuff
                 if proc.hashcode == -1118443598 && *label == 0 { // ProcScene
                     println!("Proc: {}, Label: {}, Code: {}", proc.name.unwrap(), label, proc.hashcode);
+                    set_personal_caps();
                     randomizer::assets::install_dvc_outfit();
                     continuous::do_continious_mode();
                     continuous::update_next_chapter();

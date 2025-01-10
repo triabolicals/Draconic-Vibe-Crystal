@@ -7,7 +7,7 @@ use engage::{
     force::*,
     proc::ProcInst,
     random::*,
-    gamedata::{unit::*, god::*, item::ItemData, ring::*, dispos::ChapterData, *},
+    gamedata::{unit::*, item::ItemData, ring::*, dispos::ChapterData, *},
     godpool::GodPool,
 };
 use super::CONFIG;
@@ -88,7 +88,6 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
     do_continious_mode();
     add_support_points();
     do_dlc();
-    update_bonds();
     create_bond_rings();
     unsafe {
         set_well_use_flag(2, None);
@@ -317,12 +316,16 @@ fn set_next_random_chapter(current_chapter: &ChapterData) {
     let completed = GameVariableManager::find_starts_with("G_Cleared_").iter().filter(|key| GameVariableManager::get_bool(key.to_string())).count();
     let mut available: Vec<String> = Vec::new();
     let m011_cleared = GameVariableManager::get_bool("G_Cleared_M011");
-    let m011 = GameVariableManager::get_bool("G_Cleared_M006") && GameVariableManager::get_bool("G_Cleared_M008");
-    ["M005", "M006", "M007", "M008", "M009", "M010", "M012", "M013", "M014", "M015", "M016", "M018", "S001", "S002"].iter()
+    let m011 = GameVariableManager::get_bool("G_Cleared_M006") && GameVariableManager::get_bool("G_Cleared_M008") && GameVariableManager::get_bool("G_Cleared_M009");
+    ["M005", "M006", "M007", "M008", "M009", "M010", "M012", "M013", "M015", "M016", "M018", "S001", "S002"].iter()
         .for_each(|key| if !GameVariableManager::get_bool(format!("G_Cleared_{}", key)) {available.push(key.to_string());} );
 
-    if m011_cleared { ["M017", "M019", "M020", "M021"].iter().for_each(|key| if !GameVariableManager::get_bool(format!("G_Cleared_{}", key)) { available.push(key.to_string()); } ); }
+    if GameVariableManager::get_bool("G_Cleared_M007") && !GameVariableManager::get_bool("G_Cleared_M014") { available.push("M014".to_string()); } 
+
+    if m011_cleared { ["M017", "M019", "M020"].iter().for_each(|key| if !GameVariableManager::get_bool(format!("G_Cleared_{}", key)) { available.push(key.to_string()); } ); }
     else if m011 { available.push("M011".to_string());  }
+    if GameVariableManager::get_bool("G_Cleared_M014") && GameVariableManager::get_bool("G_Cleared_M016") && GameVariableManager::get_bool("G_Cleared_M017") 
+        && GameVariableManager::get_bool("G_Cleared_M019") && !GameVariableManager::get_bool("G_Cleared_M021") { available.push("M021".to_string()); }
 
     if completed >= 15 {    // Paralogues
         for x in 0..12 {
@@ -394,48 +397,73 @@ fn bond_frags_from_achievement(this: &AchieveData) -> i32 {
 fn collect_bond_frags_from_achievements() {
     AchieveData::get_list().unwrap().iter().for_each(|achieve| { GameUserData::add_bond( bond_frags_from_achievement( achieve ) ); });
 }
-
+fn reset_bonds(g_unit: &GodUnit) {
+    let escape = g_unit.get_escape();
+    println!("Emblem {} has broken bonds and will be reset.", Mess::get(g_unit.data.mid));
+    let data = g_unit.data;
+    GodPool::delete(g_unit);
+    if let Some(god_unit2) = GodPool::create(data) {
+        god_unit2.set_escape(escape); 
+        Force::get(ForceType::Absent).unwrap().iter()
+            .for_each(|unit|{
+                if let Some(g_bond) = g_unit.get_bond(unit){
+                    for x in 0..9 { g_bond.level_up(); }
+                    unit.inherit_apt(g_unit);  
+                }
+            }  
+        );
+    }
+}
 pub fn update_bonds() {
-    if GameVariableManager::get_number("G_Continuous") == 0 { return; }
-    for x in 0..19 {
-        let gid = format!("GID_{}", EMBLEM_ASSET[x]);
-        if let Some(g_unit) = GodPool::try_get_gid(gid.as_str(), true) {
-            let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
-            let mut max_level = 1;
-            let mut bond_exp: u16 = 0;
-        // Get highest bond level 
-            for ff in force_type {
-                let force_iter = Force::iter(Force::get(ff).unwrap());
-                for unit in force_iter {
-                    let god_bond = g_unit.get_bond(unit);
-                    if god_bond.is_none() { continue; } 
-                    let g_bond = god_bond.unwrap();
-                    if g_bond.level == 4 { g_bond.level_up(); }
-                    if g_bond.level == 19 { g_bond.level_up(); }
-                    if max_level < g_bond.level { 
-                        max_level = g_bond.level;
-                        bond_exp = g_bond.exp;
-                    }
+    if GameVariableManager::get_number("G_Continuous") == 0 {
+        EMBLEM_GIDS.iter()
+            .for_each(|gid|{
+                if let Some(g_unit) = GodPool::try_get_gid(gid, true) {
+                    if g_unit.bonds == 0 { reset_bonds(g_unit); }
                 }
             }
-                    // level up to highest bond level
-            let force_type2: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
-            for ff2 in force_type2 {
-                let force_iter2 = Force::iter(Force::get(ff2).unwrap());
-                for unit in force_iter2 {
-                    let god_bond = g_unit.get_bond(unit);
-                    if god_bond.is_none() { continue; } 
-                    let g_bond = god_bond.unwrap();
-                    if g_bond.level < max_level {
-                        let n_levels = max_level - g_bond.level;
-                        for _x in 0..n_levels { g_bond.level_up(); }
-                        g_bond.exp = bond_exp;
-                        unit.inherit_apt(g_unit);  
-                    }  
+        );
+        return; 
+    }
+    let units: Vec<_> = Force::get(ForceType::Absent).unwrap().iter().collect();
+    println!("{} units to updated bonds for", units.len());
+    EMBLEM_GIDS.iter()
+        .for_each(|gid|{
+            if let Some(g_unit) = GodPool::try_get_gid(gid, true) {
+                if g_unit.bonds == 0 { reset_bonds(g_unit); }
+                else {
+                    let mut max_level = 1;
+                    let mut bond_exp: u16 = 0;
+            // Get highest bond level 
+                    units.iter()
+                        .for_each(|unit|{
+                            if let Some(g_bond) = g_unit.get_bond(unit){
+                                if g_bond.level == 4 || g_bond.level == 19 { g_bond.level_up(); }
+                                if max_level < g_bond.level { 
+                                    max_level = g_bond.level;
+                                    bond_exp = g_bond.exp;
+                                }
+                            }
+                        }
+                    );
+            // Raise all to the highest
+                    units.iter()
+                        .for_each(|unit|{
+                            if let Some(g_bond) = g_unit.get_bond(unit){
+                                if g_bond.level < max_level {
+                                    let n_levels = max_level - g_bond.level;
+                                    for _x in 0..n_levels { g_bond.level_up(); }
+                                    g_bond.exp = bond_exp;
+                                    
+                                }  
+                            }
+                        } 
+                    );
+                    // println!("Emblem {} bonds were updated.", Mess::get(g_unit.data.mid));
                 }
             }
         }
-    }
+    );
 }
 
 fn create_bond_rings() {
@@ -444,64 +472,59 @@ fn create_bond_rings() {
     let ring_list = RingData::get_list().unwrap();
     let mut active_emblems = 0;
     for x in 0..12 {
-        let god_unit = GodPool::try_get_gid(EMBLEM_GIDS[x], true);
-        if god_unit.is_none() { continue; }
-        let bond_variable_count = format!("G_{}_Ring_Count", EMBLEM_ASSET[x]);
-        if !GameVariableManager::exist(&bond_variable_count) { GameVariableManager::make_entry(&bond_variable_count, 0); }
-        if GameVariableManager::get_number(&bond_variable_count) == 0 {
-            for _x in 0..10 {
-                let rank = get_ring_rank() as usize; 
-                let ring_index = Random::get_game().get_value(10) as usize;
-                let ring_index = x * 40 + ring_index * 4 + rank;
-                add_ring(ring_list[ring_index].rid);
+        if let Some(god_unit) = GodPool::try_get_gid(EMBLEM_GIDS[x], true){
+            let bond_variable_count = format!("G_{}_Ring_Count", EMBLEM_ASSET[x]);
+            if !GameVariableManager::exist(&bond_variable_count) { GameVariableManager::make_entry(&bond_variable_count, 0); }
+            if GameVariableManager::get_number(&bond_variable_count) == 0 {
+                for _x in 0..10 {
+                    let rank = get_ring_rank() as usize; 
+                    let ring_index = Random::get_game().get_value(10) as usize;
+                    let ring_index = x * 40 + ring_index * 4 + rank;
+                    add_ring(ring_list[ring_index].rid);
+                }
+                GameVariableManager::set_number(&bond_variable_count, 10);
             }
-            GameVariableManager::set_number(&bond_variable_count, 10);
+            if !god_unit.get_escape() { active_emblems += 1; }
         }
-        if !god_unit.unwrap().get_escape() { active_emblems += 1; }
     }
+    let total_cost = 500*active_emblems;
     // DLC
     for x in 12..19 {
-        let god_unit = GodPool::try_get_gid(EMBLEM_GIDS[x], true);
-        if god_unit.is_none() { continue; }
-        if !god_unit.unwrap().get_escape() { active_emblems += 1; }
+        if let Some(god_unit) = GodPool::try_get_gid(EMBLEM_GIDS[x], true){
+            if !god_unit.get_escape() { active_emblems += 1; }
+        }
     }
-    GameUserData::add_bond(500);
+    GameUserData::add_bond(500 + 150*active_emblems);
     let bond_frag = GameUserData::get_piece_bond();
     let mut ring_count = 0;
-    //println!("Bond Frags: {}", bond_frag);
-    //println!("Active Embelms: {}", active_emblems);
-    let total_cost = 1100*active_emblems;
+    RingData::get_list().unwrap().iter().for_each(|ring| ring_count += ring.get_pool_ring_stock());
+
     if total_cost < bond_frag && ring_count < 700 {
         for x in 0..12 {
-            let god_unit = GodPool::try_get_gid(EMBLEM_GIDS[x], true);
-            if god_unit.is_none() { continue; }
-            if god_unit.unwrap().get_escape() { continue; }
-            for _x in 0..5 {
-                let rank = get_ring_rank() as usize; 
-                let ring_index = Random::get_game().get_value(10) as usize;
-                let ring_index = x * 40 + ring_index * 4 + rank;
-                add_ring(ring_list[ring_index].rid);
-        }   }
-        GameUserData::add_bond(-500*active_emblems);
+            if let Some(god_unit) = GodPool::try_get_gid(EMBLEM_GIDS[x], true) {
+                if !god_unit.get_escape() {
+                    for _x in 0..5 {
+                        let ring_index = x * 40 + ( Random::get_game().get_value(10) * 4) as usize + get_ring_rank() as usize;
+                        add_ring(ring_list[ring_index].rid);
+                    }
+                }
+            }
+        }
+        GameUserData::add_bond(total_cost);
     }
     // Auto merge rings
     let ring_cost = [game_parameter("指輪合成指輪コストB"), game_parameter("指輪合成指輪コストA"), game_parameter("指輪合成指輪コストS")];
-    ring_count = 0;
     for x in 0..12 {    // Emblem Index
         for y in 0..10 {   // Ring Index
             for z in 0..3 {    //Rank Index
                 let index = x*40 + y*4 + z;
-                let ring = &ring_list[index];
-                let count = UnitRingPool::get_ring_stock(ring);
-                if count == 0 { continue; }
-                if count >= ring_cost[z] {
-                    UnitRingPool::sub_ring(ring.rid, None, ring_cost[z]);
+                if ring_list[index].get_pool_ring_stock() >= ring_cost[z] {
+                    UnitRingPool::sub_ring(ring_list[index].rid, None, ring_cost[z]);
                     add_ring(ring_list[index + 1].rid);
                 }
             }
         }
     }
-    for x in 0..ring_list.len()-3 {  ring_count += UnitRingPool::get_ring_stock(ring_list[x as usize]); } // getting new count of bond rings
 }
 
 fn get_ring_rank() -> i32 {

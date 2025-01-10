@@ -117,15 +117,10 @@ pub fn generate_black_list() {
     ITEM_BLACK_LIST.lock().unwrap().clear();
     PERSONAL_BLIST.lock().unwrap().clear();
     SET_RECRUITMENT.lock().unwrap().clear();
-    for x in BLACKLIST_SKILL {
-        if let Some(skill) = SkillData::get(x) { SKILL_BLACK_LIST.lock().unwrap().push(skill.parent.index);  }
-    }
-    for x in BLACKLIST_ITEMS { 
-        if let Some(skill) = ItemData::get(x) { ITEM_BLACK_LIST.lock().unwrap().push(skill.parent.index);  }
-     }
-    for x in PERSONAL_BLACK_LIST { 
-        if let Some(skill) = SkillData::get(x) { PERSONAL_BLIST.lock().unwrap().push(skill.parent.index); }
-    }
+    
+    BLACKLIST_SKILL.iter().for_each(|x| if let Some(skill) = SkillData::get(x) { SKILL_BLACK_LIST.lock().unwrap().push(skill.parent.index); });
+    BLACKLIST_ITEMS.iter().for_each(|x| if let Some(item) = ItemData::get(x) { ITEM_BLACK_LIST.lock().unwrap().push(item.parent.index);  });
+    PERSONAL_BLACK_LIST.iter().for_each(|x| if let Some(skill) = SkillData::get(x) { PERSONAL_BLIST.lock().unwrap().push(skill.parent.index); });
 
     if let Ok(lines) = read_lines("sd:/engage/config/DVC_List.txt") {
         println!("Reading from sd:/engage/config/DVC_List.txt");

@@ -129,6 +129,9 @@ extern "C" fn vibe() -> &'static mut ConfigBasicMenuItem {
 extern "C" fn vibe_post_save() -> &'static mut ConfigBasicMenuItem { 
     ConfigBasicMenuItem::new_switch::<RandoSave>("Randomize Save Files")
 }
+extern "C" fn vibe_stats() -> &'static mut ConfigBasicMenuItem {
+    ConfigBasicMenuItem::new_switch::<MaxStatCaps>("Max Stat Caps")
+}
 pub struct RandomEnable;
 impl ConfigBasicMenuItemSwitchMethods for RandomEnable {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
@@ -175,6 +178,30 @@ impl ConfigBasicMenuItemSwitchMethods for RandoSave {
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.command_text = if CONFIG.lock().unwrap().apply_rando_post_new_game { "Enable" } else { "Disable" }.into();
+    }
+}
+
+pub struct MaxStatCaps;
+impl ConfigBasicMenuItemSwitchMethods for MaxStatCaps {
+    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let value = CONFIG.lock().unwrap().max_stat_caps;
+        let result = ConfigBasicMenuItem::change_key_value_b(value);
+        if value != result {
+            CONFIG.lock().unwrap().max_stat_caps = result;
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        }
+        return BasicMenuResult::new();
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = if CONFIG.lock().unwrap().max_stat_caps { "Class stat caps are set to max during the game." } 
+            else { "Default class stat caps." }.into();
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.command_text = if CONFIG.lock().unwrap().max_stat_caps { "Enable" } else { "Disable" }.into();
     }
 }
 
@@ -261,6 +288,7 @@ extern "C" fn vibe2() -> &'static mut ConfigBasicMenuItem {
 }
 
 pub fn install_vibe() { 
+    cobapi::install_global_game_setting(vibe_stats);
     cobapi::install_global_game_setting(vibe_enable);
     cobapi::install_global_game_setting(vibe_post_save);
     cobapi::install_global_game_setting(randomizer::person::vibe_custom_units);

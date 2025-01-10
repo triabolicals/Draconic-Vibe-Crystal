@@ -43,6 +43,7 @@ pub static mut STATUS: RandomizerStatus = RandomizerStatus{
     emblem_inherit: false,
     shop_randomized: false,
     randomized: false,
+    stat_caps: false,
     continious_random_chapter: String::new(),
 };
 
@@ -59,6 +60,7 @@ pub struct RandomizerStatus {
     pub emblem_inherit: bool,
     pub shop_randomized: bool,
     pub randomized: bool,
+    pub stat_caps: bool,
     pub continious_random_chapter: String,
 }
 impl RandomizerStatus {
@@ -73,6 +75,7 @@ impl RandomizerStatus {
         self.emblem_inherit = false;
         self.shop_randomized = false;
         self.randomized = false;
+        self.stat_caps = false;
         self.continious_random_chapter = "".to_string();
     }
 }

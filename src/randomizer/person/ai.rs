@@ -1,32 +1,25 @@
 use super::*;
 use crate::randomizer::emblem;
+use engage::gamedata::ai::AIData;
 static mut AISET: bool = false;
 
 pub fn adjust_dispos_person_ai(data: &mut DisposData) {
     if GameVariableManager::get_number("G_Random_Recruitment") == 0 { return; }
     if let Some(value) = data.ai_action_value {
         let string = value.to_string();
-        if PIDS.iter().any(|x| *x == string) {
-            data.ai_action_value = Some(GameVariableManager::get_string(format!("G_R_{}", string)));
-        }
+        if PIDS.iter().any(|x| *x == string) { data.ai_action_value = Some(GameVariableManager::get_string(format!("G_R_{}", string))); }
     }
     if let Some(value) = data.ai_mind_value {
         let string = value.to_string();
-        if PIDS.iter().any(|x| *x == string) {
-            data.ai_mind_value = Some(GameVariableManager::get_string(format!("G_R_{}", string)));
-        }
+        if PIDS.iter().any(|x| *x == string) { data.ai_mind_value = Some(GameVariableManager::get_string(format!("G_R_{}", string))); }
     }
     if let Some(value) = data.ai_move_value {
         let string = value.to_string();
-        if PIDS.iter().any(|x| *x == string) {
-            data.ai_move_value = Some(GameVariableManager::get_string(format!("G_R_{}", string)));
-        }
+        if PIDS.iter().any(|x| *x == string) { data.ai_move_value = Some(GameVariableManager::get_string(format!("G_R_{}", string))); }
     }
     if let Some(value) = data.ai_attack_value {
         let string = value.to_string();
-        if PIDS.iter().any(|x| *x == string) {
-            data.ai_attack_value = Some(GameVariableManager::get_string(format!("G_R_{}", string)));
-        }
+        if PIDS.iter().any(|x| *x == string) { data.ai_attack_value = Some(GameVariableManager::get_string(format!("G_R_{}", string))); }
     }
 }
 
@@ -161,18 +154,6 @@ pub fn unit_set_dispos_ai(this: &Unit, data: &mut DisposData, method_info: Optio
 #[unity::from_offset("App", "Unit", "GetEngageAttack")]
 fn unit_get_engage_atk(this: &Unit, method_info: OptionalMethod) -> Option<&'static SkillData>;
 
-#[unity::class("App", "AIData")]
-pub struct AIData {
-    pub parent: StructDataArrayFields,
-    pub code: i8,
-    pub mind: i8,
-    pub active: i8,
-    pub trans: i8,
-    __: i32,
-    pub str_value1: &'static Il2CppString,
-    pub str_value2: &'static Il2CppString,
-}
-impl GamedataArray for AIData {}
 
 #[unity::from_offset("App", "AIData", ".ctor")]
 fn ai_data_ctor(this: &AIData, method_info: OptionalMethod);

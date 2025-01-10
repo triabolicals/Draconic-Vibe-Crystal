@@ -1,5 +1,3 @@
-use std::f32::consts::E;
-
 use super::*;
 use crate::randomizer::person::unit::fixed_unit_weapon_mask;
 use assets::animation::MONSTERS;
