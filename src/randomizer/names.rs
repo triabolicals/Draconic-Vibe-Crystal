@@ -23,8 +23,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomNameMods {
             else { "Emblem will have their default name and appearances." }.into();
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = if CONFIG.lock().unwrap().random_names { "Randomized" }
-            else { "Default" }.into();
+        this.command_text = if CONFIG.lock().unwrap().random_names { "Randomized" } else { "Default" }.into();
     }
 }
 
@@ -32,11 +31,11 @@ pub struct GenericAppearance;
 impl ConfigBasicMenuItemSwitchMethods for GenericAppearance {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().generic_mode } else { GameVariableManager::get_number("G_GenericMode") };
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().generic_mode } else { GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY) };
         let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
         if value != result {
-            if GameUserData::get_sequence() == 0  {  CONFIG.lock().unwrap().generic_mode  = result; }
-            else { GameVariableManager::set_number("G_GenericMode", result) }
+            if DVCVariables::is_main_menu()  {  CONFIG.lock().unwrap().generic_mode  = result; }
+            else { GameVariableManager::set_number(DVCVariables::GENERIC_APPEARANCE_KEY, result) }
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -45,8 +44,8 @@ impl ConfigBasicMenuItemSwitchMethods for GenericAppearance {
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         //G_GenericMode
-        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap(). generic_mode } else { GameVariableManager::get_number("G_GenericMode") };
-        let str = if GameUserData::get_sequence() == 0 || value == 0 { "" } else { " (Press A to reseed.)"};
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap(). generic_mode } else { GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY) };
+        let str = if DVCVariables::is_main_menu() || value == 0 { "" } else { " (Press A to reseed.)"};
 
         this.help_text = format!("{}{}",
             match value {
@@ -58,7 +57,7 @@ impl ConfigBasicMenuItemSwitchMethods for GenericAppearance {
 
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap(). generic_mode } else { GameVariableManager::get_number("G_GenericMode") };
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap(). generic_mode } else { GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY) };
         this.command_text = 
             match value {
                 1 => { "Appearance"}
@@ -70,13 +69,13 @@ impl ConfigBasicMenuItemSwitchMethods for GenericAppearance {
 }
 
 pub extern "C" fn vibe_generic() -> &'static mut ConfigBasicMenuItem { 
-    let switch = ConfigBasicMenuItem::new_switch::<GenericAppearance>("Generic Units Settings");
+    let switch = ConfigBasicMenuItem::new_switch::<GenericAppearance>("Generic Enemy Appearance");
     switch.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = generic_acall as _ );
     switch
 }
 
 pub fn generic_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    if GameUserData::get_sequence() == 0 { return BasicMenuResult::new(); }
+    if DVCVariables::is_main_menu() { return BasicMenuResult::new(); }
     let mode = GameVariableManager::get_number("G_GenericMode");
     let msg; 
     match mode {
@@ -101,7 +100,7 @@ impl TwoChoiceDialogMethods for ReseedEnemyConfirm {
 fn change_enemy_seed() {
     let force_type = [ForceType::Enemy, ForceType::Ally];
     let rng = Random::get_game();
-    let mode = GameVariableManager::get_number("G_GenericMode");
+    let mode = GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY);
     for ff in force_type {
         let force_iter = Force::iter(Force::get(ff).unwrap());
         for unit in force_iter {
@@ -124,16 +123,11 @@ fn set_drop_seed(this: &Unit, value: i32, _method_info: OptionalMethod);
 pub fn get_person_bid(this: &PersonData, method_info: OptionalMethod) -> Option<&Il2CppString>;
 
 pub fn give_names_to_generics() {
-    if !crate::utils::can_rand() { return; }
     let list = PersonData::get_list_mut().unwrap();
-    if GameVariableManager::get_bool("G_Random_Names") {
-        randomize_emblem_names();
-        println!("Emblem Name Randomized");
-    }
     list.iter_mut()
         .filter(|p| 
-            p.get_name().is_some() && unsafe { get_person_bid(p, None ).is_some() } && p.gender != 0 
-            && !PLAYABLE.lock().unwrap().iter().any(|&y| y == p.parent.index) 
+            unsafe { get_person_bid(p, None ).is_some() } && p.gender != 0 
+            && !PLAYABLE.get().unwrap().iter().any(|&y| y == p.parent.index) 
             && !p.pid.to_string().contains("Boss")
             && p.get_flag().value & 2048 == 0
                 //&& !name_list.male.iter().any(|&y| y == p.parent.index as i16) && !name_list.female.iter().any(|&y| y ==  p.parent.index as i16)
@@ -153,7 +147,7 @@ pub fn randomize_emblem_names() {
         let person = PersonData::get(PIDS[x]).unwrap();
         is_female[x] = !(person.gender == 1 && person.get_flag().value & 32 == 0);
     }
-    if GameVariableManager::get_bool("G_Random_Names") {
+    if GameVariableManager::get_bool(DVCVariables::EMBLEM_NAME_KEY) {
         let rng = get_rng();
         let mut emblem_count = 0;
         EMBLEM_ASSET.iter().for_each(|&gid|{

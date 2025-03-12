@@ -1,7 +1,159 @@
 use serde::{Deserialize, Serialize};
+use unity::prelude::*;
 use super::VERSION;
-use engage::{gameuserdata::GameUserData, gamevariable::*};
-use crate::utils;
+use engage::{
+    gameuserdata::GameUserData, gamevariable::*,
+    gamedata::*,
+};
+use crate::{enums::*, utils};
+
+/// Structure that contains and manages DVC-Related GameVariables
+pub struct DVCVariables {}
+
+impl DVCVariables {
+    pub const SEED: &str = "G_Random_Seed";
+
+    pub const LUEUR_NAME: &str = "G_Lueur_Name";
+    pub const LUEUR_GENDER: &str = "G_Lueur_Gender2";
+    pub const LUEUR_RANDOM_JOB_KEY: &str =  "G_Lueur_Random";
+    pub const MISERCODE_TYPE: &str = "G_Misercode_Type";
+    pub const LIBERATION_TYPE: &str = "G_Liberation_Type";
+
+    pub const GENERIC_APPEARANCE_KEY: &str =  "G_GenericMode";
+    pub const ENEMY_OUTFIT_KEY: &str =  "G_EnemyOutfits";
+    pub const PLAYER_OUTFIT_KEY: &str =  "G_PlayerOutfit";
+    pub const ASSETS: &str = "G_RandAsset";
+    pub const BGM_KEY: &str =  "G_RandomBGM";
+
+    pub const DEPLOYMENT_KEY: &str =  "G_DeploymentMode";
+    pub const EMBLEM_DEPLOYMENT_KEY: &str =  "G_EmblemDeployMode";
+
+    pub const HUB_ITEM_KEY: &str =  "G_HubItem";
+    pub const ITEM_GAUGE_KEY: &str =  "G_ItemGauge";
+    pub const SHOP_KEY: &str =  "G_Random_Shop_Items";
+    pub const ITEM_KEY: &str =  "G_Random_Item";
+    pub const ITEM_DROP_GAUGE_KEY: &str =  "G_ItemDropGauge";
+    pub const PLAYER_INVENTORY: &str = "G_PRW";
+    pub const SKILL_KEY: &str =  "G_Random_Skills";
+    pub const ENEMY_SKILL_GUAGE_KEY: &str =  "G_EnemySkillGauge";
+
+    pub const CUSTOM_JOB_KEY: &str =  "G_CJobs";
+    pub const JOB_LEARN_SKILL_KEY: &str =  "G_LearnMode";
+    pub const ENEMY_JOB_GAUGE_KEY: &str =  "G_EnemyJobGauge";
+    pub const RECLASS_KEY: &str =  "G_RandomCC";
+    pub const JOB_KEY: &str =  "G_Random_Job";
+
+//Emblem Key
+    pub const ENGAGE_P_KEY: &str =  "G_EngagePlus";
+    pub const EMBLEM_SYNC_KEY: &str =  "G_Random_God_Sync";
+    pub const EMBLEM_SKILL_CHAOS_KEY: &str =  "G_ChaosMode";
+    pub const EMBLEM_SKILL_KEY: &str =  "G_Random_God_Mode";
+    pub const EMBLEM_ITEM_KEY: &str =  "G_Random_Engage_Weps";
+    pub const EMBLEM_NAME_KEY: &str =  "G_Random_Names";
+    pub const WEAPON_PROF_KEY: &str =  "G_EmblemWepProf";
+    pub const SP_KEY: &str =  "G_SPCost";
+
+    pub const DVC_AUTOLEVEL_KEY: &str =  "G_DVC_Autolevel";
+    pub const AUTOLEVEL_BENCH_KEY: &str =  "G_AutoBench";
+    pub const REVIVAL_STONE_GAUGE_KEY: &str =  "G_EnemyRevivalStone";
+    pub const ENEMY_EMBLEM_KEY: &str =  "G_EnemyEmblemGauge";
+
+    pub const TERRAIN: &str = "G_RandomEnergy";
+
+    pub const STYLES_KEY: &str =  "G_BattleStyles";
+    pub const ENGRAVE_KEY: &str =  "G_EngraveSetting";
+    pub const INTERACT_KEY: &str =  "G_InteractSetting";
+
+    pub const RECRUITMENT_KEY: &str =  "G_Random_Recruitment";
+    pub const EMBLEM_RECRUITMENT_KEY: &str =  "G_Emblem_Mode";
+    pub const CUSTOM_UNIT_RECRUIT_DISABLE: &str =  "G_CUD";
+    
+    pub const GROWTH_KEY: &str =  "G_Random_Grow_Mode";
+    pub const PERSONAL_GROWTH_KEY: &str =  "G_PGMode";
+
+    pub const CONTINIOUS: &str = "G_Continuous";
+    pub const FOW: &str = "G_FOW";
+
+    pub const IRONMAN: &str = "G_Ironman";
+    pub const PLAYER_AVERAGE_CAP: &str = "G_Player_Rating_Average";
+    pub const EMBLEM_PARALOGUE_LEVEL: &str = "G_Paralogue_Level";
+    pub const TILE: &str = "G_Tile";
+
+    pub fn get_seed() -> i32 {  GameVariableManager::get_number(Self::SEED) }
+    pub fn is_main_menu() -> bool { GameUserData::get_sequence() == 0 }
+
+    pub fn get_dvc_person(pid_index: i32, reverse: bool) -> &'static Il2CppString {
+        let key = 
+            if reverse {format!("G_R_{}", PIDS[pid_index as usize]) }
+            else { format!("G_R2_{}", PIDS[pid_index as usize]) };
+        if GameVariableManager::exist(key.as_str()) { GameVariableManager::get_string(key.as_str()) }
+        else { PIDS[pid_index as usize].into() }
+    }
+
+    pub fn get_dvc_emblem(index: i32, reverse: bool) -> &'static Il2CppString {
+        let key = 
+            if reverse {format!("G_R_{}", EMBLEM_GIDS[index as usize]) }
+            else { format!("G_R2_{}", EMBLEM_GIDS[index as usize]) };
+        if GameVariableManager::exist(key.as_str()) { GameVariableManager::get_string(key.as_str()) }
+        else { EMBLEM_GIDS[index as usize].into() }
+    }
+
+    /// Non-Custom Emblems Only
+    pub fn set_emblem_recruitment(emblem_index: i32, replace_emblem_index: i32) {
+        if emblem_index > 18 || replace_emblem_index > 18 { return; }
+        GameVariableManager::set_string(&format!("G_R_{}",EMBLEM_GIDS[emblem_index as usize]), EMBLEM_GIDS[replace_emblem_index as usize]);
+        GameVariableManager::set_string(&format!("G_R2_{}",EMBLEM_GIDS[replace_emblem_index as usize]), EMBLEM_GIDS[emblem_index as usize]);
+    }
+
+    pub fn set_person_recruitment(pid_index: i32, replace_pid_index: i32) {
+        if pid_index > 40 || replace_pid_index > 40 { return; }
+        GameVariableManager::set_string(&format!("G_R_{}",PIDS[pid_index as usize]), PIDS[replace_pid_index as usize]);
+        GameVariableManager::set_string(&format!("G_R2_{}",PIDS[replace_pid_index as usize]), PIDS[pid_index as usize]);
+    }
+
+    pub fn get_god_from_index(index: i32, randomized: bool) -> Option<&'static GodData> {
+        if let Some(list) =  crate::randomizer::emblem::EMBLEM_LIST.get(){
+            if index as usize >=  list.len() { return None; }
+            let hash = list[index as usize];
+            if GameVariableManager::get_number(Self::EMBLEM_RECRUITMENT_KEY) == 0 || !randomized { return GodData::try_get_hash(hash);  }
+            else { 
+                let key = format!("G_R_{}", GodData::try_get_hash(hash).unwrap().gid);
+                return GodData::get(GameVariableManager::get_string(key));
+            }
+        }
+        return None;
+    }
+
+    pub fn create_recruitment_variables() {
+        if !GameVariableManager::get_bool("G_Random_Emblem_Set") {
+            for i in 0..19 { 
+                GameVariableManager::make_entry_str(&format!("G_R_{}",EMBLEM_GIDS[i as usize]), EMBLEM_GIDS[i as usize]);
+                GameVariableManager::make_entry_str(&format!("G_R2_{}",EMBLEM_GIDS[i as usize]), EMBLEM_GIDS[i as usize]);
+            }
+        }
+        if !GameVariableManager::get_bool("G_Random_Person_Set") {
+            for i in 0..41 { 
+                GameVariableManager::make_entry_str(&format!("G_R_{}",PIDS[i as usize]), PIDS[i as usize]);
+                GameVariableManager::make_entry_str(&format!("G_R2_{}",PIDS[i as usize]), PIDS[i as usize]);
+            }
+        }
+    }
+    pub fn is_random_map() -> bool { GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3 }
+
+    pub fn changed_setting_text(var1: &str, var2: &str) -> String {
+        if Self::is_main_menu() { "" }
+        else {
+            if GameVariableManager::get_number(var1) != GameVariableManager::get_number(var2) { "*" }
+            else {  "" }
+        }.to_string()
+    }
+
+    pub fn is_main_chapter_complete(main_index: i32) -> bool {
+        GameVariableManager::get_bool(if main_index < 10 { format!("G_Cleared_M00{}", main_index) } else { format!("G_Cleared_M0{}", main_index) })
+    }
+}
+
+
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct DeploymentConfig {
@@ -30,6 +182,7 @@ pub struct DeploymentConfig {
     pub emblem_deployment: i32,
     pub emblem_mode: i32,
     pub continuous: i32,
+    pub player_inventory: bool,
     pub random_recruitment: i32,
     pub random_job: i32,
     pub random_skill: bool,
@@ -54,8 +207,16 @@ pub struct DeploymentConfig {
     pub auto_adjust_asset_table: bool,
     pub enable_tradables_item: bool, 
     pub custom_jobs: bool,
+    pub learn_skill: i32,
     pub debug: bool,
+    pub dlc: i32,
+    pub terrain: i32,
+    pub fow: i32,
+    pub assets: i32,
+    pub player_growth: i32,
     pub max_stat_caps: bool,
+    pub custom_unit_recruitment_disable: bool,
+    pub tile: bool,
     pub misc_option_1 : f32,
     pub misc_option_2 : f32,
 }
@@ -63,6 +224,7 @@ pub struct DeploymentConfig {
 impl DeploymentConfig {
     
     pub fn new() -> Self {
+        println!("Opening triabolical.toml");
         let config_content = std::fs::read_to_string("sd:/engage/config/triabolical.toml");
         // If the file is read to a string or there is no failure, parse into the config struct.
         if config_content.is_ok() {
@@ -115,6 +277,9 @@ impl DeploymentConfig {
             emblem_deployment: 0,
             emblem_mode: 0,
             continuous: 0,
+            fow: 0,
+            terrain: 0,
+            player_inventory: false,
             random_recruitment: 0,
             random_job: 0,
             random_skill: false,
@@ -138,8 +303,14 @@ impl DeploymentConfig {
             auto_adjust_asset_table: false,
             custom_units: false,
             custom_jobs: false,
+            learn_skill: 0,
             enable_tradables_item: false,
             debug: false,
+            dlc: 0,
+            player_growth: 0,
+            assets: 0,
+            custom_unit_recruitment_disable: false,
+            tile: false,
             max_stat_caps: false,
             misc_option_1 : 0.0,
             misc_option_2 : 1.0,
@@ -197,88 +368,104 @@ impl DeploymentConfig {
     pub fn save(&self) {
         let out_toml = toml::to_string_pretty(&self).unwrap();
         std::fs::write("sd:/engage/config/triabolical.toml", out_toml).expect("should be able to write to write default configuration");
+        println!("Config Saved");
     }
     pub fn create_game_variables(&self, include_non_change: bool) {
-        GameVariableManager::make_entry("G_HubItem", self.exploration_items); 
-        GameVariableManager::make_entry("G_EngagePlus", self.engage_link as i32); 
-        GameVariableManager::make_entry("G_EnemySkillGauge", self.random_enemy_skill_rate); 
-        GameVariableManager::make_entry("G_EnemyJobGauge", self.random_enemy_job_rate); 
-        GameVariableManager::make_entry("G_EnemyEmblemGauge", self.enemy_emblem_rate); 
-        GameVariableManager::make_entry("G_DeploymentMode", self.deployment_type); 
-        GameVariableManager::make_entry("G_EmblemDeployMode", self.emblem_deployment); 
-        GameVariableManager::make_entry("G_DVC_Autolevel", self.autolevel as i32); 
-        GameVariableManager::make_entry("G_RandomBGM", self.random_map_bgm as i32 ); 
-        GameVariableManager::make_entry("G_EnemyRevivalStone", self.revival_stone_rate); 
-        GameVariableManager::make_entry("G_ItemGauge", self.replaced_item_price); 
-        GameVariableManager::make_entry("G_BattleStyles", self.random_battle_styles as i32);
-        GameVariableManager::make_entry("G_EngraveSetting", self.engrave_settings as i32); 
-        GameVariableManager::make_entry("G_InteractSetting", self.interaction_type as i32);
-        GameVariableManager::make_entry("G_ItemDropGauge", self.enemy_drop_rate as i32);
-        GameVariableManager::make_entry("G_GenericMode", self.generic_mode as i32); 
-        GameVariableManager::make_entry("G_EnemyOutfits", 0);
-        GameVariableManager::make_entry("G_PlayerOutfit", 0);
-        GameVariableManager::make_entry("G_AutoBench", 0);
-        GameVariableManager::make_entry("G_PGMode", 0);
-        GameVariableManager::make_entry("G_CJobs", self.custom_jobs as i32);
+        GameVariableManager::make_entry(DVCVariables::HUB_ITEM_KEY, self.exploration_items); 
+        GameVariableManager::make_entry(DVCVariables::ENGAGE_P_KEY, self.engage_link as i32); 
+        GameVariableManager::make_entry(DVCVariables::ENEMY_SKILL_GUAGE_KEY, self.random_enemy_skill_rate); 
+        GameVariableManager::make_entry(DVCVariables::ENEMY_JOB_GAUGE_KEY, self.random_enemy_job_rate); 
+        GameVariableManager::make_entry(DVCVariables::ENEMY_EMBLEM_KEY, self.enemy_emblem_rate); 
+        GameVariableManager::make_entry(DVCVariables::DEPLOYMENT_KEY, self.deployment_type); 
+        GameVariableManager::make_entry(DVCVariables::EMBLEM_DEPLOYMENT_KEY, self.emblem_deployment); 
+        GameVariableManager::make_entry(DVCVariables::DVC_AUTOLEVEL_KEY, self.autolevel as i32); 
+        GameVariableManager::make_entry(DVCVariables::BGM_KEY, self.random_map_bgm as i32 ); 
+        GameVariableManager::make_entry(DVCVariables::REVIVAL_STONE_GAUGE_KEY, self.revival_stone_rate); 
+        GameVariableManager::make_entry(DVCVariables::ITEM_GAUGE_KEY, self.replaced_item_price); 
+        GameVariableManager::make_entry(DVCVariables::STYLES_KEY, self.random_battle_styles as i32);
+        GameVariableManager::make_entry(DVCVariables::ENGRAVE_KEY, self.engrave_settings as i32); 
+        GameVariableManager::make_entry(DVCVariables::INTERACT_KEY, self.interaction_type as i32);
+        GameVariableManager::make_entry(DVCVariables::ITEM_DROP_GAUGE_KEY, self.enemy_drop_rate as i32);
+        GameVariableManager::make_entry(DVCVariables::GENERIC_APPEARANCE_KEY, self.generic_mode as i32); 
+        GameVariableManager::make_entry(DVCVariables::ENEMY_OUTFIT_KEY, 0);
+        GameVariableManager::make_entry(DVCVariables::PLAYER_OUTFIT_KEY, 0);
+        GameVariableManager::make_entry(DVCVariables::AUTOLEVEL_BENCH_KEY, 0);
+        GameVariableManager::make_entry(DVCVariables::ASSETS, self.assets);
+        GameVariableManager::make_entry(DVCVariables::CUSTOM_JOB_KEY, self.custom_jobs as i32);
+        GameVariableManager::make_entry(DVCVariables::MISERCODE_TYPE, 0);
+        GameVariableManager::make_entry(DVCVariables::LIBERATION_TYPE, 0);
+        GameVariableManager::make_entry_norewind(DVCVariables::PLAYER_AVERAGE_CAP, 0);
+        GameVariableManager::make_entry(DVCVariables::FOW, self.fow);
+        GameVariableManager::make_entry(DVCVariables::TERRAIN, self.terrain);
+        GameVariableManager::make_entry(DVCVariables::JOB_LEARN_SKILL_KEY, if GameVariableManager::exist(DVCVariables::SKILL_KEY) { 0 } else { self.learn_skill } );
+        if crate::randomizer::person::PLAYABLE.get().unwrap().len() > 94 || self.custom_unit_recruitment_disable {
+            GameVariableManager::make_entry(DVCVariables::CUSTOM_UNIT_RECRUIT_DISABLE, 1);
+        }
+        else {
+            GameVariableManager::make_entry(DVCVariables::CUSTOM_UNIT_RECRUIT_DISABLE, 0);
+        }
+        GameVariableManager::make_entry_norewind(DVCVariables::PLAYER_INVENTORY, if self.random_item == 0 { 0 } else { self.player_inventory as i32} );
+        GameVariableManager::make_entry_norewind(DVCVariables::PERSONAL_GROWTH_KEY, if self.random_grow & 1 != 0 { self.player_growth as i32 } else { 0 } );
+        GameVariableManager::make_entry_norewind(DVCVariables::TILE, self.tile as i32);
         if include_non_change {
-            GameVariableManager::make_entry("G_EmblemWepProf", self.emblem_weap_prof_mode as i32); 
-            GameVariableManager::make_entry("G_Random_Shop_Items",  self.random_shop_items as i32 );
-            GameVariableManager::make_entry("G_Emblem_Mode", self.emblem_mode as i32);
-            GameVariableManager::make_entry("G_Random_Recruitment", self.random_recruitment as i32);
-            GameVariableManager::make_entry("G_Random_Job", self.random_job as i32);
-            GameVariableManager::make_entry("G_Lueur_Random", 0);
-            GameVariableManager::make_entry("G_Random_Skills", self.random_skill as i32);
-            GameVariableManager::make_entry("G_Random_Grow_Mode", self.random_grow as i32);
-            GameVariableManager::make_entry("G_Random_God_Mode",  self.random_god_mode as i32);
-            GameVariableManager::make_entry("G_Random_Item",  self.random_item as i32);
-            GameVariableManager::make_entry("G_Random_God_Sync", self.random_god_sync_mode as i32);
-            GameVariableManager::make_entry("G_ChaosMode", self.emblem_skill_chaos as i32);
-            GameVariableManager::make_entry("G_Random_Engage_Weps", self.random_engage_weapon as i32);
-            GameVariableManager::make_entry("G_Random_Names", self.random_names as i32);
-            GameVariableManager::make_entry("G_RandomCC", self.random_reclass as i32 );
-            GameVariableManager::make_entry("G_SPCost", self.random_skill_cost as i32);
+            GameVariableManager::make_entry(DVCVariables::WEAPON_PROF_KEY, self.emblem_weap_prof_mode as i32); 
+            GameVariableManager::make_entry(DVCVariables::SHOP_KEY,  self.random_shop_items as i32 );
+            GameVariableManager::make_entry(DVCVariables::EMBLEM_RECRUITMENT_KEY, self.emblem_mode as i32);
+            GameVariableManager::make_entry(DVCVariables::RECRUITMENT_KEY, self.random_recruitment as i32);
+            GameVariableManager::make_entry(DVCVariables::JOB_KEY, self.random_job as i32);
+            GameVariableManager::make_entry(DVCVariables::LUEUR_RANDOM_JOB_KEY, 0);
+            GameVariableManager::make_entry(DVCVariables::SKILL_KEY, self.random_skill as i32);
+            GameVariableManager::make_entry(DVCVariables::GROWTH_KEY, self.random_grow as i32);
+            GameVariableManager::make_entry(DVCVariables::EMBLEM_SKILL_KEY,  self.random_god_mode as i32);
+            GameVariableManager::make_entry(DVCVariables::ITEM_KEY,  self.random_item as i32);
+            GameVariableManager::make_entry(DVCVariables::EMBLEM_SYNC_KEY, self.random_god_sync_mode as i32);
+            GameVariableManager::make_entry(DVCVariables::EMBLEM_SKILL_CHAOS_KEY, self.emblem_skill_chaos as i32);
+            GameVariableManager::make_entry(DVCVariables::EMBLEM_ITEM_KEY, self.random_engage_weapon as i32);
+            GameVariableManager::make_entry(DVCVariables::EMBLEM_NAME_KEY, self.random_names as i32);
+            GameVariableManager::make_entry(DVCVariables::RECLASS_KEY, self.random_reclass as i32 );
+            GameVariableManager::make_entry(DVCVariables::SP_KEY, self.random_skill_cost as i32);
+            DVCVariables::create_recruitment_variables();
         }
     }
     pub fn create_game_variables_after_new_game(&self) {
         if !self.apply_rando_post_new_game { return; }
-        println!("Adding new game variables.");
-        GameVariableManager::make_entry("G_Random_Seed", 0);
-        if self.randomized && GameVariableManager::get_number("G_Random_Seed") == 0 {
-            if self.seed == 0 {  GameVariableManager::set_number("G_Random_Seed", utils::get_random_number_for_seed() as i32); }
-            else {  GameVariableManager::set_number("G_Random_Seed", self.seed as i32); }
+        GameVariableManager::make_entry(DVCVariables::SEED, 0);
+        if self.randomized && GameVariableManager::get_number(DVCVariables::SEED) == 0 {
+            if self.seed == 0 {  GameVariableManager::set_number(DVCVariables::SEED, utils::get_random_number_for_seed() as i32); }
+            else {  GameVariableManager::set_number(DVCVariables::SEED, self.seed as i32); }
         }
         self.create_game_variables(true);   // Make sure variables exists
 
-        if GameVariableManager::get_number("G_Random_Skills") == 0 { GameVariableManager::set_number("G_Random_Skills" , self.random_skill as i32); }
-        if GameVariableManager::get_number("G_EmblemWepProf") == 0 { GameVariableManager::set_number("G_EmblemWepProf", self.emblem_weap_prof_mode as i32);  }
-        if GameVariableManager::get_number("G_Random_Shop_Items") == 0{  GameVariableManager::set_number("G_Random_Shop_Items",  self.random_shop_items as i32 );  }
-        if GameVariableManager::get_number("G_Random_Job") == 0 { GameVariableManager::set_number("G_Random_Job", self.random_job as i32);  }
-        if GameVariableManager::get_number("G_Random_Grow_Mode") == 0{  GameVariableManager::set_number("G_Random_Grow_Mode", self.random_grow as i32); }
-        if GameVariableManager::get_number("G_Random_God_Mode") == 0 { GameVariableManager::set_number("G_Random_God_Mode",  self.random_god_mode as i32); }
-        if GameVariableManager::get_number("G_Random_Item") == 0 { GameVariableManager::set_number("G_Random_Item",  self.random_item as i32); }
-        if GameVariableManager::get_number("G_Random_God_Sync") == 0 {  GameVariableManager::set_number("G_Random_God_Sync", self.random_god_sync_mode as i32); }
-        if GameVariableManager::get_number("G_ChaosMode") == 0 { GameVariableManager::set_number("G_ChaosMode", self.emblem_skill_chaos as i32); }
-        if GameVariableManager::get_number("G_Random_Engage_Weps") == 0 { GameVariableManager::set_number("G_Random_Engage_Weps", self.random_engage_weapon as i32); }
-        if !GameVariableManager::get_bool("G_Random_Names") { GameVariableManager::set_number("G_Random_Names", self.random_names as i32); }
-        if !GameVariableManager::get_bool("G_RandomCC") { GameVariableManager::set_bool("G_RandomCC", self.random_reclass); }
-        if GameVariableManager::get_number("G_SPCost") == 0 { GameVariableManager::set_number("G_SPCost", self.random_skill_cost); }
-        if !GameVariableManager::get_bool("G_CJobs") { GameVariableManager::set_bool("G_CJobs", self.custom_jobs); }
+        if GameVariableManager::get_number(DVCVariables::SKILL_KEY) == 0 { GameVariableManager::set_number(DVCVariables::SKILL_KEY , self.random_skill as i32); }
+        if GameVariableManager::get_number(DVCVariables::WEAPON_PROF_KEY) == 0 { GameVariableManager::set_number(DVCVariables::WEAPON_PROF_KEY, self.emblem_weap_prof_mode as i32);  }
+        if GameVariableManager::get_number(DVCVariables::SHOP_KEY) == 0 {  GameVariableManager::set_number(DVCVariables::SHOP_KEY,  self.random_shop_items as i32 );  }
+        if GameVariableManager::get_number(DVCVariables::JOB_KEY) == 0 { GameVariableManager::set_number(DVCVariables::JOB_KEY, self.random_job as i32);  }
+        if GameVariableManager::get_number(DVCVariables::GROWTH_KEY) == 0{  GameVariableManager::set_number(DVCVariables::GROWTH_KEY, self.random_grow as i32); }
+        if GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_KEY) == 0 { GameVariableManager::set_number(DVCVariables::EMBLEM_SKILL_KEY,  self.random_god_mode as i32); }
+        if GameVariableManager::get_number(DVCVariables::ITEM_KEY) == 0 { GameVariableManager::set_number(DVCVariables::ITEM_KEY,  self.random_item as i32); }
+        if GameVariableManager::get_number(DVCVariables::EMBLEM_SYNC_KEY ) == 0 {  GameVariableManager::set_number(DVCVariables::EMBLEM_SYNC_KEY , self.random_god_sync_mode as i32); }
+        if GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY) == 0 { GameVariableManager::set_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY, self.emblem_skill_chaos as i32); }
+        if GameVariableManager::get_number(DVCVariables::EMBLEM_ITEM_KEY) == 0 { GameVariableManager::set_number(DVCVariables::EMBLEM_ITEM_KEY, self.random_engage_weapon as i32); }
+        if !GameVariableManager::get_bool(DVCVariables::EMBLEM_NAME_KEY) { GameVariableManager::set_number(DVCVariables::EMBLEM_NAME_KEY, self.random_names as i32); }
+        if !GameVariableManager::get_bool(DVCVariables::RECLASS_KEY) { GameVariableManager::set_bool(DVCVariables::RECLASS_KEY, self.random_reclass); }
+        if GameVariableManager::get_number(DVCVariables::SP_KEY) == 0 { GameVariableManager::set_number(DVCVariables::SP_KEY, self.random_skill_cost); }
+        if !GameVariableManager::get_bool(DVCVariables::CUSTOM_JOB_KEY) { GameVariableManager::set_bool(DVCVariables::CUSTOM_JOB_KEY, self.custom_jobs); }
     }
 
 
     pub fn get_custom_jobs(&self) -> bool {
-        if GameUserData::get_sequence() == 0 { self.custom_jobs } else { GameVariableManager::get_bool("G_CJobs") }
+        if DVCVariables::is_main_menu() { self.custom_jobs } else { GameVariableManager::get_bool(DVCVariables::CUSTOM_JOB_KEY) }
     }
     pub fn set_custom_jobs(&mut self, value: bool) {
-        if GameUserData::get_sequence() == 0 { self.custom_jobs = value; }
-        else { GameVariableManager::set_bool("G_CJobs", value); }
+        if DVCVariables::is_main_menu() { self.custom_jobs = value; }
+        else { GameVariableManager::set_bool(DVCVariables::CUSTOM_JOB_KEY, value); }
     }
     pub fn get_random_cc(&self) -> bool {
-        if GameUserData::get_sequence() == 0 { self.random_reclass} else { GameVariableManager::get_bool("G_RandomCC") }
+        if DVCVariables::is_main_menu() { self.random_reclass} else { GameVariableManager::get_bool(DVCVariables::RECLASS_KEY) }
     }
     pub fn set_random_cc(&mut self, value: bool) {
-        if GameUserData::get_sequence() == 0 { self.random_reclass = value; }
-        else { GameVariableManager::set_bool("G_RandomCC", value); }
+        if DVCVariables::is_main_menu() { self.random_reclass = value; }
+        else { GameVariableManager::set_bool(DVCVariables::RECLASS_KEY, value); }
     }
 
 }

@@ -1,14 +1,15 @@
-use super::{*, animation::*, transform::asset_table_result_setup_person_hook};
+use super::{*, transform::asset_table_result_setup_person};
 use crate::randomizer::assets::accessory::add_accessory_to_list;
 use crate::randomizer::assets::accessory::clear_accessory_from_list;
+use crate::DVCVariables;
 use accessory::change_accessory;
-use skyline::patching::Patch;
 static mut TWIN_STRIKE_EMBLEM: i32 = 11;
 static mut THREE_HOUSES: i32 = 12;
 static mut ROBIN: i32 = 22;
 
 const MALE_EMBLEMS: [usize; 9] = [0, 1, 4, 5, 8, 9, 14, 16, 18];
 const THREE_HOUSE_ACTS: [&str; 4] = ["Thr2AF-Ax1_c563_N", "Thr2AM-Lc1_c514_N", "Thr2AM-Bw1_c515_N", "Thr2AM-Sw1_c535_N"];
+
 pub fn find_and_replace_emblem_animation(result: &mut AssetTableResult, body_act: String) {
     ENGAGE_PREFIX.iter().for_each(|w|{
         result.body_anims.iter_mut().filter(|act| str_contains(act, w)).for_each(|animation|{
@@ -137,11 +138,11 @@ pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_
                 let job = person.unwrap().get_job().unwrap();
                 let item = crate::randomizer::job::get_weapon_for_asset_table(job);
             //Engaging
-                if conditions.iter_mut().any(|str| str.contains("エンゲージ開始")) {
+                if conditions.iter_mut().any(|str| str.to_string().contains("エンゲージ開始")) {
                     let mut body_vec: Vec<String> = Vec::new();
                     let reuslt1 = call_original!(this, mode2, god_data, is_darkness, conditions, method_info);
                     reuslt1.body_anims.iter().for_each(|str|{ body_vec.push(str.to_string()); println!("Engaging Act: {}", str) });
-                    let result = asset_table_result_setup_person_hook(this, mode2, person, person.unwrap().get_job(), item, conditions, None);
+                    let result = unsafe { asset_table_result_setup_person(this, mode2, person, person.unwrap().get_job(), item, conditions, None) };
                     for x in 0..body_vec.len() {
                         if x >= result.body_anims.len() { result.body_anims.add(body_vec[x].clone().into()); }
                         else { result.body_anims[x] = body_vec[x].clone().into(); }
@@ -153,9 +154,9 @@ pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_
                     }
                     return result;
                 }
-                let result = asset_table_result_setup_person_hook(this, mode2, person, person.unwrap().get_job(), item, conditions, None);
+                let result = unsafe { asset_table_result_setup_person(this, mode2, person, person.unwrap().get_job(), item, conditions, None) };
 
-                if conditions.iter().any(|str| str.contains("協力エンゲージ技")) && mode2 == 2 {  //House Unite+
+                if conditions.iter().any(|str| str.to_string().contains("協力エンゲージ技")) && mode2 == 2 {  //House Unite+
                     //result.body_anims.iter().for_each(|str| // println!("Act: {}", str));
                     let gid = god.gid.to_string();
                     if gid.contains("エフラム") {
@@ -180,7 +181,7 @@ pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_
             }
         }
     }
-    let hash = god_data.unwrap().parent.hash + ( GameVariableManager::get_number("G_Random_Seed") as u32 + 10 ) as i32 >> 2 ;
+    let hash = god_data.unwrap().parent.hash + ( DVCVariables::get_seed() as u32 + 10 ) as i32 >> 2 ;
 
     if mode > 10 { 
         let result = call_original!(this, mode-10, god_data, is_darkness, conditions, method_info); 
@@ -190,15 +191,38 @@ pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_
     }
 
     let gid = god_data.unwrap().gid.to_string(); 
-    if let Some(is_enemy_emblem) =  crate::randomizer::emblem::enemy::ENEMY_EMBLEMS.iter().find(|&x| x.0 == gid) {
+    let index = god_data.unwrap().parent.index;
+    if gid.contains("GID_相手") {
+        let result = call_original!(this, mode, god_data, true, conditions, method_info);
+        emblem_bust_randomization(result, hash);
+        return result;
+        /*
+        if let Some(emblem) = EMBLEM_ASSET.iter().position(|asset| gid.contains(asset)) {
+            if emblem < 12 || emblem == 23 {
+                let result = call_original!(this, mode, god_data, true, conditions, method_info);
+                emblem_bust_randomization(result, hash);
+                return result;
+            }
+            else if emblem != 19 {
+                let result = call_original!(this, mode, GodData::get(&format!("GID_E006_敵{}", EMBLEM_ASSET[emblem])), true, conditions, method_info); 
+                emblem_bust_randomization(result, hash);
+                return result;
+            }
+        }
+        */
+    }
+    if let Some(is_enemy_emblem) =  crate::randomizer::emblem::enemy::ENEMY_EMBLEMS.get().unwrap().iter().find(|&x| x.0 == index) {
         let emblem_index = is_enemy_emblem.1;
+
         //et new_emblem = crate::randomizer::emblem::EMBLEM_ORDER.lock().unwrap()[emblem_index as usize] as usize;
-        if let Some(replace_god) = crate::randomizer::emblem::get_god_from_index(emblem_index, true) {
-            let new_emblem = unsafe { crate::randomizer::emblem::EMBLEM_LIST.iter().position(|&hash| hash == replace_god.parent.hash).unwrap() };
-            let emblem = 
-                if new_emblem < 12 || new_emblem >= 19 { replace_god }
-                else { GodData::get(&format!("GID_E006_敵{}", EMBLEM_ASSET[new_emblem])).unwrap() };
+        if let Some(replace_god) = DVCVariables::get_god_from_index(emblem_index, true) {
             let is_m002 = gid == "GID_M002_シグルド";
+            let new_emblem = crate::randomizer::emblem::EMBLEM_LIST.get().unwrap().iter().position(|&hash| hash == replace_god.parent.hash).unwrap();
+            let emblem = 
+                if new_emblem < 12 || new_emblem >= 19 || is_m002 { replace_god }
+                // else if new_emblem == 13 { return call_original!(this, mode, god_data, is_darkness, conditions, method_info); }
+                else { GodData::get(&format!("GID_E006_敵{}", EMBLEM_ASSET[new_emblem])).unwrap() };
+        
             let result = call_original!(this, mode, Some(emblem), !is_m002, conditions, method_info);
             emblem_bust_randomization(result, hash);
             return result;
@@ -286,158 +310,6 @@ pub fn asset_table_result_get_preset_name(name: &Il2CppString, method_info: Opti
     return result;
 }
 
-pub fn correct_emblem_animations(unit: &Unit, result: &mut AssetTableResult, mode: i32, equipped: Option<&ItemData>) {
-    let job = &unit.job;
-    //if str_contains(job.jid, "JID_紋章士") { return;}
-    let gender = unit_dress_gender(unit);
-    if gender == 0 || gender > 2 { return; }
-    if mode != 1 && mode != 2 { return; }
-    let gender_str = if gender == 1 { "M" } else { "F" };
-    let mut body = "NA".to_string();
-    let mut act_type = get_animation_type(job);
-
-    if gender == 1 && ( act_type == 9 || act_type == 10 ) {  //Male Infantry replace last animation if it's Com0AM to Swd0AM
-        if let Some(last) = result.body_anims.iter_mut().last() {
-            if last.to_string() == "Com0AM-Sw1_c000_N" {
-                *last = Il2CppString::new_static("Swd0AM-Sw1_c000_N");
-            }
-        }
-    }
-    //Assign mounts
-    if act_type == 12 && gender == 1 { act_type = 8; }
-    println!("Emblem: {} has act type {}", Mess::get_name(unit.person.pid).to_string(), act_type);
-    let kind = if equipped.is_some() { equipped.unwrap().kind } else { 0 };
-    if !job.jid.contains("紋章士_") {
-        match (act_type, mode) {
-            (0|11|14, 1) => { 
-                result.ride_model = "oBody_Sig0BR_c531".into();
-                result.ride_anim = Some("UAS_Sig0BR".into());
-            }
-            (0|11|14, 2) => {
-                result.ride_dress_model = "uBody_Sig0BR_c531".into();
-                if kind < 4  || kind == 7 { // Sword / Axe / Lance / Rod
-                    result.body_anims.add( Il2CppString::new_static(concat_string!("Com0B", gender_str, "-", WEP_PRE[kind as usize], "1_c000_N")));
-                }
-                result.ride_model = "uRig_HorsR".into();
-            }
-            (3, 1) => { //Wvyern
-                result.ride_anim = Some("UAS_Wng2DR".into()); 
-                result.scale_stuff[18] = 0.50;
-                result.ride_model = "oBody_Cmi0DR_c561".into();
-            }
-            (3, 2) => {
-                result.ride_dress_model= "uBody_Cmi0DR_c561".into();
-                result.ride_model = "uRig_DragR".into();
-            }
-            (4, 1) => {
-                result.ride_anim = Some("UAS_Wng0ER".into());
-                result.scale_stuff[18] = 0.50;
-                result.ride_model = "oBody_Wng0ER_c000".into();  }
-            (4, 2) => { 
-                result.ride_dress_model = "uBody_Wng0ER_c000".into();
-                result.ride_model = "uRig_PegaR".into();
-            }
-            (5, 1) => { 
-                result.ride_anim = Some("UAS_Wng1FR".into());
-                result.ride_model = "oBody_Wng1FR_c000".into(); }
-            (5, 2) => {                         
-                result.ride_model = "uRig_GrifR".into();
-                result.ride_dress_model = "uBody_Wng1FR_c000".into();
-            }
-            (6, 1) => { 
-                result.ride_anim = Some("UAS_Cav2CR".into());
-                result.ride_model = "oBody_Cav2CR_c000".into(); 
-            }
-            (6, 2) => {
-                result.ride_model = "uRig_WolfR".into();
-                result.ride_dress_model = "uBody_Cav2CR_c000".into();
-            }
-            (12, 1) => {
-                result.ride_model = "oBody_Msn0DR_c553".into();
-                result.ride_anim = Some("UAS_Msn0DR".into());
-                result.scale_stuff[18] = 0.50;
-            }
-            (12, 2) => {
-                result.ride_model = "uRig_DragR".into();
-                result.ride_dress_model = "uBody_Msn0DR_c553".into();
-            }
-            _ => {  //Mage Cannoneer / Infantry
-                result.ride_dress_model = "null".into();
-                result.ride_model = "null".into(); 
-                result.ride_anim = None;
-            }
-        }
-    }
-    let emblem_generic = if mode == 2 { concat_string!("Enb0A", gender_str, "-",  WEP_PRE[kind as usize], "1_c000_N") } else { format!("UAS_Enb0A{}", gender_str) };
-    if change_unique_class(unit.job, result, mode, gender, equipped, true) { return;  } // Check if Unique Class
-    let new_act = get_animation_index(job, equipped, true, gender == 2) as usize;   // New Animation Index
-    if check_change_animation_type(job, equipped, gender == 2 ) { // Removes mounts if impossible mount + animation weapon combo 
-        result.ride_dress_model = "null".into();
-        result.ride_model = "null".into();
-        result.ride_anim = None;
-        body = emblem_generic;
-    }
-    else if act_type == 7 && kind == 9 {    // Mage Cannoneer Bullets
-        body = if mode == 2 { format!("Mcn3A{}-Mg2_c000_M", gender_str) }
-        else { format!("UAS_Mcn3A{}", gender_str )};
-    }
-    else if act_type == 12 {
-        if kind != 6 && kind != 1 {
-            body = if mode == 2 { concat_string!("Wng2DF-", WEP_PRE[kind as usize], "1_c000_N") } else { "UAS_Msn0DF".to_string() };    // Wyvern 
-        }
-        else {
-            body = if mode == 2 { concat_string!("Msn1DF-", WEP_PRE[kind as usize], "1_c553_N") } else { "UAS_Msn0DF".to_string() };    // Melsuine Sword / Tome
-        }
-    }
-    else if new_act == 17 || job.jid.contains("紋章士_") {  // Emblem Animations + Default Emblem
-        if let Some(pos) = ENGAGE_PREFIX.iter().position(|w| result.body_anims.iter().any(|act| act.contains(w))) {
-            if pos != 1 && pos != 17 && job.jid.contains("紋章士_") {
-                result.ride_dress_model = "null".into();
-                result.ride_model = "null".into();
-                result.ride_anim = None;
-                
-            }
-            match pos { 
-                1 => { // Remove Mount Sigurd   on not horse / not sword/lance
-                    if kind == 1 { return; }
-                    if !is_mounted(act_type ) || (act_type != 0 && act_type != 11 && act_type != 14 ) {
-                        result.ride_dress_model = "null".into();
-                        result.ride_model = "null".into();
-                        result.ride_anim = None;
-                        body = emblem_generic;
-                    }
-                }
-                17 => { // Remove Mount Camilla for not tome / axe and not wyvern 
-                    if kind == 3 || kind == 6 { return;   }
-                    else if !is_mounted(act_type ) || (act_type != 3 && act_type != 12) {
-                        result.ride_dress_model = "null".into();
-                        result.ride_model = "null".into();
-                        result.ride_anim = None;
-                        body = emblem_generic;
-                        if mode == 1 { result.scale_stuff[16] = 2.6; }
-                    }
-                }
-                0|4|5|6|8|9|10|11|18|19|26 => { if kind != 1 { body = emblem_generic; } }, // Not Swords
-                12|13|25 => { body = emblem_generic; },  //  Always generic  Tiki / Camilla
-                14|20 => { if kind != 3 {  body = emblem_generic; } }    //Hector / Edelgard for not Axes
-                21|23 => { if kind != 2 {  body = emblem_generic; } } // Dimitri / Ephiram for not lance
-                7|22 => { if kind != 4 { body = emblem_generic; } }  //Lyn / Claude for not Bows
-                2|3|15|16 => { if kind != 6 { body = emblem_generic; } } //Celica/Micaih/Veronica/Soren for not Tome
-                _ => { body = emblem_generic; }
-            }
-        }
-    }
-    else {  // The Rest
-        body = if mode == 2 { find_animation_set(format!("{}{}-{}", ACT_PRE[new_act], gender_str, WEP_PRE[kind as usize])) }
-            else { format!("UAS_{}{}", ACT_PRE[new_act], gender_str) };
-    }
-   // println!("Replacing Animation with Body: {} for {}", body, Mess::get_name(unit.person.pid));
-    if body != "NA" {
-        result.body_anim = Some(body.clone().into());
-        find_and_replace_emblem_animation(result, body.clone());
-    }
-}
-
 pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit, equipped: Option<&ItemData>, mode: i32) {
     unsafe { 
         TWIN_STRIKE_EMBLEM= 11;
@@ -447,11 +319,26 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
     if let Some(engage_attack) =  unsafe { get_engage_attack(unit, None) } {
         let mut animation_index = 0;
         let mut old_engage = 50;
-        // Finding the Engage Animation Index in Body Animations
-
+    // Replace Generic with random character voices
+        if result.sound.voice.is_none() || result.sound.voice.is_some_and(|str|{
+            let str1 = str.to_string();
+            str1.contains("_MOB_Enemy") || str1.contains("ENEMY") }){
+            let rng = Random::get_system();
+            let index = rng.get_value(40) as usize + 1;
+            let name = match index {
+                36 => { "DLC_42"}
+                37 => { "DLC_43"}
+                38 => { "DLC_44"}
+                39 => { "DLC_45"}
+                40 => { "DLC_46"}
+                _ =>  { &MPIDS[index][5..] }
+            };
+            result.sound.voice = Some(name.into());
+        }
+                // Finding the Engage Animation Index in Body Animations
         result.body_anims.iter()
             .for_each(|act|{
-                if let Some(animation) = EATK_ACT.iter().position(|&y| act.contains(y)) { old_engage = animation; }
+                if let Some(animation) = EATK_ACT.iter().position(|&y| act.to_string().contains(y)) { old_engage = animation; }
                 else if act.to_string().contains("Ler2A") {
                     old_engage = 49;
                 }
@@ -470,7 +357,7 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
             if let Some(god) = unit.god_unit {
                 if god.child.is_none() {
                     result.body_anims.iter_mut()
-                    .filter(|act| act.contains("Ler2A"))
+                    .filter(|act| act.to_string().contains("Ler2A"))
                     .for_each(|act| *act = concat_string!("Ler1A", gender_str,"-Sw1_c000_N").into());
                 }
             }
@@ -490,9 +377,10 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
             }
         }
         // Get New Engage Attack
-        let emblem_index = if let Some(pos) = EMBLEM_ASSET.iter().position(|god| engage_attack.sid.contains(god)) { pos }
-            else if engage_attack.sid.contains("三級長エンゲージ技＋") { 20 }
-            else if engage_attack.sid.contains("三級長エンゲージ") { 12 }
+        let engage_sid = engage_attack.sid.to_string();
+        let emblem_index = if let Some(pos) = EMBLEM_ASSET.iter().position(|god| engage_sid.contains(god)) { pos }
+            else if engage_sid.contains("三級長エンゲージ技＋") { 20 }
+            else if engage_sid.contains("三級長エンゲージ") { 12 }
             else { 50 };
 
         println!("Found Engage Attack {} and Old Emblem: {}", emblem_index, old_engage);
@@ -502,10 +390,19 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
             if emblem_index == 1 {
                 result.ride_model = "uRig_HorsR".into();
                 result.ride_dress_model = "uBody_Sig0BR_c531".into();
+                result.body_anims.add(Il2CppString::new_static(concat_string!("Sig1B", gender_str, "-Sw1_c000_N")));
             }
-            if emblem_index == 17 {
+            else if emblem_index == 17 {
                 result.ride_model = "uRig_DragR".into();
                 result.ride_dress_model = "uBody_Cmi0DR_c561".into(); 
+                result.body_anims.add(Il2CppString::new_static(concat_string!("Cmi1D", gender_str ,"-Ax1_c000_N")));
+            }
+            else if emblem_index == 13 {
+                if result.body_model.to_string() != "uRig_Tik1AT" {
+                    tiki_engage(result, unit, 2);
+                    result.body_anims.add( Il2CppString::new_static("Tik1AT-Mg1_c000_M"));
+                }
+                super::animation::change_hair_change(unit, result);
             }
             else {
                 result.ride_model = "null".into();
@@ -530,7 +427,10 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
         let mpid = unit.person.get_name().unwrap().to_string();
         result.ride_model = "null".into();
         result.ride_dress_model = "null".into();
-
+        if unit.god_unit.is_some_and(|gunit| gunit.data.gid.to_string().contains("敵チキ") || ( gunit.data.mid.to_string().contains("Tiki") && !gunit.data.gid.to_string().contains("チキ") )) { 
+            // FX Tiki or Enemy Tiki
+            return;
+        }
         // Remove Accessories
         match old_engage {
             5 => {  //Leif  Remove Weapons
@@ -548,7 +448,7 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
                 clear_accessory_from_list(result.accessory_list, "uWep_Bw16s-Bw");
             }
             13 => { //Change Dragon Tiki to Human Tiki for all animations not Divine Blessing
-                if emblem_index != 13 {
+                if emblem_index != 13 && !unit.god_unit.is_some_and(|god| god.data.gid.to_string().contains("敵チキ")){
                     result.dress_model = "uBody_Tik0AF_c560".into();
                     result.body_model = "uRig_GodF1".into();
                     result.head_model = "uHead_c560".into();
@@ -571,7 +471,7 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
                     result.left_hand = "uWep_Sw42L".into();
                     result.trail = "cEff_EngageA_Swd_00".into();
                 }
-                else { equip_weapon(result, equipped); }
+                else { super::edit_asset_weapon(result, true, equipped); }
             }
             2|15|16|21 => { 
                 new_engage_animation = concat_string!(ENGAGE_PREFIX[ emblem_index as usize], "1A",gender_str,"-Mg1_c000_N");  //Celica / Veronica / Soren 
@@ -583,7 +483,7 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
                 result.ride_model = "uRig_HorsR".into();
                 result.ride_dress_model = "uBody_Sig0BR_c531".into();
                 new_engage_animation = concat_string!("Sig1B", gender_str, "-Sw1_c000_N");
-                equip_weapon(result, equipped); 
+                super::edit_asset_weapon(result, true, equipped); 
             }
             3|13 => {  //Micaiah and Tiki
                 if ( mpid == "MPID_Lueur" && gender == 1 ) || mpid == "MPID_Boucheron" || mpid == "MPID_Bonet" || mpid == "MPID_Vandre" || mpid == "MPID_Mauve" {
@@ -605,7 +505,7 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
                 if mpid == "MPID_Jean" { new_engage_animation = "Eir1AM-Sw1_c103_N".to_string();  }
                 else if mpid == "MPID_Anna" { new_engage_animation = "Eir1AF-Sw1_c552_N".to_string(); }
                 else { new_engage_animation = concat_string!("Eir1A",gender_str, "-Sw1_c000_N"); }
-                equip_weapon(result, equipped); 
+                super::edit_asset_weapon(result, true, equipped); 
                 unsafe { TWIN_STRIKE_EMBLEM = old_engage  as i32 };
             }   // Eirika
             12 => { 
@@ -617,12 +517,12 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
                 add_accessory_to_list(result.accessory_list, "reserve2_loc", "uWep_Lc21");
                 add_accessory_to_list(result.accessory_list, "reserve3_loc", "uWep_Bw16s-Bw");
             } //Houses Unite  
-            14 => { new_engage_animation = concat_string!("Hec1A", gender_str, "-Ax1_c000_N"); equip_weapon(result, equipped); } // Hector
+            14 => { new_engage_animation = concat_string!("Hec1A", gender_str, "-Ax1_c000_N"); super::edit_asset_weapon(result,true, equipped); } // Hector
             17 => { //Camilla 
                 result.ride_model = "uRig_DragR".into();
                 result.ride_dress_model = "uBody_Cmi0DR_c561".into(); 
                 new_engage_animation = concat_string!("Cmi1D", gender_str,"-Ax1_c000_N");
-                equip_weapon(result, equipped);
+                super::edit_asset_weapon(result, true, equipped);
             }
             18 => {     //Chrom
                 if mpid == "MPID_Jean" {  new_engage_animation = "Chr1AM-Sw1_c103_N".to_string(); }
@@ -633,7 +533,7 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
                 }
                 else if mpid == "MPID_El" || mpid == "MPID_Selestia" { new_engage_animation = "Chr1AF-Sw1_c254_N".to_string(); }
                 else { new_engage_animation = concat_string!("Chr1A", gender_str, "-Sw1_c000_N"); }
-                equip_weapon(result, equipped);
+                super::edit_asset_weapon(result, true, equipped);
                 unsafe { ROBIN = old_engage as i32};
             }
             20 => { new_engage_animation = concat_string!("Thr2A", gender_str, "-Ax1_c000_N");
@@ -666,7 +566,7 @@ pub fn asset_table_robin_hook(this: &mut AssetTableResult, mode: i32, person: &P
                     let person = PersonData::get(PIDS[index]) ;
                     let job = person.unwrap().get_job().unwrap();
                     let item = crate::randomizer::job::get_weapon_for_asset_table(job);
-                    result = asset_table_result_setup_person_hook(this, 2, person, None, item, conditions, None);
+                    result = unsafe { asset_table_result_setup_person(this, 2, person, None, item, conditions, None) };
                 }
             }
             else {
@@ -722,3 +622,39 @@ pub fn asset_table_robin_hook(this: &mut AssetTableResult, mode: i32, person: &P
 
 #[unity::from_offset("App", "Unit", "GetEngageLinkUnit")]
 fn unit_get_engage_link_unit(this: &Unit, method_info: OptionalMethod) -> Option<&'static Unit>;
+
+pub fn tiki_engage(result: &mut AssetTableResult, unit: &Unit, mode: i32) {
+    if mode == 2 {
+        result.body_model = "uRig_Tik1AT".into();
+        result.dress_model = "uBody_Tik1AT_c000".into();
+        result.head_model = "null".into();
+        result.hair_model = "null".into();
+        result.info_anims = Some("AOC_Info_c745".into());
+        result.talk_anims = Some("AOC_Talk_c745".into());
+        ["c_spine1_jnt", "c_spine2_jnt", "c_hip_jnt", "l_arm3_jnt", "r_arm3_jnt", "l_leg3_jnt", "r_leg3_jnt"].iter().for_each(|locator|  change_accessory(result.accessory_list, "null", *locator));
+        result.body_anims.add(Il2CppString::new_static("Ent0AT-Mg1_c000_N"));
+        result.body_anims.add(Il2CppString::new_static("Ent0AT-Ft1_c000_N"));
+        result.body_anims.add(Il2CppString::new_static("Ent0AT-Ft2_c000_N"));
+    }
+    else {
+        result.body_model = "oBody_Tik1AT_c000".into();
+        result.head_model = "oHair_null".into();
+        ["c_spine1_jnt", "c_spine2_jnt", "c_hip_jnt", "l_arm3_jnt", "r_arm3_jnt", "l_leg3_jnt", "r_leg3_jnt"].iter().for_each(|locator|  change_accessory(result.accessory_list, "null", *locator));
+        result.scale_stuff[18] = 0.50;
+        result.scale_stuff[16] = 1.0;
+        result.body_anim = Some("UAS_Ent0AT".into());
+    }
+    change_hair_change(unit, result);
+
+}
+
+pub fn get_emblem_attack_index(unit: &Unit) -> usize {
+    if let Some(engage_attack) =  unsafe { get_engage_attack(unit, None) } {
+        let sid = engage_attack.sid.to_string();
+        if let Some(pos) = EMBLEM_ASSET.iter().position(|god| sid.contains(god)) { pos }
+            else if sid.contains("三級長エンゲージ技＋") { 20 }
+            else if sid.contains("三級長エンゲージ") { 12 }
+            else { 50 }
+    }
+    else { 50 }
+}

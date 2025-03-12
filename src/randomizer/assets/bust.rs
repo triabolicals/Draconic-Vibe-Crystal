@@ -34,13 +34,11 @@ pub struct BustConfirm;
 impl TwoChoiceDialogMethods for BustConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
         GameVariableManager::set_bool("BustSettingChange", false);
-        ASSET_DATA.lock().unwrap().apply_bust_changes();
-        unsafe { 
-            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap());
-            let index = menu.select_index;
-            BustGauge::set_help_text(menu.menu_item_list[index as usize], None);
-            menu.menu_item_list[index as usize].update_text();
-        }
+        let _ = super::data::ASSET_DATA.get().map(|asset_data| asset_data.apply_bust_changes() );
+        let menu = unsafe {  std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap()) };
+        let index = menu.select_index;
+        BustGauge::set_help_text(menu.menu_item_list[index as usize], None);
+        menu.menu_item_list[index as usize].update_text();
         BasicMenuResult::se_cursor().with_close_this(true)
     }
     extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
@@ -56,17 +54,4 @@ pub extern "C" fn vibe_bust() -> &'static mut ConfigBasicMenuItem {
     let switch = ConfigBasicMenuItem::new_gauge::<BustGauge>("Unit Bust Volume Slider");
     switch.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = bust_setting_acall as _ );
     switch
-}
-
-pub fn get_bust_values() {
-    let static_fields = &Il2CppClass::from_name("App", "AssetTable").unwrap().get_static_fields::<AssetTableStaticFields>().search_lists[2];
-    if ASSET_DATA.lock().unwrap().bust_values.len() > 0 { return; }
-    for x in 0..static_fields.len() {
-        let volume_bust = static_fields[x as usize].scale_stuff[11];
-        if volume_bust > 0.6 {
-            ASSET_DATA.lock().unwrap().bust_values.push( (x as i32, volume_bust) ); 
-        }
-        if  ASSET_DATA.lock().unwrap().bust_values.len() > 550 { break; }
-    }
-    println!("Bust List Size: {}", ASSET_DATA.lock().unwrap().bust_values.len());
 }

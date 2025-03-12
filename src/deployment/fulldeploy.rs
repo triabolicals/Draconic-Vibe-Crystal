@@ -1,197 +1,10 @@
 use super::*;
-use engage::gamedata::dispos::DisposData;
-use engage::gamedata::dispos::DisposDataFlag;
-use engage::gamedata::terrain::TerrainData;
-use engage::unitpool::UnitPool;
-const TERRAIN: [&str; 5] = ["TID_氷の床", "TID_火炎砲台_対戦", "TID_煙", "TID_アロマ", "TID_水溜まり"];
+use engage::{
+    gamedata::dispos::*,
+    map::terrain::MapTerrain,
+};
 
-#[unity::class("App", "MapTerrain")]
- pub struct MapTerrain {
-     _super: u64,
-     pub x: i32,
-     pub z: i32,
-     pub width: i32,
-     pub height: i32,
-     layers: u64,
-     overlaps: u64,
-     pub terrains: &'static Array<&'static Il2CppString>, 
- }
- #[unity::from_offset("App", "MapSetting", "get_MapTerrain")]
- pub fn get_map_terrain(method_info: OptionalMethod) -> Option<&'static MapTerrain>;
-#[skyline::from_offset(0x01dfe300)]
-fn can_create(attacker: Option<&Unit>, x: i32, y: i32, terrain: &TerrainData, method_info: OptionalMethod) -> bool;
-
-#[skyline::from_offset(0x01decd40)]
-fn mapoverlap_set(x: i32, z: i32, tid: &Il2CppString, turn: i32, phase: i32,  method_info: OptionalMethod) -> bool;
-
- pub fn is_tile_good(tid: &Il2CppString) -> bool{
-    if let Some(terrain) = TerrainData::get(&tid.to_string()) {
-        terrain.prohibition == 0 
-    }
-    else { false }
- }
-
-pub fn adjust_miasma_tiles() {
-    ["TID_瘴気_永続", "TID_瘴気の領域", "TID_瘴気"].iter().for_each(|m|{
-        if let Some(miasma) = TerrainData::get_mut(m){
-            if GameVariableManager::get_number("G_Continuous")  == 3 {
-                if crate::continuous::get_story_chapters_completed() < 10 {
-                    miasma.player_defense = -5;
-                    miasma.enemy_defense = 5;
-                }
-                else if crate::continuous::get_story_chapters_completed() < 15 {
-                    miasma.player_defense = -10;
-                    miasma.enemy_defense = 10;
-                }
-                else {
-                    miasma.player_defense = -20;
-                    miasma.enemy_defense = 20;
-                }
-            }
-            else {
-                miasma.player_defense = -20;
-                miasma.enemy_defense = 20;
-            }
-        }
-    });
-}
-
- pub struct RandomEmblemEnergy;
-impl ConfigBasicMenuItemSwitchMethods for RandomEmblemEnergy {
-    fn init_content(_this: &mut ConfigBasicMenuItem){ GameVariableManager::make_entry("G_RandomEnergy", 0); }
-    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_i(GameVariableManager::get_number("G_RandomEnergy"), 0, 2, 1);
-        if GameVariableManager::get_number("G_RandomEnergy") != result {
-            GameVariableManager::set_number("G_RandomEnergy", result);
-            Self::set_command_text(this, None);
-            Self::set_help_text(this, None);
-            this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match GameVariableManager::get_number("G_RandomEnergy") {
-            1 => { "Emblem energy will be randomized. Chance for spots at the start of player phase." },
-            2 => { "Chance at the start of player phase for random terrain/energy tile." }
-            _ => { "No changes to emblem energy / terrain on the map." }
-        }.into();
-
-    }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = match GameVariableManager::get_number("G_RandomEnergy") {
-            1 => { "Energy" },
-            2 => { "Terrain" },
-            _ => { "Default" },
-        }.into();
-    }
-}
-
-pub extern "C" fn vibe_energy() -> &'static mut ConfigBasicMenuItem {  
-    let switch = ConfigBasicMenuItem::new_switch::<RandomEmblemEnergy>("Terrain Effects");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_not_in_map as _);
-    switch
-}
-
-
-
-pub fn power_spot() {
-    let value = GameVariableManager::get_number("G_RandomEnergy");
-    if value == 0 { return; }
-    let rng = Random::get_system();
-    let v = rng.get_value(100);
-    let pool = &Il2CppClass::from_name("App", "UnitPool").unwrap().get_static_fields_mut::<crate::randomizer::job::UnitPoolStaticFieldsMut>().s_unit;
-    let mut iter = pool.iter().filter(|unit| unit.force.filter(|f| f.force_type < 3 ).is_some());
-    let count = pool.iter().filter(|unit| unit.force.filter(|f| f.force_type < 3 ).is_some()).count();
-    if count < 5 { return; }
-    if v < 10 && value > 0 {
-        if let Some(tile) = iter.nth(rng.get_value( count as i32 ) as usize) {
-            println!("Energy Tile added at {}, {}", tile.x , tile.z );
-            unsafe { mapoverlap_set(tile.x as i32 , tile.z as i32, "TID_紋章氣".into(), -1, 7, None) };
-        }
-
-    }
-    else if v < 60 && value == 2 {
-        if let Some(tile) = iter.nth(rng.get_value( count as i32 ) as usize) {
-            println!("Other Tile added at {}, {}", tile.x , tile.z );
-            unsafe { mapoverlap_set(tile.x as i32 , tile.z as i32, TERRAIN[rng.get_value(5) as usize].into(), -1, 7, None) };
-        }
-    }
-}
-
-pub fn randomized_emblem_power_spots() {
-    if !GameVariableManager::get_bool("G_RandomEnergy") { return; }
-    println!("Randomizing Location for Emblem Energy");
-    if let Some(terrain) =    unsafe { get_map_terrain(None) } {
-        let start_x = terrain.x;
-        let end_x = terrain.width;
-        let start_z = terrain.z;
-        let end_z = terrain.height;
-        let mut terrain_array = -1;
-        let mut pos_list: Vec<(i32, i32)> = Vec::new();
-        let energy = TerrainData::get("TID_紋章氣").unwrap();
-        let dispos = DisposData::get_list_mut().unwrap();
-        let rng = Random::get_system();
-        for z in start_z..end_z {
-            for x in start_x..end_x {
-                if !is_tile_good(terrain.terrains[ ( x + 32 * z ) as usize ]) { continue; }
-                if unsafe { can_create(None, x, z, energy, None) } {
-                    pos_list.push( (x, z));
-                }
-            }
-        }
-        println!("Number of Placement Locations: {}", pos_list.len());
-        for x in 0..dispos.len() {
-            if dispos[x].array_name.to_string() == "Terrain" { terrain_array = x as i32; break; }
-        }
-        if terrain_array == -1 {
-            println!("No Terrain Array in Dispos");
-            let mut count = 0;
-            while count < 5 && pos_list.len() > 0 {
-                let index = rng.get_value( pos_list.len() as i32 ) as usize;
-                let tile = pos_list[index];
-                if unsafe { mapoverlap_set(tile.0, tile.1, energy.tid, -1, 7, None) } {
-                    count += 1;
-                    println!("Energy added at {}, {}", tile.0, tile.1);
-                    pos_list.remove(index);
-                }
-            }
-        }
-        else {
-            let size = dispos[terrain_array as usize].len();
-            let mut count = size;
-            let dispos_flag = dispos[0][0].get_flag().get_class();
-            for x in 0..size {
-                if dispos[terrain_array as usize][x].pid.contains("紋章氣") && pos_list.len() > 2 {
-                    let index = rng.get_value( pos_list.len() as i32 ) as usize;
-                    let tile = pos_list[index];
-                    dispos[terrain_array as usize][x].dispos_x = tile.0 as i8;
-                    dispos[terrain_array as usize][x].dispos_y = tile.1 as i8;
-                    println!("Energy at {}, {}", tile.0, tile.1);
-                    pos_list.remove(index as usize);
-                    if rng.get_value(2) == 1 || count < 3 {
-                        let new_dispos = DisposData::instantiate().unwrap();
-                        let dispos_flags = Il2CppObject::<DisposDataFlag>::from_class( dispos_flag ).unwrap();
-                        dispos_flags.value = 7;
-                        unsafe { dispos_data_ctor(new_dispos, None); }
-                        new_dispos.set_flag(dispos_flags);
-                        new_dispos.pid = "PID_紋章氣".into();
-                        new_dispos.tid = "TID_紋章氣".into();
-                        let index2 = rng.get_value( pos_list.len() as i32 ) as usize;
-                        let tile2 = pos_list[index2];
-                        new_dispos.dispos_x = tile2.0 as i8;
-                        new_dispos.dispos_y = tile2.1 as i8;
-                        println!("Energy added at {}, {}", tile.0, tile.1);
-                        pos_list.remove(index2);
-                        dispos[ terrain_array as usize ].add(new_dispos);
-                        count += 1;
-                    }
-                }
-            }
-        }
-    }
-}
-
- pub fn encounter_map_dispos() {
+pub fn encounter_map_dispos() {
     if Force::get(ForceType::Absent).is_none() || DisposData::get_list_mut().is_none() { return; }
     let absent_count = Force::get(ForceType::Absent).unwrap().get_count(); 
     let dispos = DisposData::get_list_mut().unwrap();
@@ -201,8 +14,9 @@ pub fn randomized_emblem_power_spots() {
     let mut player_array = if is_encounter { 0 } else { -1 };
 
     for x in 0..dispos.len() {
-        if dispos[x].array_name.to_string() == "Terrain" { continue; }
-        if dispos[x].array_name.contains("Player") { player_array = x as i32; }
+        let array_name = dispos[x].array_name.to_string();
+        if array_name == "Terrain" { continue; }
+        if array_name.contains("Player") { player_array = x as i32; }
         let is_enemy = dispos[x].array_name.to_string() == "Enemy" || is_encounter;
         for y in 0..dispos[x].len() {
             if dispos[x][y].get_force() == 0 {
@@ -221,7 +35,7 @@ pub fn randomized_emblem_power_spots() {
         println!("Can't find player array or player count is less than absent count: {} < {}", absent_count, player_count);
         return;
      }
-    let terrain =    unsafe { get_map_terrain(None) };
+    let terrain = MapTerrain::get_instance();
     if terrain.is_none() { return; }
     let map_terrain = terrain.unwrap();
     let start_x = map_terrain.x;
@@ -234,7 +48,7 @@ pub fn randomized_emblem_power_spots() {
         for x in start_x+1..end_x-1 {
             let index: usize = ( x + 32 * z ) as usize;
             let tid = map_terrain.terrains[ index ];
-            if !is_tile_good(tid) { continue; }
+            if !crate::utils::is_tile_good(tid) { continue; }
             if unit_pos.iter().find(|&unit_pos| unit_pos.0 == x && unit_pos.1 == z).is_none() {
                 available_tiles.push( (x, z) );
                 let mut overlap: bool = false;
@@ -328,7 +142,7 @@ pub fn randomized_emblem_power_spots() {
 }
 // Full Deployment
 pub fn load_extra_deployment_slots() {
-    if !GameVariableManager::get_bool("G_Cleared_M005") { return; }
+    if !DVCVariables::is_main_chapter_complete(5) { return; }
     if GameUserData::is_encount_map() {  
         encounter_map_dispos(); 
         return;
@@ -381,6 +195,7 @@ pub fn load_extras() -> Option<Vec<(i32, i32, i32)>> {
             if spilt[0] == cid { read_slots = true;}
             if read_slots && spilt[0] != cid {
                 println!("Found {} slots", out.len());
+                GameUserData::get_status().value &= !12352; 
                 return Some(out);
             }
         }

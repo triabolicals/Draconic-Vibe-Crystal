@@ -1,21 +1,32 @@
 use unity::prelude::*;
+use super::*;
 use engage::{
     menu::{
         BasicMenuResult, 
         config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}
     },
     gamevariable::GameVariableManager,
-    gameuserdata::*,
-    random::*,
-    gamedata::*,
-    dialog::yesno::*,
 };
 use engage::gamedata::dispos::ChapterData;
-use std::sync::Mutex;
-use super::CONFIG;
-static BGM_POOL: Mutex<Vec<String>> = Mutex::new(Vec::new());
-static CHAPTER_BGM_LIST: Mutex<[i32; 450]> = Mutex::new([-1; 450]);
-static mut BGM_INDEX: [i32; 3] = [0; 3];
+use std::sync::OnceLock;
+static BGM_POOL: OnceLock<Vec<String>> = OnceLock::new();
+
+pub fn initalize_bgm_pool() {
+    BGM_POOL.get_or_init(||{
+        let mut list = Vec::new();
+        let music_list = MusicData::get_list().unwrap();
+        for x in 6..music_list.len() {
+            let event_name = music_list[x].event_name.to_string();
+            if event_name.contains("BGM_Sys") { continue; }
+            if let Some(event) = music_list[x].change_event_name { 
+                list.push(event.to_string());
+            }
+            else if x >= 68 && x <= 74 { list.push(event_name); }
+        }
+        list
+
+    });
+ }
 
 #[unity::class("App", "MusicData")]
 pub struct MusicData {
@@ -30,130 +41,94 @@ pub struct MusicData {
 }
 impl Gamedata for MusicData {}
 
-pub fn get_bgm_pool() {
-    if BGM_POOL.lock().unwrap().len() != 0 { return; }
-    let music_list = MusicData::get_list().unwrap();
-    for x in 6..music_list.len() {
-        let event_name = music_list[x].event_name.to_string();
-        if event_name.contains("BGM_Sys") { continue; }
-        else if music_list[x].change_event_name.is_some() { BGM_POOL.lock().unwrap().push(music_list[x].change_event_name.unwrap().to_string());  }
-        else if x >= 68 && x <= 74 {
-            BGM_POOL.lock().unwrap().push(event_name);
-        }
-    }
-    let chapter_list = ChapterData::get_list().unwrap();
-    let mut list = CHAPTER_BGM_LIST.lock().unwrap();
-    for x in 0..chapter_list.len() {
-        if x >= 150 { break; }
-        let chapter = &chapter_list[x as usize];
-        unsafe {
-            list[3*x] = get_music_event_index( chapter_get_player_bgm(chapter, None) );
-            list[3*x+1] = get_music_event_index( chapter_get_enemy_bgm(chapter, None) );
-            list[3*x+2] = get_music_event_index( chapter_get_ally_bgm(chapter, None) );
-        }
-    }
-}
-fn get_music_event_index(bgm: Option<&Il2CppString>) -> i32 {
-    if bgm.is_none() { return -1; }
-    let music_list = MusicData::get_list().unwrap();
-    let compare = bgm.unwrap().to_string();
-
-    for x in 0..music_list.len() {
-        if music_list[x].change_event_name.is_none() { continue; }
-        if music_list[x].change_event_name.unwrap().to_string() == compare { return x as i32; }
-    }
-    return -1;
-}
-
-
-fn get_chapter_bgm(chapter: &ChapterData){
-    unsafe {
-        let x = chapter.parent.index as usize;
-        BGM_INDEX[0] = CHAPTER_BGM_LIST.lock().unwrap()[3*x];
-        BGM_INDEX[1] = CHAPTER_BGM_LIST.lock().unwrap()[3*x+1];
-        BGM_INDEX[2] = CHAPTER_BGM_LIST.lock().unwrap()[3*x+2];
-    }
-}
-pub fn randomize_bgm_map() {
-    if !crate::utils::can_rand() { return; }
-    if GameUserData::is_encount_map() { return; }
+fn get_current_chapter_chapter_bgm(){
     let chapter = GameUserData::get_chapter();
-    get_chapter_bgm(chapter);
-    // Initial Randomized at Map Start
-    if !GameVariableManager::get_bool("G_RandomBGM") { return; }
+    GameVariableManager::make_entry_str("OBGM1", chapter.get_player_bgm().unwrap());
+    GameVariableManager::make_entry_str("OBGM2", chapter.get_enemy_bgm().unwrap());
+    GameVariableManager::make_entry_str("OBGM3", chapter.get_ally_bgm().unwrap());
+    GameVariableManager::make_entry_str("CBGM1", chapter.get_player_bgm().unwrap());
+    GameVariableManager::make_entry_str("CBGM2", chapter.get_enemy_bgm().unwrap());
+    GameVariableManager::make_entry_str("CBGM3", chapter.get_ally_bgm().unwrap());
+}
+pub fn set_random_bgm_phase(){
+    let chapter = GameUserData::get_chapter();
+    let pool = BGM_POOL.get().unwrap();
     let rng = Random::get_game();
-    let size = BGM_POOL.lock().unwrap().len() as i32;
-    let string1 = (&BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize]).into();
-    let string2 = (&BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize]).into();
-    let string3 = (&BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize]).into();
+    let size = pool.len() as i32;
+    let player = rng.get_value( size );
+    let enemy = rng.get_value( size );
+    let ally = rng.get_value( size );
+    let string1 = pool[ player as usize].as_str().into();
+    let string2 = pool[ enemy as usize].as_str().into();
+    let string3 = pool[ ally as usize].as_str().into();
+
+    GameVariableManager::set_string("CBGM1", string1);
+    GameVariableManager::set_string("CBGM2", string2);
+    GameVariableManager::set_string("CBGM3", string3);
     unsafe {
         set_phase_bgm(string1, string2, string3, None);
         set_first_played_flag(None);
-        chapter_set_ally_bgm(chapter, string3, None);
-        chapter_set_enemy_bgm(chapter, string2, None);
-        chapter_set_player_bgm(chapter, string1, None);
     }
+    chapter.set_player_bgm(string1);
+    chapter.set_enemy_bgm(string2);
+    chapter.set_ally_bgm(string3);
+}
+
+
+pub fn randomize_bgm_map() {
+    if !crate::utils::can_rand() { return; }
+    if GameUserData::is_encount_map() { return; }
+    get_current_chapter_chapter_bgm();
+    if !GameVariableManager::get_bool(DVCVariables::BGM_KEY) { return; }
+    set_random_bgm_phase();
     get_random_special(true);
 }
 #[skyline::hook(offset=0x0228deb0)]
 pub fn special_bgm_hook(calculator: u64, method_info: OptionalMethod) -> Option<&'static Il2CppString> {
     let result = call_original!(calculator, method_info);
-    if result.is_some() && GameVariableManager::get_bool("G_RandomBGM") { return Some(get_random_special(false)); }
+    if result.is_some() && GameVariableManager::get_bool(DVCVariables::BGM_KEY) { return Some(get_random_special(false)); }
     else { return result; }
 }
 
 fn get_random_special(set: bool) -> &'static Il2CppString {
     let rng = Random::get_game();
-    let size = BGM_POOL.lock().unwrap().len() as i32;
-    if !GameVariableManager::exist("SPECIAL_BGM") {
-        GameVariableManager::make_entry_str("SPECIAL_BGM", BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize].as_str());
+    let pool = BGM_POOL.get().unwrap();
+    let size = pool.len() as i32;
+    if !GameVariableManager::exist("SBGM") {
+        GameVariableManager::make_entry_str("SBGM", pool[ rng.get_value( size ) as usize].as_str());
     }
-    else if set { GameVariableManager::set_string("SPECIAL_BGM", BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize].as_str()); }
-    GameVariableManager::get_string("SPECIAL_BGM") 
+    else if set { GameVariableManager::set_string("SBGM", pool[ rng.get_value( size ) as usize].as_str()); }
+    GameVariableManager::get_string("SBGM") 
 }
 
 pub fn reset_bgm() {
-    let chapter = GameUserData::get_chapter();
+    GameVariableManager::set_string("CBGM1",  GameVariableManager::get_string("OBGM1"));
+    GameVariableManager::set_string("CBGM2",  GameVariableManager::get_string("OBGM2"));
+    GameVariableManager::set_string("CBGM3",  GameVariableManager::get_string("OBGM3"));
+
     unsafe {
-        let x = chapter.parent.index as usize;
-        BGM_INDEX[0] = CHAPTER_BGM_LIST.lock().unwrap()[3*x];
-        BGM_INDEX[1] = CHAPTER_BGM_LIST.lock().unwrap()[3*x+1];
-        BGM_INDEX[2] = CHAPTER_BGM_LIST.lock().unwrap()[3*x+2];
+        set_phase_bgm(GameVariableManager::get_string("OBGM1"), GameVariableManager::get_string("OBGM2"), GameVariableManager::get_string("OBGM3"), None);
     }
 }
 pub fn change_bgm() {
+    if GameUserData::is_encount_map() { return; }
     let chapter = GameUserData::get_chapter();
-    if unsafe {  BGM_INDEX[0] == -1 && BGM_INDEX[1] == -1 &&  BGM_INDEX[2] == -1 } {
-        if GameUserData::is_encount_map() { return; }
-        get_chapter_bgm(chapter);
+    if !GameVariableManager::exist("CBGM1") || !GameVariableManager::exist("CBGM2") || !GameVariableManager::exist("CBGM3") {
+        get_current_chapter_chapter_bgm();
     }
-    let rng = Random::get_game();
-    if GameVariableManager::get_bool("G_RandomBGM") {
-        let size = BGM_POOL.lock().unwrap().len() as i32;
-        let string1 = (&BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize]).into();
-        let string2 = (&BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize]).into();
-        let string3 = (&BGM_POOL.lock().unwrap()[ rng.get_value( size ) as usize]).into();
-
-        unsafe {
-            set_phase_bgm(string1, string2, string3, None);
-            chapter_set_ally_bgm(chapter, string3, None);
-            chapter_set_enemy_bgm(chapter, string2, None);
-            chapter_set_player_bgm(chapter, string1, None);
-            field_bgm_play(0, None);
-        }
-        println!("Bgm: {}", string1.to_string());
+    if GameVariableManager::get_bool(DVCVariables::BGM_KEY) {
+        set_random_bgm_phase();
         get_random_special(true);
     }
     else {
-        let music_list = MusicData::get_list().unwrap();
         reset_bgm();
-        unsafe {
-            if BGM_INDEX[0] > 0 { chapter_set_player_bgm( chapter, music_list[ BGM_INDEX[0] as usize ].change_event_name.unwrap(), None ); }
-            if BGM_INDEX[1] > 0 { chapter_set_enemy_bgm(  chapter, music_list[ BGM_INDEX[1] as usize ].change_event_name.unwrap(), None ); }
-            if BGM_INDEX[2] > 0 { chapter_set_ally_bgm(  chapter, music_list[ BGM_INDEX[2] as usize ].change_event_name.unwrap(), None ); }
-            set_phase_by_chapter(chapter, false, None);
-            field_bgm_play(0, None);
-        }
+        chapter.set_player_bgm( GameVariableManager::get_string("OBGM1") ); 
+        chapter.set_enemy_bgm( GameVariableManager::get_string("OBGM2") ); 
+        chapter.set_ally_bgm( GameVariableManager::get_string("OBGM3") ); 
+    }
+    unsafe {
+        set_phase_by_chapter(chapter, false, None);
+        field_bgm_play(0, None);
     }
 }
 
@@ -162,13 +137,13 @@ pub struct RandomBGMMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomBGMMod {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_map_bgm } 
-            else { GameVariableManager::get_bool("G_RandomBGM") };
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_map_bgm } 
+            else { GameVariableManager::get_bool(DVCVariables::BGM_KEY) };
             
         let result = ConfigBasicMenuItem::change_key_value_b(value);
         if value != result {
-            if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_map_bgm = result; }
-            else { GameVariableManager::set_bool("G_RandomBGM", result);  }
+            if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_map_bgm = result; }
+            else { GameVariableManager::set_bool(DVCVariables::BGM_KEY, result);  }
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -177,19 +152,19 @@ impl ConfigBasicMenuItemSwitchMethods for RandomBGMMod {
         return BasicMenuResult::new();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if GameUserData::get_sequence() == 0 {
+        if GameUserData::get_sequence() != 3 {
             this.help_text = if CONFIG.lock().unwrap().random_map_bgm { "Map BGM will be randomized for each phase." }
             else { "Default Map BGM for each phase."}.into();
         }
         else {
-            this.help_text = if GameVariableManager::get_bool("G_RandomBGM") { "Map BGM will be randomized. Press A to Change." }
+            this.help_text = if  GameVariableManager::get_bool(DVCVariables::BGM_KEY) { "Map BGM will be randomized. Press A to Change." }
             else { "Default Map BGM. Press A to Change."}.into();
         }
     }
 
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().random_map_bgm } 
-                    else { GameVariableManager::get_bool("G_RandomBGM") };
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_map_bgm } 
+            else {  GameVariableManager::get_bool(DVCVariables::BGM_KEY) };
         this.command_text = if value { "Random" } else { "Default" }.into();
     }
 }
@@ -227,21 +202,3 @@ fn field_bgm_play(force: i32, method_info: OptionalMethod);
 
 #[skyline::from_offset(0x0228d100)]
 pub fn set_first_played_flag(method_info: OptionalMethod);
-
-#[unity::from_offset("App", "ChapterData", "get_AllyPhaseBgm")]
-pub fn chapter_get_ally_bgm(this: &ChapterData, method_info: OptionalMethod) -> Option<&'static Il2CppString>;
-
-#[unity::from_offset("App", "ChapterData", "get_EnemyPhaseBgm")]
-pub fn chapter_get_enemy_bgm(this: &ChapterData, method_info: OptionalMethod) -> Option<&'static Il2CppString>;
-
-#[unity::from_offset("App", "ChapterData", "get_PlayerPhaseBgm")]
-pub fn chapter_get_player_bgm(this: &ChapterData, method_info: OptionalMethod) -> Option<&'static Il2CppString>;
-
-#[unity::from_offset("App", "ChapterData", "set_AllyPhaseBgm")]
-pub fn chapter_set_ally_bgm(this: &ChapterData, value: &Il2CppString, method_info: OptionalMethod);
-
-#[unity::from_offset("App", "ChapterData", "set_EnemyPhaseBgm")]
-pub fn chapter_set_enemy_bgm(this: &ChapterData, value: &Il2CppString, method_info: OptionalMethod);
-
-#[unity::from_offset("App", "ChapterData", "set_PlayerPhaseBgm")]
-pub fn chapter_set_player_bgm(this: &ChapterData, value: &Il2CppString, method_info: OptionalMethod);

@@ -8,15 +8,16 @@ use engage::{
 };
 use std::sync::Mutex;
 use crate::enums::*;
-use crate::CONFIG;
+use crate::{DVCVariables, CONFIG};
 
 use super::CUSTOM_EMBLEMS;
 pub static ENGAGE_ITEMS: Mutex<EngageItemList> = Mutex::new(
-    EngageItemList{ item_list: Vec::new(), 
-                god_items_list: Vec::new(), 
-                custom_god_items_list: Vec::new(),
-                engage_weapon: [2, 6, 66, 64, 2, 31, 18, 18, 10, 2, 514, 6, 28, 512, 14, 64, 64, 72, 66, 258, 0], 
-                custom_engage_weapon: [0; 20],
+    EngageItemList{ 
+        item_list: Vec::new(), 
+        god_items_list: Vec::new(), 
+        custom_god_items_list: Vec::new(),
+        engage_weapon: [2, 6, 66, 64, 2, 31, 18, 18, 10, 2, 514, 6, 28, 512, 14, 64, 64, 72, 66, 258, 0], 
+        custom_engage_weapon: [0; 20],
     });
 
 pub struct GodStyleItems {
@@ -84,11 +85,11 @@ impl EngageItemList {
         let mut new_item = EngageItem::new(index, god, weapon, is_bow, is_first, emblem_index);
         let mess = Mess::get(item.help);
         new_item.miid = item.help.to_string();
-        
         for x in 0..RINGS.len() {
             let mgid = Mess::get(format!("MGID_{}", RINGS[x])).to_string();
             if mess.contains(mgid) { new_item.mess_emblem = x as i32; }
         }
+        if new_item.miid.to_string().contains("Lueur") { new_item.mess_emblem = 25; }
         self.item_list.push(new_item);
     }
     pub fn bow_randomization(&mut self, rng: &Random) {
@@ -102,8 +103,8 @@ impl EngageItemList {
         });
         let list_size = bow_weapons.len();
         for x in 0..20 {
-            let god = GodData::get(format!("GID_{}", EMBLEM_ASSET[x])).unwrap();
-            if god.get_engage_attack().contains("リンエンゲージ技") {
+            let god = GodData::get(EMBLEM_GIDS[x]).unwrap();
+            if god.get_engage_attack().to_string().contains("リンエンゲージ技") {
                 if let Some(starting_index) = s_list.iter().position(|r| r.god_index == ( x as i32 ) ) {
                     let mut index = rng.get_value(list_size as i32) as usize;
                     while bow_weapons[index].1 { index = rng.get_value(list_size as i32) as usize; }
@@ -116,7 +117,7 @@ impl EngageItemList {
                 else { println!("No Available Engage Bows for Emblem {}'s Astra Storm", x); }
             }
             else if let Some(link_engage_attack) = god.get_engage_attack_link() {
-                if link_engage_attack.contains("リンエンゲージ技") {
+                if link_engage_attack.to_string().contains("リンエンゲージ技") {
                     if let Some(starting_index) = s_list.iter().position(|r| r.god_index == ( x as i32 ) && !r.is_first_item) {
                         let mut index = rng.get_value(list_size as i32) as usize;
                         while bow_weapons[index].1 { index = rng.get_value(list_size as i32) as usize; }
@@ -134,64 +135,58 @@ impl EngageItemList {
     // Get all engage items from GodGrowthData.LevelData
     pub fn intialize_list(&mut self){
         if self.item_list.len() != 0 { return; }
-        
         let mut x = 0;
-        EMBLEM_ASSET.iter().for_each(|&ggid|{
+        GGIDS.iter().for_each(|&ggid|{
             let mut style = GodStyleItems::new();
             if x < 20 {
-            if let Some(level_data) = GodGrowthData::get_level_data(&format!("GGID_{}",ggid)) {
-                for z in 0..9 {
-                    if level_data[0].style_items.items[z].len() >= 1 { style.items[z as usize] = level_data[0].style_items.items[z][0].parent.index; }
-                    if level_data[0].style_items.items[z].len() >= 2 { style.items[9+z as usize] = level_data[0].style_items.items[z][1].parent.index; }
-                    if level_data[0].style_items.items[z].len() >= 3 { style.items[18+z as usize] = level_data[0].style_items.items[z][2].parent.index; }
-                }
-                self.god_items_list.push(style);
-                if x != 13 {
-                    for y in 1..level_data.len() {
-                        let is_first = y < 10;
-                        for z in 0..9 {
-                            if level_data[y].style_items.items[z].len() != 0 {
-                                for aa in 0..level_data[y].style_items.items[z].len() {
-                                    if x == 9 { //Byleth
-                                        if z < 2 && is_first { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, is_first, x as i32); }
-                                        else { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, false, x as i32); }
+                if let Some(level_data) = GodGrowthData::get_level_data(ggid) {
+                    for z in 0..9 {
+                        if level_data[0].style_items.items[z].len() >= 1 { style.items[z as usize] = level_data[0].style_items.items[z][0].parent.index; }
+                        if level_data[0].style_items.items[z].len() >= 2 { style.items[9+z as usize] = level_data[0].style_items.items[z][1].parent.index; }
+                        if level_data[0].style_items.items[z].len() >= 3 { style.items[18+z as usize] = level_data[0].style_items.items[z][2].parent.index; }
+                    }
+                    self.god_items_list.push(style);
+                    if x != 13 {
+                        for y in 1..level_data.len() {
+                            let is_first = y < 10;
+                            for z in 0..9 {
+                                if level_data[y].style_items.items[z].len() != 0 {
+                                    for aa in 0..level_data[y].style_items.items[z].len() {
+                                        if x == 9 { //Byleth
+                                            if z < 2 && is_first { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, is_first, x as i32); }
+                                            else { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, false, x as i32); }
+                                        }
+                                        else { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, is_first, x as i32); }
                                     }
-                                    else { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, is_first, x as i32); }
                                 }
                             }
                         }
                     }
                 }
             }
-            }
             x += 1;
         });
         // Adding Valid Custom Engage Weapons
         if CUSTOM_EMBLEMS.lock().unwrap()[0] < 1 { return; }
-        let god_list = GodData::get_list().unwrap();
         println!("Adding Weapons from Custom Emblems");
         let n_customs = CUSTOM_EMBLEMS.lock().unwrap()[0] as usize;
         for x in 0..n_customs {
-            let index = CUSTOM_EMBLEMS.lock().unwrap()[x+1] as usize;
-            if index >= god_list.len() { continue; }
-            let growth_data = god_list[index].get_grow_table();
-            if growth_data.is_none() { continue; }
-            let lvl_data = GodGrowthData::get_level_data(&growth_data.unwrap().to_string());
-            if lvl_data.is_none() { continue; }
-            let level_data = lvl_data.unwrap();
-            let mut style = GodStyleItems::new();
-            for z in 0..9 {
-                if level_data[0].style_items.items[z].len() >= 1 { style.items[z as usize] = level_data[0].style_items.items[z][0].parent.index; }
-                if level_data[0].style_items.items[z].len() >= 2 { style.items[9+z as usize] = level_data[0].style_items.items[z][1].parent.index; }
-                if level_data[0].style_items.items[z].len() >= 3 { style.items[18+z as usize] = level_data[0].style_items.items[z][2].parent.index; }
-            }
-            self.custom_god_items_list.push(style);
-            for y in 1..level_data.len() {
-                let is_first = y < 10;
+            let index = CUSTOM_EMBLEMS.lock().unwrap()[x+1];
+            if let Some(level_data) = super::emblem_skill::get_god_level_data_by_index(index) {
+                let mut style = GodStyleItems::new();
                 for z in 0..9 {
-                    if level_data[y].style_items.items[z].len() != 0 {
-                        for aa in 0..level_data[y].style_items.items[z].len() {
-                            self.add_list(&level_data[y].style_items.items[z][aa], 30 + x as i32, is_first, 30 + x as i32); 
+                    if level_data[0].style_items.items[z].len() >= 1 { style.items[z as usize] = level_data[0].style_items.items[z][0].parent.index; }
+                    if level_data[0].style_items.items[z].len() >= 2 { style.items[9+z as usize] = level_data[0].style_items.items[z][1].parent.index; }
+                    if level_data[0].style_items.items[z].len() >= 3 { style.items[18+z as usize] = level_data[0].style_items.items[z][2].parent.index; }
+                }
+                self.custom_god_items_list.push(style);
+                for y in 1..level_data.len() {
+                    let is_first = y < 10;
+                    for z in 0..9 {
+                        if level_data[y].style_items.items[z].len() != 0 {
+                            for aa in 0..level_data[y].style_items.items[z].len() {
+                                self.add_list(&level_data[y].style_items.items[z][aa], 30 + x as i32, is_first, 30 + x as i32); 
+                            }
                         }
                     }
                 }
@@ -202,7 +197,7 @@ impl EngageItemList {
         let list_size = self.item_list.len() as i32;
         for x in 0..20 {
             if x == 13 { continue; }      // ignore Tiki
-            let god = GodData::get(format!("GID_{}", EMBLEM_ASSET[x])).unwrap();
+            let god = GodData::get(EMBLEM_GIDS[x]).unwrap();
             let can_bow: bool;
             let non_weapons: bool;
             if god.get_engage_attack_link().is_some() {
@@ -270,20 +265,16 @@ impl EngageItemList {
         self.custom_engage_weapon = [0; 20];
     }
     pub fn get_replacement(&self, item_index: i32) -> &'static ItemData {
-        let item_list = ItemData::get_list().unwrap();
-        let found = self.item_list.iter().find(|x| x.item_index == item_index);
-        if found.is_some() {
-            let new_index = found.unwrap().replaced_index;
-            if new_index == -1 {
-                return &item_list[item_index as usize];
-            }
+        if let Some(found) = self.item_list.iter().find(|x| x.item_index == item_index) {
+            let new_index = found.replaced_index;
+            if new_index == -1 { return ItemData::try_index_get(item_index).unwrap();  }
             let new_item_index = self.item_list[new_index as usize].item_index;
-            return &item_list[new_item_index as usize];
+            return ItemData::try_index_get(new_item_index).unwrap(); 
         }
-        else { return &item_list[item_index as usize]; }
+        else { return ItemData::try_index_get(item_index).unwrap(); }
     }
     pub fn get_replacement_iid(&self, iid: &'static Il2CppString) -> &'static Il2CppString {
-        if let Some(item) = ItemData::get(&iid.to_string()) {
+        if let Some(item) = ItemData::get(iid) {
             let item_index = item.parent.index; 
             let replacement_item = self.get_replacement(item_index);
             replacement_item.iid
@@ -300,7 +291,6 @@ impl EngageItemList {
             let index = god_index - 30;
             self.custom_engage_weapon[index as usize] = self.custom_engage_weapon[index as usize] | ( 1 << item.kind );
         }
-
     }
     pub fn commit(&mut self){
         for x in 0..20 {
@@ -309,9 +299,9 @@ impl EngageItemList {
                 continue; 
             }
             self.engage_weapon[x as usize] = 0;
-            let growth_id = format!("GGID_{}", EMBLEM_ASSET[x]);
-            let level_data = GodGrowthData::get_level_data(&growth_id).unwrap();
-            for y in 0..level_data.len() { level_data[y].style_items.clear();  }
+            let level_data = GodGrowthData::get_level_data(GGIDS[x]).unwrap();
+            level_data.iter_mut().for_each(|level|level.style_items.clear());
+             //clearing the list
             for z in 0..9 {
                 let index = self.god_items_list[x as usize].items[z as usize];
                 if index != -1 {
@@ -335,45 +325,38 @@ impl EngageItemList {
                 }
             }
         }
-
         if CUSTOM_EMBLEMS.lock().unwrap()[0] < 1 { return; }
-        let god_list = GodData::get_list().unwrap();
         println!("Randomizing Custom Engage Weapons");
         let n_customs = CUSTOM_EMBLEMS.lock().unwrap()[0] as usize;
         let mut custom_god_index = -1;
         for x in 0..n_customs {
-            let index = CUSTOM_EMBLEMS.lock().unwrap()[x+1] as usize;
-            if index >= god_list.len() { continue; }
-            let growth_data = god_list[index].get_grow_table();
-            if growth_data.is_none() { continue; }
-            let lvl_data = GodGrowthData::get_level_data(&growth_data.unwrap().to_string());
-            if lvl_data.is_none() { continue; }
-            let level_data = lvl_data.unwrap();
-            custom_god_index += 1; 
-            for y in 0..level_data.len() { level_data[y].style_items.clear();  }
-            for z in 0..9 {
-                let index = self.custom_god_items_list[custom_god_index as usize].items[z as usize];
-                if index != -1 {
-                    let item = self.get_replacement(index);
-                    for y in 0..level_data.len() { level_data[y].style_items.add_item(z, item); }
-                    self.add_weapon_flag(30 + x as i32, item);
-                }
-                let index2 = self.custom_god_items_list[custom_god_index as usize].items[9+z as usize];
-                if index2 != -1 {
-                    let item2 = self.get_replacement(index2);
-                    for y in 10..level_data.len() { level_data[y].style_items.add_item(z, item2); }
-                    level_data[0].style_items.add_item(z, item2);
-                    self.add_weapon_flag(30 + x as i32, item2);
-                }
-                let index_3 = self.custom_god_items_list[custom_god_index as usize].items[18+z as usize];
-                if index_3 != -1 {
-                    let item3 = self.get_replacement(index_3);
-                    for y in 15..level_data.len() { level_data[y].style_items.add_item(z, item3); }
-                    level_data[0].style_items.add_item(z, item3);
-                    self.add_weapon_flag(30 + x as i32, item3);
+            let index = CUSTOM_EMBLEMS.lock().unwrap()[x+1];
+            if let Some(level_data) = super::emblem_skill::get_god_level_data_by_index(index) {
+                custom_god_index += 1; 
+                level_data.iter_mut().for_each(|level|level.style_items.clear());
+                for z in 0..9 {
+                    let index = self.custom_god_items_list[custom_god_index as usize].items[z as usize];
+                    if index != -1 {
+                        let item = self.get_replacement(index);
+                        for y in 0..level_data.len() { level_data[y].style_items.add_item(z, item); }
+                        self.add_weapon_flag(30 + x as i32, item);
+                    }
+                    let index2 = self.custom_god_items_list[custom_god_index as usize].items[9+z as usize];
+                    if index2 != -1 {
+                        let item2 = self.get_replacement(index2);
+                        for y in 10..level_data.len() { level_data[y].style_items.add_item(z, item2); }
+                        level_data[0].style_items.add_item(z, item2);
+                        self.add_weapon_flag(30 + x as i32, item2);
+                    }
+                    let index_3 = self.custom_god_items_list[custom_god_index as usize].items[18+z as usize];
+                    if index_3 != -1 {
+                        let item3 = self.get_replacement(index_3);
+                        for y in 15..level_data.len() { level_data[y].style_items.add_item(z, item3); }
+                        level_data[0].style_items.add_item(z, item3);
+                        self.add_weapon_flag(30 + x as i32, item3);
+                    }
                 }
             }
-
         }
     }
     pub fn print(&self, emblem: i32, level: i32) -> String {
@@ -404,42 +387,34 @@ impl EngageItemList {
 }
 
 pub fn can_engage_bow(engage_atk: &String) -> bool {
-    if engage_atk == "SID_マルスエンゲージ技" { return false; }
-    if engage_atk == "SID_シグルドエンゲージ技" { return false; }
-    if engage_atk == "SID_ロイエンゲージ技" { return false;}
-    if engage_atk == "SID_ルキナエンゲージ技" { return false;}
-    if engage_atk == "SID_アイクエンゲージ技" { return false;}
-    if engage_atk == "SID_エイリークエンゲージ技" { return false; }
-    if engage_atk == "SID_クロムエンゲージ技" {return false;}
-    if engage_atk == "SID_ヘクトルエンゲージ技" || engage_atk == "SID_ヘクトルエンゲージ技＋" { return false; }
-    if engage_atk == "SID_クロムエンゲージ技" || engage_atk == "SID_クロムエンゲージ技＋" {return false;}
-    if engage_atk == "SID_カミラエンゲージ技" || engage_atk == "SID_カミラエンゲージ技＋" { return false;}
-    if engage_atk == "SID_リュールエンゲージ技" || engage_atk == "SID_リュールエンゲージ技共同" { return false;}
+    if let Some(pos) = EMBLEM_ASSET.iter().position(|emblem| engage_atk.contains(emblem)) {
+        match pos {
+            0|1|4|6|8|11|14|17|18|19 => { return false; }
+            _ => { return true; }
+        }
+
+    }
     return true;
 }
 pub fn can_equip_non_weapons(engage_atk: &String) -> bool {
-    if engage_atk == "SID_マルスエンゲージ技" { return false; }
-    if engage_atk == "SID_シグルドエンゲージ技" { return false; }
-    if engage_atk == "SID_ロイエンゲージ技" { return false;}
-    if engage_atk == "SID_ルキナエンゲージ技" { return false;}
-    if engage_atk == "SID_アイクエンゲージ技" { return false;}
-    if engage_atk == "SID_エイリークエンゲージ技" { return false; }
-    if engage_atk == "SID_リンエンゲージ技" { return false; }
-    if engage_atk == "SID_クロムエンゲージ技" || engage_atk == "SID_クロムエンゲージ技＋" {return false;}
-    if engage_atk.contains("リュール") || engage_atk.contains("ヘクトル") || engage_atk.contains("カミラ") { return false;}
-    return true;
+    if let Some(pos) = EMBLEM_ASSET.iter().position(|emblem| engage_atk.contains(emblem)) {
+        match pos {
+            2|3|5|9|10|12|13|15|16 => { return true; }
+            _ => { return false; }
+        }
+
+    }
+    return true;    //Three Houses
 }
 
 pub fn randomized_emblem_apts() {
-    if unsafe { super::super::STATUS.emblem_apt_randomized } { return; }
-    let mode = GameVariableManager::get_number("G_EmblemWepProf");
+    if crate::randomizer::RANDOMIZER_STATUS.read().unwrap().emblem_apt_randomized { return; }
+    let mode = GameVariableManager::get_number(DVCVariables::WEAPON_PROF_KEY);
     if mode == 0  { return; }
     let rng = crate::utils::get_rng();
-    for x in EMBLEM_ASSET {
-        if x == "ディミトリ" { break; }
-        let god = GodData::get(&format!("GID_{}", x)).unwrap();
-        randomize_god_apts(god, mode, rng);
-    }
+    EMBLEM_GIDS.iter().for_each(|gid|{
+        randomize_god_apts(GodData::get(gid).unwrap(), mode, rng);
+    });
     if CUSTOM_EMBLEMS.lock().unwrap()[0] < 1 { return; }
     let god_list = GodData::get_list().unwrap();
     println!("Adding Weapons from Custom Emblems");
@@ -450,7 +425,7 @@ pub fn randomized_emblem_apts() {
         let god = &god_list[index];
         randomize_god_apts(god, mode, rng);
     }
-    unsafe { super::super::STATUS.emblem_apt_randomized = true };
+    let _ = crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.emblem_apt_randomized = true);
 }
 
 fn randomize_god_apts(god: &GodData, mode: i32, rng: &Random) {
@@ -463,14 +438,15 @@ fn randomize_god_apts(god: &GodData, mode: i32, rng: &Random) {
         let mut weapons_set: [bool; 8] = [false; 8];
         let mut apt: [i32; 25] = [0; 25];
         let mut current_apt = 0;
-        for y in 1..level_data.len(){
+        let max = crate::utils::min(level_data.len() as i32, 24) as usize;
+        let gmax =  crate::utils::min(grow_data.len() as i32, 24) as usize;
+        for y in 1..max {
             apt[y] = level_data[y].aptitude.value;
         }
         let mut count = 0;
         let mut kind: usize;
-        let max = level_data.len();
-        let gmax = grow_data.len();
-        for y in 2..level_data.len() {
+
+        for y in 2..max {
             if apt[y] == apt[y-1] { 
                 level_data[y].aptitude.value = current_apt; 
                 continue; 
@@ -483,7 +459,7 @@ fn randomize_god_apts(god: &GodData, mode: i32, rng: &Random) {
             level_data[y].aptitude.value = current_apt; 
             weapons_set[kind] = true;
             count += 1;
-            if y < grow_data.len() { grow_data[y-1].aptitude.value = 1 << ( kind + 1); }
+            if y < gmax { grow_data[y-1].aptitude.value = 1 << ( kind + 1); }
         }
         if count < 3 {
             loop {
@@ -498,8 +474,8 @@ fn randomize_god_apts(god: &GodData, mode: i32, rng: &Random) {
     }
     else {  // None
         level_data[0].aptitude.value = 0;
-        for y in 0..grow_data.len() { grow_data[y].aptitude.value = 0; }
-        for y in 0..level_data.len() { level_data[y].aptitude.value = 0; }
+        grow_data.iter_mut().for_each(|level|level.aptitude.value = 0);
+        level_data.iter_mut().for_each(|level| level.aptitude.value = 0);
     }
 }
 

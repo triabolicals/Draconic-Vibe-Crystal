@@ -1,6 +1,6 @@
 use super::*;
-use std::sync::Mutex;
-pub static INTERACT_DEFAULT: Mutex<[i32; 30]> = Mutex::new([0; 30]);
+use std::sync::OnceLock;
+pub static INTERACT_DEFAULT: OnceLock<Vec<i32>> = OnceLock::new();
 
 #[unity::class("App", "InteractData")]
 pub struct InteractData {
@@ -13,13 +13,13 @@ impl Gamedata for InteractData {}
 pub struct InteractionSettings;
 impl ConfigBasicMenuItemSwitchMethods for InteractionSettings {
     fn init_content(_this: &mut ConfigBasicMenuItem){
-        GameVariableManager::make_entry("InteractSetting", GameVariableManager::get_number("G_InteractSetting") );
+         GameVariableManager::make_entry("InteractSetting", GameVariableManager::get_number(DVCVariables::INTERACT_KEY) );
     }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value =  if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().interaction_type } else { GameVariableManager::get_number("InteractSetting") };
+        let value =  if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().interaction_type } else { GameVariableManager::get_number("InteractSetting") };
         let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 6, 1);
         if value != result {
-            if GameUserData::get_sequence() == 0 {  CONFIG.lock().unwrap().interaction_type = result;  }
+            if DVCVariables::is_main_menu() {  CONFIG.lock().unwrap().interaction_type = result;  }
             else {  GameVariableManager::set_number("InteractSetting", result);  }
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
@@ -28,7 +28,7 @@ impl ConfigBasicMenuItemSwitchMethods for InteractionSettings {
         } else {return BasicMenuResult::new(); }
     } 
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if GameUserData::get_sequence() == 0 {  CONFIG.lock().unwrap().interaction_type } else { GameVariableManager::get_number("InteractSetting") };
+        let value = if DVCVariables::is_main_menu() {  CONFIG.lock().unwrap().interaction_type } else { GameVariableManager::get_number("InteractSetting") };
         let string1: String = match value {
             1 => { "Reversed weapon type interactions." },
             2 => { "Same weapon type only interactions."},
@@ -38,15 +38,16 @@ impl ConfigBasicMenuItemSwitchMethods for InteractionSettings {
             6 => { "All weapon types interact with each other."},
             _ => { "Default weapon type interactions."},
         }.to_string();
-        if GameVariableManager::get_number("InteractSetting") != GameVariableManager::get_number("G_InteractSetting") {  
+        if GameVariableManager::get_number("InteractSetting") != GameVariableManager::get_number(DVCVariables::INTERACT_KEY) {  
             this.help_text = format!("{} (Press A to change)", string1).into();
         }
         else { this.help_text = string1.into(); }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if GameUserData::get_sequence() == 0 { CONFIG.lock().unwrap().interaction_type }
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().interaction_type }
             else { GameVariableManager::get_number("InteractSetting") };
-        this.command_text = interaction_setting_text( value ).into();
+        let changed = DVCVariables::changed_setting_text("InteractSetting", DVCVariables::INTERACT_KEY);
+        this.command_text = format!("{}{}", changed, interaction_setting_text( value )).into();
     }
 }
 fn interaction_setting_text(choice: i32) -> String {
@@ -62,11 +63,11 @@ fn interaction_setting_text(choice: i32) -> String {
 }
 
 pub fn interaction_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    if GameUserData::get_sequence() == 0 {return BasicMenuResult::new(); }
-    if GameVariableManager::get_number("InteractSetting") == GameVariableManager::get_number("G_InteractSetting") { return BasicMenuResult::new();}
+    if DVCVariables::is_main_menu() {return BasicMenuResult::new(); }
+    if GameVariableManager::get_number("InteractSetting") == GameVariableManager::get_number(DVCVariables::INTERACT_KEY) { return BasicMenuResult::new();}
     if GameVariableManager::get_number("InteractSetting") == 3 && !crate::utils::can_rand() { return BasicMenuResult::new(); }
     let text = format!("Change Weapon Interactions:\n\tFrom '{}' to '{}'?",
-        interaction_setting_text( GameVariableManager::get_number("G_InteractSetting")), 
+        interaction_setting_text( GameVariableManager::get_number(DVCVariables::INTERACT_KEY)), 
         interaction_setting_text( GameVariableManager::get_number("InteractSetting")), 
     );
     YesNoDialog::bind::<InteractionConfirm>(this.menu, text, "Do it!", "Nah..");
@@ -75,12 +76,13 @@ pub fn interaction_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: O
 pub struct InteractionConfirm;
 impl TwoChoiceDialogMethods for InteractionConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
-        GameVariableManager::set_number("G_InteractSetting", GameVariableManager::get_number("InteractSetting"));
-        change_interaction_data( GameVariableManager::get_number("InteractSetting") );
+        GameVariableManager::set_number(DVCVariables::INTERACT_KEY, GameVariableManager::get_number("InteractSetting"));
+        change_interaction_data( GameVariableManager::get_number("InteractSetting"), false);
         unsafe { 
             let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap());
             let index = menu.select_index;
             InteractionSettings::set_help_text(menu.menu_item_list[index as usize], None);
+            InteractionSettings::set_command_text(menu.menu_item_list[index as usize], None);
             menu.menu_item_list[index as usize].update_text();
         }
         BasicMenuResult::se_cursor().with_close_this(true)
@@ -96,14 +98,16 @@ pub extern "C" fn vibe_interaction() -> &'static mut ConfigBasicMenuItem {
 }
 
 
-pub fn change_interaction_data(choice: i32) {
+pub fn change_interaction_data(choice: i32, loaded: bool) {
+    if loaded && choice == 0 { return; }
     let interact_data = InteractData::get_list_mut().unwrap();
     println!("Change Interaction to {}", choice);
+    let interact = INTERACT_DEFAULT.get().unwrap();
     match choice {
         1 => {  //Reverse
             for x in 0..10 {
-                interact_data[x as usize].flag.value = INTERACT_DEFAULT.lock().unwrap()[ 10 + x as usize ];
-                interact_data[ x as usize + 10 ].flag.value = INTERACT_DEFAULT.lock().unwrap()[ x as usize ];
+                interact_data[x as usize].flag.value = interact[ 10 + x as usize ];
+                interact_data[ x as usize + 10 ].flag.value = interact[ x as usize ];
             }
         },
         2 => {  //Self-Interaction
@@ -152,21 +156,32 @@ pub fn change_interaction_data(choice: i32) {
             }
         },
         _ => {
-            for x in 0..20 { interact_data[x as usize].flag.value = INTERACT_DEFAULT.lock().unwrap()[x as usize] as i32;  }
+            for x in 0..20 { interact_data[x as usize].flag.value = interact[x as usize] as i32;  }
         },
     }
 }
 
 pub fn get_style_interact_default_values() {
-    for x in 1..200 { if super::battle_styles::BATTLE_STYLES_DEFAULT.lock().unwrap()[x] > 0 { return; }  } // already set
-    let job_list = JobData::get_list_mut().unwrap();
-    for x in 1..job_list.len() {
-        let style_name = job_list[x].style_name.to_string();
-        let pos = crate::enums::STYLE_NAMES.iter().position(|&x| x == style_name);
-        if pos.is_some() { super::battle_styles::BATTLE_STYLES_DEFAULT.lock().unwrap()[x] = pos.unwrap() as i32; }
-        else { super::battle_styles::BATTLE_STYLES_DEFAULT.lock().unwrap()[x] = -1; }
-    }
-    let interact_data = InteractData::get_list().unwrap();
-    for x in 0..interact_data.len() { INTERACT_DEFAULT.lock().unwrap()[x] = interact_data[x].flag.value; }
+    super::battle_styles::BATTLE_STYLES_DEFAULT.get_or_init(||{
+        let mut list: Vec<i32> = Vec::new();
+        list.push(-1);
+        let job_list = JobData::get_list().unwrap();
+        for x in 1..job_list.len() {
+            let style_name = job_list[x].style_name.to_string();
+            if let Some(pos) = crate::enums::STYLE_NAMES.iter().position(|&x| x == style_name) {
+                list.push(pos as i32);
+            }
+            else {
+                list.push(-1);
+            }
+        }
+
+        list
+    });
+    INTERACT_DEFAULT.get_or_init(||{
+        let mut list: Vec<i32> = Vec::new();
+        InteractData::get_list().unwrap().iter().for_each(|data| list.push(data.flag.value));
+        list
+    });
 }
 

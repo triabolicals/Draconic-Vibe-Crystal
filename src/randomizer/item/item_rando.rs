@@ -60,7 +60,7 @@ impl WeaponData {
             if magic && item.range_o > 2 { true }
             else if !magic && item.range_o > 1 { true }
             else { false };
-
+        let is_rare = item.price == 100 || flags & 18 != 0;
         Self {
             item_index: item.parent.index,
             weapon_type: item.kind as u8 - 1,
@@ -77,13 +77,13 @@ impl WeaponData {
             is_crit: crit,
             is_range: range,
             is_effective: check_effectiveness(item),
-            is_rare: flags & 2 != 0,
+            is_rare: ( flags & 2 != 0 || is_rare ),
         }
     }
 
     pub fn can_replace(&self, item2: &WeaponData, kind: u8, enemy: bool) -> bool {
         if item2.is_rare { 
-            if !enemy || !GameVariableManager::get_bool("G_Cleared_M008") { return false; }
+            if !enemy || !DVCVariables::is_main_chapter_complete(8) { return false; }
         }
         if item2.weapon_type != kind { return false; }
         if self.is_slim == item2.is_slim { return true; }
@@ -357,8 +357,6 @@ impl WeaponDatabase {
         let index = possible_weapons[selection].item_index;
         return ItemData::try_index_get(index);
     }
-
-
 }
 
 
@@ -367,11 +365,12 @@ pub fn is_generic(item: &ItemData) -> bool {
     return super::unit_items::STANDARD_WEPS.iter().any(|&iid2| iid2 == iid.as_str());
 }
 pub fn is_vaild_weapon(item: &ItemData) -> bool {
-    if item.iid.to_string() == "IID_メティオ" { return false; }
-    if item.kind == 0 || item.kind > 9 { return false; }
+    let iid = item.iid.to_string(); 
     if item.icon.is_none() { return false; }
     if item.flag.value & 128 != 0  { return false; }
-
+    if Mess::get(item.name).to_string().len() <= 1 { return false;}
+    if item.kind == 0 || item.kind > 9 { return false; }
+    if iid == "IID_メティオ" || iid == "IID_ミセリコルデ" || iid == "IID_リベラシオン" { return false; }    // No Meteor / Liberation / Misercode
     return enums::ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == item.parent.index).is_none();
 }
 
@@ -386,20 +385,19 @@ pub fn check_effectiveness(item: &ItemData) -> bool {
 }
 pub fn get_min_rank() -> u8 {
     let story_chapter = crate::continuous::get_story_chapters_completed();
-    let continous = GameVariableManager::get_number("G_Continuous") == 3;
-    if GameVariableManager::get_bool("G_Cleared_M025") || (continous && story_chapter >= 25 ) { return 5;}
-    if GameVariableManager::get_bool("G_Cleared_M017") || (continous && story_chapter >= 16 && GameVariableManager::get_bool("G_Cleared_M011")) { return 3;}
-    if GameVariableManager::get_bool("G_Cleared_M006") || (continous && story_chapter >= 6)  { return 2;}
+    let continous = DVCVariables::is_random_map();
+    if DVCVariables::is_main_chapter_complete(25) || (continous && story_chapter >= 25 ) { return 5;}
+    if DVCVariables::is_main_chapter_complete(17) || (continous && story_chapter >= 16 && DVCVariables::is_main_chapter_complete(11)) { return 3;}
+    if DVCVariables::is_main_chapter_complete(6) || (continous && story_chapter >= 6)  { return 2;}
     return 1;
 }
 
 pub fn get_magic_staff() -> usize {
     let story_chapter = crate::continuous::get_story_chapters_completed();
-    let continous = GameVariableManager::get_number("G_Continuous") == 3;
-
-    if GameVariableManager::get_bool("G_Cleared_M021") { return 4;}
-    if GameVariableManager::get_bool("G_Cleared_M017") || (continous && story_chapter >= 16 && GameVariableManager::get_bool("G_Cleared_M011")) { return 3;}
-    if GameVariableManager::get_bool("G_Cleared_M011") { return 2;}
-    if GameVariableManager::get_bool("G_Cleared_M006") || (continous && story_chapter >= 6) { return 1;}
+    let continous = DVCVariables::is_random_map();
+    if DVCVariables::is_main_chapter_complete(21) { return 4;}
+    if DVCVariables::is_main_chapter_complete(17) || (continous && story_chapter >= 16 && DVCVariables::is_main_chapter_complete(11)) { return 3;}
+    if DVCVariables::is_main_chapter_complete(11) { return 2;}
+    if DVCVariables::is_main_chapter_complete(6) || (continous && story_chapter >= 6) { return 1;}
     return 0;
 }

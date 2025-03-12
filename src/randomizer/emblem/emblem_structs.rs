@@ -1,10 +1,4 @@
 use super::*;
-use engage::{
-    mess::Mess,
-    random::Random,
-};
-use std::fs::File;
-use std::io::Write;
 use super::super::skill::SKILL_POOL;
 
 pub struct EngageAttackIndex {
@@ -47,15 +41,21 @@ pub struct SynchoList {
     pub chaos_inherit_list: Vec<(i32, i32, bool)>,
     pub randomized: bool, 
     pub sync_list_size: i32, // Size before added
+    pub sync_rando: Vec<(i32, i32)>,
 }
+
+const EIRIKA_HASH: [i32; 12] = [ 1166279381, 1203307432, 244739392, 446418448, 933063973, -1323396701, 	1137740356, -1874837901, 919405771, -213541829, -1311625676, 1981791378];
+const NONE_SID: i32 = 359194254;
+const FRIENDLY_RIVARLRY: i32 = 1238512915;
+const NIGHT_DAY: i32 = 924387794;
+const BOOK_OF_WORLDS: i32 = 106021179;
 
 impl SynchoList {
     // For the three houses gambits to force them to be 4 separate skills instead of one 4-level skill
     pub fn add_to_non_upgrade(&mut self, sid: &str, is_not_randomized: bool){
         if let Some(skill) = SkillData::get(sid) {
             let skill_index = skill.parent.index;
-            let sid = skill.sid.to_string();
-            if skill.get_flag() & 1 == 1 && sid != "SID_無し" {  return; } 
+            if ( skill.get_flag() & 1 == 1 || skill.help.is_none() ) && skill.parent.hash != NONE_SID {  return; } 
             if self.sync_list.iter_mut().find(|x| x.index == skill_index).is_none() {
                 self.sync_list.push(SynchoSkill::new(skill_index, 0, false));
             }
@@ -66,8 +66,7 @@ impl SynchoList {
     }
     pub fn add_by_sid(&mut self, sid: &str, is_syncho: bool, is_not_randomized: bool){
         if let Some(skill) = SkillData::get(sid) { 
-            let sid = skill.sid.to_string();
-            if skill.get_flag() & 1 == 1 && sid != "SID_無し" {  return; }  
+            if (skill.get_flag() & 1 == 1 || skill.help.is_none() ) && skill.parent.hash != NONE_SID {  return; }  
             let index = skill.parent.index;
             self.add_list(skill, is_syncho);
             if self.non_random_skills.iter().find(|&&x| x == index).is_none() && is_not_randomized {
@@ -77,8 +76,7 @@ impl SynchoList {
     }
     pub fn add_by_index(&mut self, skill_index: i32, is_syncho: bool, is_not_randomized: bool){
         if let Some(skill) = SkillData::try_index_get(skill_index)  { 
-            let sid = skill.sid.to_string();
-            if skill.get_flag() & 1 == 1 && sid != "SID_無し" {  return; } 
+            if (skill.get_flag() & 1 == 1 || skill.help.is_none() ) && skill.parent.hash != NONE_SID {  return; } 
             self.add_list(skill, is_syncho);
             if !self.non_random_skills.iter().find(|&&x| x == skill_index).is_none() && is_not_randomized {
                 self.non_random_skills.push(skill_index); // Skills not do not get randomized to another skill but other skills can randomized to
@@ -109,6 +107,11 @@ impl SynchoList {
     }
     pub fn add_list(&mut self, skill: &SkillData, is_syncho: bool) {
         // ignore "None" "Night and Day", "Friendly Riviary"
+        let hash = skill.parent.hash;
+        if skill.help.is_none() && skill.parent.index > 2 {  return; }
+        if skill.flag & 1 != 0  && hash != NONE_SID {  return; }    // cannot be hidden
+        if hash == FRIENDLY_RIVARLRY || hash == NIGHT_DAY   { return; }
+
         let can_inherit = skill.get_inheritance_cost() != 0;
         if can_inherit {
             if !self.inherit_cost.iter().any(|c| c.0 == skill.parent.index) {
@@ -119,11 +122,9 @@ impl SynchoList {
             }
         }
         let only_chaos = !can_inherit && !is_syncho;
-        //if !can_inherit && !is_syncho { return; }   
         let sid = skill.sid.to_string();
-        if skill.get_flag() & 1 == 1 && sid != "SID_無し" {  return; }    // cannot be hidden
-        if sid == "SID_オルタネイト" || sid == "SID_切磋琢磨"  { return; }
-        if sid == "SID_異界の力" { // if book of worlds
+
+        if hash == BOOK_OF_WORLDS { // if book of worlds
             self.add_inherit(skill.parent.index, 0, is_syncho, can_inherit, only_chaos, false);
             return;
         }
@@ -148,6 +149,7 @@ impl SynchoList {
         self.reset_skill_cost();
         if self.sync_list_size as usize > self.sync_list.len() { self.sync_list.drain(self.sync_list_size as usize..); }
         self.chaos_inherit_list.iter_mut().for_each(|x| x.1 = -1);  
+        self.sync_rando.clear();
     }
     pub fn randomized(&mut self, rng: &Random) {
         if self.randomized { return; }
@@ -191,7 +193,7 @@ impl SynchoList {
         s_list[1].randomized_index = value; s_list[ value as usize].in_use = true; s_list[1].skill_used = true;
         for x in 2..size {
             if s_list[x as usize].randomized_index != -1 { continue; }
-            if self.non_random_skills.iter().find(|&&y| y == s_list[x as usize].index ).is_some() { 
+            if self.non_random_skills.iter().find(|&&y| y == s_list[x as usize].index ).is_some() { //Prevent the non-randomized from being pick to replaced
                 s_list[x as usize].randomized_index = x as i32;
                 continue; 
             }
@@ -234,12 +236,10 @@ impl SynchoList {
             c_list[x as usize ].randomized_index = value;
         }
         // Inherit Chaos Mode
-        if GameVariableManager::get_number("G_SPCost") == 2 {
+        if GameVariableManager::get_number(DVCVariables::SP_KEY) == 2 {
             let skill_pool = SKILL_POOL.lock().unwrap();
             let mut available: Vec<i32> = Vec::with_capacity(skill_pool.len());
             skill_pool.iter().for_each(|x| available.push(x.index));
-            println!("Skill Pool For Inherit Rando: {}", available.len());
-            println!("Inherit Skill Size: {}", self.chaos_inherit_list.len());
             if available.len() < self.chaos_inherit_list.len() {
                 let msg = format!("Skill Inherit List exceeds Skill Pool List.\nInherit List Size: {} vs Skill Pool Size: {}\nPlease set non-inheritables to 0 SP.", self.chaos_inherit_list.len(), available.len());
                 panic!("{}", msg.as_str());
@@ -258,59 +258,103 @@ impl SynchoList {
         self.randomized = true;
     }
     pub fn get_replacement_sid(&mut self, sid: &Il2CppString, is_inherit: bool) -> &'static SkillData {
-        if let Some(skill) = SkillData::get(&sid.to_string()) { 
-            if is_inherit && GameVariableManager::get_number("G_SPCost") == 2 {
-                return if let Some(skill2) = self.inherit_skill_chaos_mode(skill){skill2 }
-                    else {  SkillData::get("SID_無し").unwrap() };
+        if let Some(skill) = SkillData::get(sid) { 
+            if is_inherit && GameVariableManager::get_number(DVCVariables::SP_KEY) == 2 {
+                return if let Some(skill2) = self.inherit_skill_chaos_mode(skill){ skill2 }
+                    else {  SkillData::try_index_get(0).unwrap() }
             }
-            let replacement = self.get_replacement(skill, is_inherit);
-            return replacement;
+            else { self.get_replacement(skill, is_inherit) }
         }
-        else {  SkillData::get("SID_無し").unwrap() }
+        else {  SkillData::try_index_get(0).unwrap() }
     }
     pub fn get_replacement(&mut self, original_skill: &SkillData, is_inherit: bool) -> &'static SkillData {
-        let skill_list = SkillData::get_list().unwrap();
-        let o_skill = &skill_list[ original_skill.parent.index as usize];
-        let sid = original_skill.sid.to_string();    
-        if original_skill.get_flag() & 1 != 0 && sid != "SID_無し" {  return o_skill; }     
-    // ignore "Night and Day", "Friendly Riviary"
-        if sid == "SID_オルタネイト" || sid == "SID_切磋琢磨" { return o_skill; }
+        let o_index = original_skill.parent.index;
+        if !is_inherit {
+            if let Some(new) = self.sync_rando.iter().find(|x| x.0 == o_index) {
+                return SkillData::try_index_get(new.1).unwrap();
+            }
+        }
+        let o_skill = SkillData::try_index_get(o_index).unwrap();  
+        let hash = original_skill.parent.hash;
+        if ( original_skill.get_flag() & 1 != 0 && hash != NONE_SID ) ||  hash == FRIENDLY_RIVARLRY || hash == NIGHT_DAY { 
+            if !is_inherit { self.sync_rando.push( (o_index, o_index)); }
+            return o_skill;
+        }     // Hidden and not None
+       // if hash == 1238512915 || hash == "SID_切磋琢磨" { return o_skill; } // ignore "Night and Day", "Friendly Riviary"
+
         let mut priority = original_skill.get_priority();
         let skill_index;
-        if sid == "SID_異界の力" { priority = 0; }
-        if let Some(eirika) = EIRIKA_TWIN_SKILLS.iter().position(|x| *x == sid) {
-            skill_index = if eirika < 6 { original_skill.parent.index } else { original_skill.parent.index - 3 };
+        if hash == BOOK_OF_WORLDS { priority = 0; }
+        if let Some(eirika) = EIRIKA_HASH.iter().position(|&x| x == hash) {
+            skill_index = if eirika < 6 { o_index } else { o_index- 3 };
             priority = if eirika < 6 { 1 } else { 2 };
         }
-        else { skill_index = if priority == 0 { original_skill.parent.index } else { original_skill.parent.index - (priority - 1)};  }
+        else { 
+            skill_index = if priority == 0 { o_index } else { o_index - (priority - 1)}; 
+        }
 
-        let chaos_mode = GameVariableManager::get_number("G_ChaosMode");
+        let chaos_mode = GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY);
         let mode = if is_inherit { 0 }
             else if chaos_mode & 1 != 0 { 2 }
             else { 1 }; 
 
-        let list = [&mut self.inherit_list, &mut self.sync_list, &mut self.chaos_list];
-        let found = list[mode as usize].iter_mut().find(|x| x.index == skill_index);
-        if found.is_none() {  return o_skill;  }
-        let f = found.unwrap().clone();
-        let new_skill_index = list[mode as usize][ f.randomized_index as usize ].index;
-        let new_max_priority = list[mode as usize][ f.randomized_index as usize ].max_priority;
-        let is_eirika_twin = list[mode as usize][ f.randomized_index as usize ].eirika_twin_skill;
-        let new_priority = ( priority as i8 ) - f.min_priority + list[mode as usize][ f.randomized_index as usize ].min_priority;
+        let list = if is_inherit { &mut self.inherit_list }
+            else if chaos_mode & 1 != 0 { &mut self.chaos_list }
+            else { &mut self.sync_list }; 
+        let index;
+        let randomized_index;
+        if let Some(found) = list.iter().find(|x| x.index == skill_index) {
+            randomized_index =  found.randomized_index as usize;
+            let new_skill_index = list[ randomized_index ].index;
+            let new_max_priority = list[ randomized_index].max_priority;
+            let is_eirika_twin = list[ randomized_index ].eirika_twin_skill;
+            let new_priority = ( priority as i8 ) - found.min_priority + list[ randomized_index ].min_priority;
 
-        if mode >= 1 { list[mode as usize][f.randomized_index as usize ].skill_used = true; }
-
-        if is_eirika_twin { // Replacement skill is an Eirika Twin Skill (Lunar Brace/Solar Brace/Eclipse Brace etc...)
-            if new_max_priority <= priority as i8 { // new_max_priority is 2 for Lunar/Solar/Eclipse Brace +
-                return &skill_list[ ( new_skill_index + 3 ) as usize]; 
+            if is_eirika_twin { // Replacement skill is an Eirika Twin Skill (Lunar Brace/Solar Brace/Eclipse Brace etc...)
+                index = new_skill_index + if new_max_priority <= priority as i8 { 3 } else { 0 }; // new_max_priority is 2 for Lunar/Solar/Eclipse Brace +
             }
-            return &skill_list[ new_skill_index as usize];
+            else if new_max_priority == 0 || priority == 0 { index = new_skill_index; }
+            else {
+                index = if new_max_priority <= new_priority { new_skill_index + (new_max_priority as i32 ) - 1 } else { new_skill_index + (new_priority as i32 ) - 1  };
+            }
         }
-        if new_max_priority == 0 || priority == 0 {  return &skill_list[new_skill_index as usize]; }
-
-        let index = if new_max_priority <= new_priority { new_skill_index + (new_max_priority as i32 ) - 1 }
-            else { new_skill_index + (new_priority as i32 ) - 1  };
-        SkillData::try_index_get(index).unwrap()
+        else { 
+            if !is_inherit { self.sync_rando.push( (o_index, o_index)); }
+            return o_skill;
+        }
+        if mode >= 1 { list[ randomized_index ].skill_used = true; }    // removes already used sync skills for extra sync skills
+        let skill = SkillData::try_index_get(index).unwrap();
+        if skill.help.is_none() || skill.flag & 1 != 0 {   // In case if the index is incorrect, search for skill that matches priority and has help text
+            let priority = skill.priority;
+            let mut n_index = skill.parent.index;
+            let mut count = 0;
+            while count < 10 {
+                n_index -= 1;
+                count += 1;
+                if index < 1 { break; }
+                let correct_skill = SkillData::try_index_get(n_index).unwrap();
+                if correct_skill.help.is_some() && correct_skill.priority == priority && correct_skill.flag & 1 == 0 {
+                    if !is_inherit { self.sync_rando.push( (o_index, n_index)); }
+                    return correct_skill;
+                }
+            }
+            count = 0;
+            while count < 10 {
+                n_index += 1;
+                count += 1;
+                if index >= SkillData::get_count() - 1 { break; }
+                let correct_skill = SkillData::try_index_get(n_index).unwrap();
+                if correct_skill.help.is_some() && correct_skill.priority == priority && correct_skill.flag & 1 == 0 {
+                    if !is_inherit { self.sync_rando.push( (o_index, n_index)); }
+                    return correct_skill;
+                }
+            }
+        }
+        if !is_inherit { 
+            // println!("{} -> {}", Mess::get(original_skill.name.unwrap()), Mess::get(skill.name.unwrap()));
+            self.sync_rando.push( (o_index, index)); 
+        }
+        return skill;
     }
     pub fn inherit_skill_chaos_mode(&self, skill: &SkillData) -> Option<&'static SkillData> {
         if let Some(x) = self.chaos_inherit_list.iter().find(|x| x.0 == skill.parent.index) {
@@ -319,68 +363,17 @@ impl SynchoList {
         None
     }
 
-    pub fn get_non_randomized_skill(&self) -> Vec<SynchoSkill> {
-        let chaos_mode = GameVariableManager::get_number("G_ChaosMode");
-        let list = if chaos_mode == 3 || chaos_mode == 1 { &self.chaos_list } else { &self.sync_list };
-        let out: Vec<SynchoSkill> = list.iter().filter(|&x| !x.skill_used ).copied().collect();
+    pub fn get_non_randomized_skill(&mut self) -> Vec<&mut SynchoSkill> {
+        let chaos_mode = GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY);
+        let list = if chaos_mode & 1 != 0 { &mut self.chaos_list } else { &mut self.sync_list };
+        let out: Vec<_> = list.iter_mut().filter(|x| !x.skill_used ).collect();
         out
     }
-    pub fn print_inherit_list(&self) {
-        let skill_list = SkillData::get_list().unwrap();
-        let filename = format!("sd:/Draconic Vibe Crystal/Emblem Skills List.txt");
-        let file = File::options().create(true).write(true).truncate(true).open(filename);
-        if file.is_err() { println!("Cannot create output file"); return; }
-        let mut f = file.unwrap();
-        let i_list = &self.inherit_list;
-        writeln!(&mut f, "Inherit Skills").unwrap();
-        writeln!(&mut f, "Index\tSid\tName\tTo Sid\tTo Name\tSkill Index\tRandom Skill Index\tSkill Max Priority\tRandom Skill Max Priority").unwrap();
-        for x in 0..i_list.len() {
-            let sid = skill_list[ i_list[x].index as usize].sid.to_string();
-            writeln!(&mut f, "{}\t{}", i_list[x].index, sid).unwrap();
-        }
-        for x in 0..i_list.len() {
-            let sid = skill_list[ i_list[x].index as usize].sid.to_string();
-            let name = Mess::get(skill_list[ i_list[x].index as usize].name.expect(format!("Skill #{}: {} does not have a valid MSID", i_list[x].index, sid).as_str())).to_string();
-
-            let random_index =  i_list[x].randomized_index as usize;
-            let sid2 = skill_list[ i_list[random_index].index as usize].sid.to_string();
-            let name2 = Mess::get(skill_list[ i_list[random_index].index as usize].name.expect(format!("Skill #{}: {} does not have a valid MSID", i_list[random_index].index, sid2).as_str())).to_string();
-
-            writeln!(&mut f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", x, sid, name, sid2, name2, i_list[x].index,  random_index, i_list[x].max_priority, i_list[random_index].max_priority).unwrap();
-        }
-        let s_list = &self.sync_list;
-        writeln!(&mut f, "\nSync Skills").unwrap();
-        writeln!(&mut f, "Index\tSid\tName\tTo Sid\tTo Name\tSkill Index\tRandom Skill Index\tSkill Max Priority\tRandom Skill Max Priority\tUsed").unwrap();
-        for x in 0..s_list.len() {
-            let sid = skill_list[ s_list[x].index as usize].sid.to_string();
-            let name = Mess::get(skill_list[ s_list[x].index as usize].name.expect(format!("Skill #{}: {} does not have a valid MSID", s_list[x].index, sid).as_str())).to_string();
-            if s_list[x].randomized_index == -1 { continue; }
-            let random_index =  s_list[x].randomized_index as usize;
-            let sid2 = skill_list[ s_list[random_index].index as usize].sid.to_string();
-            let name2 = Mess::get(skill_list[ s_list[random_index].index as usize].name.expect(format!("Skill #{}: {} does not have a valid MSID", s_list[random_index].index, sid2).as_str())).to_string();
-
-            writeln!(&mut f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", x, sid, name, sid2, name2, s_list[x].index, random_index, s_list[x].max_priority, s_list[random_index].max_priority, s_list[random_index].skill_used).unwrap();
-        }
-        let c_list = &self.chaos_list;
-        writeln!(&mut f, "\nChaos Skills").unwrap();
-        writeln!(&mut f, "Index\tSid\tName\tTo Sid\tTo Name\tSkill Index\tRandom Skill Index\tSkill Max Priority\tRandom Skill Max Priority").unwrap();
-        for x in 0..c_list.len() {
-            let sid = skill_list[ c_list[x].index as usize].sid.to_string();
-            let name = Mess::get(skill_list[ c_list[x].index as usize].name.expect(format!("Skill #{}: {} does not have a valid MSID", c_list[x].index, sid).as_str())).to_string();
-            if c_list[x].randomized_index == -1 { continue; }
-            let random_index =  c_list[x].randomized_index as usize;
-            let sid2 = skill_list[ c_list[random_index].index as usize].sid.to_string();
-            let name2 = Mess::get(skill_list[ c_list[random_index].index as usize].name.expect(format!("Skill #{}: {} does not have a valid MSID", c_list[random_index].index, sid2).as_str())).to_string();
-
-            writeln!(&mut f, "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}", x, sid, name, sid2, name2, c_list[x].index, random_index, c_list[x].max_priority, c_list[random_index].max_priority).unwrap();
-        }
-    }
     pub fn get_sync_list_size(&mut self) { 
-        println!("Syncho Skill List Size: {}", self.sync_list.len());
         self.sync_list_size = self.sync_list.len() as i32; 
     }
     pub fn randomized_skill_cost(&self, rng: &Random) {
-        if GameVariableManager::get_number("G_SPCost") == 0 { return; }
+        if GameVariableManager::get_number(DVCVariables::SP_KEY) == 0 { return; }
         // Make all 0
         self.inherit_cost.iter().for_each(|x|{
             if let Some(skill) = SkillData::try_index_get_mut(x.0) { skill.set_inherit_cost(0); }
@@ -416,7 +409,7 @@ impl SynchoList {
                 }
             }
         });
-        if GameVariableManager::get_number("G_SPCost") != 2 { return; }
+        if GameVariableManager::get_number(DVCVariables::SP_KEY) != 2 { return; }
         self.chaos_inherit_list.iter().for_each(|x|{
             if let Some(skill) = SkillData::try_index_get_mut(x.1) {
                 if skill.get_inheritance_cost() == 0 {

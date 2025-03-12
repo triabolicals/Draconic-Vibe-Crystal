@@ -1,11 +1,8 @@
+use accessory::AccessoryData;
 use unity::prelude::*;
 use engage::{
-    menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}},
-    gamevariable::*,
-    random::*,
-    gamedata::{*, item::*, shop::{*, ShopData}},
+    gamedata::{item::*, shop::{ShopData, *}, *}, gamevariable::*, hub::access::HubRandomSet, menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemSwitchMethods}, BasicMenuResult}, random::*
 };
-pub static mut SHOP_SET: bool = false;
 use super::{RANDOM_ITEM_POOL, *};
 
 pub struct ShopRandomizer {
@@ -47,13 +44,15 @@ impl ShopRandomizer {
             self.pool.push(RandomItem::new(item.parent.index, false, false));
         }
     }
-    pub fn get_random(&mut self, rng: &Random) -> &'static ItemData {
-        let mut index = rng.get_value(self.pool.len() as i32 );
-        while self.pool[index as usize].used || self.pool[index as usize].is_inf {
-            index = rng.get_value(self.pool.len() as i32 );
+    pub fn get_random(&mut self, rng: &Random) -> Option<&'static ItemData> {
+        let mut pool: Vec<_> = self.pool.iter_mut().filter(|item| ( !item.used && !item.is_inf ) ).collect();
+        let size = pool.len();
+        if size == 0 { return None; }
+        if let Some(item) = pool.iter_mut().nth( rng.get_value(size as i32) as usize) {
+            item.used = true;
+            return ItemData::try_index_get( item.index);
         }
-        self.pool[index as usize].used = true;
-        return ItemData::try_index_get( self.pool[index as usize].index).unwrap();
+        return None;
     }
 }
 
@@ -64,19 +63,17 @@ pub fn reset_shopdata(){
     ItemShopData::load();
     FleaMarketData::unload();
     FleaMarketData::load();
-    unsafe { SHOP_SET = false; }
     HubRandomSet::unload();
     HubRandomSet::load();
 }
 
 pub fn randomize_shop_data() {
-    if !crate::utils::can_rand() || GameVariableManager::get_number("G_Random_Shop_Items") == 0  { return; }
-    unsafe {
-        if SHOP_SET { return;}
-        else { SHOP_SET = true;  }
-    }
+    if !crate::utils::can_rand() || GameVariableManager::get_number(DVCVariables::SHOP_KEY) == 0  { return; }
+    if super::super::RANDOMIZER_STATUS.read().unwrap().shop_randomized { return; }
+
     let rng = crate::utils::get_rng();
     println!("Randomizing Shop Data");
+    let _ = super::super::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.shop_randomized = true);
     let mut ishop_rzr = ShopRandomizer::new();
     let mut wshop_rzr = ShopRandomizer::new();
     let mut fm_rzr = ShopRandomizer::new();
@@ -110,16 +107,17 @@ pub fn randomize_shop_data() {
             shop.iter().as_ref().into_iter().for_each(|item|ishop_rzr.flag_item(item.iid, item.stock == -1));
             let num_new_items = rng.get_value(5) + 5;
             for _ in 0..num_new_items {
-                let new_data = ItemShopData::instantiate().unwrap();
-                new_data.ctor();
-                let item = ishop_rzr.get_random(rng);
-                new_data.iid = item.iid;
-                new_data.stock = match item.usetype {
-                    5|6|7|15|18|21|27 => { 1 }
-                    8|9|11|13|23|24 => { 2 + rng.get_value(3) }
-                    _ => { 3 + rng.get_value(5) }
-                };
-                shop.add(new_data);
+                if let Some(item) = ishop_rzr.get_random(rng) {
+                    let new_data = ItemShopData::instantiate().unwrap();
+                    new_data.ctor();
+                    new_data.iid = item.iid;
+                    new_data.stock = match item.usetype {
+                        5|6|7|15|18|21|27 => { 1 }
+                        8|9|11|13|23|24 => { 3 + rng.get_value(3) }
+                        _ => { 3 + rng.get_value(5) }
+                    };
+                    shop.add(new_data);
+                }
             }
         }
     );
@@ -128,13 +126,15 @@ pub fn randomize_shop_data() {
         .for_each(|shop|{
             wshop_rzr.reset();
             shop.iter().as_ref().into_iter().for_each(|item|wshop_rzr.flag_item(item.iid, item.stock == -1));
-            let num_new_items = rng.get_value(3) + 5;
+            let num_new_items = rng.get_value(5) + 5;
             for _ in 0..num_new_items {
-                let new_data = WeaponShopData::instantiate().unwrap();
-                new_data.ctor();
-                new_data.iid = wshop_rzr.get_random(rng).iid;
-                new_data.stock = 1 + rng.get_value(3);
-                shop.add(new_data);
+                if let Some(item) = wshop_rzr.get_random(rng) {
+                    let new_data = WeaponShopData::instantiate().unwrap();
+                    new_data.ctor();
+                    new_data.iid = item.iid;
+                    new_data.stock = 1 + rng.get_value(3);
+                    shop.add(new_data);
+                }
             }
         }
     );  
@@ -144,16 +144,18 @@ pub fn randomize_shop_data() {
         .for_each(|shop|{
             fm_rzr.reset();
             shop.iter().as_ref().into_iter().for_each(|item|fm_rzr.flag_item(item.iid, item.stock == -1));
-            let num_new_items = rng.get_value(5) + 5;
+            let num_new_items = rng.get_value(10) + 5;
             for _ in 0..num_new_items {
-                let new_data = FleaMarketData::instantiate().unwrap();
-                new_data.ctor();
-                new_data.iid = fm_rzr.get_random(rng).iid;
-                new_data.stock = 5*(rng.get_value(10) + 1);
-                shop.add(new_data);
+                if let Some(item) = wshop_rzr.get_random(rng) {
+                    let new_data = FleaMarketData::instantiate().unwrap();
+                    new_data.ctor();
+                    new_data.iid = item.iid;
+                    new_data.stock = 3 + rng.get_value(5);
+                    shop.add(new_data);
+                }
             }
         }
-    );  
+    );
     FleaMarketData::register();
     WeaponShopData::register();
     ItemShopData::register();
@@ -175,41 +177,14 @@ impl ConfigBasicMenuItemSwitchMethods for RandomShopMod {
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.help_text = if CONFIG.lock().unwrap().random_shop_items { "Random items will be added to shops" }
-                         else {"No random items will be added to shops." }.into();
+            else {"No random items will be added to shops." }.into();
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = if CONFIG.lock().unwrap().random_shop_items { "Random Shop Items" }
-                            else { "Standard Shop Items" }.into();
+        this.command_text = if CONFIG.lock().unwrap().random_shop_items { "Add Random" }
+            else { "Default" }.into();
     }
 }
 
-#[unity::class("App", "HubRandomSet")]
-pub struct HubRandomSet {
-    pub parent: StructDataArrayFields,
-    pub iid: &'static Il2CppString,
-    pub rate: i32,
-    pub count: i32,
-}
-
-impl GamedataArray for HubRandomSet {}
-impl ShopData for HubRandomSet {}
-
-pub fn randomize_hub_random_items(){
-    if !crate::utils::can_rand() || GameVariableManager::get_number("G_Random_Item") & 2 == 0  { return; }
-    println!("Randomizing Hub Items");
-    HubRandomSet::get_list_mut().unwrap().iter_mut()
-        .for_each(|set|{
-            set.iter_mut()
-                .for_each(|item|{
-                    let iid = item.iid.to_string();
-                    if item.rate != 0 && !iid.contains("の晶石") && iid.contains("IID_") {
-                        item.iid = super::random_item(2, false);
-                    }
-                }
-            );
-        }
-    );
-}
 #[unity::class("App", "ItemEvolveData")]
 pub struct ItemEvolveData {
     pub parent: StructDataArrayFields,
@@ -222,20 +197,19 @@ pub struct ItemEvolveData {
 }
 impl GamedataArray for ItemEvolveData  {}
 impl ShopData for ItemEvolveData {}
-#[skyline::from_offset(0x0203dfd0)]
-fn regist_evolve_flags(method_info: OptionalMethod);
+
 
 pub fn randomize_item_evolve() {
-    if !crate::utils::can_rand() || !GameVariableManager::get_bool("G_Random_Shop_Items")  { return; }
+    if !crate::utils::can_rand() || !GameVariableManager::get_bool(DVCVariables::SHOP_KEY)  { return; }
     let rng = crate::utils::get_rng();
     let item_pool_size = RANDOM_ITEM_POOL.lock().unwrap().len();
     ItemEvolveData::get_list_mut().unwrap().iter_mut()
         .for_each(|list|{
             let new_evolve = ItemEvolveData::instantiate().unwrap();
             new_evolve.ctor();
-            new_evolve.iron = 200;
+            new_evolve.iron = 100;
             new_evolve.steel = 10;
-            new_evolve.silver = 5;
+            new_evolve.silver = 1;
             new_evolve.price = 5000;
             loop {
                 let index = rng.get_value(item_pool_size as i32);
@@ -259,89 +233,14 @@ pub fn randomize_item_evolve() {
     println!("Randomizing Refine Items");
     unsafe { regist_evolve_flags(None); }
 }
+#[skyline::from_offset(0x0203dfd0)]
+fn regist_evolve_flags(method_info: OptionalMethod);
 
-pub struct RandomHubItemMod;
-impl ConfigBasicMenuItemSwitchMethods for RandomHubItemMod {
-    fn init_content(_this: &mut ConfigBasicMenuItem){}
-    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().exploration_items, 0, 3, 1);
-        if CONFIG.lock().unwrap().exploration_items != result {
-            CONFIG.lock().unwrap().exploration_items = result;
-            Self::set_command_text(this, None);
-            Self::set_help_text(this, None);
-            this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match CONFIG.lock().unwrap().exploration_items {
-            1 => {"Excludes gift items from exploration." },
-            2 => { "Excludes food items from exploration."},
-            3 => { "Excludes gift and food items from exploration."},
-            _ => { "Exploration items includes both gift and food items."},
-        }.into();
-    }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = match CONFIG.lock().unwrap().exploration_items {
-            1 => {  "No Gifts" },
-            2 => {  "No Food" },
-            3 => {  "No Gift/Food"},
-            _ => {  "Default"},
-        }.into();
-    }
-}
-// For In-game
-pub struct RandomHubItemMod2;
-impl ConfigBasicMenuItemSwitchMethods for RandomHubItemMod2{
-    fn init_content(_this: &mut ConfigBasicMenuItem){ GameVariableManager::make_entry("G_HubItem", CONFIG.lock().unwrap().exploration_items); }
-    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value =  GameVariableManager::get_number("G_HubItem");
-        let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
-        if value != result {
-            GameVariableManager::set_number("G_HubItem", result);
-            Self::set_command_text(this, None);
-            Self::set_help_text(this, None);
-            this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match GameVariableManager::get_number("G_HubItem") {
-            1 => { "Excludes gift items from exploration." },
-            2 => { "Excludes food items from exploration."},
-            3 => { "Excludes gift and food items from exploration."},
-            _ => { "Exploration items includes both gift and food items."},
-        }.into();
-    }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = match  GameVariableManager::get_number("G_HubItem") {
-            1 => {  "No Gifts" },
-            2 => {  "No Food" },
-            3 => {  "No Gift/Food"},
-            _ => {  "Default"},
-        }.into();
-    }
-}
-
-pub extern "C" fn vibe_hub_items() -> &'static mut ConfigBasicMenuItem {  
-    let hub_items = ConfigBasicMenuItem::new_switch::<RandomHubItemMod2>("Exploration Items");
-    hub_items.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_hub_items as _);
-    hub_items
-}
 
 pub fn add_personal_outfits() {
-    if engage::gamedata::assettable::AssetTable::get_count() >= 4000 { return; }
-    let hublist = AccessoryShopData::get_list_mut().unwrap();
-    if hublist[0].len() > 40 {  AccessoryShopData::register(); }
+    let accessory = AccessoryData::get_list().unwrap();
+    if GameVariableManager::get_bool(accessory[1].flag_name) { return; }
     else {
-        for x in 1..41 {
-            let aid = format!("AID_{}私服", &crate::enums::PIDS[x][4..]);
-            let acc = AccessoryShopData::instantiate().unwrap();
-            acc.ctor();
-            acc.aid = aid.into();
-            hublist[0].add(acc);
-        }
-        AccessoryShopData::register();
+        for x in 1..42 { GameVariableManager::set_bool(accessory[x].flag_name, true);}
     }
-    println!("Outfits Registered");
 }

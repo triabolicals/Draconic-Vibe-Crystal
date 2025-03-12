@@ -2,6 +2,9 @@ JID_神竜ノ子	1	2	8	Drg0A	c001
 JID_神竜ノ子	2	2	8	Drg0A	c051	
 JID_神竜ノ王	1	258	8	Drg1A	c001	
 JID_神竜ノ王	2	258	8	Drg1A	c051	
+JID_邪竜ノ子    1   2   8   Drg0A   c002
+JID_邪竜ノ子    2   2   8   Drg0A   c052
+JID_M002_神竜ノ王 2 258 8 Drg1A c555 uRig_Drg1AF
 JID_邪竜ノ娘	2	96	8	Sdp0A	c551	uRig_HumnF1Low
 JID_アヴニール下級	1	4	0	Avn0B	c100
 JID_アヴニール	1	6	0	Avn1B	c100
@@ -30,5 +33,6 @@ JID_クピードー_E	1	18	0	Cpd1B	c400
 JID_ダンサー	1	256	8	Dnc0A	c403
 JID_裏邪竜ノ娘	2	516	8	Sds0A	c099
 JID_裏邪竜ノ子	1	520	8	Sds0A	c049
+JID_裏邪竜ノ子_E1-4 1 520	8	Sds0A	c049
 JID_メリュジーヌ_味方	2	66	3	Msn0D	c553b   Wng2D 12
 JID_メリュジーヌ 2		66	3	Msn0D	c553    Wng2D 12

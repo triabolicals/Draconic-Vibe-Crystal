@@ -1,17 +1,21 @@
 use engage::gameuserdata::GameUserData;
 use super::*;
-
+use crate::config::DVCVariables;
 
 pub struct RandomAssets;
 impl ConfigBasicMenuItemSwitchMethods for RandomAssets {
     fn init_content(_this: &mut ConfigBasicMenuItem){
-        GameVariableManager::make_entry("G_RandAsset", 0);
+        GameVariableManager::make_entry(DVCVariables::ASSETS, 0);
     }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value = GameVariableManager::get_number("G_RandAsset");
+        let main = DVCVariables::is_main_menu();
+        let value = if main { CONFIG.lock().unwrap().assets }
+            else { GameVariableManager::get_number(DVCVariables::ASSETS) };
         let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
         if value != result {
-            GameVariableManager::set_number("G_RandAsset", result);
+            if main { CONFIG.lock().unwrap().assets = result; }
+            else { GameVariableManager::set_number(DVCVariables::ASSETS, result);  }
+
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -19,7 +23,10 @@ impl ConfigBasicMenuItemSwitchMethods for RandomAssets {
         } else {return BasicMenuResult::new(); }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match GameVariableManager::get_number("G_RandAsset") {
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().assets }
+            else { GameVariableManager::get_number(DVCVariables::ASSETS) };
+
+        this.help_text = match value {
             1 => { "Weapons assets are randomized"  }
             2 => { "Info animations are randomized for player units."}
             3 => { "Weapons / player info animations are randomized"}
@@ -27,7 +34,10 @@ impl ConfigBasicMenuItemSwitchMethods for RandomAssets {
         }.into();
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text =  match GameVariableManager::get_number("G_RandAsset") {
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().assets }
+        else { GameVariableManager::get_number(DVCVariables::ASSETS)  };
+            
+        this.command_text =  match value {
             1 => { "Weapons"}
             2 => { "Info"}
             3 => { "Weapon+Info"}
@@ -38,12 +48,12 @@ impl ConfigBasicMenuItemSwitchMethods for RandomAssets {
 
 pub struct PlayerOutfits;
 impl ConfigBasicMenuItemSwitchMethods for PlayerOutfits {
-    fn init_content(_this: &mut ConfigBasicMenuItem){ GameVariableManager::make_entry("G_PlayerOutfit", 0); }
+    fn init_content(_this: &mut ConfigBasicMenuItem){ GameVariableManager::make_entry(DVCVariables::PLAYER_OUTFIT_KEY, 0); }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value = GameVariableManager::get_bool("G_PlayerOutfit");
+        let value = GameVariableManager::get_bool(DVCVariables::PLAYER_OUTFIT_KEY);
         let result = ConfigBasicMenuItem::change_key_value_b(value);
         if value != result {
-            GameVariableManager::set_bool("G_PlayerOutfit", result);
+            GameVariableManager::set_bool(DVCVariables::PLAYER_OUTFIT_KEY, result);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -52,12 +62,12 @@ impl ConfigBasicMenuItemSwitchMethods for PlayerOutfits {
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.help_text =
-            if GameVariableManager::get_bool("G_PlayerOutfit") { "Playable units will wear their equipped somniel outfits."  }
+            if GameVariableManager::get_bool(DVCVariables::PLAYER_OUTFIT_KEY) { "Playable units will wear their equipped somniel outfits."  }
             else { "Playable units will be in their default outfits for battle." }.into();
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.command_text = 
-            if GameVariableManager::get_bool("G_PlayerOutfit") { "Casual" } 
+            if GameVariableManager::get_bool(DVCVariables::PLAYER_OUTFIT_KEY) { "Casual" } 
             else { "Default" }.into();
     }
 }
@@ -65,8 +75,7 @@ impl ConfigBasicMenuItemSwitchMethods for PlayerOutfits {
 pub struct RandomEnemyOutfits;
 impl ConfigBasicMenuItemSwitchMethods for RandomEnemyOutfits {
     fn init_content(_this: &mut ConfigBasicMenuItem){
-        GameVariableManager::make_entry("G_EnemyOutfits", 0);
-        GameVariableManager::make_entry("EnemyOutfits", GameVariableManager::get_number("G_EnemyOutfits"));
+        GameVariableManager::make_entry("EnemyOutfits", GameVariableManager::get_number(DVCVariables::ENEMY_OUTFIT_KEY));
     }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let value = GameVariableManager::get_bool("EnemyOutfits");
@@ -83,18 +92,21 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEnemyOutfits {
         let str1 =  if GameVariableManager::get_bool("EnemyOutfits") { "Enemies will wear random outfits. "  }
                     else { "Enemies will wear their regular outfits." };
 
-        this.help_text = if GameVariableManager::get_bool("EnemyOutfits") != GameVariableManager::get_bool("G_EnemyOutfits") {
+        this.help_text = if GameVariableManager::get_bool("EnemyOutfits") != GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) {
             format!("{} (Press A to Confirm)", str1) }
         else { str1.to_string() }.into();
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = if GameVariableManager::get_bool("EnemyOutfits") { "Randomized"  } 
-                            else { "Normal "}.into();
+        let changed = if GameVariableManager::get_bool("EnemyOutfits") != GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) { "*"} else { "" };
+        this.command_text = format!("{}{}", changed,
+            if GameVariableManager::get_bool("EnemyOutfits") { "Randomized"  } 
+            else { "Normal "}
+        ).into();
     }
 }
 
 pub fn outfits_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    if GameVariableManager::get_bool("EnemyOutfits") == GameVariableManager::get_bool("G_EnemyOutfits") { return BasicMenuResult::new();}
+    if GameVariableManager::get_bool("EnemyOutfits") == GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) { return BasicMenuResult::new();}
     let str1 = if GameVariableManager::get_bool("EnemyOutfits") { "Randomized enemy outfits?"}
         else { "Revert enemies to their default outfits?"};
 
@@ -110,78 +122,48 @@ pub extern "C" fn vibe_enemy_outfit() -> &'static mut ConfigBasicMenuItem {
 pub struct OutfitConfirm;
 impl TwoChoiceDialogMethods for OutfitConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
-        GameVariableManager::set_bool("G_EnemyOutfits", GameVariableManager::get_bool("EnemyOutfits"));
+        GameVariableManager::set_bool(DVCVariables::ENEMY_OUTFIT_KEY, GameVariableManager::get_bool("EnemyOutfits"));
         change_enemy_outfits();
-        unsafe { 
-            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap());
-            let index = menu.select_index;
-            RandomEnemyOutfits::set_help_text(menu.menu_item_list[index as usize], None);
-            menu.menu_item_list[index as usize].update_text();
-        }
+
+        let menu =         unsafe {  std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap()) };
+        let index = menu.select_index;
+        RandomEnemyOutfits::set_help_text(menu.menu_item_list[index as usize], None);
+        RandomEnemyOutfits::set_command_text(menu.menu_item_list[index as usize], None);
+        menu.menu_item_list[index as usize].update_text();
         BasicMenuResult::se_cursor().with_close_this(true)
     }
     extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
 }
 
-pub fn gather_all_accesories(){
-    let accessory_list = AccessoryData::get_list().unwrap(); 
-    /*
-    if asset_table.len() < 5000 {
-        for x2 in 3500..asset_table.len() {
-            let asset_entry = &asset_table[x2];
-            if asset_entry.conditions.is_none() { continue; }
-            let conditions = unsafe { asset_table_get_conditions( asset_entry, None) };
-            if let Some(con) = conditions.iter_mut().find(|str| str.contains("私服")) {
-                *con = "!エンゲージ中".into();  
-            }
-        }
-        unsafe { asset_table_on_completed_end(asset_table[0], None); }
-    }
-    */
-    println!("Adding Accessory Assets...");
-    let assets = include_str!("data/accessories.txt").lines();
-    let mut asset_data = ASSET_DATA.lock().unwrap();
-    if asset_data.assets.len() == 0 {
-        assets.into_iter().for_each(|line|{
-            let new_line = line.to_string();
-            asset_data.add_asset_data(new_line);
-        });
-        println!("Accessory Assets Added");
-        // Skipping Character unique outfits
-        for x in 43..accessory_list.len() { asset_data.add_data(accessory_list[x]);  }
-    }
-    for x in 0..8 {
-        println!("Male Entries for Accessory Type {}, {}", x, asset_data.male.n_entries[x]);
-        println!("Female Entries for Accessory Type {}, {}", x, asset_data.female.n_entries[x]);
-    }
 
-
-}
 
 pub fn accesorize_enemy_unit(enemy: &Unit) {
     let accessory_list = &mut unsafe { unit_get_accessory_list(enemy, None) }.unit_accessory_array;
     let length = accessory_list.len();
-    if !GameVariableManager::get_bool("G_EnemyOutfits") && enemy.person.get_asset_force() != 0 { 
+    if !GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) && enemy.person.get_asset_force() != 0 { 
         for x in 0..length { accessory_list[x].index = 0; }
         return;
     }
     let rng = Random::get_game();
     let gender = unit_dress_gender(enemy);
-    match gender  {
-        1 => { 
-            for x in 0..length {
-                if x == 4 { continue; }
-                accessory_list[x].index = ASSET_DATA.lock().unwrap().male.get_index(x as i32, rng);
-            }
-        },
-        2 => {
-            for x in 0..length {
-                if x == 4 { continue; }
-                accessory_list[x].index = ASSET_DATA.lock().unwrap().female.get_index(x as i32, rng);
-            }
-        },
-        _ => {}, 
+    if let Some(asset_data) = super::data::ASSET_DATA.get() {
+        match gender  {
+            1 => { 
+                for x in 0..length {
+                    if x == 4 { continue; }
+                    accessory_list[x].index = asset_data.male.get_index(x as i32, rng);
+                }
+            },
+            2 => {
+                for x in 0..length {
+                    if x == 4 { continue; }
+                    accessory_list[x].index = asset_data.female.get_index(x as i32, rng);
+                }
+            },
+            _ => {}, 
+        }
     }
+
 }
 
 fn change_enemy_outfits() {
@@ -196,7 +178,7 @@ fn change_enemy_outfits() {
 }
 
 pub fn set_accessories_for_unit(unit: &Unit, result: &mut AssetTableResult) {
-    let asset_data = ASSET_DATA.lock().unwrap();
+    let asset_data = super::data::ASSET_DATA.get().unwrap();
     let index = unit.accessory_list.unit_accessory_array[0].index;
     let gender = unit_dress_gender(unit);
     if gender > 2 || gender == 0 { return; }
@@ -223,15 +205,18 @@ pub fn set_accessories_for_unit(unit: &Unit, result: &mut AssetTableResult) {
     }
 }
 
-pub fn set_accessories_generic(result: &mut AssetTableResult, aid: &Il2CppString, gender: i32) {
-    let belong = aid.to_string();
-    match belong.as_str() {
-        "AID_異形兵" => {
-            if gender == 1 { add_accessory_to_list(&mut result.accessory_list, "uAcc_spine2_BoneMrp1AM", "c_spine2_jnt"); }
-            else { add_accessory_to_list(&mut result.accessory_list, "uAcc_spine2_BoneMrp1AF", "c_spine2_jnt"); }
+pub fn set_accessories_generic(result: &mut AssetTableResult, aid: Option<&Il2CppString>, gender: i32) {
+    if let Some(generic_aid) = aid {
+        let belong = generic_aid.to_string();
+        match belong.as_str() {
+            "AID_異形兵" => {
+                if gender == 1 { add_accessory_to_list(result.accessory_list, "uAcc_spine2_BoneMrp1AM", "c_spine2_jnt"); }
+                else { add_accessory_to_list(result.accessory_list, "uAcc_spine2_BoneMrp1AF", "c_spine2_jnt"); }
+            }
+            _ => {},
         }
-        _ => {},
     }
+
 }
 
 pub fn add_accessory_to_list(list: &mut List<AssetTableAccessory>, model: &str, location: &str) {
@@ -244,7 +229,7 @@ pub fn add_accessory_to_list(list: &mut List<AssetTableAccessory>, model: &str, 
 pub fn clear_accessory_from_list(list: &mut List<AssetTableAccessory>, model: &str) {
     for x in 0..list.len() {
         if let Some(accessory_model) = list[x].model {
-            if accessory_model.contains(model) {
+            if accessory_model.to_string().contains(model) {
                 list[x].model = Some("null".into());
             }
         }
@@ -257,8 +242,8 @@ pub fn change_accessory(list: &mut List<AssetTableAccessory>, model: &str, locat
         if list.iter_mut().any(|f| f.model.filter(|m| m.to_string().contains(model)).is_some() ) { return; }
     }
     // check if locator exists then replace the model
-    if let Some(acc) = list.iter_mut().find(|f| f.locator.filter(|m| m.to_string().contains(locator)).is_some() ) {
-        acc.model = Some(model.clone().into());
+    if let Some(acc) = list.iter_mut().find(|f| f.locator.is_some_and(|m|m.to_string().contains(locator))) {
+        acc.model = Some(model.into());
     }
     else { add_accessory_to_list(list, model, locator); }
 }

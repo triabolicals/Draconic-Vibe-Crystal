@@ -4,23 +4,35 @@ use engage::{
     force::*,
     mess::*,
     gameuserdata::GameUserData,
-    gamedata::{*, unit::Unit, item::*, skill::*},
+    gamedata::{*, terrain::TerrainData, unit::Unit, item::*, skill::*},
 };
 use engage::gamevariable::GameVariableManager;
 use skyline::patching::Patch;
 use crate::randomizer::emblem::emblem_skill::STAT_BONUS;
+use crate::config::DVCVariables;
 use crate::enums::*;
 
+pub fn set_patch_flag(flag: &str) {
+    GameVariableManager::make_entry(flag, 1);
+    GameVariableManager::set_bool(flag, true);
+}
 pub fn get_rng() -> &'static Random {
     let rng = Random::instantiate().unwrap();
-    rng.ctor(GameVariableManager::get_number("G_Random_Seed") as u32);
+    rng.ctor(GameVariableManager::get_number(DVCVariables::SEED) as u32);
     rng
 }
-pub fn can_rand() -> bool { return GameVariableManager::get_number("G_Random_Seed") != 0; }
+
+
+pub fn is_tile_good(tid: &Il2CppString) -> bool{
+    if let Some(terrain) = TerrainData::get(&tid.to_string()) {  terrain.prohibition == 0  }
+    else { false }
+ }
+
+pub fn can_rand() -> bool { return GameVariableManager::get_number(DVCVariables::SEED) != 0; }
 
 pub fn create_rng(seed: i32, rng_mode: i32) -> &'static Random {
     let rng = Random::instantiate().unwrap();
-    let r_seed = GameVariableManager::get_number("G_Random_Seed");
+    let r_seed = GameVariableManager::get_number(DVCVariables::SEED);
     let rng_seed = match rng_mode {
         1 => { ( seed >> 1 ) + ( r_seed >> 1 ) }
         _ => { r_seed }
@@ -61,7 +73,7 @@ pub fn get_player_name() -> String {
         let force = Force::get(f).unwrap();
         let mut force_iter = Force::iter(force);
         while let Some(unit) = force_iter.next() {
-            if unit.person.pid.to_string() == "PID_リュール" {
+            if unit.person.pid.to_string() == PIDS[0] {
                 if unit.edit.name.is_some(){ return unit.edit.name.unwrap().to_string(); }
             }
         }
@@ -69,25 +81,40 @@ pub fn get_player_name() -> String {
     return "randomized".to_string();
 }
 pub fn get_lueur_name_gender(){
-    GameVariableManager::make_entry("G_Lueur_Gender".into(), 0);
-    GameVariableManager::make_entry("G_Lueur_Name".into(), 0);
+    GameVariableManager::make_entry(DVCVariables::LUEUR_GENDER, 0);
+    GameVariableManager::make_entry(DVCVariables::LUEUR_NAME, 0);
     let f_type: [ForceType; 5] = [ForceType::Player, ForceType::Enemy, ForceType::Absent, ForceType::Dead, ForceType::Lost];
     for f in f_type {
         let force = Force::get(f).unwrap();
         let mut force_iter = Force::iter(force);
         while let Some(unit) = force_iter.next() {
-            if unit.person.pid.to_string() == "PID_リュール" {
+            if unit.person.pid.to_string() == PIDS[0] {
                 if unit.edit.name.is_some(){
                     if unit.edit.gender != 0 {
                         if unit.edit.gender > 2 { unit.edit.set_gender(1); }
-                            GameVariableManager::set_number("G_Lueur_Gender", unit.edit.gender);
-                            GameVariableManager::set_string("G_Lueur_Name", &unit.edit.name.unwrap().to_string());
-                            return;
+                        GameVariableManager::set_number(DVCVariables::LUEUR_GENDER, unit.edit.gender);
+                        GameVariableManager::set_string(DVCVariables::LUEUR_NAME, unit.edit.name.unwrap());
+                        return;
                     }
                 }
             }
         }
     }
+}
+
+pub fn remove_equip_emblems() {
+    Force::get(ForceType::Player).unwrap().iter()
+        .chain( Force::get(ForceType::Absent).unwrap().iter() )
+        .chain( Force::get(ForceType::Dead).unwrap().iter() )
+        .for_each(|unit| unit.clear_parent());
+}
+
+pub fn get_list_item_class() -> &'static Il2CppClass {
+    let common_rewards_sequence = engage::sequence::commonrewardsequence::CommonRewardSequence::instantiate().unwrap();
+    let methods = common_rewards_sequence.get_class().get_methods();
+    let ctor_parameters = methods[0].get_parameters();
+    let para = unity::prelude::Il2CppClass::from_il2cpptype( ctor_parameters[2].parameter_type ).unwrap();
+    return para;
 }
 
 pub fn str_contains(this: &Il2CppString, value: &str) -> bool { this.to_string().contains(value)  }
@@ -132,8 +159,8 @@ pub fn skill_array_string(skills: &SkillArray) -> String {
     let n_skills = skills.list.size;
     let mut n_print = 0;
     let mut out: String = "".to_string();
-    let min_index = STAT_BONUS.lock().unwrap()[0]; //Lowest HP Index
-    let max_index = STAT_BONUS.lock().unwrap()[65]; //Highest Move Index
+    let min_index = STAT_BONUS.get().unwrap()[0]; //Lowest HP Index
+    let max_index = STAT_BONUS.get().unwrap()[65]; //Highest Move Index
     for x in 0..n_skills {
         let skill = skills.list.item[x as usize].get_skill().unwrap();
         let index = skill.parent.index;
@@ -149,8 +176,8 @@ pub fn stats_from_skill_array(skills: &SkillArray) -> String {
     let mut n_print = 0;
     let mut out: String = "".to_string();
     let mut enhance_array: [i8; 11] = [0; 11];
-    let min_index = STAT_BONUS.lock().unwrap()[0]; //Lowest HP Index
-    let max_index = STAT_BONUS.lock().unwrap()[65]; //Highest Move Index
+    let min_index = STAT_BONUS.get().unwrap()[0]; //Lowest HP Index
+    let max_index = STAT_BONUS.get().unwrap()[65]; //Highest Move Index
     for x in 0..n_skills {
         let skill = skills.list.item[x as usize].get_skill().unwrap();
         let index = skill.parent.index;
@@ -295,14 +322,7 @@ pub fn return_true(address: usize){
     let _ = Patch::in_text(address+0x4).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
  }
 
-pub fn dlc_check() -> bool {
-    unsafe {
-        if has_content(0, None) {
-        return true;
-        }
-        return false;
-    }
-}
+pub fn dlc_check() -> bool { return unsafe { has_content(0, None) }  }
 
 pub fn is_valid_skill_index(index: i32 ) -> bool {
     if let Some(skill) = SkillData::try_index_get(index) {
@@ -333,6 +353,9 @@ pub fn replace_strs_il2str<'a>(this: &Il2CppString, str1: impl Into<&'a Il2CppSt
         replace_str(this, str1.into(), str2.into(), None)
     }
 }
+pub fn replace_string(this: &Il2CppString, str1: &Il2CppString, str2: &Il2CppString) -> &'static mut Il2CppString {
+    unsafe { replace_str(this, str1, str2, None) }
+}
 pub fn il2_str_substring(this: &Il2CppString, start: i32) -> &'static Il2CppString {
     unsafe { sub_string(this, start, None)}
 }
@@ -344,9 +367,13 @@ pub fn max(v1: i32, v2: i32) -> i32 {
     if v1 > v2 { v1 } else { v2 }
 }
 pub fn min(v1: i32, v2: i32) -> i32 {
-    if v1 > v2 { v1 } else { v2 }
+    if v1 > v2 { v2 } else { v1 }
 }
 pub fn in_map_chapter() -> bool { GameUserData::get_sequence() == 3 }
+
+pub fn get_fnv_hash<'a>(value: impl Into<&'a Il2CppString>) -> i32 {
+    unsafe { fnv_hash_string(value.into(), None ) }
+}
 //
 // Unity Functions from Engage
 //DLC Check 
