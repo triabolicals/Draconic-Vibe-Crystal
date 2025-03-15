@@ -3,8 +3,8 @@ use super::*;
 fn add_in_game_dvc_menu_items(config_menu: &mut ConfigMenu<ConfigBasicMenuItem>) {
     config_menu.add_item(deployment::vibe_deployment());
     config_menu.add_item(deployment::vibe_emblem_deployment());
-    config_menu.add_item(randomizer::terrain::menuitem::vibe_energy());
-    config_menu.add_item(randomizer::terrain::menuitem::vibe_fow());
+    config_menu.add_item(randomizer::terrain::menu::vibe_energy());
+    config_menu.add_item(randomizer::terrain::menu::vibe_fow());
     config_menu.add_item(randomizer::assets::accessory::vibe_enemy_outfit());
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::assets::accessory::RandomAssets>("Randomized Assets"));
     config_menu.add_item(randomizer::job::vibe_job_rerand());
@@ -12,25 +12,25 @@ fn add_in_game_dvc_menu_items(config_menu: &mut ConfigMenu<ConfigBasicMenuItem>)
     config_menu.add_item(randomizer::assets::bust::vibe_bust());
     config_menu.add_item(randomizer::names::vibe_generic());
     config_menu.add_item(randomizer::grow::vibe_pgmode());
-    config_menu.add_item(autolevel::vibe_autolevel());
-    config_menu.add_item(autolevel::autobench());
+    config_menu.add_item(autolevel::menu::vibe_autolevel());
+    config_menu.add_item(autolevel::menu::autobench());
     config_menu.add_item(randomizer::job::vibe_custom_job());
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::RandomCC>("Random Reclassing"));
     config_menu.add_item(randomizer::skill::learn::vibe_learn_skill());
     config_menu.add_item(randomizer::emblem::emblem_skill::vibe_rand_esc());
-    config_menu.add_item(randomizer::skill::menuitem::vibe_rand_spc());
-    config_menu.add_item(randomizer::skill::menuitem::vibe_skill_gauge());
+    config_menu.add_item(randomizer::skill::menu::vibe_rand_spc());
+    config_menu.add_item(randomizer::skill::menu::vibe_skill_gauge());
     config_menu.add_item(randomizer::job::vibe_job_gauge());
     config_menu.add_item(randomizer::item::vibe_drops());
     config_menu.add_item(randomizer::item::hub::vibe_hub_items());
     config_menu.add_item(randomizer::item::vibe_item_gauge());
     config_menu.add_item(randomizer::bgm::vibe_bgm());
-    config_menu.add_item(randomizer::battle_styles::vibe_styles());
+    config_menu.add_item(randomizer::styles::vibe_styles());
     config_menu.add_item(randomizer::interact::vibe_interaction());
     config_menu.add_item(randomizer::emblem::engrave::vibe_engrave());
-    config_menu.add_item(autolevel::vibe_enemy_emblem());
-    config_menu.add_item(autolevel::vibe_enemy_stones());
-    config_menu.add_item(randomizer::emblem::menuitem::vibe_engage_links());
+    config_menu.add_item(autolevel::enemy::vibe_enemy_emblem());
+    config_menu.add_item(autolevel::revival::vibe_enemy_stones());
+    config_menu.add_item(randomizer::emblem::menu::vibe_engage_links());
     config_menu.add_item(randomizer::map::vibe_tile());
 }
 
@@ -59,7 +59,7 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalInGameMenu {
             else { BasicMenuResult::new() }
         }
         else if pad_instance.npad_state.buttons.plus() {
-            if crate::utils::can_rand() {
+            if DVCVariables::random_enabled() {
                 let text = format!("Create Output File for this Save?\n Save as 'sd:/Draconic Vibe Crystal/{}.log'",  crate::utils::get_player_name());
                 YesNoDialog::bind::<WriteOutputConfirm>(this.menu, text, "Do it!", "Nah..");
             }

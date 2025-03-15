@@ -81,6 +81,7 @@ impl DVCVariables {
 
     pub fn get_seed() -> i32 {  GameVariableManager::get_number(Self::SEED) }
     pub fn is_main_menu() -> bool { GameUserData::get_sequence() == 0 }
+    pub fn random_enabled() -> bool { Self::get_seed() != 0 }
 
     pub fn get_dvc_person(pid_index: i32, reverse: bool) -> &'static Il2CppString {
         let key = 

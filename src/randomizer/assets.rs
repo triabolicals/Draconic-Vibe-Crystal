@@ -25,6 +25,7 @@ pub mod bust;
 pub mod emblem;
 pub mod transform;
 pub mod accmenu;
+// pub mod dress;
 
 #[unity::class("Combat", "AnimSetDB")]
 pub struct AnimSetDB{
@@ -158,10 +159,11 @@ pub fn asset_table_result_setup_hook(this: &mut AssetTableResult, mode: i32, uni
         if let Some(jid) = unit.person.jid { unit.job = JobData::get_mut(jid).unwrap(); }
         else {unit.job = JobData::get_mut("JID_ソードマスター").unwrap(); }
     }
-    unsafe { clear_result(this, None) };
+    // unsafe { clear_result(this, None) };
     let outfit = get_unit_outfit_mode(unit);
     let is_hub = conditions.iter().any(|x| x.to_string() == "私服");
     let is_talk = conditions.iter().any(|x| x.to_string() == "会話" || x.to_string() == "情報" );
+
     // PlayerOutfit Mode
     let is_rosado = unit.person.parent.hash == 469588104;
     if is_rosado { if unit.edit.gender > 0 {  unit.edit.set_gender(2); } }
@@ -197,19 +199,17 @@ pub fn asset_table_result_setup_hook(this: &mut AssetTableResult, mode: i32, uni
     }
     // Class Change / Co-Op Engage Attack or Loading into Map
     if conditions.iter().any(|con| con.to_string() == "エンゲージ開始") && GameVariableManager::get_bool(DVCVariables::ENGAGE_P_KEY) {
-        if unsafe { LINK_COUNT == 0 } {
+        if let Some(body) = result.body_anims.iter_mut().find(|act| act.to_string().contains("Tsf0A")){  
+            unsafe { LINK_COUNT = 1; }
+        }
+        else if unsafe { LINK_COUNT == 0 } {
             if unit_dress_gender(unit) == 1 { result.body_anims.add(Il2CppString::new_static("Tsf0AM-No1_c001_N")); }
             else { result.body_anims.add(Il2CppString::new_static("Tsf0AF-No1_c051_N")); }
             unsafe { LINK_COUNT += 1; }
         }
-        else { 
-            unsafe { LINK_COUNT = 0; }
-            if let Some(body) = result.body_anims.iter_mut().find(|act| act.to_string().contains("Tsf0A")){
-                *body = "".into();
-            }
-        }
     }
     if ( sequence == 7 && mode == 2 ) || conditions.iter().any(|con|{ let condition = con.to_string(); condition == "クラスチェンジ中" || condition == "エンゲージ開始"  }) {
+        emblem::random_engage_voice(result);
         unique_class_dress(unit.job, result, unit_dress_gender(unit), mode, unit, false, true);
         return result; 
     }
@@ -228,24 +228,27 @@ pub fn asset_table_result_setup_hook(this: &mut AssetTableResult, mode: i32, uni
         illusion_double_assets(result, unit, mode, equipped, conditions); 
         return result; 
     }
-
     let is_engage = unit.status.value & 8388608 != 0;
 
-    let state = unsafe { unit_god_get_state(unit, None) };
+    let state = unit.get_god_state();
     let generic_mode =  GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY);
 
     if unsafe { !crate::utils::is_null_empty(result.dress_model, None) } && (is_engage || state != 2 ) { //Tiki Engage Mode 2
-        if result.dress_model.to_string().contains("uBody_Tik") { 
+        if result.dress_model.to_string().contains("uBody_Tik1AT") { 
             if unit.person.get_flag().value & 2048 != 0 && generic_mode & 2 == 2  { change_hair_change(unit, result); }
             if unit.status.value & 16777216 != 0 {
                 emblem::adjust_engage_attack_animation(result, unit, equipped, mode); 
             }
+            if is_talk { result.scale_stuff[0] = 0.5; }
             return result; 
         }
     }
     if unsafe { !crate::utils::is_null_empty(result.body_model, None) } && ( is_engage || state != 2) { //Tiki Engage Mode 1
         if result.body_model.to_string().contains("Tik1AT") { 
             if unit.person.get_flag().value & 2048 != 0 && generic_mode & 2 == 2  { change_hair_change(unit, result); }
+            result.body_anim = Some("UAS_Ent0AT".into());
+            result.body_anims.add(Il2CppString::new_static("UAS_Ent0AT"));
+            result.body_anims.iter().for_each(|act| println!("Tiki Body Act: {}", act));
             return result; 
         }
     }
@@ -415,24 +418,8 @@ fn replace_weapon_hands(result: &mut AssetTableResult, weapon: &WeaponAsset, lef
     }
 }
 
-
-#[skyline::from_offset(0x01bb0100)]
-pub fn unit_god_get_state(this: &Unit, method_info: OptionalMethod) -> i32;
-
-#[skyline::from_offset(0x1bb2260)]
-pub fn get_body_anims(this: &AssetTableResult, method_info: OptionalMethod) -> &'static mut List<Il2CppString>;
-
-#[skyline::from_offset(0x01a21460)]
-pub fn get_engage_attack(this: &Unit, method_info: OptionalMethod) -> Option<&'static SkillData>;
-
-#[skyline::from_offset(0x01bb2270)]
-pub fn asset_table_result_accessory_list(this: &AssetTableResult, method_info: OptionalMethod) -> &'static mut List<AssetTableAccessory>;
-
 #[skyline::from_offset(0x01baf640)]
 pub fn try_add_accessory_list(this: &mut List<AssetTableAccessory>, accessory: &AssetTableAccessory, method_info: OptionalMethod);
-
-#[skyline::from_offset(0x01bb5a90)]
-pub fn get_for_talk(pid: &Il2CppString, method_info: OptionalMethod) -> &'static mut AssetTableResult;
 
 // Fixing Engage Attack Animation (kinda)
 

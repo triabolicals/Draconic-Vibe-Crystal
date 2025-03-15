@@ -57,7 +57,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomBattleStyles {
 pub fn battle_style_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
     if DVCVariables::is_main_menu() {return BasicMenuResult::new(); }
     if GameVariableManager::get_number(DVCVariables::STYLES_KEY) == GameVariableManager::get_number("BattleStyles") { return BasicMenuResult::new();}
-    if GameVariableManager::get_number("BattleStyles") == 1 && !crate::utils::can_rand()  { return BasicMenuResult::new();}
+    if GameVariableManager::get_number("BattleStyles") == 1 && !DVCVariables::random_enabled()  { return BasicMenuResult::new();}
     let text = format!("Change Class Type Setting:\nFrom '{}' to '{}'?",
         style_setting_text( GameVariableManager::get_number(DVCVariables::STYLES_KEY)), 
         style_setting_text( GameVariableManager::get_number("BattleStyles")), 
@@ -91,13 +91,13 @@ impl TwoChoiceDialogMethods for BattleStyleConfirm {
 
 pub extern "C" fn vibe_styles() -> &'static mut ConfigBasicMenuItem {  
     let item_gauge = ConfigBasicMenuItem::new_switch::<RandomBattleStyles>("Random Class Types");
-    item_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_normal as _);
+    item_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::build_attribute_normal as _);
     item_gauge.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = battle_style_setting_acall as _ );
     item_gauge
 }
 
 pub fn randomize_job_styles(){
-    if !crate::utils::can_rand() { return; }
+    if !DVCVariables::random_enabled() { return; }
     let job_list = JobData::get_list_mut().unwrap();
     let rng = crate::utils::get_rng();
     match GameVariableManager::get_number(DVCVariables::STYLES_KEY) {

@@ -82,8 +82,7 @@ pub fn generic_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMetho
         1 => { msg = "Reseed generic enemy appearance?" }
         2 => { msg = "Reseed generic enemy colors?"}
         3 => { msg = "Reseed generic enemy appearance/colors?"}
-        _ => { 
-            return BasicMenuResult::new() }
+        _ => { return BasicMenuResult::new() }
     }
     YesNoDialog::bind::<ReseedEnemyConfirm>(this.menu, msg, "Do it!", "Nah..");
     return BasicMenuResult::new();

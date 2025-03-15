@@ -94,7 +94,7 @@ fn engrave_setting_text(choice: i32) -> String {
 
 pub extern "C" fn vibe_engrave() -> &'static mut ConfigBasicMenuItem { 
     let switch = ConfigBasicMenuItem::new_switch::<EngraveSettings>("Engrave Randomization Level");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_normal as _);
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::build_attribute_normal as _);
     switch.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = engrave_setting_acall as _);
     switch
 }
@@ -146,7 +146,7 @@ pub fn get_engrave_stats() {
 }
 
 pub fn randomized_engraves2(lower: i32, upper: i32, bandwidth: i32) {
-    if lower == upper || !crate::utils::can_rand() {
+    if lower == upper || !DVCVariables::random_enabled() {
         for x in 0..20 { 
             let god = GodData::get(EMBLEM_GIDS[x]).unwrap();
             for i in 0..6 {

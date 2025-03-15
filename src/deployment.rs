@@ -63,7 +63,7 @@ impl ConfigBasicMenuItemSwitchMethods for DeploymentMod {
 
 pub extern "C" fn vibe_deployment() -> &'static mut ConfigBasicMenuItem { 
     let switch = ConfigBasicMenuItem::new_switch::<DeploymentMod>("Deployment Mode");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_not_in_map2 as _);
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
     switch
 } 
 
@@ -109,7 +109,7 @@ impl ConfigBasicMenuItemSwitchMethods for EmblemMod {
 
 pub extern "C" fn vibe_emblem_deployment() -> &'static mut ConfigBasicMenuItem { 
     let switch = ConfigBasicMenuItem::new_switch::<EmblemMod>("Emblem Deployment Mode");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_not_in_map2 as _);
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
     switch
 } 
 
@@ -151,7 +151,7 @@ pub fn unit_selection_menu_disable(enabled: bool) { GameVariableManager::set_boo
 //Hook to function that creates the sortie deploy positions to do deployment stuff
 
 pub fn get_emblem_paralogue_level() {
-    if !crate::utils::can_rand() || GameVariableManager::get_bool("G_CustomEmblem") { return; }
+    if !DVCVariables::random_enabled() || GameVariableManager::get_bool("G_CustomEmblem") { return; }
     let cid = GameUserData::get_chapter().get_prefixless_cid().to_string();
     GameVariableManager::make_entry(DVCVariables::EMBLEM_PARALOGUE_LEVEL, 0);
     GameVariableManager::set_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL, 0);
@@ -191,7 +191,7 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
     if GameVariableManager::get_number(DVCVariables::DEPLOYMENT_KEY) == 3 {
         if GameUserData::get_status().value & 64 != 0 { GameUserData::get_status().value &= !64;  }  //Disables Continuous Flag 
     }
-    if crate::utils::can_rand() {  
+    if DVCVariables::random_enabled() {  
         if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 && !GameVariableManager::get_bool(DVCVariables::LUEUR_RANDOM_JOB_KEY) {
             crate::randomizer::job::unit_change_to_random_class(hero_unit);
             GameVariableManager::set_bool(DVCVariables::LUEUR_RANDOM_JOB_KEY, true);

@@ -108,6 +108,6 @@ pub extern "C" fn vibe_post_save() -> &'static mut ConfigBasicMenuItem {  Config
 pub extern "C" fn vibe_stats() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_switch::<MaxStatCaps>("Max Stat Caps") }
 pub extern "C" fn vibe_dlc() -> &'static mut ConfigBasicMenuItem {
     let switch = ConfigBasicMenuItem::new_switch::<DLCSetting>("DLC Emblems / Units");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = build_attribute_dlc as _);
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = buildattr::dlc_build_attr as _);
     switch
 }

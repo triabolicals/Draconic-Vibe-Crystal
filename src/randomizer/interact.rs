@@ -65,7 +65,7 @@ fn interaction_setting_text(choice: i32) -> String {
 pub fn interaction_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
     if DVCVariables::is_main_menu() {return BasicMenuResult::new(); }
     if GameVariableManager::get_number("InteractSetting") == GameVariableManager::get_number(DVCVariables::INTERACT_KEY) { return BasicMenuResult::new();}
-    if GameVariableManager::get_number("InteractSetting") == 3 && !crate::utils::can_rand() { return BasicMenuResult::new(); }
+    if GameVariableManager::get_number("InteractSetting") == 3 && !DVCVariables::random_enabled() { return BasicMenuResult::new(); }
     let text = format!("Change Weapon Interactions:\n\tFrom '{}' to '{}'?",
         interaction_setting_text( GameVariableManager::get_number(DVCVariables::INTERACT_KEY)), 
         interaction_setting_text( GameVariableManager::get_number("InteractSetting")), 
@@ -92,7 +92,7 @@ impl TwoChoiceDialogMethods for InteractionConfirm {
 
 pub extern "C" fn vibe_interaction() -> &'static mut ConfigBasicMenuItem { 
     let switch = ConfigBasicMenuItem::new_switch::<InteractionSettings>("Weapon Triangle Setting");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_normal as _);
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::build_attribute_normal as _);
     switch.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = interaction_setting_acall as _ );
     switch
 }
@@ -117,7 +117,7 @@ pub fn change_interaction_data(choice: i32, loaded: bool) {
             } 
         },
         3 => {  // Random 
-            if !crate::utils::can_rand() { return; }
+            if !DVCVariables::random_enabled() { return; }
             let rng = crate::utils::get_rng();
             for x in 0..20 {
                 if x % 10 == 0 { continue; }
@@ -162,7 +162,7 @@ pub fn change_interaction_data(choice: i32, loaded: bool) {
 }
 
 pub fn get_style_interact_default_values() {
-    super::battle_styles::BATTLE_STYLES_DEFAULT.get_or_init(||{
+    super::styles::BATTLE_STYLES_DEFAULT.get_or_init(||{
         let mut list: Vec<i32> = Vec::new();
         list.push(-1);
         let job_list = JobData::get_list().unwrap();

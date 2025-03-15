@@ -6,7 +6,6 @@ use engage::force::*;
 use engage::unitpool::*;
 use engage::util::get_instance;
 use engage::menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItemGaugeMethods, ConfigBasicMenuItem}};
-use utils::can_rand;
 
 pub const JOB_HASH: [i32; 111] = [ 
     1367578960, -1369632991, 689554073, -1369626630, 185671037, 1499787884, 185670709, -1998645787, 
@@ -141,14 +140,15 @@ impl ConfigBasicMenuItemGaugeMethods for EnemyJobGauge {
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let gauge = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_enemy_job_rate } else { GameVariableManager::get_number(DVCVariables::ENEMY_JOB_GAUGE_KEY) };
-        if gauge == 10 { this.help_text = "Only bosses will be in a random class (if possible).".into(); }
+        if gauge == 0 {  this.help_text = "Enemy units will not be in a random class.".into();}
+        else if gauge == 10 { this.help_text = "Only bosses will be in a random class (if possible).".into(); }
         else { this.help_text = format!("{}% chance of enemy units will be in a random class (if possible).", gauge).into(); }
     }
 }
 
 pub extern "C" fn vibe_job_gauge() -> &'static mut ConfigBasicMenuItem {  
     let class_gauge = ConfigBasicMenuItem::new_gauge::<EnemyJobGauge>("Random Enemy Class Rate"); 
-    class_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_job_gauge as _);
+    class_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::job_gauge_build_attr as _);
     class_gauge
 }
 
@@ -205,7 +205,8 @@ pub fn re_randomize_build_attr(_this: &mut ConfigBasicMenuItem, _method_info: Op
     if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 == 0 { return  BasicMenuItemAttribute::Hide; }
     if DVCVariables::is_main_chapter_complete(3) {
         let count = if Force::get(ForceType::Ally).is_some() { Force::get(ForceType::Ally).unwrap().get_count() } else { 0 };
-        if GameUserData::get_sequence() == 2 && count > 0 { BasicMenuItemAttribute::Enable }
+        if GameUserData::get_chapter().cid.contains("M018") && GameUserData::get_sequence() == 2 { BasicMenuItemAttribute::Enable }
+        else if GameUserData::get_sequence() == 2 && count > 0 { BasicMenuItemAttribute::Enable }
         else {  BasicMenuItemAttribute::Hide  }
     }
     else if GameUserData::get_sequence() == 3 && GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 { BasicMenuItemAttribute::Enable }
@@ -220,13 +221,14 @@ pub extern "C" fn vibe_job_rerand() -> &'static mut ConfigBasicMenuItem {
 fn rerandomize_jobs() {
     if DVCVariables::is_main_chapter_complete(3) {
         UnitPool::class().get_static_fields_mut::<UnitPoolStaticFieldsMut>().s_unit
-        .iter_mut().filter(|unit| unit.force.is_some_and(|f| f.force_type == 2 )).for_each(|unit|{
+        .iter_mut().filter(|unit| unit.force.is_some_and(|f| f.force_type == 2 || f.force_type == 1 )).for_each(|unit|{
             if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 {
                 if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit); }
                 else { enemy_unit_change_to_random_class(unit); }
-                crate::randomizer::person::unit::random_map_unit_level(unit);
+                crate::autolevel::auto_level_unit_for_random_map(unit, false);
                 super::person::unit::adjust_unit_items(unit);
                 unit.auto_equip();
+                crate::randomizer::person::ai::adjust_person_unit_ai(unit);
                 unit.reload_actor();
             }
         });
@@ -237,7 +239,7 @@ fn rerandomize_jobs() {
             if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 {
                 if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit); }
                 else { enemy_unit_change_to_random_class(unit); }
-                crate::randomizer::person::unit::random_map_unit_level(unit);
+                crate::autolevel::auto_level_unit_for_random_map(unit, false);
                 unit.auto_equip();
                 unit.reload_actor();
             }
@@ -396,7 +398,7 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
     }
     unit.original_aptitude.value = new_opt;
     unit.aptitude.value |= new_opt;
-    crate::autolevel::unit_update_learn_skill(unit);
+    crate::randomizer::skill::learn::unit_update_learn_skill(unit);
     println!("{} changed to {} (Lv {}/{})", Mess::get_name(unit.person.pid), Mess::get(new_job.name), unit.level, unit.internal_level);
     
 }
@@ -478,7 +480,7 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
     unit.set_hp(unit.get_capability(0, true));
     fixed_unit_weapon_mask(unit);
     randomize_selected_weapon_mask(unit);
-    crate::autolevel::unit_update_learn_skill(unit);
+    crate::randomizer::skill::learn::unit_update_learn_skill(unit);
     return true;
 }
 
@@ -486,7 +488,7 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
 #[skyline::hook(offset=0x019c6700)]
 pub fn add_job_list_unit(this: &mut ChangeJobData, unit: &Unit, method_info: OptionalMethod) -> bool {
     let result = call_original!(this, unit, method_info);
-    if !can_rand() { return result; }
+    if !DVCVariables::random_enabled() { return result; }
     if CONFIG.lock().unwrap().debug {
         this.is_gender = true;
         this.is_default_job = true;
@@ -569,7 +571,7 @@ pub fn get_weapon_for_asset_table(job: &JobData) -> Option<&'static ItemData> {
             weapon_level = job.get_max_weapon_level(x);
         }
     }
-    return crate::randomizer::item::item_rando::WEAPONDATA.lock().unwrap().get_random_weapon(weapon_type - 1, true);
+    return crate::randomizer::item::data::WEAPONDATA.lock().unwrap().get_random_weapon(weapon_type - 1, true);
 }
 
 pub fn correct_job_base_stats() {
@@ -686,7 +688,7 @@ pub struct ClassChangeJobMenuItem {
 }
 pub fn class_change_a_call_random_cc(item: &ClassChangeJobMenuItem, _method_info: OptionalMethod) -> i32 {
     if item.atr != 1 { return 0x800; }
-    if !GameVariableManager::get_bool(DVCVariables::RECLASS_KEY) || !can_rand() {
+    if !GameVariableManager::get_bool(DVCVariables::RECLASS_KEY) || !DVCVariables::random_enabled() {
         if item.atr == 1 {
             unsafe { class_change_confirm_bind(item.menu, item.job_data, None); }
             return 0x80;

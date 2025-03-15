@@ -2,7 +2,7 @@ use engage::menu::BasicMenuItemAttribute;
 use engage::unitpool::UnitPool;
 
 use super::*;
-use super::item_rando::*;
+use super::data::*;
 use crate::{continuous::{get_story_chapters_completed, get_continious_total_map_complete_count}, randomizer::{assets::animation::MONSTERS, person::unit::has_sid}};
 
 pub struct PlayerRandomWeapons;
@@ -142,7 +142,7 @@ pub fn replace_weapon(item: &UnitItem, weapon_mask: i32, max_rank: i32, is_enemy
     // Random Weapons for Enemy
     let ran_map = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
     if !is_enemy && GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) {
-        if let Some(new_item) = item_rando::WEAPONDATA.lock().unwrap().get_new_weapon(item, new_weapon_type, false) {
+        if let Some(new_item) = data::WEAPONDATA.lock().unwrap().get_new_weapon(item, new_weapon_type, false) {
             item.ctor(new_item);
             return;
         }
@@ -150,20 +150,20 @@ pub fn replace_weapon(item: &UnitItem, weapon_mask: i32, max_rank: i32, is_enemy
     if is_enemy && ( DVCVariables::is_main_chapter_complete(11) || ran_map ) {
        // println!("Enemy Item Replacement for rank: {}, Weapon: {}", max_rank, new_weapon_type);
         if get_continious_total_map_complete_count() < 11 && ran_map {
-            if let Some(generic_weapon) = item_rando::WEAPONDATA.lock().unwrap().get_generic_weapon(new_weapon_type, level) {
+            if let Some(generic_weapon) = data::WEAPONDATA.lock().unwrap().get_generic_weapon(new_weapon_type, level) {
                // println!("Replacement Generic Item: {}", Mess::get(generic_weapon.name));
                 item.ctor(generic_weapon);
                 item.set_flags(flag);
                 return;
             } 
         }
-        if let Some(new_item) = item_rando::WEAPONDATA.lock().unwrap().get_new_weapon(item, new_weapon_type, true) {
+        if let Some(new_item) = data::WEAPONDATA.lock().unwrap().get_new_weapon(item, new_weapon_type, true) {
             // println!("Replacement Item: {}", Mess::get(new_item.name));
             item.ctor(new_item);
             if new_item.flag.value & 2 == 0 { item.set_flags(flag); }
             return;
         }
-        if let Some(generic_weapon)= item_rando::WEAPONDATA.lock().unwrap().get_generic_weapon(new_weapon_type, level) {
+        if let Some(generic_weapon)= data::WEAPONDATA.lock().unwrap().get_generic_weapon(new_weapon_type, level) {
            // println!("Replacement Generic Item: {}", Mess::get(generic_weapon.name));
             item.ctor(generic_weapon);
             item.set_flags(flag);
@@ -386,7 +386,7 @@ pub fn adjust_unit_items(unit: &Unit) {
         if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) && is_player {
             let mut count = 0;
             while count < 10 {
-                if let Some(new_item) = item_rando::WEAPONDATA.lock().unwrap().get_random_weapon(5, false) {
+                if let Some(new_item) = data::WEAPONDATA.lock().unwrap().get_random_weapon(5, false) {
                     if new_item.get_weapon_level() <= job.weapon_levels[6]  { 
                         unit.item_list.add_item_no_duplicate(new_item); 
                         break;

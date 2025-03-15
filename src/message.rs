@@ -55,7 +55,7 @@ pub fn initialize_mess_hashs() {
 #[unity::hook("App", "Mess", "GetImpl")]
 pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: bool, method_info: OptionalMethod) -> &'static Il2CppString {
     let result = call_original!(label, is_replaced, method_info);
-    if !RANDOMIZER_STATUS.read().unwrap().enabled || !can_rand() { return result; }
+    if !RANDOMIZER_STATUS.read().unwrap().enabled || !DVCVariables::random_enabled() { return result; }
 
     if let Some(mess_il2cp) = label {
         let mess_label = mess_il2cp.to_string();
@@ -68,7 +68,7 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                 }
                 2 => {  // Alear Name Swap
                     if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
-                        return replace_string(result, Mess::get_name(GameVariableManager::get_string("G_R_PID_リュール")), GameVariableManager::get_string(DVCVariables::LUEUR_NAME));
+                        return replace_string(result, Mess::get_name(DVCVariables::get_dvc_person(0, true)), GameVariableManager::get_string(DVCVariables::LUEUR_NAME));
                     }
                 }
                 3 => {  //Enemy Person Name Swap
@@ -109,12 +109,12 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                             let mess_emblem = found.mess_emblem;
                             if new_emblem == -1 || old_emblem == -1 || new_emblem > 20 || old_emblem > 19 { return result; }
                             let old_name = if mess_emblem == 25 {
-                                if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 { Mess::get_name(GameVariableManager::get_string("G_R_PID_リュール")) }
+                                if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 { Mess::get_name(DVCVariables::get_dvc_person(0, true)) }
                                 else { GameVariableManager::get_string(DVCVariables::LUEUR_NAME) }
                             }
                             else { call_original!(Some(concat_string!("MGID_", RINGS[ mess_emblem as usize]).into()), false, None) };
                             let new_name = if new_emblem == 19 {
-                                if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 { Mess::get_name(GameVariableManager::get_string("G_R_PID_リュール")) }
+                                if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 { Mess::get_name(DVCVariables::get_dvc_person(0, true)) }
                                 else { GameVariableManager::get_string(DVCVariables::LUEUR_NAME) }
                             }
                             else { call_original!(Some(concat_string!("MGID_", RINGS[ new_emblem as usize]).into()), false, None) };

@@ -19,7 +19,7 @@ pub fn event_sequence_map_opening_hook(proc: &ProcInst, method_info: OptionalMet
 #[skyline::hook(offset=0x021a3310)]
 pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option<&'static Il2CppString> {
     let result = call_original!(dyn_value, method_info);
-    if result.is_none() || !crate::utils::can_rand() { return result; }
+    if result.is_none() || !DVCVariables::random_enabled() { return result; }
     let result_string = result.unwrap();
     let str1 = result_string.to_string();
     if str1.contains("Kengen") && !GameVariableManager::get_bool("G_CustomEmblem") {
@@ -88,7 +88,7 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
 
 pub fn change_g_pid_lueur() {
     if !GameVariableManager::exist("G_R_PID_リュール") { return; }
-    let replacement_pid = GameVariableManager::get_string("G_R_PID_リュール");
+    let replacement_pid = DVCVariables::get_dvc_person(0, true);
     if unsafe { crate::utils::is_null_empty(replacement_pid, None) } { return; }
     EventScript::set("g_pid_lueur", DynValue::new_string(replacement_pid));
     println!("Lueur PID was replaced for Chapter 22"); 
@@ -116,7 +116,7 @@ pub fn post_sortie_script_adjustment() {
             emblem_list.remove(value);
         }
     }
-    
+
     if crate::utils::lueur_on_map() && GameVariableManager::get_number(DVCVariables::DEPLOYMENT_KEY) == 3 { return; } // if alear is on map don't change anything 
     adjust_person_map_inspectors();
 }

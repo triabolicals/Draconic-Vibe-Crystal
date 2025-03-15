@@ -41,7 +41,7 @@ impl ConfigBasicMenuItemSwitchMethods for  MapTileRandomizer {
 
 pub extern "C" fn vibe_tile() -> &'static mut ConfigBasicMenuItem {  
     let switch = ConfigBasicMenuItem::new_switch::<MapTileRandomizer>("Tilebolical");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_not_in_map3 as _);
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_build_attr as _);
     switch
 }
 

@@ -19,7 +19,7 @@ pub static HAS_REWARD: OnceLock<bool> = OnceLock::new();
 
 pub mod unit_items;
 pub mod shop;
-pub mod item_rando;
+pub mod data;
 pub mod hub;
 
 // standard set 
@@ -36,14 +36,14 @@ impl ConfigBasicMenuItemGaugeMethods  for EnemyDropGauge {
             this.update_text();
             return BasicMenuResult::new();
         }
-        let gauge = if is_main { CONFIG.lock().unwrap().enemy_drop_rate as f32 / 100.0 }
-            else { GameVariableManager::get_number(DVCVariables::ITEM_DROP_GAUGE_KEY) as f32 / 100.0 };
+        let gauge = if is_main { CONFIG.lock().unwrap().enemy_drop_rate  }
+            else { GameVariableManager::get_number(DVCVariables::ITEM_DROP_GAUGE_KEY) };
 
-        let result = ConfigBasicMenuItem::change_key_value_f(gauge, 0.0, 1.0, 0.10);
+        let result = ConfigBasicMenuItem::change_key_value_i(gauge, 0, 100, 10);
         if gauge != result {
-            if is_main {CONFIG.lock().unwrap().enemy_drop_rate  = ( result * 100.0 ) as i32; }
-            else { GameVariableManager::set_number(DVCVariables::ITEM_DROP_GAUGE_KEY, ( result * 100.0 ) as i32 ); }
-            this.gauge_ratio = result;
+            if is_main {CONFIG.lock().unwrap().enemy_drop_rate  = result; }
+            else { GameVariableManager::set_number(DVCVariables::ITEM_DROP_GAUGE_KEY, result ); }
+            this.gauge_ratio = 0.01 * result as f32; 
             Self::set_help_text(this, None);
             this.update_text();
             return BasicMenuResult::se_cursor();
@@ -52,13 +52,18 @@ impl ConfigBasicMenuItemGaugeMethods  for EnemyDropGauge {
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().enemy_drop_rate }
             else { GameVariableManager::get_number(DVCVariables::ITEM_DROP_GAUGE_KEY)};
+        if value == 0 {
+            this.help_text = "Enemy units will not randomly drop items.".into();
+        }
+        else {
+            this.help_text = format!("Chance of enemy units dropping random items: {}%",  value).into();
+        }
 
-        this.help_text = format!("Percentage of enemy units dropping random items. ({:.2}%)",  value).into();
     }
 }
 pub extern "C" fn vibe_drops() -> &'static mut ConfigBasicMenuItem {
     let item_gauge = ConfigBasicMenuItem::new_gauge::<EnemyDropGauge>("Enemy Item Drop Rate");
-    item_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_not_in_map as _);
+    item_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
     item_gauge
 }
 
@@ -69,14 +74,14 @@ impl ConfigBasicMenuItemGaugeMethods  for ItemPriceGauge {
             else { GameVariableManager::get_number(DVCVariables::ITEM_GAUGE_KEY) as f32 / 100.0 };
     }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let gauge = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().replaced_item_price as f32 / 100.0 }
-            else { GameVariableManager::get_number(DVCVariables::ITEM_GAUGE_KEY) as f32 / 100.0 };
+        let gauge = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().replaced_item_price }
+            else { GameVariableManager::get_number(DVCVariables::ITEM_GAUGE_KEY) };
 
-        let result = ConfigBasicMenuItem::change_key_value_f(gauge, 0.0, 1.0, 0.25);
+        let result = ConfigBasicMenuItem::change_key_value_i(gauge, 0, 100, 10);
         if gauge != result {
-            if DVCVariables::is_main_menu() {CONFIG.lock().unwrap().replaced_item_price = ( result * 100.0 ) as i32; }
-            else { GameVariableManager::set_number(DVCVariables::ITEM_GAUGE_KEY, ( result * 100.0 ) as i32 ); }
-            this.gauge_ratio = result;
+            if DVCVariables::is_main_menu() {CONFIG.lock().unwrap().replaced_item_price = result; }
+            else { GameVariableManager::set_number(DVCVariables::ITEM_GAUGE_KEY, result ); }
+            this.gauge_ratio = 0.01 * result as f32;
             this.update_text();
             return BasicMenuResult::se_cursor();
         } else {return BasicMenuResult::new(); }
@@ -87,7 +92,7 @@ impl ConfigBasicMenuItemGaugeMethods  for ItemPriceGauge {
 }
 pub extern "C" fn vibe_item_gauge() -> &'static mut ConfigBasicMenuItem {  
     let item_gauge = ConfigBasicMenuItem::new_gauge::<ItemPriceGauge>("Randomized Item Value");
-    item_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_hub_items as _);
+    item_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::hub_item_build_attr as _);
     item_gauge
 }
 pub struct RandomItemMod;
@@ -188,7 +193,7 @@ pub fn create_item_pool() {
         }
     );
     println!("{} items are in the Random Item Pool", RANDOM_ITEM_POOL.lock().unwrap().len());
-    item_rando::WEAPONDATA.lock().unwrap().intitalize();
+    data::WEAPONDATA.lock().unwrap().intitalize();
 }
 
 pub fn random_item(item_type: i32, allow_rare: bool) -> &'static Il2CppString {

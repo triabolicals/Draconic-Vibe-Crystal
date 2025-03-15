@@ -41,12 +41,12 @@ impl ConfigBasicMenuItemSwitchMethods for RandomHubItemMod{
 
 pub extern "C" fn vibe_hub_items() -> &'static mut ConfigBasicMenuItem {  
     let hub_items = ConfigBasicMenuItem::new_switch::<RandomHubItemMod>("Exploration Items");
-    hub_items.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_hub_items as _);
+    hub_items.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::hub_item_build_attr as _);
     hub_items
 }
 
 pub fn hub_item_randomized() {
-    if !crate::utils::can_rand() || GameVariableManager::get_number(DVCVariables::ITEM_KEY) & 2 == 0  { return; }
+    if !DVCVariables::random_enabled() || GameVariableManager::get_number(DVCVariables::ITEM_KEY) & 2 == 0  { return; }
     if let Some(hub_sequence) = get_singleton_proc_instance::<HubSequence>() {
         println!("Randomizing Hub Items");
         let rng = Random::get_system();

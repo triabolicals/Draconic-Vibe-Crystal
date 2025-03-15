@@ -26,7 +26,7 @@ pub mod grow;
 pub mod item;
 pub mod person;
 pub mod interact;
-pub mod battle_styles;
+pub mod styles;
 pub mod emblem;
 pub mod skill;
 pub mod job;
@@ -191,7 +191,7 @@ impl TwoChoiceDialogMethods for ReseedConfirm {
 
 pub extern "C" fn vibe_reseed() -> &'static mut ConfigBasicMenuItem { 
     let switch = ConfigBasicMenuItem::new_command::<ReseedRandomizer>("Change Randomizer Seed");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_not_in_map2 as _);
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
     switch
 }
 pub extern "C" fn vibe_seed() -> &'static mut ConfigBasicMenuItem {  ConfigBasicMenuItem::new_command::<SeedRandomizer>("Set New Game Seed") }
@@ -516,7 +516,7 @@ pub fn try_get_index(dyn_value: &DynValue, index: i32, method_info: OptionalMeth
 /// SaveLoad Event Randomizing for Cobalt 1.21+
 pub fn save_file_load() {
     tutorial_check();
-    if !utils::can_rand() {  return;  }
+    if !DVCVariables::random_enabled() {  return;  }
     CONFIG.lock().unwrap().create_game_variables_after_new_game();
 
     if GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY) == 4 { 
@@ -568,7 +568,7 @@ fn randomize_gamedata(is_new_game: bool) {
     
     interact::change_interaction_data( GameVariableManager::get_number(DVCVariables::INTERACT_KEY), true);
     grow::random_grow();
-    battle_styles::randomize_job_styles();
+    styles::randomize_job_styles();
     if GameVariableManager::get_bool(DVCVariables::EMBLEM_NAME_KEY) { names::randomize_emblem_names();  }
 
     if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() {
@@ -740,7 +740,7 @@ pub fn randomize_stuff() {
             lock.seed =  DVCVariables::get_seed();
         }
     }
-    if utils::can_rand() && RANDOMIZER_STATUS.read().unwrap().enabled && !utils::in_map_chapter() && GameUserData::get_sequence() != 5 {
+    if DVCVariables::random_enabled() && RANDOMIZER_STATUS.read().unwrap().enabled && !utils::in_map_chapter() && GameUserData::get_sequence() != 5 {
         skill::replace_enemy_version();
         emblem::enemy::randomize_enemy_emblems();
         emblem::emblem_skill::adjust_emblem_common_skills();

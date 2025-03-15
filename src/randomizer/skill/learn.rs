@@ -1,10 +1,32 @@
 use super::*;
 use std::sync::OnceLock;
 pub static JOB_RESTRICT_SKILLS_LIST: OnceLock<Vec<SkillWeaponRestrictions>> = OnceLock::new();
-
+use engage::force::*;
 pub struct SkillWeaponRestrictions {
     pub hash: i32,
     pub mask: i32,
+}
+
+pub fn update_learn_skills(forced: bool) {
+    println!("LearnSkillKey: {}", GameVariableManager::get_number(DVCVariables::JOB_LEARN_SKILL_KEY));
+    if forced || !crate::randomizer::RANDOMIZER_STATUS.read().unwrap().learn_skill {
+        let force_type = [ForceType::Player, ForceType::Absent, ForceType::Dead, ForceType::Lost, ForceType::Enemy, ForceType::Ally];
+        for ff in force_type { Force::get(ff).unwrap().iter().for_each(|unit| unit_update_learn_skill(unit) ); }
+        let _ = crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.learn_skill = true);
+        return;
+    }
+}
+
+
+pub fn unit_update_learn_skill(unit: &Unit) { 
+    if unit.learned_job_skill.is_some() && unit.job.learn_skill.is_some() {
+        unit.set_learn_skill(None);
+        crate::randomizer::skill::learn::unit_learn_job_skill_hook(unit, unit.job, None);
+        //if let Some(skill) = crate::randomizer::skill::learn::unit_learn_job_skill_hook(unit, unit.job, None) {
+        //    println!("{} Learned {}", Mess::get_name(unit.person.pid), Mess::get(skill.name.unwrap()));
+       // }
+    }
+    else { unit.try_learn_job_skill(); }
 }
 
 pub struct JobLearnSkillMode;
@@ -88,7 +110,7 @@ impl TwoChoiceDialogMethods for LearnSkillConfirm {
         let index = menu.select_index;
         JobLearnSkillMode::set_help_text(menu.menu_item_list[index as usize], None);
         JobLearnSkillMode::set_command_text(menu.menu_item_list[index as usize], None);
-        crate::autolevel::update_learn_skills(true);
+        update_learn_skills(true);
         menu.menu_item_list[index as usize].update_text();
         BasicMenuResult::se_cursor().with_close_this(true)
     }
@@ -103,7 +125,7 @@ pub fn lsk_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -
 
 pub extern "C" fn vibe_learn_skill() -> &'static mut ConfigBasicMenuItem {  
     let skill = ConfigBasicMenuItem::new_switch::<JobLearnSkillMode>("Random Class Learn Skills");
-    skill.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_skill_gauge as _);
+    skill.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::skill_gauge_build_attr as _);
     skill.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = lsk_acall as _);
     skill
 }

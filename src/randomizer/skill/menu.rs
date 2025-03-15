@@ -132,13 +132,15 @@ impl ConfigBasicMenuItemGaugeMethods for EnemySkillGauge {
         }
         let gauge = if is_main {  CONFIG.lock().unwrap().random_enemy_skill_rate }
             else { GameVariableManager::get_number(DVCVariables::ENEMY_SKILL_GUAGE_KEY) };
-
-        if gauge == 10 { this.help_text = "Only bosses will gain a random skill".into(); }
+            
+        if gauge == 0 { this.help_text = "Enemy units will not gain a random skill.".into(); }
+        else if gauge == 10 { this.help_text = "Only bosses will gain a random skill".into(); }
         else {this.help_text = format!("{}% chance of enemy units will gain a random skill.", gauge).into(); }
     }
 }
 pub extern "C" fn vibe_skill_gauge() -> &'static mut ConfigBasicMenuItem {  
     let skill_gauge = ConfigBasicMenuItem::new_gauge::<EnemySkillGauge>("Random Enemy Skill Rate");
-    skill_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_skill_gauge as _);
+    skill_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::skill_gauge_build_attr as _);
     skill_gauge
 }
+

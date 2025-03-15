@@ -3,9 +3,7 @@ use engage::menu::{BasicMenuItem, BasicMenuItemAttribute};
 
 pub fn sortie_top_menu_back_get_map_attr(this: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
     let c_mode = GameVariableManager::get_number(DVCVariables::CONTINIOUS);
-    if c_mode > 0 && c_mode < 4 {
-        BasicMenuItemAttribute::Hide
-    }
+    if c_mode > 0 && c_mode < 4 { BasicMenuItemAttribute::Hide }
     else { unsafe { sortie_top_menu_back_get_map_attr_original(this, None) } }
 }
 

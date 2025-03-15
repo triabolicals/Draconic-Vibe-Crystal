@@ -41,7 +41,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEmblemEnergy {
 
 pub extern "C" fn vibe_energy() -> &'static mut ConfigBasicMenuItem {  
     let switch = ConfigBasicMenuItem::new_switch::<RandomEmblemEnergy>("Terrain Effects");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_not_in_map as _);
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
     switch
 }
 

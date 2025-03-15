@@ -376,7 +376,7 @@ pub fn change_map_dispos() {
             if aid.is_none() { continue; }
             let pid = aid.unwrap().to_string();
             if pid == PIDS[0] { 
-                t_list[x][y].set_pid(GameVariableManager::get_string("G_R_PID_リュール"));   }
+                t_list[x][y].set_pid(DVCVariables::get_dvc_person(0, true));   }
             else if ( t_list[x][y].get_force() == 0 || t_list[x][y].get_force() == 2 ) && GameVariableManager::get_bool("DDFanClub") && GameVariableManager::exist(&format!("G_R_{}", pid)) {
                 t_list[x][y].set_pid(GameVariableManager::get_string(&format!("G_R_{}", pid)));
             }
@@ -387,10 +387,10 @@ pub fn change_map_dispos() {
 
 
 pub fn change_lueur_for_recruitment(is_start: bool) {
-    if !crate::utils::can_rand() || super::RANDOMIZER_STATUS.read().unwrap().alear_person_set { return; }
+    if !DVCVariables::random_enabled() || super::RANDOMIZER_STATUS.read().unwrap().alear_person_set { return; }
     if !GameVariableManager::exist("G_R_PID_リュール") ||GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) == 0 { return; }
     println!("Alear check");
-    if GameVariableManager::get_string("G_R_PID_リュール").to_string() == PIDS[0] {
+    if DVCVariables::get_dvc_person(0, true).to_string() == PIDS[0] {
         let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.alear_person_set = true);
         return;
      }
@@ -507,7 +507,7 @@ pub fn switch_person_reverse(person: &PersonData) -> &'static PersonData {
 
 // Handle the case of Chapter 11 ends with not escape
 pub fn m011_ivy_recruitment_check(){
-    if !crate::utils::can_rand() || GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) == 0 { return; }
+    if !DVCVariables::random_enabled() || GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) == 0 { return; }
     if GameUserData::get_chapter().cid.to_string() == "CID_M011" && crate::utils::lueur_on_map() {
         GameVariableManager::make_entry("MapRecruit", 1);
         GameVariableManager::set_bool("MapRecruit", true);

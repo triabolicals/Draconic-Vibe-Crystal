@@ -1,46 +1,12 @@
 use super::*;
 use animation::MONSTERS;
-use engage::gamedata::item::*;
+use engage::combat::{CombatRecord, CharacterGameStatus};
+use item::UnitItem;
 
 pub const MONSTER_PERSONS: [&str; 8] = ["PID_G000_幻影飛竜", "PID_E004_異形兵_異形飛竜", "PID_G000_幻影狼", "PID_E001_異形兵_異形狼", "PID_E006_Boss", "PID_S006_幻影竜", "PID_M019_異形竜", "PID_M026_ソンブル_竜型"];
 pub const SCALE: [f32; 8] = [  1.0, 1.0, 1.0, 1.0, 0.40, 1.0, 1.0, 0.40];
 pub static mut OLD_EMBLEM: String = String::new();
 
-#[unity::class("App", "BattleInfoSide")]
-pub struct BattleInfoSide {
-    info: u64,
-    pub side_type: i32,
-    pub unit: Option<&'static Unit>,
-    pub item: &'static UnitItem,
-}
-
-#[unity::class("Combat", "CharacterGameStatus")]
-pub struct CharacterGameStatus {
-    pub appearance: u64,
-    pub emblem_ident: Option<&'static Il2CppString>,
-    pub side: i32,
-    pub stun: bool,
-    pub unit: Option<&'static Unit>,
-    pub person: &'static mut PersonData,
-    pub job_data: &'static JobData,
-    pub force: &'static Force,
-    pub name: &'static Il2CppString,
-    pub values: [i32; 9],
-    pub weapon: Option<&'static mut UnitItem>,
-}
-
-#[unity::class("Combat", "CombatRecord")]
-pub struct CombatRecord {
-    pub is_enemy_attack: bool,
-    pub combat_style: i32,
-    calc: u64,
-    sim_calc: u64,
-    pub game_status: &'static mut Array<&'static mut CharacterGameStatus>,
-    pub chain_atk: &'static mut Array<&'static mut CharacterGameStatus>,
-    pub dragonize: &'static mut Array<&'static mut CharacterGameStatus>,
-    junk: [u64; 3],
-    pub map_distance: i32,
-}
 
 pub struct CombatRecordDisplayClass85 {
     pub this: &'static CombatRecord,
@@ -78,39 +44,13 @@ fn combat_side_convert_from(side_type: i32, is_reversed: bool, method_info: Opti
 fn character_game_status_is_valid(gs: &CharacterGameStatus, method_info: OptionalMethod) -> bool;
 
 #[skyline::from_offset(0x027e0880)]
-pub fn combat_character_game_status_import(this:&mut CharacterGameStatus, side: i32, calc: u64, side_type: i32, distance: i32, method_info: OptionalMethod);
-/* 
-{
-    call_original!(this, side, calc, side_type, distance, method_info);
-    if this.emblem_ident.is_some() && this.unit.is_some() {
-        let unit = this.unit.unwrap();
-        if unsafe { unit_god_get_state(unit, None) } > 1 {
-            if let Some(engage_attack) =  unsafe { get_engage_attack(unit, None) } {
-                let sid = engage_attack.sid.to_string();
-                let emblem_index = if let Some(pos) = EMBLEM_ASSET.iter().position(|god| sid.contains(god)) { pos }
-                    else if sid.contains("三級長エンゲージ技＋") { 20 }
-                    else if sid.contains("三級長エンゲージ") { 12 }
-                    else { 50 };
-                if emblem_index > 20 { return; }
-                let new_emblem_id = 
-                    match emblem_index {
-                        12|20 => { "Ede" },
-                        16 => { "Sen"},
-                        17 => { "Cam"},
-                        _ => { ENGAGE_PREFIX[emblem_index] }
-                    };
-                this.emblem_ident = Some(new_emblem_id.into());
-            }
-        }
-    }
-}
-*/
+fn combat_character_game_status_import(this:&mut CharacterGameStatus, side: i32, calc: u64, side_type: i32, distance: i32, method_info: OptionalMethod);
 
 fn adjust_emblem_zone(this: &mut CharacterGameStatus) {
-    if this.emblem_ident.is_some() && this.unit.is_some() {
+    if this.emblem_identifier.is_some() && this.unit.is_some() {
         let unit = this.unit.unwrap();
-        if unsafe { unit_god_get_state(unit, None) } > 1 {
-            if let Some(engage_attack) =  unsafe { get_engage_attack(unit, None) } {
+        if unit.get_god_state() > 1 {
+            if let Some(engage_attack) = unit.get_engage_attack()  {
                 let sid = engage_attack.sid.to_string();
                 let emblem_index = if let Some(pos) = EMBLEM_ASSET.iter().position(|god| sid.contains(god)) { pos }
                     else if sid.contains("三級長エンゲージ技＋") { 20 }
@@ -124,7 +64,7 @@ fn adjust_emblem_zone(this: &mut CharacterGameStatus) {
                         17 => { "Cam"},
                         _ => { ENGAGE_PREFIX[emblem_index] }
                     };
-                this.emblem_ident = Some(new_emblem_id.into());
+                this.emblem_identifier = Some(new_emblem_id.into());
             }
         }
     }
@@ -137,9 +77,16 @@ pub fn enemy_tiki_emblem_transformation(result: &mut AssetTableResult, unit: &Un
     let kind = if equipped.is_none() { 0 } else { equipped.unwrap().kind } as usize;
     let gender = unit_dress_gender(unit);
     let gen = if gender == 1 { "M" } else { "F" };
-    let state = unsafe { unit_god_get_state(unit, None) };
+    let state = unit.get_god_state();
     if unsafe { !crate::utils::is_null_empty(result.body_model, None) } {
         if result.body_model.to_string().contains("Tik1AT") { return; }
+    }
+    if unsafe { !crate::utils::is_null_empty(result.dress_model, None) } {
+        if result.dress_model.to_string().contains("Tik1AT") { return; }
+    }
+    if unit.god_unit.is_some_and(|g| g.data.gid.contains("チキ") )&& state == 1 {
+        emblem::tiki_engage(result, unit, mode);
+        return;
     }
     if kind == 9 || state == 2 || equipped.is_some_and(|i| i.iid.to_string().contains("チキ")) {
         println!("Enemy Tiki Body: {}", result.body_model);
@@ -171,7 +118,6 @@ pub fn enemy_tiki_emblem_transformation(result: &mut AssetTableResult, unit: &Un
 #[skyline::hook(offset=0x029285f0)]
 pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatRecordDisplayClass85, method_info: OptionalMethod) {
     call_original!(this, calc_side, param_3, method_info);
-    
     let side = unsafe { combat_side_convert_from(calc_side, this.is_enemy_attack,  None)};
     adjust_emblem_zone(this.game_status[side as usize]);
     let game_status = &this.game_status[side as usize];
@@ -179,9 +125,8 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
     if let Some(unit) = game_status.unit.as_ref() {
         if unit.person.pid.to_string().contains("チキ_竜化") { return; }
         let distance = crate::utils::clamp_value(this.map_distance, 1, 2);
-        let status = unsafe { unit_god_get_state(this.game_status[side as usize].unit.unwrap(), None) };
+        let status = this.game_status[side as usize].unit.unwrap().get_god_state();
         if let Some(gunit) = unit.god_unit {
-
             if gunit.data.gid.to_string().contains("敵チキ") || ( gunit.data.mid.to_string().contains("Tiki") && !gunit.data.gid.contains("チキ") ) {  // Enemy Tiki Emblem
                 if status == 2 || status == 3 {   // Is Engage Attacking 
                     let asset_index = super::emblem::get_emblem_attack_index(unit);
@@ -192,12 +137,12 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
                     if asset_index == 13 || asset_index > 20 {
                         conditions[1] = "敵チキ".into();
                         conditions[2] = "AID_チキ竜化".into();
-                        result = unsafe { asset_table_result_get_from_pid(2, "PID_E001_Boss_竜化".into(),  conditions, None) };
+                        result = AssetTableResult::get_from_pid(2, "PID_E001_Boss_竜化",  conditions);
                     }
                     else {
                         conditions[1] = if asset_index == 20 {  "エーデルガルト" } else { EMBLEM_ASSET[asset_index] }.into();
                         conditions[2] = "女装".into();
-                        result = unsafe { result_get_from_god(2, gunit, conditions, None) };
+                        result = AssetTableResult::get_from_god_unit(2, gunit, conditions)
                     }
                     unsafe { combat_character_game_status_import(this.dragonize[side as usize], side, param_3.calc, calc_side, distance, None) };
                     result.sound.voice = None;
@@ -209,13 +154,12 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
                     let result;
                     if gunit.data.gid.to_string().contains("M002") {
                         conditions[0] = "チキ".into();
-                        result = unsafe { asset_table_result_get_from_pid(2, "PID_G001_チキ_竜化".into(),  conditions, None) };
+                        result = AssetTableResult::get_from_pid(2, "PID_G001_チキ_竜化", conditions);
                         result.sound.voice = Some("Lumiere".into());
-                        // change_hair_change(this.game_status[side as usize].unit.unwrap(), result);
                     }
                     else {
                         conditions[0] = "敵チキ".into();
-                        result = unsafe { asset_table_result_get_from_pid(2, "PID_E001_Boss_竜化".into(),  conditions, None) };
+                        result = AssetTableResult::get_from_pid(2, "PID_E001_Boss_竜化",  conditions);
                     }
                     result.body_anims.add(Il2CppString::new_static("Ent0AT-Ft1_c000_N"));
                     result.sound.voice = None;
@@ -236,12 +180,14 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
                 else { conditions[0] = format!("AID_Person_{}", emblem).into(); }
             }
         }
-        else if let Some(weapon) = game_status.weapon.as_ref() {
+        else if let Some(weapon) = &game_status.weapon {
+            println!("Item Index: {}", weapon.item.parent.index);
             if weapon.item.iid.to_string().contains("チキ") && status == 0 {
                 conditions[0] = "AID_Person_チキ_竜化".into();
                 pid = "PID_闘技場_チキ".to_string();
             }
             else if weapon.item.kind == 9 {
+                println!("Kind 0");
                 if jid == "JID_裏邪竜ノ娘" {
                     conditions[0] = "AID_エル竜化".into();
                     pid = "PID_エル_竜化".to_string();
@@ -262,7 +208,7 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
             if this.combat_style & (1 << 28 ) == 0 {
                 this.combat_style |= 1 << 22;
             }
-            let result = unsafe { asset_table_result_get_from_pid(2, pid.into(), conditions, None) };
+            let result = AssetTableResult::get_from_pid(2, pid, conditions);
             unsafe { combat_character_game_status_import(this.dragonize[side as usize], side, param_3.calc, calc_side, distance, None) };
             this.game_status[side as usize].appearance = unsafe { create_from_result(result, distance, None) };
         }
@@ -273,7 +219,9 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
 #[skyline::from_offset(0x01bb5be0)]
 fn asset_table_result_get_from_pid(mode: i32, pid: &Il2CppString, conditions: &Array<&Il2CppString>, method_info: OptionalMethod) -> &'static mut AssetTableResult;
 
-#[skyline::from_offset(0x01bb7980)]
-fn result_get_from_god(mode: i32, god_unit: &GodUnit, conditions: &Array<&Il2CppString>, method_info: OptionalMethod) -> &'static mut AssetTableResult;
+#[unity::from_offset("App", "UnitItem", "GetData")]
+fn unititem_get_data(this: &UnitItem, method_info: OptionalMethod) -> Option<&'static ItemData>;
+
+
 #[skyline::from_offset(0x02b0ed80)]
 fn create_from_result(result: &AssetTableResult, map_distance: i32, method_info: OptionalMethod) -> u64;

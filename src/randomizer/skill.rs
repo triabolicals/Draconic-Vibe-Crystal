@@ -15,7 +15,7 @@ use super::{DVCVariables, CONFIG};
 use crate::{enums::*, utils::*};
 
 pub mod learn;
-pub mod menuitem;
+pub mod menu;
 
 pub static SKILL_POOL: Mutex<Vec<SkillIndex>> = Mutex::new(Vec::new());
 pub static MADDENING_POOL: Mutex<Vec<i32>> = Mutex::new(Vec::new());
@@ -324,7 +324,7 @@ pub fn replace_enemy_version() {
 }
 pub fn randomize_skills() {
     if crate::randomizer::RANDOMIZER_STATUS.read().unwrap().skill_randomized { return; }
-    if !GameVariableManager::get_bool(DVCVariables::SKILL_KEY) || !crate::utils::can_rand() {
+    if !GameVariableManager::get_bool(DVCVariables::SKILL_KEY) || !DVCVariables::random_enabled() {
         crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.skill_randomized = true).unwrap();
         return; 
     }
@@ -396,7 +396,7 @@ pub fn randomize_skills() {
             if len == 0 { panic!("No Available Skills to give as personals to {}",  Mess::get_name(person_list[x].pid).to_string()); }
             let new_skill_index = &mut available[ rng.get_value(len) as usize];
             let skill = SkillData::try_index_get(new_skill_index.index).expect("Attempting to assign personal skill: Bad Skill? :O");
-            println!("Person: {} Skill: {}, Hash: {}", Mess::get_name(person_list[x].pid).to_string(), Mess::get(skill.name.unwrap()).to_string(), skill.parent.hash);
+            println!("Person: {} Skill: {}, Hash: {}", Mess::get_name(person_list[x].pid), Mess::get(skill.name.unwrap()).to_string(), skill.parent.hash);
             change_personal_sid(person_list[x], skill);
             new_skill_index.in_use = true;
             GameVariableManager::set_number(&format!("G_P_{}", person_list[x].pid.to_string()), skill.parent.hash);
@@ -410,19 +410,16 @@ pub fn randomize_skills() {
         .filter(|job|{ job.is_high() || ( job.is_low() && job.max_level == 40 ) })
         .for_each(|job|{
             let mut weapon_mask = 0;
-            for x in 1..9 {
-                if job.get_max_weapon_level(x) > 0 { weapon_mask |= 1 << x; }
-            }
+            for x in 1..9 { if job.get_max_weapon_level(x) > 0 { weapon_mask |= 1 << x; } }
+
             let index = job.parent.index;
-            let job_key = format!("G_L_{}", job.jid.to_string());
+            let job_key = format!("G_L_{}", job.jid);
             if GameVariableManager::exist(job_key.as_str()) {
                 let mut set_skill = false;
                 if let Some(skill) = SkillData::try_get_hash( GameVariableManager::get_number(job_key.as_str()) ) {
                     let hash = skill.parent.hash;
                     if let Some(restrict) = restriction_list.iter().find(|x| x.hash == hash) {
-                        if restrict.mask & weapon_mask != 0 {
-                            set_skill = true;
-                        }
+                        if restrict.mask & weapon_mask != 0 { set_skill = true; }
                     }
                     else { set_skill = true; }
                     if set_skill {
@@ -436,7 +433,7 @@ pub fn randomize_skills() {
                 else { jobs.push(index); }
             }
             else { 
-                GameVariableManager::make_entry(&job_key, 0);  
+                GameVariableManager::make_entry(job_key.as_str(), 0);  
                 jobs.push(index);
             }
         }
@@ -466,8 +463,7 @@ pub fn randomize_skills() {
                 }
                 job.set_learning_skill( skill.sid );
                 new_skill_index.in_use = true;
-                let job_key = format!("G_L_{}", job.jid.to_string());
-                GameVariableManager::set_number(&job_key, skill.parent.hash);
+                GameVariableManager::set_number(format!("G_L_{}", job.jid), skill.parent.hash);
             }
         }
     });   

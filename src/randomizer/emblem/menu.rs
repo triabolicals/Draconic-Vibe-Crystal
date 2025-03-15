@@ -179,7 +179,7 @@ pub fn engage_link_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalM
 
 pub extern "C" fn vibe_engage_links() -> &'static mut ConfigBasicMenuItem {  
     let switch = ConfigBasicMenuItem::new_switch::<RandomEmblemLinkMod>("Unit-Emblem Links");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::build_attribute_not_in_map as _);
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
     switch.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = engage_link_acall as _ );
     switch
 }

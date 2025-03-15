@@ -310,7 +310,7 @@ pub fn randomize_job_grow(){
 
 
 pub fn random_grow(){
-    if !crate::utils::can_rand() { return; }
+    if !DVCVariables::random_enabled() { return; }
     let growth_mode = GameVariableManager::get_number(DVCVariables::GROWTH_KEY);
     println!("Growth Randomization: {}", growth_mode);
     if growth_mode & 1 != 0 { randomize_person_grow(); }

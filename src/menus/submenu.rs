@@ -40,7 +40,7 @@ pub fn recruitment_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: Opt
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<deployment::EmblemMod>("Emblem Deployment Mode"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<ironman::IronmanMod>("Ironman Mode"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::person::RandomPersonMod>("Unit Recruitment Order"));
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::menuitem::RandomEmblemMod>("Emblem Recruitment Order"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::menu::RandomEmblemMod>("Emblem Recruitment Order"));
     config_menu.add_item(randomizer::person::vibe_custom_units());
     config_menu.add_item(randomizer::person::vibe_custom_slot_disable());
     TitleBar::open_header("Draconic Vibe Crystal", "Deployment and Recruitment Settings", "");
@@ -69,13 +69,13 @@ pub fn emblem_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: Optional
     config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose_to_dvc_main as _).unwrap();
     config_menu.full_menu_item_list.clear();
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::names::RandomNameMods>("Random Emblem Names"));
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::menuitem::RandomGodMod>("Emblem Engage/Inherit Skills"));       
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::menuitem::RandomSynchoMod>("Emblem Sync Skills"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::menu::RandomGodMod>("Emblem Engage/Inherit Skills"));       
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::menu::RandomSynchoMod>("Emblem Sync Skills"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::emblem_skill::EmblemSkillChaos>("Emblem Skill Chaos Mode"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::engrave::EngraveSettings>("Engrave Randomization Level"));
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::menuitem::RandomEngageWepMod>("Engage Items / Weapons"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::menu::RandomEngageWepMod>("Engage Items / Weapons"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::emblem_item::EmblemWeaponProfs>("Emblem Proficiencies Setting"));
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::menuitem::RandomEmblemLinkMod>("Unit-Emblem Links"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::emblem::menu::RandomEmblemLinkMod>("Unit-Emblem Links"));
     TitleBar::open_header("Draconic Vibe Crystal", "Emblem Settings", "");
     BasicMenuResult::se_cursor()
 }
@@ -102,11 +102,11 @@ pub fn class_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalM
     config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose_to_dvc_main as _).unwrap();
     config_menu.full_menu_item_list.clear();
     config_menu.add_item(randomizer::job::vibe_custom_job());
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::battle_styles::RandomBattleStyles>("Class Types Setting"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::styles::RandomBattleStyles>("Class Types Setting"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::RandomCC>("Reclassing Setting"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::RandomJobMod>("Random Classes"));    
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::menuitem::RandomSkillMod>("Randomize Skills"));
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::menuitem::RandomSkillCost>("Skill Inheritance / SP Cost"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::menu::RandomSkillMod>("Randomize Skills"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::menu::RandomSkillCost>("Skill Inheritance / SP Cost"));
     config_menu.add_item(randomizer::skill::learn::vibe_learn_skill());
     TitleBar::open_header("Draconic Vibe Crystal", "Class / Skill Settings", "");
     BasicMenuResult::se_cursor()
@@ -166,11 +166,11 @@ pub fn enemy_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalM
     config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose_to_dvc_main as _).unwrap();
     config_menu.full_menu_item_list.clear();
     config_menu.add_item(randomizer::names::vibe_generic());
-    config_menu.add_item(ConfigBasicMenuItem::new_gauge::<randomizer::skill::menuitem::EnemySkillGauge>("Random Enemy Skill Rate"));
+    config_menu.add_item(ConfigBasicMenuItem::new_gauge::<randomizer::skill::menu::EnemySkillGauge>("Random Enemy Skill Rate"));
     config_menu.add_item(randomizer::item::vibe_drops());
     config_menu.add_item(randomizer::job::vibe_job_gauge());
-    config_menu.add_item(ConfigBasicMenuItem::new_gauge::<autolevel::EnemyEmblemGauge>("Enemy Emblem Rate"));
-    config_menu.add_item(ConfigBasicMenuItem::new_gauge::<autolevel::EnemyRevivalStones>("Enemy Revival Stone Rate"));
+    config_menu.add_item(ConfigBasicMenuItem::new_gauge::<autolevel::enemy::EnemyEmblemGauge>("Enemy Emblem Rate"));
+    config_menu.add_item(ConfigBasicMenuItem::new_gauge::<autolevel::revival::EnemyRevivalStones>("Enemy Revival Stone Rate"));
     TitleBar::open_header("Draconic Vibe Crystal", "Enemy Settings", "");
     BasicMenuResult::se_cursor()
 }

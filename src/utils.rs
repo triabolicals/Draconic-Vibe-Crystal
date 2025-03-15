@@ -1,4 +1,5 @@
 use unity::prelude::*;
+use unity::il2cpp::class::VirtualInvoke;
 use engage::{
     random::*,
     force::*,
@@ -236,6 +237,24 @@ pub fn get_stats_for_emblem(rng: &Random) -> [i32; 4] {
         index += 1;
     }
     return out;
+}
+
+pub fn get_nested_virtual_methods_mut(namespace: &str, class_name: &str, nested_class: &str, method_name: &str) -> Option<&'static mut VirtualInvoke> {
+    if let Some(cc) = Il2CppClass::from_name(namespace, class_name).unwrap().get_nested_types().iter()
+        .find(|x| x.get_name() == nested_class) {
+        let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
+        menu_mut.get_virtual_method_mut(method_name)
+    }
+    else { None }
+}
+pub fn get_nested_nested_virtual_method_mut(namespace: &str, class_name: &str, nested_class: &str, nested_class2: &str, method_name: &str) -> Option<&'static mut VirtualInvoke> {
+    if let Some(cc) = Il2CppClass::from_name(namespace, class_name).unwrap().get_nested_types().iter()
+        .find(|x| x.get_name() == nested_class).unwrap().get_nested_types().iter()
+        .find(|x| x.get_name() == nested_class2) {
+        let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
+        menu_mut.get_virtual_method_mut(method_name)
+    }
+    else { None }
 }
 
 pub fn mess_get(value: &Il2CppString) -> String { return Mess::get(value).to_string(); }

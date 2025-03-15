@@ -20,7 +20,7 @@ pub mod engrave;
 pub mod emblem_skill;
 pub mod enemy;
 pub mod custom;
-pub mod menuitem;
+pub mod menu;
 
 pub static EMBLEM_LIST: OnceLock<Vec<i32>> = OnceLock::new();
 pub static ENEMY_EMBLEM_LIST: OnceLock<Vec<i32>> = OnceLock::new();
@@ -83,7 +83,7 @@ pub fn initialize_emblem_list() {
 }
 
 pub fn emblem_gmap_spot_adjust(){
-    if GameUserData::get_sequence() != 6 || !crate::utils::can_rand() { return; }
+    if GameUserData::get_sequence() != 6 || !DVCVariables::random_enabled() { return; }
     let edelgard_obtain = GameVariableManager::get_bool("G_拠点_神竜導入イベント再生済み");
     if edelgard_obtain  {
         for x in 1..7 {
@@ -189,7 +189,7 @@ fn get_custom_recruitment_list() -> Vec<(i32, i32)> {   // person_x to person_y
 }
 
 pub fn randomize_emblems() {
-    if !crate::utils::can_rand() { return; }
+    if !DVCVariables::random_enabled() { return; }
     GameVariableManager::make_entry("G_CustomEmblem", 0);
     if !GameVariableManager::exist("G_Random_Emblem_Set") { GameVariableManager::make_entry("G_Random_Emblem_Set", 0); }
     if GameVariableManager::get_bool("G_Random_Emblem_Set") {
@@ -312,7 +312,7 @@ pub fn get_engage_attack_type(skill: Option<&SkillData>) -> i32 {
 }
 
 pub fn randomize_engage_links(reset: bool) {
-    if reset || !crate::utils::can_rand() {
+    if reset || !DVCVariables::random_enabled() {
         let dic = GodData::get_link_dictionary();
         for x in 1..PIDS.len() {
             let person = PersonData::get(PIDS[x]).unwrap();

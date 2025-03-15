@@ -76,7 +76,7 @@ pub fn set_random_bgm_phase(){
 
 
 pub fn randomize_bgm_map() {
-    if !crate::utils::can_rand() { return; }
+    if !DVCVariables::random_enabled() { return; }
     if GameUserData::is_encount_map() { return; }
     get_current_chapter_chapter_bgm();
     if !GameVariableManager::get_bool(DVCVariables::BGM_KEY) { return; }

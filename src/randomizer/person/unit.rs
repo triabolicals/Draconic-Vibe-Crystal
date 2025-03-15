@@ -1,12 +1,7 @@
-use engage::godpool::GodPool;
-use engage::map::situation::MapSituation;
-use engage::util::get_instance;
-
 use super::{*, ai};
-use crate::randomizer::assets::animation::MONSTERS;
-use crate::randomizer::emblem::{EMBLEM_LIST, ENEMY_EMBLEM_LIST};
-use crate::randomizer::{grow, job, item::unit_items, assets, skill};
-use crate::{autolevel, utils, DVCVariables};
+use engage::godpool::GodPool;
+use crate::randomizer::{emblem::{EMBLEM_LIST, ENEMY_EMBLEM_LIST}, assets::animation::MONSTERS, grow, job, item::unit_items, assets, skill};
+use crate::DVCVariables;
 
 #[unity::hook("App", "Unit", "CreateImpl2")]
 pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
@@ -30,7 +25,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 ||  ( GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 ) {  adjust_unit_items(this);  }
             if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) { unit_items::adjust_missing_weapons(this); }
             grow::adaptive_growths(this);
-            random_map_unit_level(this); 
+            auto_level_unit_for_random_map(this, false); 
         }
         else {  // Enemy Randomization
             assets::accessory::accesorize_enemy_unit(this); 
@@ -45,7 +40,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         return;
     }
     if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
-        if GameVariableManager::get_string("G_R_PID_リュール") == this.person.pid && DVCVariables::is_main_menu() {    //IsLueur
+        if DVCVariables::get_dvc_person(0, true) == this.person.pid && DVCVariables::is_main_menu() {    //IsLueur
             println!("Alear: {}", Mess::get_name(this.person.pid));
             change_unit_autolevel(this, true);
             this.item_list.put_off_all_item();
@@ -85,7 +80,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
                 if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) { unit_items::adjust_missing_weapons(this); }
             }
             grow::adaptive_growths(this);
-            random_map_unit_level(this);
+            auto_level_unit_for_random_map(this, false);
             this.set_hp(this.get_capability(0, true));
             return;
         }
@@ -107,7 +102,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     set_unit_edit_name(this);
     this.auto_equip();
     grow::adaptive_growths(this);
-    random_map_unit_level(this);
+    auto_level_unit_for_random_map(this, false);
     this.set_hp(this.get_capability(0, true));
 }
 
@@ -223,47 +218,6 @@ pub fn set_unit_edit_name(unit: &Unit) {
     } 
 }
 
-pub fn emblem_paralogue_level_adjustment(this: &Unit){
-    if !crate::utils::can_rand() || DVCVariables::is_random_map()  { return; }
-    let level_difference = GameVariableManager::get_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL);
-    if level_difference == 0 { return; }
-    let total_level = this.level as i32 + this.internal_level as i32;
-    let new_level = total_level + level_difference;
-    this.auto_grow_capability(new_level, new_level);
-    if this.job.is_high() {
-        if new_level < 20 {
-            this.set_level(1);
-            this.set_internal_level(20);
-        }
-        else if new_level > 40 {
-            this.set_level(20);
-            this.set_internal_level(new_level - 20);
-        }
-        else {
-            this.set_level(new_level - 20);
-            this.set_internal_level(20);
-        }
-    }
-    else {
-        if this.job.max_level == 40 {
-            if new_level > 40 {
-                this.set_level(40);
-                this.set_internal_level(new_level - 40);
-            }
-            else {
-                this.set_level(max(new_level, 21));
-                this.set_internal_level(0);
-            }
-        }
-        else {
-            this.set_level(20);
-            if new_level > 20 { this.set_internal_level(new_level - 20); }
-            else { this.set_internal_level(0); }
-        }
-    }
-    this.set_hp(this.get_capability(0, true));
-}
-
 pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
     let person = if reverse { super::switch_person_reverse(unit.person) } else { unit.get_person() };
     if DVCVariables::is_random_map() && person.parent.hash == -266109647 {
@@ -371,10 +325,10 @@ pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
 
     unit.set_sp( person.get_sp() );
     unit.set_person(new_person);    // change person
-    fixed_unit_weapon_mask(unit);   // fixed weapon mask due to class changes
-    random_map_unit_level(unit);   // Random map order level adjustment
+    fixed_unit_weapon_mask(unit);   // fixed weapon mask due to class changes  // Random map order level adjustment
 }
 
+/* 
 pub fn random_map_unit_level(unit: &mut Unit) {
     if !DVCVariables::is_main_chapter_complete(4) || GameUserData::is_evil_map() { return; }
     if !DVCVariables::is_random_map() {
@@ -383,9 +337,8 @@ pub fn random_map_unit_level(unit: &mut Unit) {
     }
     let mut total_level = crate::continuous::random::random_map_mode_level() - 1;
     let avg_level = get_instance::<MapSituation>().average_level;
-    if avg_level != 0 { total_level = ( total_level + avg_level ) / 2; }
+    if avg_level > total_level { total_level = ( total_level + avg_level + 1 ) / 2; }
 
-    unit.set_sp(total_level * 100 + 300 );
 
     let job = unit.get_job();
     let job_max_level = job.max_level as i32;
@@ -409,7 +362,7 @@ pub fn random_map_unit_level(unit: &mut Unit) {
             if high_jobs.len() > 0 {
                 unit.class_change(high_jobs[0]);
                 unit.set_level(total_level-job_max_level);
-                unit.set_weapon_mask_from_person();
+
                 unit.set_internal_level(job_max_level);
             }
             else {
@@ -433,8 +386,9 @@ pub fn random_map_unit_level(unit: &mut Unit) {
         }
     }
     unit.set_hp(unit.get_capability(0, true));
-    unit_update_learn_skill(unit);
+
 }
+*/
 
 
 fn calculate_new_offset(original: &PersonData, new: &PersonData) -> [i8; 11] {
@@ -490,16 +444,6 @@ pub fn has_sid(this: &Unit, sid: &str) -> bool {
     return this.mask_skill.unwrap().find_sid(sid.into()).is_some() | this.private_skill.find_sid(sid.into()).is_some() | this.equip_skill.find_sid(sid.into()).is_some();
 }
 
-
-#[unity::from_offset("App", "Unit", "SetSelectedWeaponFromOriginalAptitude")]
-fn unit_set_select_weapon_from_original_aptitude(this: &Unit, mask: &WeaponMask, method_info: OptionalMethod);
-
-#[unity::from_offset("App", "Unit", "AddAptitudeFromWeaponMask")]
-fn unit_add_apt_from_weapon_mask(this: &Unit, method_info: OptionalMethod);
-
-#[skyline::from_offset(0x01a3c290)]
-fn unit_learn_job_skill(this: &Unit, method_info: OptionalMethod) -> &'static engage::gamedata::skill::SkillData;
-
 pub fn reload_all_actors() {
     engage::unitpool::UnitPool::class().get_static_fields_mut::<crate::randomizer::job::UnitPoolStaticFieldsMut>().s_unit
         .iter_mut().filter(|unit| unit.force.is_some_and(|f| f.force_type < 3  )).for_each(|unit|{
@@ -543,7 +487,7 @@ fn enemy_unit_randomization(unit: &mut Unit) {
             if person.get_engage_sid().is_none()  {
                 if ( GameVariableManager::get_bool(DVCVariables::SKILL_KEY) &&
                  ( (is_boss && GameVariableManager::get_number(DVCVariables::ENEMY_SKILL_GUAGE_KEY) == 10 ) || GameVariableManager::get_number(DVCVariables::ENEMY_SKILL_GUAGE_KEY) > 10 )) && 
-                 ( utils::can_rand() && person.get_asset_force() != 0 ) {
+                 ( DVCVariables::random_enabled() && person.get_asset_force() != 0 ) {
                     if let Some(dispos_skill) = data.sid {
                         unit.private_skill.replace_sid(dispos_skill, skill::get_random_skill_dispos(diffculty, rng));
                     }
@@ -570,7 +514,6 @@ fn enemy_unit_randomization(unit: &mut Unit) {
         if unit.person.get_asset_force() == 0 && ( GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 ){  ai::adjust_unitai(unit);  }
         if unit.person.get_asset_force() != 0 {
             if random_map && m004_complete && !GameUserData::get_chapter().cid.contains("E00") { // Continuous Mode Random Map
-                auto_level_unit_for_random_map(unit, is_boss); 
                 fixed_unit_weapon_mask(unit);
                 let maps_completed = crate::continuous::get_continious_total_map_complete_count();
                 if maps_completed < 16 {
@@ -595,8 +538,6 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                 changed_class = true;
                 unit_items::adjust_missing_weapons(unit);
             }
-            else if GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 5 { auto_level_unit_for_random_map(unit, is_boss); }
-            else if GameVariableManager::get_bool(DVCVariables::DVC_AUTOLEVEL_KEY) && !GameUserData::is_evil_map() { auto_level_unit(unit); }
             if ( GameVariableManager::get_number(DVCVariables::JOB_KEY) & 2 != 0 )  && m004_complete {
                 let gauge = GameVariableManager::get_number(DVCVariables::ENEMY_JOB_GAUGE_KEY);
                 if unit.person.get_bmap_size()  == 1 && ( rng.get_value(100) < gauge && gauge > 11 )  || ( gauge > 0 && gauge <= 11  && is_boss ) {
@@ -632,9 +573,10 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                 let current_chapter = GameUserData::get_chapter().cid.to_string();
                 if current_chapter != "CID_M022" && current_chapter != "CID_M011"  {
                     let emblem = rng.get_value( ENEMY_EMBLEM_LIST.get().unwrap().len() as i32) as usize;
-                    if try_equip_emblem(unit, emblem) {  autolevel::adjust_emblem_unit_ai(unit);   }
+                    if crate::autolevel::enemy::try_equip_emblem(unit, emblem) {  ai::adjust_enemy_emblem_unit_ai_flags(unit);   }
                 }
             } 
+            crate::autolevel::auto_level_unit(unit, is_boss);
         }
         unit_items::adjust_enemy_meteor(unit);
         if has_master {  unit.item_list.add_iid_no_duplicate("IID_マスタープルフ"); }    // Add Seal if lost seal

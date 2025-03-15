@@ -52,51 +52,55 @@ pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_
             *con = "".into();
         }
         match three_houses {
-            9|12|20 => { return result; }
+            9|12|20 => { 
+                emblem_bust_randomization(result, 0);
+                return result; 
+            }
+            0|13 => {
+                if kind == 0 { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[13]), is_darkness, conditions, method_info); }
+                else { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[0]), is_darkness, conditions, method_info); }
+            }
+            1|5 => {
+                let other_emblem = if three_houses == 1 { 5 } else { 1 };
+                if kind == 3 { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[three_houses]), is_darkness, conditions, method_info); }
+                else if kind != 0 { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[other_emblem as usize]), is_darkness, conditions, method_info); }
+            }
+            7|14 => {
+                if kind == 0 { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[7]), is_darkness, conditions, method_info); }
+                else  { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[14]), is_darkness, conditions, method_info); }
+            }
+            8|16|3 => {
+                let main = if three_houses == 4 { 8 } else { three_houses };
+                let other = if main == 8 { 16 } else { 8 } as usize;
+                if kind == 3 { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[main]), is_darkness, conditions, method_info); }
+                else if kind != 0 { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[other]), is_darkness, conditions, method_info); }
+                else { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[3]), is_darkness, conditions, method_info); }
+            }
             21|15 => {
-                if kind == 0 {
-                    result.dress_model = "uBody_Ver0AF_c562".into();
-                    result.head_model = "uHead_c562".into();
-                    result.hair_model = "uHair_null".into();
-                    change_accessory(result.accessory_list, "uAcc_spine2_Hair562", "c_spine1_jnt");
-                    change_accessory(result.accessory_list, "uAcc_head_Tiara562", "c_head_loc");
-                }
+                if kind == 0 { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[15]), is_darkness, conditions, method_info);  }
                 else {
                     let rng = Random::get_system();
                     let male = MALE_EMBLEMS[ rng.get_value(9) as usize ];
                     result = call_original!(this, mode,  GodData::get(EMBLEM_GIDS[male]), is_darkness, conditions, method_info);
-                    houses_unite_plus_act(result, kind);
                 }
             }
             6|18 => {
-                if kind == 0 {
-                    result.dress_model = "uBody_Luc0AF_c584".into();
-                    result.head_model = "uHead_c584".into();
-                    result.hair_model = "uHair_null".into();
-                    change_accessory(result.accessory_list, "uAcc_spine2_Hair584", "c_spine1_jnt");
-                }
-                else if kind != 3 {
-                    result.dress_model = "uBody_Chr0AM_c512".into();
-                    result.head_model = "uHead_c512".into();
-                    result.hair_model = "uHair_h513".into();
-                }
+                if kind == 0 { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[6]), is_darkness, conditions, method_info);  }
+                else if kind != 3 { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[18]), is_darkness, conditions, method_info);  }
                 else {
                     result.dress_model = "uBody_Rbi0AM_c513".into();
                     result.head_model = "uHead_c513".into();
                     result.hair_model = "uHair_h513".into();
+                    result.sound.voice = Some("DLC_51".into());
                 }
             }
             11 => {
-                if kind == 0 {
-                    result.dress_model = "uBody_Eir0AF_c582".into();
-                    result.head_model = "uHead_c582".into();
-                    result.hair_model = "uHair_null".into();
-                    change_accessory(result.accessory_list, "uAcc_spine2_Hair582", "c_spine1_jnt");
-                }
+                if kind == 0 { call_original!(this, mode,  GodData::get(EMBLEM_GIDS[11]), is_darkness, conditions, method_info);  }
                 else {
                     result.dress_model = "uBody_Eph0AM_c536".into();
                     result.head_model = "uHead_c536".into();
                     result.hair_model = "uHair_h536".into();
+                    result.sound.voice = Some("Ephraim".into());
                 }
             }
             19 => {
@@ -104,26 +108,28 @@ pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_
                     result.dress_model = "uBody_Drg0AF_c053".into();
                     result.head_model = "uHead_c053".into();
                     result.hair_model = "uHair_null".into();
-                    change_accessory(result.accessory_list, "uAcc_spine2_Hair0053", "c_spine1_jnt");
+                    change_accessory(result.accessory_list, "uAcc_spine2_Hair053", "c_spine1_jnt");
+                    result.sound.voice = Some("PlayerF".into());
                 }
-                else if kind != 3 { // Alear
+                else {
                     result.dress_model = "uBody_Drg0AM_c003".into();
                     result.head_model = "uHead_c003".into();
                     result.hair_model = "uHair_h003".into();
+                    result.sound.voice = Some("PlayerM".into());
                 }
             }
             _ => { 
                 let new_god2 = GodData::get(EMBLEM_GIDS[three_houses]).unwrap();
                 if new_god2.female == 1 && kind == 0 { 
                     result = call_original!(this, mode, Some(new_god2), is_darkness, conditions, method_info);
-                    houses_unite_plus_act(result, 0);
                 }
                 else if new_god2.female == 0 && kind != 0 { 
                     result = call_original!(this, mode, Some(new_god2), is_darkness, conditions, method_info);
-                    houses_unite_plus_act(result, kind);
                 }
             }
         }
+        emblem_bust_randomization(result, 0);
+        houses_unite_plus_act(result, kind);
         remove_mounts_accs(result);
         return result;
     }
@@ -196,20 +202,6 @@ pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_
         let result = call_original!(this, mode, god_data, true, conditions, method_info);
         emblem_bust_randomization(result, hash);
         return result;
-        /*
-        if let Some(emblem) = EMBLEM_ASSET.iter().position(|asset| gid.contains(asset)) {
-            if emblem < 12 || emblem == 23 {
-                let result = call_original!(this, mode, god_data, true, conditions, method_info);
-                emblem_bust_randomization(result, hash);
-                return result;
-            }
-            else if emblem != 19 {
-                let result = call_original!(this, mode, GodData::get(&format!("GID_E006_敵{}", EMBLEM_ASSET[emblem])), true, conditions, method_info); 
-                emblem_bust_randomization(result, hash);
-                return result;
-            }
-        }
-        */
     }
     if let Some(is_enemy_emblem) =  crate::randomizer::emblem::enemy::ENEMY_EMBLEMS.get().unwrap().iter().find(|&x| x.0 == index) {
         let emblem_index = is_enemy_emblem.1;
@@ -227,24 +219,23 @@ pub fn asset_table_result_god_setup(this: &mut AssetTableResult, mode: i32, god_
             emblem_bust_randomization(result, hash);
             return result;
         }
-        else {
-            let result = call_original!(this, mode, god_data, is_darkness, conditions, method_info); 
-            emblem_bust_randomization(result, hash);
-            return result;
-        }
     }
-    else { 
-        let result = call_original!(this, mode, god_data, is_darkness, conditions, method_info); 
-        emblem_bust_randomization(result, hash);
-        return result;
-    }
+    let result = call_original!(this, mode, god_data, is_darkness, conditions, method_info); 
+    emblem_bust_randomization(result, hash);
+    return result;
 }
 
 fn emblem_bust_randomization(result: &mut AssetTableResult, hash: i32){
     if CONFIG.lock().unwrap().misc_option_1 >= 4.75 {
-        let rng = Random::instantiate().unwrap();
-        rng.ctor(hash as u32);
-        result.scale_stuff[9] = 1.0 + rng.get_value(50) as f32 * 0.025;
+        let rng = Random::get_system();
+        if hash != 0 {
+            let rng = Random::instantiate().unwrap();
+            rng.ctor(hash as u32);
+            result.scale_stuff[9] = 1.0 + rng.get_value(50) as f32 * 0.025;
+        }
+        else {
+            result.scale_stuff[9] = 1.0 + rng.get_value(50) as f32 * 0.025;
+        }
     }
 }
 
@@ -265,45 +256,41 @@ pub fn asset_table_result_get_preset_name(name: &Il2CppString, method_info: Opti
                     new_conditions[0] = "協力エンゲージ技".into();
                     return asset_table_result_god_setup(result, 2, GodData::get("GID_エフラム"), false, new_conditions, None);
                 }
-                match eirika {
-                    15|21 => {
-                        new_conditions[0] = "".into();
-                        let male = MALE_EMBLEMS[ rng.get_value(9) as usize ];
-                        result = asset_table_result_god_setup(result, 2, GodData::get(EMBLEM_GIDS[male]), false, new_conditions, None); 
+                else {
+                    new_conditions[0] = "".into();
+                }
+                let partner = combo_engage_attack_male_emblem_index(eirika, true);
+                println!("Twin Strike Emblem: {} -> {}", eirika, partner);
+                match partner {
+                    23|50 => { 
+                        emblem_bust_randomization(result, 0);
+                        return result; 
                     }
-                    18 => { // Robin
-                        result.dress_model = "uBody_Rbi0AM_c513".into();
-                        result.head_model = "uHead_c513".into();
-                        result.hair_model = "uHair_h133".into();
-                        return result;
-                    }
-                    19 => { // Alear
+                    19 => {
                         result.dress_model = "uBody_Drg0AM_c003".into();
                         result.head_model = "uHead_c003".into();
                         result.hair_model = "uHair_h003".into();
-                        return result;
+                        result.sound.voice = Some("PlayerM".into());
                     }
-                    11 => { return result; }
-                    12|20 => {
-                        new_conditions[0] = "".into();
-                        let dimi_claude = if rng.get_value(2) == 1 { GodData::get("GID_ディミトリ")  }
-                            else { GodData::get("GID_クロード")  };
-                        result = asset_table_result_god_setup(result, 2, dimi_claude, false, new_conditions, None);
+                    22 => {
+                        result.dress_model = "uBody_Rbi0AM_c513".into();
+                        result.head_model = "uHead_c513".into();
+                        result.hair_model = "uHair_h513".into();
+                        result.sound.voice = Some("DLC_51".into());
                     }
                     _ => {
-                        new_conditions[0] = "".into();
-                        if let Some(god) = GodData::get(EMBLEM_GIDS[eirika]) {
-                            if god.female == 0 { result = asset_table_result_god_setup(result, 2, Some(god), false, new_conditions, None); }
-                            else { return result; }
-                        }
+                        let gid = format!("GID_{}", EMBLEM_ASSET[partner]);
+                        result = asset_table_result_god_setup(result, 2, GodData::get(gid), false, new_conditions, None); 
                     }
                 }
                 // Animation Replacement 
                 remove_mounts_accs(result);
+                emblem_bust_randomization(result, 0);
                 result.body_anims.iter_mut().for_each(|str| *str = "Eir1AM-Lc1_c536_N".into());
                 result.right_hand = "uWep_Lc19".into(); 
                 result.left_hand = "null".into(); 
-                break;
+                println!("Finish!");
+                return result;
             }
         }
     }
@@ -316,25 +303,11 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
         THREE_HOUSES = 12;
         ROBIN = 22;
     }
-    if let Some(engage_attack) =  unsafe { get_engage_attack(unit, None) } {
+    if let Some(engage_attack) = unit.get_engage_attack()  {
         let mut animation_index = 0;
         let mut old_engage = 50;
     // Replace Generic with random character voices
-        if result.sound.voice.is_none() || result.sound.voice.is_some_and(|str|{
-            let str1 = str.to_string();
-            str1.contains("_MOB_Enemy") || str1.contains("ENEMY") }){
-            let rng = Random::get_system();
-            let index = rng.get_value(40) as usize + 1;
-            let name = match index {
-                36 => { "DLC_42"}
-                37 => { "DLC_43"}
-                38 => { "DLC_44"}
-                39 => { "DLC_45"}
-                40 => { "DLC_46"}
-                _ =>  { &MPIDS[index][5..] }
-            };
-            result.sound.voice = Some(name.into());
-        }
+        random_engage_voice(result);
                 // Finding the Engage Animation Index in Body Animations
         result.body_anims.iter()
             .for_each(|act|{
@@ -350,7 +323,7 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
         let mut gender_str = if gender == 2 { "F" } else { "M" };
 
         if old_engage == 49 {
-            if let Some(link) = unsafe { unit_get_engage_link_unit(unit, None )} {
+            if let Some(link) = unit.get_engage_link() {
                 println!("Linked Unit: {}", Mess::get_name(link.person.pid));
                 return;
             }
@@ -572,40 +545,28 @@ pub fn asset_table_robin_hook(this: &mut AssetTableResult, mode: i32, person: &P
             else {
                 let robin = unsafe { ROBIN } as usize;
                 if robin > 21 { return result; }
-                let rng = Random::get_system();
-                match robin {
-                    15|21 => {
-                        let male = MALE_EMBLEMS[ rng.get_value(9) as usize ];
-                        result = asset_table_result_god_setup(result, 2, GodData::get(EMBLEM_GIDS[male]), false, conditions, None); 
+                let partner = combo_engage_attack_male_emblem_index(robin, true);
+
+                match partner {
+                    22|50 => { 
+                        emblem_bust_randomization(result, 0);
+                        return result; 
                     }
-                    6|18 => { return result; }
-                    19 => { // Alear
+                    19 => {
                         result.dress_model = "uBody_Drg0AM_c003".into();
                         result.head_model = "uHead_c003".into();
                         result.hair_model = "uHair_h003".into();
+                        result.sound.voice = Some("PlayerM".into());
                     }
-                    11 => {                     
+                    23 => {
                         result.dress_model = "uBody_Eph0AM_c536".into();
                         result.head_model = "uHead_c536".into();
                         result.hair_model = "uHair_h536".into();
-                        return result; 
-                    }
-                    0|13 => {
-                        result.dress_model = "uBody_Mar0AM_c530".into();
-                        result.head_model = "uHead_c530".into();
-                        result.hair_model = "uHair_h530".into();
-                        return result; 
-                    }
-                    12|20 => {
-                        let dimi_claude = if rng.get_value(2) == 1 { GodData::get("GID_ディミトリ")  }
-                            else { GodData::get("GID_クロード")  };
-                        result = asset_table_result_god_setup(result, 2, dimi_claude, false, conditions, None);
+                        result.sound.voice = Some("Ephraim".into());
                     }
                     _ => {
-                        if let Some(god) = GodData::get(EMBLEM_GIDS[robin]) {
-                            if god.female == 0 { result = asset_table_result_god_setup(result, 2, Some(god), false, conditions, None); }
-                            else { return result; }
-                        }
+                        let gid = format!("GID_{}", EMBLEM_ASSET[partner]);
+                        result = asset_table_result_god_setup(result, 2, GodData::get(gid), false, conditions, None); 
                     }
                 }
             }
@@ -615,13 +576,11 @@ pub fn asset_table_robin_hook(this: &mut AssetTableResult, mode: i32, person: &P
             result.magic = "MG_DLC6_2".into();
             result.trail = "cEff_EmblemA_Swd_00".into();
             result.body_anims.iter_mut().for_each(|str| *str = "Chr1AM-Mg1_c513_M".into());
+            emblem_bust_randomization(result, 0);
         }
     }
     result
 }
-
-#[unity::from_offset("App", "Unit", "GetEngageLinkUnit")]
-fn unit_get_engage_link_unit(this: &Unit, method_info: OptionalMethod) -> Option<&'static Unit>;
 
 pub fn tiki_engage(result: &mut AssetTableResult, unit: &Unit, mode: i32) {
     if mode == 2 {
@@ -649,7 +608,7 @@ pub fn tiki_engage(result: &mut AssetTableResult, unit: &Unit, mode: i32) {
 }
 
 pub fn get_emblem_attack_index(unit: &Unit) -> usize {
-    if let Some(engage_attack) =  unsafe { get_engage_attack(unit, None) } {
+    if let Some(engage_attack) = unit.get_engage_attack()  {
         let sid = engage_attack.sid.to_string();
         if let Some(pos) = EMBLEM_ASSET.iter().position(|god| sid.contains(god)) { pos }
             else if sid.contains("三級長エンゲージ技＋") { 20 }
@@ -657,4 +616,48 @@ pub fn get_emblem_attack_index(unit: &Unit) -> usize {
             else { 50 }
     }
     else { 50 }
+}
+
+fn combo_engage_attack_male_emblem_index(emblem: usize, partner: bool) -> usize {
+    let rng = Random::get_system();
+    match emblem {
+        0|13 => { 1 },
+        1 => { if partner { 5 } else { 1 } }
+        3 => { if rng.get_value(2) < 1 { 8 } else { 16 } }
+        5 => { if partner { 1 } else { 5 } }
+        6 => { 18 }
+        7 => { 14 }
+        8 => { if partner { 16 } else { 8 } }
+        9 => { 
+            if partner {
+                if rng.get_value(2) < 1 { 20 } else { 21 }
+            }
+            else { 9}
+        }
+        11 => { 23 } //Epharim
+        12|20 => { if rng.get_value(2) < 1 { 20 } else { 21 } }
+        15|21 => { MALE_EMBLEMS[ rng.get_value(9) as usize ] }
+        16 => { if partner { 8 } else { 16 } }
+        18 => { if partner { 22 } else { 18 } }
+        4|19 => { emblem }
+        _ => { 50 }
+    }
+}
+
+pub fn random_engage_voice(result: &mut AssetTableResult) {
+    if result.sound.voice.is_none() || result.sound.voice.is_some_and(|str|{
+        let str1 = str.to_string();
+        str1.contains("_MOB_Enemy") || str1.contains("ENEMY") }){
+        let rng = Random::get_system();
+        let index = rng.get_value(40) as usize + 1;
+        let name = match index {
+            36 => { "DLC_42"}
+            37 => { "DLC_43"}
+            38 => { "DLC_44"}
+            39 => { "DLC_45"}
+            40 => { "DLC_46"}
+            _ =>  { &MPIDS[index][5..] }
+        };
+        result.sound.voice = Some(name.into());
+    }
 }

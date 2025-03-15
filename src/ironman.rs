@@ -1,13 +1,14 @@
 use unity::prelude::*;
 use skyline::patching::Patch;
 use engage::{
-    gamevariable::*, 
-    menu::{
-        BasicMenuResult,
-        config::{ ConfigBasicMenuItem, ConfigBasicMenuItemSwitchMethods},
-    },
+    mess::Mess,
+    proc::{desc::ProcDesc, ProcVoidMethod, ProcInst},
+    sequence::mapsequence::human::MapSequenceHumanLabel,
+    gameuserdata::GameUserData, gamevariable::*, menu::{
+        config::{ ConfigBasicMenuItem, ConfigBasicMenuItemSwitchMethods}, BasicMenuItem, BasicMenuItemAttribute, BasicMenuResult
+    }
 };
-use crate::CONFIG;
+use crate::{utils::{get_nested_virtual_methods_mut, get_nested_nested_virtual_method_mut}, CONFIG};
 
 pub struct IronmanMod;
 impl ConfigBasicMenuItemSwitchMethods for IronmanMod {
@@ -33,49 +34,76 @@ impl ConfigBasicMenuItemSwitchMethods for IronmanMod {
 
 
 pub fn ironman_code_edits(){
+    println!("IronManS");
     //Code Edits to disable restart/reset/time crystal and forced bookmark if on ironman mode
     if GameVariableManager::get_bool("G_Ironman") {
-        println!("Iron man code patch are active");
-        // Restart Build Attribute = 4
-        Patch::in_text(0x01b72cb0).bytes(&[0x80, 0x00, 0x80, 0xD2]).unwrap();
-        Patch::in_text(0x01b72cb4).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
-
-        // Reset Build Attribute = 4
-        Patch::in_text(0x01b72950).bytes(&[0x80, 0x00, 0x80, 0xD2]).unwrap();
-        Patch::in_text(0x01b72954).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
-
-        // Rewind Attribute = 4
-        Patch::in_text(0x01f52230).bytes(&[0x80, 0x00, 0x80, 0xD2]).unwrap();
-        Patch::in_text(0x01f52234).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
-
-    // bookmark instead of save for all difficulies
-        Patch::in_text(0x01e4111c).bytes(&[0x2D,0x02,0x00,0x54]).unwrap();
-        //SaveSuspendBefore
-        Patch::in_text(0x0267730c).bytes(&[0x4D, 0xFF, 0xFF, 0x54]).unwrap();
-        //SaveSuspendAfter
-        Patch::in_text(0x02677448).bytes(&[0xC1, 0x07, 0x00, 0x54]).unwrap();
-        // Save instead of bookmark
-        Patch::in_text(0x01e40d7c).bytes(&[0x3F,0x15,0x00,0x71]).unwrap();
-        Patch::in_text(0x01e40f0c).bytes(&[0x3F,0x15,0x00,0x71]).unwrap();
-
+        unsafe { map_history_rewind_disable(None); }
     }
-    // if not store the original code
-    else {
-        // Restart Build Attribute 
-        println!("Iron man code patch are inactive");
-        Patch::in_text(0x01b72cb0).bytes(&[0xfd, 0x7b, 0xbc, 0xa9]).unwrap();
-        Patch::in_text(0x01b72cb4).bytes(&[0xf7, 0x0b, 0x00, 0xf9]).unwrap();
-    
-        // Reset Build Attribute
-        Patch::in_text(0x01b72950).bytes(&[0xfd, 0x7b, 0xbe, 0xa9]).unwrap();
-        Patch::in_text(0x01b72954).bytes(&[0xf3, 0x0b, 0x00, 0xf9]).unwrap();
-        // Rewind Attribute 
-        Patch::in_text(0x01f52230).bytes(&[0xfd, 0x7b, 0xbe, 0xa9]).unwrap();
-        Patch::in_text(0x01f52234).bytes(&[0xf4, 0x4f, 0x01, 0xa9]).unwrap();
-
-        Patch::in_text(0x01e41118).bytes(&[0x3f, 0x0d, 0x00,0x71]).unwrap();
-        Patch::in_text(0x02677308).bytes(&[0x1f, 0x15, 0x00,0x71]).unwrap();
-        Patch::in_text(0x01e40d7c).bytes(&[0x3F,0x0d,0x00,0x71]).unwrap();
-        Patch::in_text(0x01e40f0c).bytes(&[0x3F,0x0d,0x00,0x71]).unwrap();
+    else  {
+        unsafe { map_history_rewind_enable(None); }
     }
+    println!("IronManE");
 } 
+
+pub fn map_save_proc_edit(map_sequence_human: &ProcInst) {
+    let descs = map_sequence_human.descs.get();
+    unsafe { 
+    // Force MapSequenceHuman to Jump to Label 47 at Label 48 MapSequenceHumanLabel::SuspendMenu
+        (*descs)[0xd0] = ProcDesc::jump(MapSequenceHumanLabel::SaveMenu as i32); 
+    // Replace MapSequenceHuman$$SaveAndSuspendMenuBefore to remove Temporary Status
+        (*descs)[0xcb] = ProcDesc::call(ProcVoidMethod::new(None, remove_temporary_game_status));  
+    }
+}
+
+extern "C" fn remove_temporary_game_status(_proc: &mut ProcInst, _method_info: OptionalMethod) {
+    let status = GameUserData::get_status();
+    status.value &= !0x200;
+}
+
+pub fn map_save_menu_edits() {
+    get_nested_virtual_methods_mut("App", "MapSystemMenu", "TemporarySaveItem", "GetName")
+        .map(|m| m.method_ptr = map_system_temp_save_menu_name as _).unwrap();
+
+    get_nested_virtual_methods_mut("App", "MapSystemMenu", "TemporarySaveItem", "GetHelpText")
+        .map(|m| m.method_ptr = map_system_temp_save_get_help_text as _).unwrap();
+
+    get_nested_virtual_methods_mut("App", "MapSystemMenu", "TemporarySaveItem", "GetMapAttribute")
+        .map(|m| m.method_ptr = map_system_temp_save_build_attr as _).unwrap();
+
+    get_nested_nested_virtual_method_mut("App", "MapSystemMenu", "SubSystemMenu", "RestartItem", "BuildAttribute")
+        .map(|m| m.method_ptr = restart_menu_item_build_attr as _).unwrap();
+
+    get_nested_nested_virtual_method_mut("App", "MapSystemMenu", "SubSystemMenu", "ResetItem", "BuildAttribute")
+        .map(|m| m.method_ptr = reset_menu_item_build_attr as _).unwrap();
+}
+
+fn map_system_temp_save_menu_name(_temp_save_menu_item: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString { Mess::get("MID_SORTIE_SAVE") }
+
+fn map_system_temp_save_get_help_text(_temp_save_menu_item: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString { Mess::get("MID_SORTIE_SAVE_HELP") }
+
+fn map_system_temp_save_build_attr(_temp_save_menu_item: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
+    if GameVariableManager::get_bool("G_Ironman") { BasicMenuItemAttribute::Hide }
+    else { BasicMenuItemAttribute::Enable }
+}
+
+fn restart_menu_item_build_attr(restart_item: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
+    if GameVariableManager::get_bool("G_Ironman") { BasicMenuItemAttribute::Hide }
+    else {
+        unsafe { original_restart_item_build_attr(restart_item, None) }
+    }
+}
+
+fn reset_menu_item_build_attr(reset_item: &BasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute {
+    if GameVariableManager::get_bool("G_Ironman") { BasicMenuItemAttribute::Hide }
+    else { BasicMenuItemAttribute::Enable } 
+}
+
+#[skyline::from_offset(0x01b72cb0)]
+fn original_restart_item_build_attr(restart_item: &BasicMenuItem, method_info: OptionalMethod) -> BasicMenuItemAttribute;
+
+#[unity::from_offset("App", "MapHistory", "RewindDisable")]
+fn map_history_rewind_disable(method_info: OptionalMethod);
+
+#[unity::from_offset("App", "MapHistory", "RewindEnable")]
+fn map_history_rewind_enable(method_info: OptionalMethod);
+

@@ -4,7 +4,7 @@ use engage::{
     map::{overlap::MapOverlap, terrain::MapTerrain},
 };
 pub mod fow;
-pub mod menuitem;
+pub mod menu;
 
 const TERRAIN: [&str; 9] = ["TID_瘴気の領域", "TID_瘴気", "TID_氷の領域", "TID_霧", "TID_流砂", "TID_煙", "TID_アロマ", "TID_水溜まり", "TID_土柱", ];
 

@@ -724,7 +724,7 @@ pub fn edit_result_for_monster_trans(result: &mut AssetTableResult, unit: &mut U
     let kind = if equipped.is_none() { 0 } else { equipped.unwrap().kind } as usize;
     let gender = unit_dress_gender(unit);
     let gen = if gender == 1 { "M" } else { "F" };
-    let state = unsafe { unit_god_get_state(unit, None) };
+    let state = unit.get_god_state();
     if state == 2 {
         return;
     }

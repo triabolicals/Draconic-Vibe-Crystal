@@ -17,6 +17,15 @@ pub fn adjust_person_unit_ai(unit: &mut Unit) {
     }
 }
 
+pub fn adjust_enemy_emblem_unit_ai_flags(unit: &Unit){
+    let ai = &unit.ai;
+    ai.set_sequence(2, "AI_AT_Versus");
+    ai.set_flag(31);
+    ai.set_flag(0x400);
+    ai.set_flag(0x800);
+    ai.set_flag( 0x20000000 );
+}
+
 pub fn adjust_ai_by_skill(unit: &mut Unit) {
     if has_sid(unit, "SID_特別な踊り") && unit.person.gender != 0 {
         unit.private_skill.add_sid("SID_踊り", 10, 0);

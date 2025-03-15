@@ -1,6 +1,6 @@
 use unity::prelude::*;
 use engage::{
-    dialog::yesno::*, gameuserdata::*, gamevariable::*, 
+    dialog::yesno::*, gamevariable::*, 
     menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItemSwitchMethods}, BasicMenuResult, *},
     pad::Pad, proc::{desc::ProcDesc, Bindable, ProcInst, ProcVoidMethod},
     sequence::configsequence::ConfigSequence, 
@@ -8,12 +8,13 @@ use engage::{
     titlebar::TitleBar, 
     util::get_instance
 };
-use crate::{autolevel, deployment, continuous, ironman, randomizer, utils};
+use crate::{autolevel, deployment, continuous, ironman, randomizer};
 use super::{DVCVariables, CONFIG};
 
 pub mod ingame;
 pub mod global;
 pub mod submenu;
+pub mod buildattr;
 
 extern "C" fn open_anime_all_ondispose(this: &mut ProcInst, _method_info: OptionalMethod) {
     this.parent.as_ref().unwrap().get_class().get_virtual_method("OpenAnimeAll").map(|method| {
@@ -22,55 +23,6 @@ extern "C" fn open_anime_all_ondispose(this: &mut ProcInst, _method_info: Option
     });
 }
 // Functions to hide the option when conditions are met
-pub fn build_attribute_job_gauge(_this: &mut ConfigBasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
-    if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2  { BasicMenuItemAttribute::Hide }
-    else if DVCVariables::is_main_menu()  { BasicMenuItemAttribute::Enable }
-    else if !crate::utils::can_rand() { BasicMenuItemAttribute::Hide }
-    else if GameVariableManager::get_number(DVCVariables::JOB_KEY) > 1 { BasicMenuItemAttribute::Enable }
-    else { BasicMenuItemAttribute::Hide }
-}
-
-pub fn build_attribute_skill_gauge(_this: &mut ConfigBasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
-    if DVCVariables::is_main_menu() {
-        if CONFIG.lock().unwrap().random_skill { BasicMenuItemAttribute::Enable }
-        else { BasicMenuItemAttribute::Disable }
-    }
-    else if GameUserData::get_sequence() < 4 { BasicMenuItemAttribute::Hide }
-    else if !crate::utils::can_rand() { BasicMenuItemAttribute::Hide }
-    else if GameVariableManager::get_bool(DVCVariables::SKILL_KEY) { BasicMenuItemAttribute::Enable }
-    else { BasicMenuItemAttribute::Hide }
-}
-
-pub fn build_attribute_hub_items(_this: &mut ConfigBasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
-    if DVCVariables::is_main_menu() { BasicMenuItemAttribute::Enable }
-    else if GameUserData::get_sequence() < 4 { BasicMenuItemAttribute::Hide }
-    else if !crate::utils::can_rand() { BasicMenuItemAttribute::Hide }
-    else if GameVariableManager::get_number(DVCVariables::ITEM_KEY) != 0 { BasicMenuItemAttribute::Enable }
-    else { BasicMenuItemAttribute::Hide }
-}
-pub fn build_attribute_not_in_map(_this: &mut ConfigBasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
-    if DVCVariables::is_main_menu() {BasicMenuItemAttribute::Enable  }
-    else if GameUserData::get_sequence() < 4 { BasicMenuItemAttribute::Hide }
-    else if !crate::utils::can_rand() { BasicMenuItemAttribute::Hide }
-    else { BasicMenuItemAttribute::Enable }
-}
-pub fn build_attribute_not_in_map3(_this: &mut ConfigBasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
-    if DVCVariables::is_main_menu() {BasicMenuItemAttribute::Enable  }
-    else if !crate::utils::can_rand() { BasicMenuItemAttribute::Hide }
-    else if GameUserData::get_sequence() == 3 { BasicMenuItemAttribute::Hide }
-    else { BasicMenuItemAttribute::Enable }
-}
-pub fn build_attribute_normal(_this: &mut ConfigBasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
-    if !crate::utils::can_rand() && !DVCVariables::is_main_menu() { BasicMenuItemAttribute::Hide }
-    else { BasicMenuItemAttribute::Enable }
-}
-pub fn build_attribute_not_in_map2(_this: &mut ConfigBasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
-    if GameUserData::get_sequence() < 4 { BasicMenuItemAttribute::Hide }
-    else { BasicMenuItemAttribute::Enable }
-}
-pub fn build_attribute_dlc(_this: &mut ConfigBasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
-    if utils::dlc_check() { BasicMenuItemAttribute::Enable } else { BasicMenuItemAttribute::Hide }
-}
 
 fn add_dvc_menu_options(config_menu: &mut ConfigMenu<ConfigBasicMenuItem>){
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<continuous::ContiniousMode>("Continuous/Map Modes"));
@@ -81,9 +33,9 @@ fn add_dvc_menu_options(config_menu: &mut ConfigMenu<ConfigBasicMenuItem>){
     config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::EnemySubMenu>("Enemy Settings"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::grow::RandomGrowMod>("Random Growth Mode"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::grow::PersonalGrowMode>("Personal Growth Mode"));
-    config_menu.add_item(randomizer::terrain::menuitem::vibe_energy());
-    config_menu.add_item(randomizer::terrain::menuitem::vibe_fow());
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<autolevel::AutolevelMod>("Level Scale Units")); 
+    config_menu.add_item(randomizer::terrain::menu::vibe_energy());
+    config_menu.add_item(randomizer::terrain::menu::vibe_fow());
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<autolevel::menu::AutolevelMod>("Level Scale Units")); 
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::bgm::RandomBGMMod>("Map BGM Setting")); 
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::assets::accessory::RandomAssets>("Random Assets"));
     config_menu.add_item(randomizer::map::vibe_tile());
