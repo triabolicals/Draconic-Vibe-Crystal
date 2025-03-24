@@ -175,27 +175,7 @@ pub fn adjust_unitai(unit: &mut Unit) {
         unit.ai.set_sequence(0,  old_ai_names[0].as_str());
         for x in 0..4 { unit.ai.set_value(0, x, old_ac_values[x as usize] as i32); }
     }
-    let engage_atk_ai = unsafe { emblem::get_engage_attack_type(unit_get_engage_atk(unit, None)) };
-    if engage_atk_ai != -1 {
-        unit.ai.set_sequence(2, ENGAGE_ATK_AI[engage_atk_ai as usize]);
-        if engage_atk_ai == 4 {
-             unit.ai.set_value(2, 0, 255);
-             unit.ai.set_value(2, 1, 255);
-             unit.ai.set_value(2, 2, 3);
-             unit.ai.set_value(2, 3, 3);
-        }
-        else if engage_atk_ai == 8 { 
-            unit.ai.set_value(2, 0, 2);
-            unit.ai.set_value(2, 1, 2);
-            unit.ai.set_value(2, 2, 255);
-            unit.ai.set_value(2, 3, 255);
-        }
-        else { 
-            unit.ai.set_value(2, 0, 2);
-            unit.ai.set_value(2, 1, 2);
-        }
-        if old_ai_names[0].contains("AC_Null") {  unit.ai.set_sequence(0, "AI_AC_AttackRange"); }
-    }
+    adjust_ai_for_engage_attack(unit);
     if m022 {
         if unit.ai.sequence[2].contains("Null") {
             unit.ai.set_sequence(2, "AI_AT_ForceOnly");
@@ -218,4 +198,28 @@ fn set_ai_values_to_0(ai: &mut UnitAI, order: i32){
     ai.set_value(order, 1, 0);
     ai.set_value(order, 2, 0);
     ai.set_value(order, 3, 0);
+}
+
+pub fn adjust_ai_for_engage_attack(unit: &mut Unit) {
+    let engage_atk_ai = emblem::get_engage_attack_type(unit.get_engage_attack());
+    if engage_atk_ai != -1 {
+        unit.ai.set_sequence(2, ENGAGE_ATK_AI[engage_atk_ai as usize]);
+        if engage_atk_ai == 4 {
+             unit.ai.set_value(2, 0, 255);
+             unit.ai.set_value(2, 1, 255);
+             unit.ai.set_value(2, 2, 3);
+             unit.ai.set_value(2, 3, 3);
+        }
+        else if engage_atk_ai == 8 { 
+            unit.ai.set_value(2, 0, 2);
+            unit.ai.set_value(2, 1, 2);
+            unit.ai.set_value(2, 2, 255);
+            unit.ai.set_value(2, 3, 255);
+        }
+        else { 
+            unit.ai.set_value(2, 0, 2);
+            unit.ai.set_value(2, 1, 2);
+        }
+
+    }
 }

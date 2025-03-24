@@ -123,7 +123,6 @@ pub fn randomize_job_styles(){
             );
         },
         0 => {  //Default
-            println!("Battle Styles set to default");
             let styles = BATTLE_STYLES_DEFAULT.get().unwrap();
             job_list.iter_mut()
                 .for_each(|job|{

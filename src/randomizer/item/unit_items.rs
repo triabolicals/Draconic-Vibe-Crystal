@@ -3,7 +3,7 @@ use engage::unitpool::UnitPool;
 
 use super::*;
 use super::data::*;
-use crate::{continuous::{get_story_chapters_completed, get_continious_total_map_complete_count}, randomizer::{assets::animation::MONSTERS, person::unit::has_sid}};
+use crate::{assets::animation::MONSTERS, continuous::{get_story_chapters_completed, get_continious_total_map_complete_count}, randomizer::person::unit::has_sid};
 
 pub struct PlayerRandomWeapons;
 impl ConfigBasicMenuItemSwitchMethods for PlayerRandomWeapons {
@@ -864,7 +864,6 @@ pub fn add_monster_weapons(unit: &Unit){
         add_equip_condition(unit);
     }
     if unit.person.get_asset_force() == 0 { unit.item_list.add_iid_no_duplicate("IID_特効薬"); }
-    // "Monster Class Weapons Added");
 }
 
 

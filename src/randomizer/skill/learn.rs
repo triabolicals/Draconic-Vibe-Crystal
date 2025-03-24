@@ -21,10 +21,10 @@ pub fn update_learn_skills(forced: bool) {
 pub fn unit_update_learn_skill(unit: &Unit) { 
     if unit.learned_job_skill.is_some() && unit.job.learn_skill.is_some() {
         unit.set_learn_skill(None);
-        crate::randomizer::skill::learn::unit_learn_job_skill_hook(unit, unit.job, None);
-        //if let Some(skill) = crate::randomizer::skill::learn::unit_learn_job_skill_hook(unit, unit.job, None) {
-        //    println!("{} Learned {}", Mess::get_name(unit.person.pid), Mess::get(skill.name.unwrap()));
-       // }
+        if let Some(skill) = crate::randomizer::skill::learn::unit_learn_job_skill_hook(unit, unit.job, None) {
+            if CONFIG.lock().unwrap().equip_learn_skill { unit.add_to_equip_skill_pool(skill); }
+            println!("{} Learned {}", Mess::get_name(unit.person.pid), Mess::get(skill.name.unwrap()));
+        }
     }
     else { unit.try_learn_job_skill(); }
 }
@@ -101,7 +101,31 @@ impl ConfigBasicMenuItemSwitchMethods for JobLearnSkillMode {
     }
 }
 
+pub struct EquipLearnSkill;
+impl ConfigBasicMenuItemSwitchMethods for EquipLearnSkill {
+    fn init_content(_this: &mut ConfigBasicMenuItem){
+    }
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let value = CONFIG.lock().unwrap().equip_learn_skill; 
 
+        let result = ConfigBasicMenuItem::change_key_value_b(value);
+        if value != result {
+            CONFIG.lock().unwrap().equip_learn_skill = result;
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+            return BasicMenuResult::se_cursor();
+        } else {return BasicMenuResult::new(); }
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){ 
+        this.command_text = if CONFIG.lock().unwrap().equip_learn_skill { "Enable"} else { "Disable" }.into();
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){ 
+        this.help_text = "Global Setting: Class skill added to equip skills.".into();
+    }
+}
+
+pub extern "C" fn vibe_equip_job_learn_skills() -> &'static mut ConfigBasicMenuItem {  ConfigBasicMenuItem::new_switch::<EquipLearnSkill>("Equip Class Learn Skills") } 
 pub struct LearnSkillConfirm;
 impl TwoChoiceDialogMethods for LearnSkillConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
@@ -201,10 +225,18 @@ pub fn random_job_learn_skill(unit: &Unit, job: &JobData) -> Option<&'static Ski
 pub fn unit_learn_job_skill_hook(this: &Unit, job: &JobData, _method_info: OptionalMethod) -> Option<&'static SkillData> {
     let result = call_original!(this, job, None);
     let mode = GameVariableManager::get_number(DVCVariables::JOB_LEARN_SKILL_KEY);
-    if !can_rand() || !GameVariableManager::get_bool(DVCVariables::SKILL_KEY) { return result; }
-    if ( mode & 1 == 0 && this.person.get_asset_force() == 0 ) || ( mode & 2 == 0 && this.person.get_asset_force() != 0 ) || result.is_none() { return result; }
+    if !can_rand() || !GameVariableManager::get_bool(DVCVariables::SKILL_KEY) { 
+        if CONFIG.lock().unwrap().equip_learn_skill && result.is_some() { this.add_to_equip_skill_pool(result.unwrap()); }
+        return result; 
+    }
+    if ( mode & 1 == 0 && this.person.get_asset_force() == 0 ) {
+        if CONFIG.lock().unwrap().equip_learn_skill && result.is_some() { this.add_to_equip_skill_pool(result.unwrap()); }
+        return result; 
+    }
+    if ( mode & 2 == 0 && this.person.get_asset_force() != 0 ) || result.is_none() { return result; }
     let new_result = random_job_learn_skill(this, job);
     this.set_learn_skill(new_result);
+    if new_result.is_some() && CONFIG.lock().unwrap().equip_learn_skill { this.add_to_equip_skill_pool(new_result.unwrap()); }
     new_result
 }
 

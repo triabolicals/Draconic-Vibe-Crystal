@@ -3,7 +3,7 @@ use engage::{
     gameuserdata::GameUserData, gamevariable::GameVariableManager, 
     godpool::GodPool, map::inspectors::*, proc::ProcInst, 
     random::Random, script::{DynValue, *}, 
-    sequence::mapsequence::MapSequence, unitpool::UnitPool, util::get_singleton_proc_instance
+    sequence::mapsequence::MapSequence, util::get_singleton_proc_instance
 };
 use unity::{prelude::*, il2cpp::object::Array, };
 use crate::{utils::*, enums::PIDS, randomizer::{*, person::PLAYABLE, RANDOMIZER_STATUS}, config::DVCVariables};
@@ -88,8 +88,8 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
 
 pub fn change_g_pid_lueur() {
     if !GameVariableManager::exist("G_R_PID_リュール") { return; }
-    let replacement_pid = DVCVariables::get_dvc_person(0, true);
-    if unsafe { crate::utils::is_null_empty(replacement_pid, None) } { return; }
+    let replacement_pid = GameVariableManager::get_string("G_R_PID_リュール");
+    if replacement_pid.is_null() { return; }
     EventScript::set("g_pid_lueur", DynValue::new_string(replacement_pid));
     println!("Lueur PID was replaced for Chapter 22"); 
 }

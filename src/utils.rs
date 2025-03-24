@@ -17,6 +17,7 @@ pub fn set_patch_flag(flag: &str) {
     GameVariableManager::make_entry(flag, 1);
     GameVariableManager::set_bool(flag, true);
 }
+
 pub fn get_rng() -> &'static Random {
     let rng = Random::instantiate().unwrap();
     rng.ctor(GameVariableManager::get_number(DVCVariables::SEED) as u32);

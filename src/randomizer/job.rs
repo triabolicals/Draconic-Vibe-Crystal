@@ -1,7 +1,5 @@
 use super::*;
 use crate::randomizer::person::unit::fixed_unit_weapon_mask;
-use assets::animation::MONSTERS;
-use assets::data::CUSTOM_CLASS_ASSETS;
 use engage::force::*;
 use engage::unitpool::*;
 use engage::util::get_instance;
@@ -23,6 +21,9 @@ pub const JOB_HASH: [i32; 111] = [
     1982073595, -1406772370, -974713853, 266659697, -158341635, 577339931, 1316562832, -573263642, 
     355160656, 842455118, 692959593, 1534528826, 877759506, -1361615043, -1095679653
 ];
+
+pub mod reclass;
+pub mod menu;
 
 pub struct UnitPoolStaticFieldsMut {
     pub s_unit: &'static mut Array<&'static mut Unit>,
@@ -252,8 +253,10 @@ fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, pla
     if !GameVariableManager::get_bool(DVCVariables::CUSTOM_JOB_KEY) {
         if !JOB_HASH.iter().any(|&hash| hash == job.parent.hash ) { return false;}
     }
+    let job_flags = job.flag.value;
+    if job_flags & 32 != 0 { return false; }
     let jid = job.jid.to_string();
-    if let Some(pos) = MONSTERS.iter().position(|&j| j == jid) { 
+    if let Some(pos) = crate::assets::animation::MONSTERS.iter().position(|&j| j == jid) { 
         if !DVCVariables::is_main_chapter_complete(17) || emblem { return false; }
         if player { 
             if !crate::utils::dlc_check() { return pos == 5 || pos == 6 ; } // Wyrms Only
@@ -262,7 +265,7 @@ fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, pla
         return  pos == 2 || pos == 3 || pos == 5 || pos == 6 ;  // Wolfs and Wyrms
     }
     if jid.contains("_紋章士_") { return false; }     // Prevent Emblem Classes
-    let job_flags = job.flag.value;
+
     if job_flags == 0 || ( player && job_flags & 3 == 0  ) || (job_flags & 16 != 0 && is_female ) || (job_flags & 4 != 0 && !is_female) { return false; }    // Wrong Gender / Player Can't reclass
     if high_class && (job.is_low() && job.max_level == 20 ) || ( !high_class && job.is_high() ) { return false; }   // Wrong Job Tier
 
@@ -604,7 +607,7 @@ pub fn correct_job_base_stats() {
     ["JID_フロラージュ下級", "JID_フロラージュ", "JID_フロラージュ_E", "JID_リンドブルム下級", "JID_リンドブルム", "JID_リンドブルム_E", "JID_スレイプニル下級", "JID_スレイプニル", "JID_スレイプニル_E", "JID_ピッチフォーク下級", "JID_ピッチフォーク", "JID_ピッチフォーク_E",
     "JID_メリュジーヌ_味方", "JID_メリュジーヌ", "JID_裏邪竜ノ娘"].iter()
     .for_each(|jid| 
-        if let Some(job) = JobData::get_mut(jid) {job.get_flag().value |= 4;}
+        if let Some(job) = JobData::get_mut(jid) {job.get_flag().value |= 7;}
     );
 
     [ "JID_アヴニール下級", "JID_アヴニール", "JID_アヴニール_E", "JID_スュクセサール下級", "JID_スュクセサール", "JID_スュクセサール_E", "JID_ティラユール下級", "JID_ティラユール", "JID_ティラユール_E", "JID_クピードー下級", "JID_クピードー", "JID_クピードー_E",
@@ -613,26 +616,9 @@ pub fn correct_job_base_stats() {
         if let Some(job) = JobData::get_mut(jid) {
             job.get_flag().value |= 16;
             job.get_flag().value &= !4; 
+            job.get_flag().value |= 3;
         }
     );
-
-    CUSTOM_CLASS_ASSETS.get().unwrap().iter().for_each(|assets|{
-        if let Some(job) = JobData::try_get_hash(assets.job_hash) {
-            if assets.gender & 3 == 3 {
-                job.get_flag().value &= !20;
-                job.get_flag().value |= 2;
-            }
-            else if assets.gender & 3 == 2 {
-                job.get_flag().value &= !20;
-                job.get_flag().value |= 6;
-            }
-            else if assets.gender & 3 == 1 {
-                job.get_flag().value &= !20;
-                job.get_flag().value |= 18;
-            }
-            else { job.get_flag().value &= !22; }
-        }
-    });
 }
 
 pub fn randomize_selected_weapon_mask(unit: &mut Unit) {
@@ -717,6 +703,17 @@ pub fn class_change_a_call_random_cc(item: &ClassChangeJobMenuItem, _method_info
     }
     return 0x80;
 }
+pub fn black_list_jobs() {
+    JOB_BLACK_LIST.lock().unwrap().iter()
+        .flat_map(|&i| JobData::try_index_get_mut(i))
+        .for_each(|job| { 
+            let flag = job.get_flag();
+            flag.value &= !2;
+            flag.value |= 32;
+        }
+    )
+}
+
 #[skyline::from_offset(0x019c76c0)]
 fn class_change_confirm_bind(this: u64, data: &ChangeJobData, method_info: OptionalMethod);
 

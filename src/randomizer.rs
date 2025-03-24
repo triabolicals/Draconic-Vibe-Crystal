@@ -1,3 +1,4 @@
+use emblem::EMBLEM_LIST;
 use person::PLAYABLE;
 pub use unity::prelude::*;
 use skyline::patching::Patch;
@@ -18,7 +19,7 @@ pub use super::config::*;
 pub use std::sync::{RwLock, OnceLock};
 
 use std::{fs::{self, File}, io::Write};
-use crate::utils::{self, dlc_check, fnv_hash_string};
+use crate::utils::{self, can_rand, dlc_check, fnv_hash_string};
 
 pub mod status;
 pub mod bgm;
@@ -30,12 +31,11 @@ pub mod styles;
 pub mod emblem;
 pub mod skill;
 pub mod job;
-pub mod assets;
 pub mod names;
 pub mod map;
 pub mod terrain;
 
-use engage::{proc::*, script::DynValue};
+use engage::{godpool::GodPool, proc::*, script::DynValue};
 use engage::proc::desc::ProcDesc;
 
 pub use super::{CONFIG, VERSION};
@@ -207,12 +207,14 @@ pub fn tutorial_check(){
         }
     }
     GameVariableManager::find_starts_with("G_進化_").iter().for_each(|key| GameVariableManager::set_bool(key.to_string(), true));
-    if dlc_check() {
+    if dlc_check() && can_rand() {
         GameVariableManager::set_bool("G_CC_エンチャント", true);
         GameVariableManager::set_bool("G_CC_マージカノン", true);
     }
     if CONFIG.lock().unwrap().debug {
         GameVariableManager::find_starts_with("G_GmapSpot_").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
+        EMBLEM_LIST.get().unwrap().iter().flat_map(|&i| GodData::try_get_hash(i))
+            .for_each(|god| { GodPool::create(god); });
     }
 }
 #[skyline::from_offset(0x01fde850)]
@@ -576,7 +578,7 @@ fn randomize_gamedata(is_new_game: bool) {
         lock.enabled = true;
     }
     item::shop::add_personal_outfits();
-    if GameVariableManager::get_number(DVCVariables::JOB_KEY) != 0 { assets::unlock_royal_classes(); }
+    if GameVariableManager::get_number(DVCVariables::JOB_KEY) != 0 { crate::assets::unlock_royal_classes(); }
     println!("Game data randomized");
 }
 
@@ -754,7 +756,6 @@ pub fn intitalize_game_data() {
     crate::talk::fill_name_array();
     emblem::initialize_emblem_list();
     // assets::auto_adjust_asset_table( IS_GHAST);
-    assets::data::initalize_asset_data();
     interact::get_style_interact_default_values();
     skill::create_skill_pool();
     emblem::engrave::get_engrave_stats();
@@ -769,11 +770,13 @@ pub fn intitalize_game_data() {
     emblem::enemy::initalize_dark_emblems();
     skill::fixed_skill_inherits();
     skill::learn::initialize_job_skill_restrictions();
+    crate::assets::data::initialize_search_list();
+    crate::assets::animation::fix_common_male_swords();
     CONFIG.lock().unwrap().seed = 0;
 }
 /// Data that does not depend on game data
 pub fn intialize_added_data() { 
-    assets::data::HEAD_DATA.get_or_init(||assets::data::person::get_head_data());
+    // crate::assets::data::HEAD_DATA.get_or_init(||crate::assets::data::person::get_head_data());
 }
 
 pub fn engage_count() {

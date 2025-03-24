@@ -1,8 +1,8 @@
 use super::{*, ai};
 use engage::godpool::GodPool;
-use crate::randomizer::{emblem::{EMBLEM_LIST, ENEMY_EMBLEM_LIST}, assets::animation::MONSTERS, grow, job, item::unit_items, assets, skill};
-use crate::DVCVariables;
-
+use crate::{
+    assets::animation::MONSTERS, config::DVCVariables, randomizer::{emblem::{self, EMBLEM_LIST, ENEMY_EMBLEM_LIST}, grow, item::unit_items, job, skill}
+};
 #[unity::hook("App", "Unit", "CreateImpl2")]
 pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     let can_lueur_change = RANDOMIZER_STATUS.read().unwrap().enabled;
@@ -28,7 +28,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             auto_level_unit_for_random_map(this, false); 
         }
         else {  // Enemy Randomization
-            assets::accessory::accesorize_enemy_unit(this); 
+            crate::assets::accessory::accesorize_enemy_unit(this); 
             enemy_unit_randomization(this);
             let rng = Random::get_game();
             if rng.get_value(100) < 2*GameVariableManager::get_number(DVCVariables::ITEM_DROP_GAUGE_KEY) {
@@ -499,7 +499,7 @@ fn enemy_unit_randomization(unit: &mut Unit) {
         }
         if unit.person.parent.hash == 1879825845 || unit.status.value & 134217728 != 0 { return; }
         let job = unit.get_job();
-        if super::super::assets::animation::MONSTERS.iter().any(|str| job.jid.contains(str)) { 
+        if crate::assets::animation::MONSTERS.iter().any(|str| job.jid.contains(str)) { 
             if random_map && m004_complete { auto_level_unit_for_random_map(unit, is_boss);  }
             else { emblem_paralogue_level_adjustment(unit); }
             return;  
@@ -576,7 +576,14 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                     if crate::autolevel::enemy::try_equip_emblem(unit, emblem) {  ai::adjust_enemy_emblem_unit_ai_flags(unit);   }
                 }
             } 
+            else if unit.person.get_engage_sid().is_some() {
+                let ty = emblem::get_engage_attack_type(unit.get_engage_attack());
+                
+            }
             crate::autolevel::auto_level_unit(unit, is_boss);
+            if unit.get_engage_attack().is_some() {
+                ai::adjust_ai_for_engage_attack(unit);
+            }
         }
         unit_items::adjust_enemy_meteor(unit);
         if has_master {  unit.item_list.add_iid_no_duplicate("IID_マスタープルフ"); }    // Add Seal if lost seal

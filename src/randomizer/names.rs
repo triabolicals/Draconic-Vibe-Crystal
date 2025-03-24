@@ -91,6 +91,7 @@ pub struct ReseedEnemyConfirm;
 impl TwoChoiceDialogMethods for ReseedEnemyConfirm {
     extern "C" fn on_first_choice(_this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
         change_enemy_seed();
+        crate::assets::accessory::change_enemy_outfits();
         BasicMenuResult::se_cursor().with_close_this(true)
     }
     extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
