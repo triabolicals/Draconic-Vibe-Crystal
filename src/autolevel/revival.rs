@@ -25,9 +25,7 @@ impl ConfigBasicMenuItemGaugeMethods  for EnemyRevivalStones {
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){ 
         let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().revival_stone_rate }
             else { GameVariableManager::get_number(DVCVariables::REVIVAL_STONE_GAUGE_KEY)};
-        if value == 0 {
-            this.help_text = "Enemy units will not gain revival stones".into();
-        }
+        if value == 0 { this.help_text = "Enemy units will not gain revival stones.".into(); }
         else {
             this.help_text = format!("Chance of enemy units gaining a revival stone: {}%.", value).into();
         }

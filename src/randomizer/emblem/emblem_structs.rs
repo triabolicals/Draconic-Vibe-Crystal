@@ -1,5 +1,6 @@
 use super::*;
 use super::super::skill::SKILL_POOL;
+use std::fmt::{Display, Formatter};
 
 pub struct EngageAttackIndex {
     pub index_1: i32,
@@ -14,23 +15,29 @@ impl EngageAttackIndex {
 #[derive(Clone, Copy)]
 pub struct SynchoSkill {
     pub index: i32,
+    pub randomized_index: i32, 
     pub max_priority: i8,
     pub min_priority: i8,
-    pub in_use : bool,
     pub eirika_twin_skill: bool,
     pub skill_used: bool,
-    pub randomized_index: i32,
+ // New Version: Randomized Skill Index, previous Vec Index
 }
 impl SynchoSkill {
     pub fn new(skill_index: i32, priority: i8, eirika: bool) -> Self {
-        Self { index: skill_index, max_priority: priority, min_priority: priority, in_use: false, randomized_index: 0, eirika_twin_skill: eirika, skill_used: false} 
+        Self { index: skill_index, max_priority: priority, min_priority: priority, randomized_index: 0, eirika_twin_skill: eirika, skill_used: false} 
     }
     pub fn reset(&mut self) {
-        self.in_use = false;
         self.randomized_index = 0;
         self.skill_used = false;
     }
 }
+/*
+impl Display for SynchoSkill {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "#{}: {} -> #{}: {}", self.index, Mess::get(SkillData::try_index_get(self.index).unwrap().name.unwrap()), self.randomized_index, Mess::get(SkillData::try_index_get(self.randomized_index).unwrap().name.unwrap()))
+    }
+}
+*/
 
 pub struct SynchoList {
     pub sync_list: Vec<SynchoSkill>,
@@ -84,6 +91,7 @@ impl SynchoList {
          }
     }
     pub fn add_inherit(&mut self, skill_index: i32, priority: i8, in_sync: bool, in_inherit: bool, chaos_only: bool, is_eirika: bool) {
+
         if let Some(found) = self.chaos_list.iter_mut().find(|x| x.index == skill_index) {
             if found.max_priority < priority { found.max_priority = priority; }
             if priority < found.min_priority { found.min_priority = priority; }
@@ -143,8 +151,6 @@ impl SynchoList {
         self.inherit_list.iter_mut().for_each(|x| x.reset());
         self.chaos_list.iter_mut().for_each(|x| x.reset());
 
-        self.sync_list[0].in_use = true;
-        self.sync_list[1].in_use = true;
         self.randomized = false;
         self.reset_skill_cost();
         if self.sync_list_size as usize > self.sync_list.len() { self.sync_list.drain(self.sync_list_size as usize..); }
@@ -153,93 +159,64 @@ impl SynchoList {
     }
     pub fn randomized(&mut self, rng: &Random) {
         if self.randomized { return; }
-        let i_size = self.inherit_list.len() as i32;
-        let i_list = &mut self.inherit_list;
-        let mut value;
-        for x in 0..i_size {     //inherit skill -> inherit skill
-            value = rng.get_value( i_size );
-            let dp = i_list[x as usize].max_priority - i_list[x as usize].min_priority;
-            let mut dp2 = i_list[value as usize].max_priority - i_list[value as usize].min_priority;
-            let mut count = 0;
-            while i_list[ value as usize ].in_use || ( dp != dp2 ) {
-                if count == 200 { break; }
-                value = rng.get_value( i_size );
-                dp2 = i_list[value as usize].max_priority - i_list[value as usize].min_priority;
-                count += 1;
-            }
-            if count == 200 { value = x as i32; }
-            i_list[value as usize].in_use = true;
-            i_list[x as usize ].randomized_index = value;
-        }
         let i_list = &mut self.inherit_list;
         let s_list = &mut self.sync_list;
-        let size = s_list.len() as i32;
-        for x in 2..size {
-            s_list[x as usize].randomized_index = -1;
-            let skill_index = s_list[x as usize].index;
-            if let Some(found) = i_list.iter().find(|z| z.index == skill_index){     // is inherit skill in sync list
-                let random_index = i_list[ found.randomized_index as usize ].index;
-                if let Some(found2) = s_list.iter().position(|z| z.index == random_index) {   // is the randomized skill in sync list in inherit list
-                    s_list[found2].in_use = true;
-                    s_list[x as usize ].randomized_index = found2 as i32;
+        let mut s_list_avail: Vec<_> = s_list.iter().map(|i| (i.index, i.max_priority - i.min_priority)).collect();
+        s_list_avail.remove(1);
+        s_list_avail.remove(0);
+
+        let max_dp = i_list.iter().map(|s| s.max_priority - s.min_priority).max().unwrap();
+    // SyncSkills that are also Inherit Skills Randomized within each other 
+        let mut intersection_si: (Vec<_>, Vec<_>) = i_list.iter_mut().partition(|inherit| s_list.iter().any(|sync| sync.index == inherit.index));
+        for dp in 0..max_dp+1 {
+            // Inherit Skill that also Sync Skill Randomization
+            let mut avail: Vec<_> = intersection_si.0.iter_mut().filter(|s| ( s.max_priority - s.min_priority) == dp).map(|s| s.index).collect();
+            intersection_si.0.iter_mut().filter(|s| ( s.max_priority - s.min_priority) == dp)
+                .for_each(|inherit|{
+                    inherit.randomized_index = avail.get(rng.get_value(avail.len() as i32) as usize).map_or_else(|| inherit.index, |r| *r); 
+                    if let Some(pos) = avail.iter().position(|&x| x == inherit.randomized_index) { avail.remove(pos); }
+                    if let Some(pos) = s_list_avail.iter().position(|x| x.0 == inherit.randomized_index) { s_list_avail.remove(pos); }
+                    let _ = s_list.iter_mut().find(|x| x.index == inherit.index).map(|x| { x.randomized_index = inherit.randomized_index; } );
                 }
-            }
+            );
+            // Inherit Skills that are not Sync Skills
+            let mut avail: Vec<_> = intersection_si.1.iter_mut().filter(|s| ( s.max_priority - s.min_priority) == dp).map(|s| s.index).collect();
+            intersection_si.1.iter_mut().filter(|s| ( s.max_priority - s.min_priority) == dp)
+                .for_each(|inherit|{
+                    inherit.randomized_index = avail.get(rng.get_value(avail.len() as i32) as usize).map_or_else(|| inherit.index, |r| *r); 
+                    if let Some(pos) = avail.iter().position(|&x| x == inherit.randomized_index) { avail.remove(pos); }
+                }
+            );
         }
-        value =  rng.get_value( size - 5) + 2;  //Gambit
-        while s_list[ value as usize].max_priority != 0 || s_list[ value as usize].in_use { value =  rng.get_value( size - 5) + 2; }
-        s_list[0].randomized_index = value;  s_list[ value as usize].in_use = true; s_list[0].skill_used = true;
-        //None
-        while s_list[ value as usize].max_priority != 0 || s_list[ value as usize].in_use { value =  rng.get_value( size - 5) + 2; }
-        s_list[1].randomized_index = value; s_list[ value as usize].in_use = true; s_list[1].skill_used = true;
-        for x in 2..size {
-            if s_list[x as usize].randomized_index != -1 { continue; }
-            if self.non_random_skills.iter().find(|&&y| y == s_list[x as usize].index ).is_some() { //Prevent the non-randomized from being pick to replaced
-                s_list[x as usize].randomized_index = x as i32;
-                continue; 
-            }
-            let dp = s_list[x as usize].max_priority;
-            let mut count = 0;
-            value = rng.get_value( size - 2 ) + 2;
-            let mut dp2 = s_list[value as usize].max_priority;
-           
-            while s_list[ value as usize ].in_use || ( dp != dp2 ) || value < 2 {
-                if count >= 100 && !s_list[ value as usize ].in_use { break; }
-                if count == 200 { break; }
-                value = rng.get_value( size - 2 ) + 2;
-                dp2 = s_list[value as usize].max_priority ;
-                count += 1;
-            }
-            if count >= 200 { value = x as i32; }
-            s_list[value as usize].in_use = true;
-            s_list[x as usize ].randomized_index = value;
+         // Allow Gambit and None to be randomized into something
+        for xx in 0..2 { if let Some(pos) = self.non_random_skills.iter().position(|&x| s_list[xx as usize].index == x) { self.non_random_skills.remove(pos); }  }
+
+        let max_dp = s_list.iter().map(|s| s.max_priority - s.min_priority).max().unwrap();
+        for dp in 0..max_dp+1 {
+            let mut avail_dp_pool: Vec<_> = s_list_avail.iter().filter(|s| s.1 == dp).collect();
+            s_list.iter_mut().filter(|s| ( s.max_priority - s.min_priority )  == dp && s.randomized_index == 0 && !self.non_random_skills.iter().any(|&i| i == s.index))
+                .for_each(|s|{
+                    s.randomized_index = if avail_dp_pool.len() > 0 { avail_dp_pool[rng.get_value(avail_dp_pool.len() as i32) as usize].0 } else { s.index };
+                    if let Some(pos) = avail_dp_pool.iter().position(|x| x.0 == s.randomized_index){ avail_dp_pool.remove(pos);  }
+                }
+            );
         }
-        for x in 0..size { 
-            if s_list[x as usize ].randomized_index == -1 { s_list[x as usize ].randomized_index = x; }
-        }
-        let c_size = self.chaos_list.len() as i32;
         let c_list = &mut self.chaos_list;
-        // Chaos
-        for x in 0..c_size {
-            let dp = c_list[x as usize].max_priority;
-            let mut count = 0;
-            value = rng.get_value( c_size );
-            let mut dp2 = c_list[value as usize].max_priority;
-            while c_list[ value as usize ].in_use || ( dp != dp2 ) {
-                if count >= 100 && !c_list[ value as usize ].in_use { break; }
-                if count == 200 { break; }
-                value = rng.get_value( c_size );
-                dp2 = c_list[value as usize].max_priority ;
-                count += 1;
-            }
-            if count >= 200 { value = x as i32; }
-            c_list[value as usize].in_use = true;
-            c_list[x as usize ].randomized_index = value;
+        let max_dp = c_list.iter().map(|s| s.max_priority - s.min_priority).max().unwrap();
+        for dp in 0..max_dp+1 {
+            let mut avail_dp_pool: Vec<_> = c_list.iter().filter(|s| ( s.max_priority - s.min_priority ) == dp).map(|s| s.index ).collect();
+            c_list.iter_mut().filter(|s| ( s.max_priority - s.min_priority )  == dp )
+                .for_each(|s|{
+                    s.randomized_index = 0;
+                    s.randomized_index = if avail_dp_pool.len() > 0 { avail_dp_pool[rng.get_value(avail_dp_pool.len() as i32) as usize] } else { s.index };
+                    if let Some(pos) = avail_dp_pool.iter().position(|x| *x == s.randomized_index){  avail_dp_pool.remove(pos);  }
+                }
+            );
         }
         // Inherit Chaos Mode
         if GameVariableManager::get_number(DVCVariables::SP_KEY) == 2 {
             let skill_pool = SKILL_POOL.lock().unwrap();
-            let mut available: Vec<i32> = Vec::with_capacity(skill_pool.len());
-            skill_pool.iter().for_each(|x| available.push(x.index));
+            let mut available: Vec<_> =  skill_pool.iter().map(|x| x.index).collect();  //Vec::with_capacity(skill_pool.len());
             if available.len() < self.chaos_inherit_list.len() {
                 let msg = format!("Skill Inherit List exceeds Skill Pool List.\nInherit List Size: {} vs Skill Pool Size: {}\nPlease set non-inheritables to 0 SP.", self.chaos_inherit_list.len(), available.len());
                 panic!("{}", msg.as_str());
@@ -303,12 +280,13 @@ impl SynchoList {
             else { &mut self.sync_list }; 
         let index;
         let randomized_index;
-        if let Some(found) = list.iter().find(|x| x.index == skill_index) {
-            randomized_index =  found.randomized_index as usize;
-            let new_skill_index = list[ randomized_index ].index;
-            let new_max_priority = list[ randomized_index].max_priority;
-            let is_eirika_twin = list[ randomized_index ].eirika_twin_skill;
-            let new_priority = ( priority as i8 ) - found.min_priority + list[ randomized_index ].min_priority;
+        if let Some(found) = list.iter().find(|x| x.index == skill_index && x.randomized_index > 0 ) {
+            let rnd = list.iter().enumerate().find(|x| x.1.index == found.randomized_index).unwrap();
+            randomized_index = rnd.0;
+            let new_skill_index = rnd.1.index;
+            let new_max_priority = rnd.1.max_priority;
+            let is_eirika_twin = rnd.1.eirika_twin_skill;
+            let new_priority = ( priority as i8 ) - found.min_priority + rnd.1.min_priority;
 
             if is_eirika_twin { // Replacement skill is an Eirika Twin Skill (Lunar Brace/Solar Brace/Eclipse Brace etc...)
                 index = new_skill_index + if new_max_priority <= priority as i8 { 3 } else { 0 }; // new_max_priority is 2 for Lunar/Solar/Eclipse Brace +
@@ -322,7 +300,9 @@ impl SynchoList {
             if !is_inherit { self.sync_rando.push( (o_index, o_index)); }
             return o_skill;
         }
-        if mode >= 1 { list[ randomized_index ].skill_used = true; }    // removes already used sync skills for extra sync skills
+        if mode >= 1 { 
+            list[randomized_index].skill_used = true;
+        }    // removes already used sync skills for extra sync skills
         let skill = SkillData::try_index_get(index).unwrap();
         if skill.help.is_none() || skill.flag & 1 != 0 {   // In case if the index is incorrect, search for skill that matches priority and has help text
             let priority = skill.priority;

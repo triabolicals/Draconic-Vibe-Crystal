@@ -264,7 +264,7 @@ pub fn random_unit_accessory(unit: &Unit, kind: i32, is_enemy: bool) -> bool {
     let index = accessory.unit_accessory_array[kind as usize].index;
     let accessories = AccessoryData::get_list().unwrap();
     let mut dress_gender = unit_dress_gender(unit);
-    if SEARCH_LIST.get().unwrap().job.iter().find(|j| j.mound == Mount::Pegasus && j.job_hash == unit.job.parent.hash).is_some() { dress_gender = 2; }
+    if SEARCH_LIST.get().unwrap().job.iter().find(|j| j.mount == Mount::Pegasus && j.job_hash == unit.job.parent.hash).is_some() { dress_gender = 2; }
 
     let rng = Random::get_game();
     let access: Vec<_> = accessories.iter()

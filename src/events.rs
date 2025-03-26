@@ -1,7 +1,7 @@
 use unity::prelude::*;
 use engage::{
-    gameuserdata::GameUserData,
-    proc::ProcInst, sequence::{mainmenusequence::MainMenuSequenceLabel, mainsequence::MainSequenceLabel, mapsequence::{human::MapSequenceHumanLabel, MapSequenceLabel}},
+    force::Force,
+    gameuserdata::GameUserData, mapmind::MapMind, proc::ProcInst, sequence::{mainmenusequence::MainMenuSequenceLabel, mainsequence::MainSequenceLabel, mapsequence::{human::MapSequenceHumanLabel, MapSequenceLabel}}
 };
 use crate::{config::DVCVariables, CONFIG};
 
@@ -111,7 +111,7 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
             crate::enums::generate_black_list();
             crate::randomizer::intitalize_game_data();
             crate::message::initialize_mess_hashs();
-            if let Some(asset_data) = crate::randomizer::assets::data::ASSET_DATA.get()  { asset_data.apply_bust_changes(); }
+            if let Some(asset_data) = crate::assets::data::SEARCH_LIST.get() { asset_data.bust.apply_bust_changes(); }
             crate::menus::menu_calls_install();
             crate::ironman::map_save_menu_edits();
         }
@@ -121,7 +121,8 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
 
 pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
     if label == 0 {
-        crate::randomizer::assets::install_dvc_outfit();
+        crate::assets::install_dvc_outfit();
+        crate::randomizer::job::reclass::black_list_jobs();
         crate::misc::set_personal_caps();
         crate::randomizer::randomize_stuff();
         crate::randomizer::tutorial_check();

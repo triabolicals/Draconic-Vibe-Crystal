@@ -9,7 +9,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEmblemMod {
         this.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = custom::cemblem_recruitment_menu_a_call as _).unwrap();
     }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let max = if CUSTOM_EMBLEMS.lock().unwrap()[0] > 0 { 4 } else { 3 };
+        let max = if EMBLEM_LIST.get().unwrap().len() > 20 { 4 } else { 3 };
         let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().emblem_mode, 0, max, 1);
         if CONFIG.lock().unwrap().emblem_mode != result {
             CONFIG.lock().unwrap().emblem_mode = result;

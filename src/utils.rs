@@ -18,6 +18,11 @@ pub fn set_patch_flag(flag: &str) {
     GameVariableManager::set_bool(flag, true);
 }
 
+pub fn get_random_element<'a, T>(vec: &'a mut Vec<T>, rng: &Random) -> Option<&'a T> {
+    vec.get(rng.get_value(vec.len() as i32 ) as usize)
+}
+
+
 pub fn get_rng() -> &'static Random {
     let rng = Random::instantiate().unwrap();
     rng.ctor(GameVariableManager::get_number(DVCVariables::SEED) as u32);

@@ -271,12 +271,12 @@ pub fn asset_table_result_get_preset_name(name: &Il2CppString, method_info: Opti
     return result;
 }
 
-pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit, equipped: Option<&ItemData>) {
+pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit, equipped: Option<&ItemData>, flags: ConditionFlags) {
     let engage_status = &mut ASSET_STATUS.try_write().unwrap();
     engage_status.reset_engage_atk();
 
     if let Some(engage_attack) = unit.get_engage_attack()  {
-        println!("{} is Engage Attacking:  {} hash: {}", Mess::get_name(unit.person.pid), Mess::get(engage_attack.name.unwrap()), engage_attack.parent.hash);
+        println!("{} is Engage Attacking: {} hash: {}", Mess::get_name(unit.person.pid), Mess::get(engage_attack.name.unwrap()), engage_attack.parent.hash);
         let engage_sid = engage_attack.sid.to_string();
         engage_status.engage_atk_type = get_engage_attack_source(unit);
         engage_status.unit = unit.ident;
@@ -289,24 +289,14 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
         });
 
         let gender = unit_dress_gender(unit);
-        let gender_str = if gender == 2 { "F" } else { "M" };
+        let mut gender_str = if gender == 2 { "F" } else { "M" };
         let mut gender_con = SEARCH_LIST.get().unwrap().get_gender_condition(gender);
     // Replace Generic with random character voices
         random_engage_voice(result);
-        let mut old_engage = EATK_ACT.iter().position(|prefix|{
-            result.body_anims.iter().any(|act| act.to_string().contains(prefix))
-        }).unwrap_or(50);
+        let mut old_engage = EATK_ACT.iter().position(|prefix|{ result.body_anims.iter().any(|act| act.to_string().contains(prefix)) }).unwrap_or(50);
 
         if old_engage == 22 {
-            if unit.get_engage_link().is_none() {
-                if let Some(god) = unit.god_unit {
-                    if god.child.is_none() {
-                        result.body_anims.iter_mut()
-                            .filter(|act| act.to_string().contains("Ler2A"))
-                            .for_each(|act| *act = concat_string!("Ler1A", if gender == 2 { "F" } else { "M" },"-Sw1_c000_N").into());
-                    }
-                }
-            }
+            lueur_engage_atk(result, unit, flags);
             return;
         }
         else if old_engage == 50 {
@@ -332,34 +322,16 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
         if emblem_index == 50 { 
             if let Some(engage_atk_data) = engage_atks.iter().find(|x| x.original_god_index == 50 && x.is_engage_atk(engage_attack)) {
                 println!("Found Custom Engage Atk");
-                crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve1_loc");
-                crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve2_loc");
-                crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve3_loc");
-                crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve4_loc");
+                engage_atk_result_clear(result, equipped);
                 if is_tiki_engage(result) {
-                    result.dress_model = "uBody_Tik0AF_c560".into();
-                    result.body_model = "uRig_GodF1".into();
-                    result.head_model = "uHead_c560".into();
-                    result.hair_model = "uHair_null".into();
-                    add_accessory_to_list(result.accessory_list, "uAcc_spine2_Hair560", "c_spine1_jnt");
-                    add_accessory_to_list(result.accessory_list, "uAcc_head_Tiara560", "c_head_loc");
-                    gender_con = SEARCH_LIST.get().unwrap().get_gender_condition(2);
+                    SEARCH_LIST.get().unwrap().replace_with_god(result, 2, 13, false);
+                    gender_str = "F";
                 }
-                super::edit_asset_weapon(result, true, equipped);
                 engage_atk_data.apply(result, unit, gender_con);
             }
             return;
         }
-
-
-        result.ride_model = "null".into();
-        result.ride_dress_model = "null".into();
-        result.accessory_list.list.iter().for_each(|acc| println!("Before Accessory: {}", acc.to_string()));
-        crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve1_loc");
-        crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve2_loc");
-        crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve3_loc");
-        crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve4_loc");
-        result.accessory_list.list.iter().for_each(|acc| println!("After Accessory: {}", acc.to_string()));
+        engage_atk_result_clear(result, equipped);
         let enemy_tiki = unit.god_unit.is_some_and(|gunit| gunit.data.gid.to_string().contains("敵チキ") || ( gunit.data.mid.to_string().contains("Tiki") && !gunit.data.gid.to_string().contains("チキ") ));
         match (emblem_index, old_engage) {
             (13, 13) => {    // No Change
@@ -392,12 +364,6 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
                     }
                     return;
                 }
-                else {
-                    if old_engage == 5 || old_engage == 12 || old_engage == 20 {
-                        result.left_hand = "null".into();
-                        result.right_hand = "null".into();
-                    }
-                }
             }
         }
         match emblem_index {    //Marth, Roy, Leif, Lucina, Ike, Byleth, Dragon Blast
@@ -405,16 +371,12 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
                 engage_atks.iter().find(|emblem| emblem.original_god_index == 3).map(|engage| engage.apply(result, unit, gender_con)).unwrap();
                 return;
             }
-            11 => { 
-                engage_status.engage_atk_eirika = old_engage as i32;
-                super::edit_asset_weapon(result, true, equipped);
-            }
-            15 => {
-                change_accessory(result.accessory_list, "uAcc_Event_SummonStoneB", "reserve4_loc");
-            }
-            18 => {
-                engage_status.engage_atk_chrom = old_engage as i32;
-                super::edit_asset_weapon(result, true, equipped);
+            11 => {  engage_status.engage_atk_eirika = old_engage as i32;}
+            15 => {change_accessory(result.accessory_list, "uAcc_Event_SummonStoneB", "reserve4_loc"); }
+            18 => { engage_status.engage_atk_chrom = old_engage as i32;  }
+            19 => { 
+                super::animation::lueur_engage_atk(result, unit, flags); 
+                return;
             }
             20 => { 
                 engage_status.engage_atk_3h = old_engage as i32; 
@@ -423,7 +385,6 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
                 result.body_anims.add(Il2CppString::new_static(concat_string!("Thr2A", gender_str, "-Ax1_c000_N")));
                 return;
             }
-            0|1|4|5|6|8|9|14|17|19 => { super::edit_asset_weapon(result, true, equipped); }
             _ => {}
         }
         let _ = engage_atks.iter().find(|emblem| emblem.original_god_index == emblem_index as i32 ).map(|engage| engage.apply(result, unit, gender_con));
@@ -635,4 +596,15 @@ fn houses_unite_partner(index: usize, kind: i32, rng: &Random) -> Option<&GodDat
             GodData::get(concat_string!("GID_",EMBLEM_ASSET[male]))
         })
     }
+}
+fn engage_atk_result_clear(result: &mut AssetTableResult, equipped: Option<&ItemData>) {
+    result.ride_model = "null".into();
+    result.ride_dress_model = "null".into();
+    result.left_hand = "null".into();
+    result.right_hand = "null".into();
+    crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve1_loc");
+    crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve2_loc");
+    crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve3_loc");
+    crate::assets::accessory::clear_accessory_at_locator(result.accessory_list, "reserve4_loc");
+    super::edit_asset_weapon(result, true, equipped);
 }

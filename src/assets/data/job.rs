@@ -17,9 +17,10 @@ pub enum Mount {
 pub struct JobAssetSets {
     pub job_hash: i32,
     pub mode: i32,
-    pub mound: Mount,
+    pub mount: Mount,
     pub unique: bool,
     pub dragon_stone: bool,
+    pub cannon: bool,
     pub entries: Vec<i32>,
 }
 
@@ -96,7 +97,7 @@ impl JobAssetSets {
         return None;
     }
     pub fn get_acc(&self, gender: Gender, mode: i32, locator: &str) -> Option<&'static AssetTableAccessory> {
-        let gen_str = create_anim_type(self.mound, gender);
+        let gen_str = create_anim_type(self.mount, gender);
         self.entries.iter().flat_map(|&index| AssetTable::try_index_get(index))
             .filter(|entry| entry.mode == mode)
             .flat_map(|entry| entry.accessory_list.list.iter())
@@ -107,7 +108,7 @@ impl JobAssetSets {
             .map(|v| &**v)
     }
     pub fn get_body_anims(&self, result: &mut AssetTableResult, kind: i32, gender: Gender, is_morph: bool) {
-        let search = create_anim_type(self.mound, gender);
+        let search = create_anim_type(self.mount, gender);
         if self.mode == 1 {
             if let Some(a) = self.entries.iter().flat_map(|&i| AssetTable::try_index_get(i))
             .find(|entry| entry.body_anim.is_some_and(|x| x.to_string().contains(search.as_str())) ){
@@ -119,9 +120,10 @@ impl JobAssetSets {
         }
         let act_data = ACTDATA.get().unwrap();
         let gen = if gender == Gender::Male { "M-"} else { "F-" };
+        let engage = AssetTableStaticFields::get_condition_index("エンゲージ技");
         // let weapon_kind_index = SEARCH_LIST.get().unwrap().weapon_conditions[kind as usize];
         self.entries.iter().flat_map(|&i| AssetTable::try_index_get(i))
-            .filter(|entry| weapon_condition_met(entry, kind) && 
+            .filter(|entry| weapon_condition_met(entry, kind) && !has_condition(entry, engage) &&
                 entry.body_anim.is_some_and(|x| x.to_string().contains(gen))
             )
             .for_each(|entry|{
@@ -187,7 +189,7 @@ pub fn get_job_entries(table: &mut JobAssetSets, mode: i32, jid: &Il2CppString) 
         .filter(|entry| entry.condition_indexes.list.iter().any(|s| s.iter().any(|&x| x == jid_index)))
             //entry.condition_indexes.list.iter().flat_map(|s| s.iter().any(|&index| jid_index == index)))
         .for_each(|entry|{
-            if table.mound == Mount::None { table.mound = determine_mount(entry); }
+            if table.mount == Mount::None { table.mount = determine_mount(entry); }
             if !not_unique {
                 not_unique = entry.condition_indexes.list.iter().any(|c1| c1.iter().any(|&i| i == male_con || i == female_con));
             }

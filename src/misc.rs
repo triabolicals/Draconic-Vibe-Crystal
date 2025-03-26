@@ -7,6 +7,7 @@ pub fn code_patches() {
     fx_patch();
     battle_save_patch();
     skill_equip_patch();
+    dual_guard_code_patch();
     // Prevents Class Roll
     Patch::in_text(0x022957d4).bytes(&[0x28, 0x00, 0x80, 0x52]).unwrap();
 
@@ -17,7 +18,20 @@ pub fn code_patches() {
     }
 }
 
+pub fn dual_guard_code_patch() {
+    Patch::in_text(0x01e4ee00).nop();
+    Patch::in_text(0x026800a8).bytes(&[0x05, 0x00, 0x00, 0x14]).unwrap();
+    Patch::in_text(0x01a34db8).bytes(&[0x5e, 0x00, 0x00, 0x14]).unwrap(); // 5e 00 00 14     b          LAB_7101a34f30
+    Patch::in_text(0x01a34fe0).bytes(&[0x06, 0x00, 0x00, 0x14]).unwrap(); //     b          LAB_7101a34ff8
+    Patch::in_text(0x01e7afb4).bytes(&[0x5e, 0x00, 0x00, 0x14]).unwrap(); //     b          LAB_7101e7b12c
+    Patch::in_text(0x0194d1c8).bytes(&[0x60, 0x00, 0x00, 0x14]).unwrap(); //    b          LAB_710194d348
 
+    Patch::in_text(0x02713da0).nop();
+
+    Patch::in_text(0x02680160).nop();
+    Patch::in_text(0x01c77dfc).bytes(&[0xdc, 0xfe, 0xff, 0x17]).unwrap(); // dc fe ff 17     b          LAB_7101c7796c
+
+}
 pub fn disable_support_restriction() {
     let replace = &[0x1f, 0x25, 0x00, 0x71];
     Patch::in_text(0x0209950C).bytes(replace).unwrap();

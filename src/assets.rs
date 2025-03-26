@@ -16,12 +16,21 @@ use crate::{
     config::DVCVariables, enums::*, utils::str_contains, CONFIG,
     randomizer::{names::EMBLEM_NAMES, person::PLAYABLE},
 };
+
+pub mod accessory;
+pub mod data;
+pub mod animation;
+pub mod bust;
+pub mod emblem;
+pub mod transform;
+pub mod accmenu;
+pub mod dress;
+pub mod conditions;
+
 use animation::*;
 
-// Move to Accessory
 pub static ACCESSORY_COUNT: OnceLock<i32> = OnceLock::new();
 pub static ASSET_STATUS: RwLock<AssetStatus> = RwLock::new(AssetStatus{
-    engaging_count: 0, 
     engage_atk_eirika: 11, 
     engage_atk_3h: 12, 
     engage_atk_chrom: 18, 
@@ -31,11 +40,9 @@ pub static ASSET_STATUS: RwLock<AssetStatus> = RwLock::new(AssetStatus{
     link_unit2: 0,
     link_god: 0,
     darkness: false,
-    condition_flag: ConditionFlags::empty(),
 });
 
 pub struct AssetStatus {
-    pub engaging_count: i32,
     pub engage_atk_eirika: i32,
     pub engage_atk_3h: i32,
     pub engage_atk_chrom: i32,
@@ -45,11 +52,9 @@ pub struct AssetStatus {
     pub link_unit2: i32,
     pub link_god: i32,
     pub darkness: bool,
-    pub condition_flag: ConditionFlags,
 }
 impl AssetStatus {
     pub fn reset(&mut self) { 
-        self.engaging_count = 0;
         self.engage_atk_3h = 12;
         self.engage_atk_eirika = 11;
         self.engage_atk_chrom = 22;
@@ -58,7 +63,6 @@ impl AssetStatus {
         self.link_unit1 = 0;
         self.link_unit2 =  0;
         self.link_god = 0;
-        self.condition_flag.clear();
     }
     pub fn reset_engage_atk(&mut self) {
         self.engage_atk_3h = 12;
@@ -79,15 +83,6 @@ pub fn get_accessory_count() { ACCESSORY_COUNT.get_or_init(|| unsafe { accessory
 #[unity::from_offset("App", "UnitAccessoryList", "get_Count")]
 fn accessory_list_get_count(this: u64, method_info: OptionalMethod) -> i32;
 
-pub mod accessory;
-pub mod data;
-pub mod animation;
-pub mod bust;
-pub mod emblem;
-pub mod transform;
-pub mod accmenu;
-pub mod dress;
-pub mod conditions;
 
 // pub mod dress;
 
@@ -117,7 +112,13 @@ pub fn get_unit_outfit_mode(unit: &Unit) -> i32 {
 }
 
 //Unlock royal classes if asset table entry is found
-pub fn unlock_royal_classes(){}
+pub fn unlock_royal_classes(){
+    SEARCH_LIST.get().unwrap().job.iter().filter(|x| x.unique)
+        .for_each(|x|{
+            if let Some(job) = JobData::try_get_hash_mut(x.job_hash) { job.get_flag().value |= 3; }
+        }
+    );
+}
 
 #[skyline::hook(offset=0x01bb2430)]
 pub fn asset_table_result_setup_hook(this: &mut AssetTableResult, mode: i32, unit: &mut Unit, equipped: Option<&ItemData>, conditions: &mut Array<&'static Il2CppString>, method_info: OptionalMethod) -> &'static mut AssetTableResult {
@@ -127,8 +128,13 @@ pub fn asset_table_result_setup_hook(this: &mut AssetTableResult, mode: i32, uni
     emblem::bust_modifier_randomization(result, unit.grow_seed);
     let pid = unit.person.pid.to_string();
 
-    if conditions_flags.contains(ConditionFlags::EngageAttack) && mode == 2 && !conditions_flags.contains(ConditionFlags::Talk) {
-        emblem::adjust_engage_attack_animation(result, unit, equipped);  
+    if conditions_flags.contains(ConditionFlags::Talk) { return result; }
+    if conditions_flags.contains(ConditionFlags::EngageAttack) && mode == 2 {
+        emblem::adjust_engage_attack_animation(result, unit, equipped, conditions_flags);  
+        return result;
+    }
+    if conditions_flags.contains(ConditionFlags::EngageAttackComboMain) || conditions_flags.contains(ConditionFlags::EngageAttackComboSub) && mode == 2 {
+        animation::lueur_engage_atk(result, unit, conditions_flags);
         return result;
     }
     if ( engage::gameuserdata::GameUserData::get_chapter().cid.to_string().contains("G00") && unit.person.get_asset_force() != 0 ) || pid.contains("_チキ")   { 
@@ -211,8 +217,7 @@ pub fn edit_asset_weapon(result: &mut AssetTableResult, equipped: bool, item: Op
             }
         }
         else if equipped {
-            let _ = weapons.get_index(w_item.parent.index)
-                .map(|item| AssetTable::try_index_get(item.asset_entry).map(|asset| result.commit_asset_table(asset)));
+            let _ = weapons.get_index(w_item.parent.index).map(|item| AssetTable::try_index_get(item.asset_entry).map(|asset| result.commit_asset_table(asset)));
         }   
     }
 }

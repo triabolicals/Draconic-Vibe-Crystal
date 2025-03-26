@@ -102,7 +102,7 @@ pub fn set_gender_conditions(condition_unit: &Unit, flags: &mut ConditionFlags) 
     remove_condition("男装");
     flags.set(ConditionFlags::Male, false);
     flags.set(ConditionFlags::Female, false);
-    if SEARCH_LIST.get().unwrap().job.iter().find(|j| j.job_hash == condition_unit.job.parent.hash).is_some_and(|j| j.mound == Mount::Pegasus){
+    if SEARCH_LIST.get().unwrap().job.iter().find(|j| j.job_hash == condition_unit.job.parent.hash).is_some_and(|j| j.mount == Mount::Pegasus){
         add_condition("女装");
         AssetTable::add_condition_key("女装");
         flags.set(ConditionFlags::Female, true);

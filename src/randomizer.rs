@@ -706,7 +706,7 @@ pub fn reset_gamedata() {
     Patch::in_text(0x01e5ff4c).bytes(&[0x8d, 0xeb, 0x2f, 0x94]).unwrap();
     Patch::in_text(0x027049c8).bytes(&[0xee, 0x58, 0x0d, 0x94]).unwrap();
     Patch::in_text(0x01c77620).bytes(&[0xfd, 0x7b, 0xbc, 0xa9]).unwrap();   // Summon Delete Impl
-
+    Patch::in_text(0x01dee3a8).bytes(&[0x42, 0x00, 0x80, 0x52]).unwrap();
     
     unsafe { for x in 0..20 {  LINKED[x as usize] = -1; }    }
     if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() {

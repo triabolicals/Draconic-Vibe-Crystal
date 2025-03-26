@@ -2,6 +2,7 @@ use super::*;
 use std::sync::OnceLock;
 pub static JOB_RESTRICT_SKILLS_LIST: OnceLock<Vec<SkillWeaponRestrictions>> = OnceLock::new();
 use engage::force::*;
+use crate::randomizer::job::reclass::ChangeJobData;
 pub struct SkillWeaponRestrictions {
     pub hash: i32,
     pub mask: i32,
@@ -250,7 +251,7 @@ pub struct ClassChangeJobMenuContent {
 }
 
 #[unity::hook("App", "ClassChangeJobMenuContent", "SetJobDetails")]
-pub fn class_change_job_menu_content_hook(this: &mut ClassChangeJobMenuContent, data: &crate::randomizer::job::ChangeJobData, _method_info: OptionalMethod) {
+pub fn class_change_job_menu_content_hook(this: &mut ClassChangeJobMenuContent, data: &ChangeJobData, _method_info: OptionalMethod) {
     call_original!(this, data, None);
     if data.job.learn_skill.is_none() || !can_rand() || !GameVariableManager::get_bool(DVCVariables::SKILL_KEY)  { return; }
     if GameVariableManager::get_number(DVCVariables::JOB_LEARN_SKILL_KEY) & 1 == 0 { return; }

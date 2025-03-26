@@ -1,52 +1,5 @@
 use super::*;
 
-pub const ACT_PRE: &[&str] = &[
-    "Com0AM", "Com0AF",
-    "Com0BM", "Com0BF",
-    "Swd0AM", "Swd1AM", "Swd2AM",
-    "Lnc0AM", "Lnc1AM", "Lnc2BM",
-    "Axe0AM", "Axe1AM", "Axe2AM",
-    "Bow0AM", "Bow1AM", "Bow2BM",
-    "Dge0AM",
-    "Mag0AM", "Mag1AM", "Mag2BM",
-    "Rod0AM", "Rod1AM", "Rod2AM",
-    "Cav0BM", "Cav1BM", "Cav2CM",
-    "Amr0AM", "Amr1AM", "Amr2B",
-    "Wng1FM", "Wng2DM", 
-
-    "Swd0AF", "Swd1AF", "Swd2AF",
-    "Lnc0AF", "Lnc1AF", "Lnc2BF",
-    "Axe0AF", "Axe1AF", "Axe2AF",
-    "Bow0AF", "Bow1AF", "Bow2BF",
-    "Dge0AF",
-    "Mag0AF", "Mag1AF", "Mag2BF",
-    "Rod0AF", "Rod1AF", "Rod2AF",
-    "Cav0BF", "Cav1BF", "Cav2CF",
-    "Amr0AF", "Amr1AF", "Amr2BF",
-    "Wng1FM", "Wng2DM",
-    "Drg0AM", "Drg0AF", "Drg1AM", "Drg1AF", 
-    "Sdp0AF",
-    "Sdk0AM",
-    "Avn0BM", "Avn1BM",
-    "Flr0AF", "Flr1AF",
-    "Scs0AM", "Scs1AM",
-    "Trl0AM", "Trl1AM",
-    "Lnd0DF", "Lnd1DF",
-    "Slp0EF", "Slp1EF",
-    "Pcf0AF", "Pcf1AF",
-    "Cpd0BM", "Cpd1BM", 
-    "Dnc0AM",
-    "Sds0AM", "Sds0AF",
-    "Msn0DF", "Msn1DF",
-    "Ect3AM", "Ect3AF",
-    "Mcn3AM", "Mcn3AF",
-    // Backup/Dragon/Cav, Qi, Flying, Magic, Armor
-    "Enb0AM", "Enc0AM", "Enw0AM", "Enm0AM", "Enh0AM", 
-    "Enb0AF", "Enc0AF", "Enw0AF", "Enm0AF", "Enh0AF", 
-    "Mar0AM", "Sig0BM", "Cel0AF", "Mic0AF", "Roy0AM", "Lei0AM", "Luc0AF", "Lyn0AF", "Ike0AM", "Byl0AM", "Cor0AM", "Eir0AF", "Eph0AF", "Ler1AM", "Ler1AF",
-    "Tik0AF", "Ede0AF", "Dim0AM", "Cla0AM", "Hec0AM", "Ver0AF", "Sor0AM", "Cmi0DF", "Chr0AM", "Rbi0AM"
-];
-
 
 
 pub struct AnimData {
@@ -60,7 +13,50 @@ pub struct AnimData {
     pub special: i32,
     pub suffix: String,
 }
+/*
+pub struct ActData {
+    pub anims: Vec<AnimData>,
+    pub base_mount: BaseAnim,
+}
 
+pub struct BaseAnim {
+    pub inf0a: [i32; 20],
+    pub cav0b: [i32; 20],
+    pub cav2c: [i32; 20],
+    pub wng2d: [i32; 20],
+    pub wng0e: [i32; 20],
+    pub wng1f: [i32; 20],
+}
+impl BaseAnim {
+    pub fn set(&mut self, index: i32, set: usize, kind: i32, female: bool) {
+        let act_index = if female { 10 } else { 0 } + kind as usize;
+        match set {
+            0 => { if self.inf0a[act_index] == 0 { self.inf0a[act_index] = index; } }
+            1 => { if self.cav0b[act_index] == 0 { self.cav0b[act_index] = index; } }
+            2 => { if self.cav2c[act_index] == 0 { self.cav2c[act_index] = index; } }
+            3 => { if self.wng2d[act_index] == 0 { self.wng2d[act_index] = index; } }
+            4 => { if self.wng0e[act_index] == 0 { self.wng0e[act_index] = index; } }
+            5 => { if self.wng1f[act_index] == 0 { self.wng1f[act_index] = index; } }
+            _ => {}
+        }
+    }
+    pub fn get(&self, mount: Mount, female: bool, kind: i32) -> Option<&'static Il2CppString>{
+        let act_index = if female { 10 } else { 0 } + kind as usize;
+        let anim_index = 
+        match Mount {
+            Mount::None => { self.inf0a[act_index] }
+            Mount::Cav => { self.cav0b[act_index] }
+            Mount::Wolf => { self.cav2c[act_index] }
+            Mount::Wyvern => { self.wng2d[act_index] }
+            Mount::Pegasus => { self.wng0e[act_index] }
+            Mount::Griffin => { self.wng1f[act_index] }
+        };
+
+        if anim_index > 0 { AnimSetDB::try_index_get(anim_index).map_or_else(|| None, |f| Some(f.name)) }
+        else { None }
+    }
+}
+*/
 impl AnimData {
     pub fn create_anim(&self, item_kind: i32, is_morph: bool) -> String {
         let mut suffix = if self.is_generic { 
@@ -126,4 +122,3 @@ impl AnimData {
         }
     }
 }
-

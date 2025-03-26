@@ -101,10 +101,10 @@ pub fn class_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalM
     let config_menu = this.menu.proc.child.as_mut().unwrap().cast_mut::<ConfigMenu<ConfigBasicMenuItem>>();
     config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose_to_dvc_main as _).unwrap();
     config_menu.full_menu_item_list.clear();
-    config_menu.add_item(randomizer::job::vibe_custom_job());
+    config_menu.add_item(randomizer::job::menu::vibe_custom_job());
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::styles::RandomBattleStyles>("Class Types Setting"));
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::RandomCC>("Reclassing Setting"));
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::RandomJobMod>("Random Classes"));    
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::menu::RandomCC>("Reclassing Setting"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::menu::RandomJobMod>("Random Classes"));    
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::menu::RandomSkillMod>("Randomize Skills"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::menu::RandomSkillCost>("Skill Inheritance / SP Cost"));
     config_menu.add_item(randomizer::skill::learn::vibe_learn_skill());
@@ -168,7 +168,7 @@ pub fn enemy_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalM
     config_menu.add_item(randomizer::names::vibe_generic());
     config_menu.add_item(ConfigBasicMenuItem::new_gauge::<randomizer::skill::menu::EnemySkillGauge>("Random Enemy Skill Rate"));
     config_menu.add_item(randomizer::item::vibe_drops());
-    config_menu.add_item(randomizer::job::vibe_job_gauge());
+    config_menu.add_item(randomizer::job::menu::vibe_job_gauge());
     config_menu.add_item(ConfigBasicMenuItem::new_gauge::<autolevel::enemy::EnemyEmblemGauge>("Enemy Emblem Rate"));
     config_menu.add_item(ConfigBasicMenuItem::new_gauge::<autolevel::revival::EnemyRevivalStones>("Enemy Revival Stone Rate"));
     TitleBar::open_header("Draconic Vibe Crystal", "Enemy Settings", "");

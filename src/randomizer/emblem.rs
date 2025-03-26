@@ -25,14 +25,11 @@ pub mod menu;
 pub static EMBLEM_LIST: OnceLock<Vec<i32>> = OnceLock::new();
 pub static ENEMY_EMBLEM_LIST: OnceLock<Vec<i32>> = OnceLock::new();
 pub static RECOMMENED_LVL: OnceLock<Vec<u8>> = OnceLock::new();
-pub static CUSTOM_EMBLEMS: Mutex<Vec<i32>> = Mutex::new(Vec::new());
 
 pub fn init_emblem_list() -> Vec<i32> {
     let mut list: Vec<i32> = Vec::new();
     EMBLEM_GIDS.iter().for_each(|gid| list.push(GodData::get(gid).unwrap().parent.hash));
-    let mut custom_emblem = CUSTOM_EMBLEMS.lock().unwrap();
-    custom_emblem.clear();
-    custom_emblem.push(0);
+    let mut custom_count = 0;
     let mut ggids: Vec<String> = Vec::new();
     GodData::get_list().unwrap().iter()
         .filter(|god|
@@ -44,10 +41,9 @@ pub fn init_emblem_list() -> Vec<i32> {
         if let Some(grow) = god.get_level_data() {
             let ggid = god.grow_table.unwrap().to_string();
             if grow.len() >= 20 && ggids.iter().find(|&c_ggid| *c_ggid == ggid).is_none() {
-                custom_emblem[0] += 1;
-                custom_emblem.push(god.parent.index);
                 ggids.push(ggid);
-                println!("{} Is added as custom emblem #{}", Mess::get(god.mid), custom_emblem[0]);
+                custom_count += 1;
+                println!("{} Is added as custom emblem #{}", Mess::get(god.mid), custom_count);
                 list.push(god.parent.hash);
             }
         }
@@ -479,9 +475,7 @@ pub fn player_emblem_check() {
 
 #[unity::hook("App", "ArenaOrderSequence", "SetEmblemWeapon")]
 pub fn arena_emblem_weapon(this: u64, unit: &mut Unit, god: &engage::gamedata::unit::GodUnit, bond_level: i32, method_info: OptionalMethod) {
-    if !GameVariableManager::get_bool(DVCVariables::EMBLEM_ITEM_KEY) { 
-        call_original!(this, unit, god, bond_level, method_info);
-    }
+    if !GameVariableManager::get_bool(DVCVariables::EMBLEM_ITEM_KEY) {  call_original!(this, unit, god, bond_level, method_info);  }
     else {
         if let Some(item) = super::job::get_weapon_for_asset_table(unit.job) {
             unit.put_off_all_item();

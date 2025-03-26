@@ -1,5 +1,4 @@
 use unity::prelude::*;
-use skyline::patching::Patch;
 use engage::{
     mess::Mess,
     proc::{desc::ProcDesc, ProcVoidMethod, ProcInst},
@@ -34,15 +33,8 @@ impl ConfigBasicMenuItemSwitchMethods for IronmanMod {
 
 
 pub fn ironman_code_edits(){
-    println!("IronManS");
-    //Code Edits to disable restart/reset/time crystal and forced bookmark if on ironman mode
-    if GameVariableManager::get_bool("G_Ironman") {
-        unsafe { map_history_rewind_disable(None); }
-    }
-    else  {
-        unsafe { map_history_rewind_enable(None); }
-    }
-    println!("IronManE");
+    if GameVariableManager::get_bool("G_Ironman") { unsafe { map_history_rewind_disable(None); } }
+    else  {  unsafe { map_history_rewind_enable(None); } }
 } 
 
 pub fn map_save_proc_edit(map_sequence_human: &ProcInst) {
@@ -93,7 +85,7 @@ fn restart_menu_item_build_attr(restart_item: &BasicMenuItem, _method_info: Opti
     }
 }
 
-fn reset_menu_item_build_attr(reset_item: &BasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute {
+fn reset_menu_item_build_attr(_reset_item: &BasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute {
     if GameVariableManager::get_bool("G_Ironman") { BasicMenuItemAttribute::Hide }
     else { BasicMenuItemAttribute::Enable } 
 }

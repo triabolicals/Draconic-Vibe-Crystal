@@ -24,13 +24,16 @@ pub mod animation;
 pub fn initialize_anim_data() {
     let data = AnimSetDB::get_list().unwrap();
     let wep = ["No", "Sw", "Lc", "Ax", "Bw", "Dg", "Mg", "Rd", "Ft"];
+    let prefixes: HashSet<String> = data.iter().map(|x| x.name.to_string().split_at(6).0.to_string() ).collect();
+
     ACTDATA.get_or_init(||{
         let mut list: Vec<AnimData> = Vec::new();
-        ACT_PRE.iter().for_each(|act|{
-            let set: Vec<_> = data.iter().filter(|x| x.name.to_string().contains(act)).map(|x| x.name.to_string()).collect();
+        prefixes.iter().for_each(|act|{
+            let set: Vec<_> = data.iter().filter(|x| x.name.to_string().contains(act)).map(|x| x.name.to_string() ).collect();
             let mut mask = 0;
 
-            let mut anim = AnimData{ gender: determine_gender_str(act), act_name: act.to_string(), special: 0, mount: determine_mount_str(act), weapon_mask: 0, has_transformation: false, is_generic: false, has_morph: false, suffix: String::new() };
+            let mut anim = 
+                AnimData{ gender: determine_gender_str(act), act_name: act.to_string(), special: 0, mount: determine_mount_str(act), weapon_mask: 0, has_transformation: false, is_generic: false, has_morph: false, suffix: String::new() };
 
             for x in 0..9 {
                 let search = concat_string!(act, "-", wep[x]);
@@ -183,14 +186,18 @@ impl AssetData {
     }
     pub fn add_job(&mut self, job: &JobData) {
         let hash = job.parent.hash;
+        let canon = job.weapon_levels[9] > 1 && job.mask_skills.find_sid("SID_弾丸装備".into()).is_some();
+        let dragonstone = job.weapon_levels[9] > 1 && job.mask_skills.find_sid("SID_弾丸装備".into()).is_none();
         for mode in 1..3 { 
             let mut job_data = JobAssetSets{ 
                 job_hash: hash, 
                 mode: mode, 
-                mound: Mount::None, 
+                mount: Mount::None, 
                 entries: Vec::new(), 
                 unique: false, 
-                dragon_stone: job.weapon_levels[9] > 1 && job.mask_skills.find_sid("SID_弾丸装備".into()).is_none() };
+                cannon: canon,
+                dragon_stone: dragonstone,
+            };
             if job_data.dragon_stone { println!("Class: {} can use DragonStones", engage::mess::Mess::get_name(job.jid)); }
             if get_job_entries(&mut job_data, mode, job.jid) { self.job.push(job_data); }
             else {
@@ -214,7 +221,7 @@ impl AssetData {
         }
     }
     pub fn replace_with_god(&self, result: &mut AssetTableResult, mode: i32, god_index: i32, is_darkness: bool) {
-        let _ = self.god.iter().find(|data| god_index == data.index )
+        let _ = self.god.iter().find(|data| mode == data.mode && god_index == data.index )
             .map(|data|{
                 if let Some(entry) = data.get_entry(is_darkness) {
                     let _ = entry.body_model.map(|body| result.body_model = body);
@@ -333,9 +340,7 @@ impl AssetData {
         }
     }
     pub fn get_gender_condition(&self, gender: i32) -> i32 {
-        if gender == 1 { self.male_index }
-        else if gender == 2 { self.female_index }
-        else { 0 }
+        if gender == 1 { self.male_index } else if gender == 2 { self.female_index } else { 0 }
     }
     pub fn random_aoc(&self, unit: &Unit, result: &mut AssetTableResult, conditions: ConditionFlags) {
         if conditions.contains(ConditionFlags::TikiEngage) { return; }
@@ -348,6 +353,8 @@ impl AssetData {
             result.info_anims = Some(concat_string!("AOC_Info_c", aoc).into());
         }
     }
+    pub fn job_can_use_canon(&self, job_data: &JobData) -> bool { self.job.iter().find(|x| x.job_hash == job_data.parent.hash).map_or_else(|| false, |x| x.cannon) }
+    pub fn job_can_use_dragonstone(&self, job_data: &JobData) -> bool { self.job.iter().find(|x| x.job_hash == job_data.parent.hash).map_or_else(|| false, |x| x.dragon_stone) }
 }
 
 pub struct SearchData {

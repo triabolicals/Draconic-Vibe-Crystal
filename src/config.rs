@@ -218,6 +218,7 @@ pub struct DeploymentConfig {
     pub max_stat_caps: bool,
     pub custom_unit_recruitment_disable: bool,
     pub tile: bool,
+    pub equip_learn_skill: bool,
     pub misc_option_1 : f32,
     pub misc_option_2 : f32,
 }
@@ -312,6 +313,7 @@ impl DeploymentConfig {
             assets: 0,
             custom_unit_recruitment_disable: false,
             tile: false,
+            equip_learn_skill: false,
             max_stat_caps: false,
             misc_option_1 : 0.0,
             misc_option_2 : 1.0,

@@ -38,12 +38,6 @@ pub fn initialize_mess_hashs() {
             vec.insert(format!("MTID_Ring_{}",  RINGS[ x as usize ]), ( 5, x)); // Tile Replacement
             vec.insert(format!("MID_TUT_NAVI_M022_GET_{}",  RINGS[ x as usize ]), ( 6, x)); // "Pick up"
         }
-        let engage_weapons = ENGAGE_ITEMS.lock().unwrap();
-        engage_weapons.item_list.iter().for_each(|w|{
-            if w.mess_emblem != -1 {
-                vec.insert(w.miid.clone(), (7, w.mess_emblem) ); // Emblem Swaps
-            }
-        });
         vec.insert("MID_Hub_Next_Go".to_string(), (8, 0));  // COntinous Mode
         vec.insert("MID_Hub_Next_Go1".to_string(), (8, 1));  // COntinous Mode
         println!("Mess Entries: {}", vec.len());
@@ -98,28 +92,6 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                         let sigurd_text = call_original!(Some("MGID_Ring_Siglud".into()), true, None);
                         let new_emblem = call_original!(Some(concat_string!("MGID_Ring_", RINGS[new_index as usize]).into()), false, None);
                         return replace_string(mock_text, sigurd_text, new_emblem);
-                    }
-                }
-                7 => {
-                    if GameVariableManager::get_bool(DVCVariables::EMBLEM_ITEM_KEY) {
-                        let engage_weapons = ENGAGE_ITEMS.lock().unwrap();
-                        if let Some(found)= engage_weapons.item_list.iter().find(|x| x.miid == mess_label) {
-                            let new_emblem = found.new_emblem;
-                            let old_emblem = found.original_emblem;
-                            let mess_emblem = found.mess_emblem;
-                            if new_emblem == -1 || old_emblem == -1 || new_emblem > 20 || old_emblem > 19 { return result; }
-                            let old_name = if mess_emblem == 25 {
-                                if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 { Mess::get_name(DVCVariables::get_dvc_person(0, true)) }
-                                else { GameVariableManager::get_string(DVCVariables::LUEUR_NAME) }
-                            }
-                            else { call_original!(Some(concat_string!("MGID_", RINGS[ mess_emblem as usize]).into()), false, None) };
-                            let new_name = if new_emblem == 19 {
-                                if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 { Mess::get_name(DVCVariables::get_dvc_person(0, true)) }
-                                else { GameVariableManager::get_string(DVCVariables::LUEUR_NAME) }
-                            }
-                            else { call_original!(Some(concat_string!("MGID_", RINGS[ new_emblem as usize]).into()), false, None) };
-                            return  replace_string(result, old_name, new_name);
-                        }
                     }
                 }
                 8 => {

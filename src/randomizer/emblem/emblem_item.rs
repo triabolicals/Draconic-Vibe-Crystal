@@ -2,66 +2,43 @@ use unity::prelude::*;
 use engage::{
     mess::*,
     random::*,
-    gamedata::{*, item::*, god::*},
+    gamedata::{*, item::*, god::*, skill::SkillData},
     menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}},
     gamevariable::*,
 };
 use std::sync::Mutex;
-use crate::enums::*;
+use crate::{enums::*, randomizer::emblem::EMBLEM_LIST};
 use crate::{DVCVariables, CONFIG};
 
-use super::CUSTOM_EMBLEMS;
 pub static ENGAGE_ITEMS: Mutex<EngageItemList> = Mutex::new(
     EngageItemList{ 
         item_list: Vec::new(), 
         god_items_list: Vec::new(), 
-        custom_god_items_list: Vec::new(),
         engage_weapon: [2, 6, 66, 64, 2, 31, 18, 18, 10, 2, 514, 6, 28, 512, 14, 64, 64, 72, 66, 258, 0], 
         custom_engage_weapon: [0; 20],
     });
 
 pub struct GodStyleItems {
-    pub items: [i32; 27],
+    pub item: [[i32; 9]; 3],
 }
 
 impl GodStyleItems {
-    fn new() -> Self { Self { items: [-1; 27], } }
+    fn new() -> Self { Self { item: [[-1; 9]; 3], } }
 }
 pub struct EngageItem {
     pub item_index: i32,
-    pub god_index: i32,
+    pub replaced_index: i32,
     pub weapon: bool,
     pub is_bow: bool,
-    pub is_first_item: bool,
-    // Stuff for what the Item gets randomized into
-    pub god_can_bow: bool,  
-    pub god_can_weapon: bool,
-    pub replaced_index: i32,
-    pub reverse_index: i32,
-    pub in_used: bool,
-    // Stuff for text replacement
-    pub original_emblem: i32,
-    pub mess_emblem: i32,
-    pub new_emblem: i32,
-    pub miid: String,
 }
 
 impl EngageItem {
-    fn new(itemdata_index: i32, god: i32, not_weapon: bool, bow: bool, first: bool, emblem_index: i32) -> Self {
+    fn new(itemdata_index: i32, not_weapon: bool, bow: bool) -> Self {
         Self {
             item_index: itemdata_index, 
-            god_index: god, 
             weapon: not_weapon, 
             is_bow: bow, 
-            is_first_item: first,
-            god_can_bow: false, god_can_weapon: false, 
-            replaced_index: -1, 
-            reverse_index: -1,
-            in_used: false, 
-            original_emblem: emblem_index,
-            mess_emblem: -1,
-            new_emblem: -1,
-            miid: "".to_string(),
+            replaced_index: 0, 
         }
     }
 }
@@ -69,209 +46,109 @@ impl EngageItem {
 pub struct EngageItemList {
     pub item_list: Vec<EngageItem>,
     pub god_items_list: Vec<GodStyleItems>,
-    pub custom_god_items_list: Vec<GodStyleItems>,
     pub engage_weapon: [i32; 21],
     pub custom_engage_weapon: [i32; 20],
 }
 
 impl EngageItemList {
-    pub fn add_list(&mut self, item: &ItemData, god: i32, is_first: bool, emblem_index: i32) {
-        let index = item.parent.index;
-        if self.item_list.iter_mut().any(|x| x.item_index == index) { return; } // Already in the List
+    pub fn get_weapon_from_god_mut(&mut self, style: usize, god: usize, slot: usize) -> Option<&mut EngageItem> {
+        let index = self.god_items_list[god].item[slot][style];
+        self.item_list.iter_mut().find(|x| x.item_index == index)
+    }
+    pub fn get_god_weapon_mask(&self, index: usize) -> i32  {
+        if index < 20 { self.engage_weapon[index]  } else { self.custom_engage_weapon[index - 20 ] }
+    }
 
+    pub fn add_list(&mut self, item: &ItemData) {
+        let iid = item.iid.to_string();
+        let index = item.parent.index;
+        if item.usetype == 15 || item.usetype >= 36 || item.kind == 9  || item.range_o == 255 || item.icon.is_none() || iid.contains("ディザスタ") || iid.contains("エンゲージ技") { return; }
+        if self.item_list.iter_mut().any(|x| x.item_index == index) { return; } // Already in the List or its an Tiki / Engage Atk only Weapon
         let is_bow = item.kind == 4;
         let weapon = !(item.kind == 7 || item.kind >= 9);
 
-        let mut new_item = EngageItem::new(index, god, weapon, is_bow, is_first, emblem_index);
-        let mess = Mess::get(item.help);
-        new_item.miid = item.help.to_string();
-        for x in 0..RINGS.len() {
-            let mgid = Mess::get(format!("MGID_{}", RINGS[x])).to_string();
-            if mess.contains(mgid) { new_item.mess_emblem = x as i32; }
-        }
-        if new_item.miid.to_string().contains("Lueur") { new_item.mess_emblem = 25; }
+        let mut new_item = EngageItem::new(index, weapon, is_bow);
         self.item_list.push(new_item);
-    }
-    pub fn bow_randomization(&mut self, rng: &Random) {
-        // find all emblems that have astra storm as an engage attack 
-        let s_list = &mut self.item_list;
-        let mut bow_weapons: Vec<(usize,bool)> = Vec::new();    // index, used
-        let mut x = 0;
-        s_list.iter().for_each(|item|{
-            if item.is_bow { bow_weapons.push((x, false)) }
-            x += 1;
-        });
-        let list_size = bow_weapons.len();
-        for x in 0..20 {
-            let god = GodData::get(EMBLEM_GIDS[x]).unwrap();
-            if god.get_engage_attack().to_string().contains("リンエンゲージ技") {
-                if let Some(starting_index) = s_list.iter().position(|r| r.god_index == ( x as i32 ) ) {
-                    let mut index = rng.get_value(list_size as i32) as usize;
-                    while bow_weapons[index].1 { index = rng.get_value(list_size as i32) as usize; }
-                    bow_weapons[index].1 = true;
-                    s_list[starting_index].replaced_index = bow_weapons[index].0 as i32;
-                    s_list[ bow_weapons[index].0 ].in_used = true;
-                    s_list[ bow_weapons[index].0 ].reverse_index = starting_index as i32;
-                    s_list[ bow_weapons[index].0 ].new_emblem = s_list[starting_index].original_emblem
-                }
-                else { println!("No Available Engage Bows for Emblem {}'s Astra Storm", x); }
-            }
-            else if let Some(link_engage_attack) = god.get_engage_attack_link() {
-                if link_engage_attack.to_string().contains("リンエンゲージ技") {
-                    if let Some(starting_index) = s_list.iter().position(|r| r.god_index == ( x as i32 ) && !r.is_first_item) {
-                        let mut index = rng.get_value(list_size as i32) as usize;
-                        while bow_weapons[index].1 { index = rng.get_value(list_size as i32) as usize; }
-                        bow_weapons[index].1 = true;
-                        s_list[starting_index].replaced_index = bow_weapons[index].0 as i32;
-                        s_list[ bow_weapons[index].0 ].in_used = true;
-                        s_list[ bow_weapons[index].0 ].reverse_index = starting_index as i32;
-                        s_list[ bow_weapons[index].0 ].new_emblem = s_list[starting_index].original_emblem;
-                    }
-                    else { println!("No Available Engage Bows for Emblem {}'s Link Astra Storm", x); }
-                }
-            }
-        }
     }
     // Get all engage items from GodGrowthData.LevelData
     pub fn intialize_list(&mut self){
         if self.item_list.len() != 0 { return; }
-        let mut x = 0;
-        GGIDS.iter().for_each(|&ggid|{
-            let mut style = GodStyleItems::new();
-            if x < 20 {
-                if let Some(level_data) = GodGrowthData::get_level_data(ggid) {
-                    for z in 0..9 {
-                        if level_data[0].style_items.items[z].len() >= 1 { style.items[z as usize] = level_data[0].style_items.items[z][0].parent.index; }
-                        if level_data[0].style_items.items[z].len() >= 2 { style.items[9+z as usize] = level_data[0].style_items.items[z][1].parent.index; }
-                        if level_data[0].style_items.items[z].len() >= 3 { style.items[18+z as usize] = level_data[0].style_items.items[z][2].parent.index; }
-                    }
-                    self.god_items_list.push(style);
-                    if x != 13 {
-                        for y in 1..level_data.len() {
-                            let is_first = y < 10;
-                            for z in 0..9 {
-                                if level_data[y].style_items.items[z].len() != 0 {
-                                    for aa in 0..level_data[y].style_items.items[z].len() {
-                                        if x == 9 { //Byleth
-                                            if z < 2 && is_first { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, is_first, x as i32); }
-                                            else { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, false, x as i32); }
-                                        }
-                                        else { self.add_list(&level_data[y].style_items.items[z][aa], x as i32, is_first, x as i32); }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            x += 1;
-        });
-        // Adding Valid Custom Engage Weapons
-        if CUSTOM_EMBLEMS.lock().unwrap()[0] < 1 { return; }
-        println!("Adding Weapons from Custom Emblems");
-        let n_customs = CUSTOM_EMBLEMS.lock().unwrap()[0] as usize;
-        for x in 0..n_customs {
-            let index = CUSTOM_EMBLEMS.lock().unwrap()[x+1];
-            if let Some(level_data) = super::emblem_skill::get_god_level_data_by_index(index) {
+        EMBLEM_LIST.get().unwrap().iter()
+            .flat_map(|&h| GodData::try_get_hash_mut(h))
+            .flat_map(|god| god.get_level_data())
+            .enumerate()
+            .for_each(|(god, level_data)|{
                 let mut style = GodStyleItems::new();
-                for z in 0..9 {
-                    if level_data[0].style_items.items[z].len() >= 1 { style.items[z as usize] = level_data[0].style_items.items[z][0].parent.index; }
-                    if level_data[0].style_items.items[z].len() >= 2 { style.items[9+z as usize] = level_data[0].style_items.items[z][1].parent.index; }
-                    if level_data[0].style_items.items[z].len() >= 3 { style.items[18+z as usize] = level_data[0].style_items.items[z][2].parent.index; }
+                level_data[0].style_items.iter().enumerate().for_each(|(s, list)|{
+                    let mut item_iter = list.iter();
+                    style.item[0][s] = item_iter.next().map_or(0, |item| item.parent.index); // 1st Engage Weapon 
+                    style.item[1][s] = item_iter.next().map_or(0, |item| item.parent.index); // 2nd Engage Weapon
+                    style.item[2][s] = item_iter.next().map_or(0, |item| item.parent.index); // 3rd Engage Weapon
+                });
+                self.god_items_list.push(style);
+            }
+        );
+        ItemData::get_list().unwrap().iter().filter(|item| item.flag.value & 128 == 128 ).for_each(|item| self.add_list(item));
+        self.item_list.iter_mut().for_each(|x| x.replaced_index = 0);
+    }
+    pub fn randomize_list(&mut self, list: &Vec<&mut GodData>, rng: &Random){
+        let s_list = &mut self.item_list;
+        let mut avail_weapons: Vec<_> = s_list.iter().map(|x| (x.item_index, x.weapon, x.is_bow)).collect();
+        let mut engage_bows: Vec<_> = s_list.iter().filter(|x| x.is_bow).map(|x| x.item_index).collect();
+    
+        // Change 1st Engage Weapon to match Engage Attack
+        // Astra Storm Bow Randomization
+        list.iter()
+            .enumerate()
+            .for_each(|(god, data)|{
+                let astra_storm_slot = if data.engage_attack.is_some_and(|atk| atk.to_string().contains("リンエンゲージ技")) { 0 }
+                else if data.engage_attack_link.is_some_and(|atk| atk.to_string().contains("リンエンゲージ技")) && god != 13 { 1 }
+                else { 3 };
+                if astra_storm_slot < 3 {
+                    let index = rng.get_value(engage_bows.len() as i32) as usize;
+                    let bow_index = engage_bows.get(index).map_or(0, |v| *v);
+                    for style in 0..9{
+                        if let Some(original_item) = self.get_weapon_from_god_mut(style, god, astra_storm_slot) {
+                            original_item.replaced_index = bow_index;
+                        }
+                    }
+                    let _ = avail_weapons.iter().position(|x| x.0 == bow_index).map(|pos| avail_weapons.remove(pos));
                 }
-                self.custom_god_items_list.push(style);
-                for y in 1..level_data.len() {
-                    let is_first = y < 10;
-                    for z in 0..9 {
-                        if level_data[y].style_items.items[z].len() != 0 {
-                            for aa in 0..level_data[y].style_items.items[z].len() {
-                                self.add_list(&level_data[y].style_items.items[z][aa], 30 + x as i32, is_first, 30 + x as i32); 
+            }
+        );
+        list.iter()
+            .enumerate()
+            .for_each(|(god, data)|{
+                for slot in 0..3  {
+                    if god != 13 { // Not Tiki
+                        let non_weapons = can_equip_non_weapons(data);
+                        let can_bow = can_engage_bow(data);
+                        let selection: Vec<_> = avail_weapons.iter().filter(|x| ( slot == 0 && ( x.1 == !non_weapons || non_weapons) || ( x.2 == can_bow || can_bow ) ) || slot != 0 )
+                            .map(|x| x.0).collect();
+                        for style in 0..9 {
+                            if let Some(original_item) = self.get_weapon_from_god_mut(style, god, slot) {
+                                if original_item.replaced_index < 1 { original_item.replaced_index = selection.get(rng.get_value(selection.len() as i32) as usize).map_or(0, |v| *v); }
                             }
                         }
+                        let replacement_item_index  = self.get_weapon_from_god_mut(0, god, slot).map_or(0, |f| f.replaced_index);
+                        // Remove Only the 1st Style Item 
+                        let _ = avail_weapons.iter().position(|x| x.0 == replacement_item_index).map(|pos| avail_weapons.remove(pos));
                     }
                 }
             }
-        }
-    }
-    pub fn randomize_list(&mut self, rng: &Random){
-        let list_size = self.item_list.len() as i32;
-        for x in 0..20 {
-            if x == 13 { continue; }      // ignore Tiki
-            let god = GodData::get(EMBLEM_GIDS[x]).unwrap();
-            let can_bow: bool;
-            let non_weapons: bool;
-            if god.get_engage_attack_link().is_some() {
-                can_bow = can_engage_bow(&god.get_engage_attack().to_string()) && can_engage_bow(&god.get_engage_attack_link().unwrap().to_string());
-                non_weapons = can_equip_non_weapons(&god.get_engage_attack().to_string()) && can_equip_non_weapons(&god.get_engage_attack_link().unwrap().to_string());
-            }
-            else {
-                can_bow = can_engage_bow(&god.get_engage_attack().to_string());
-                non_weapons = can_equip_non_weapons(&god.get_engage_attack().to_string());
-            }
-            for y in 0..list_size {
-                if  self.item_list[y as usize].god_index < x.try_into().unwrap() { continue; }
-                else if  self.item_list[y as usize].god_index > x.try_into().unwrap() { break; }
-                self.item_list[y as usize].god_can_bow = can_bow;
-                self.item_list[y as usize].god_can_weapon = non_weapons;
-            }
-        }
-        self.bow_randomization(rng);
-        let s_list = &mut self.item_list;
-        for x in 0..list_size {
-            let mut index = rng.get_value(list_size) as usize;
-            //Randomization of Engage Items
-            let mut count = 0;
-            if s_list[x as usize].replaced_index != -1 { 
-                //println!("Engage Item Swap: {} to {}, {} -> {}", x, 
-                //    index, Mess::get(item_list[ s_list[x as usize].item_index as usize].name).to_string(), 
-                //    Mess::get(item_list[ s_list[index].item_index as usize].name).to_string() );
-                continue; 
-            } //Already Randomized
-            loop {
-                count += 1;
-                if count == 100 { break;}
-                if s_list[index].in_used { index = rng.get_value(list_size) as usize; continue; }
-                if s_list[index].is_bow && !s_list[x as usize].god_can_bow { 
-                    // If not the first engage item, then able to use a bow
-                    if !s_list[x as usize].is_first_item { break; }
-                    else { index = rng.get_value(list_size) as usize;  continue;  }
-                }
-                if s_list[index].is_bow && s_list[x as usize].god_can_bow { break; }
-                if !s_list[index].weapon {
-                    if s_list[x as usize].is_first_item { index = rng.get_value(list_size) as usize; continue; }
-                    else if s_list[x as usize].god_can_weapon { break; }
-                }
-                if s_list[index].weapon { break;}
-                index = rng.get_value(list_size) as usize;
-            }
-           // println!("Engage Item Swap: {} to {}, {} -> {}", x, index, 
-            //    Mess::get(item_list[ s_list[x as usize].item_index as usize].name).to_string(),
-           //     Mess::get(item_list[ s_list[index].item_index as usize].name).to_string() );
-            s_list[x as usize].replaced_index = index as i32;
-            s_list[index].in_used = true;
-            s_list[index].reverse_index = x as i32;
-            s_list[index].new_emblem = s_list[x as usize].original_emblem;
-        }
+        );
     }
     pub fn reset(&mut self){
-        let s_list = &mut self.item_list;
-        let list_size = s_list.len();
-        for x in 0..list_size {
-            s_list[x as usize].in_used = false; 
-            s_list[x as usize].replaced_index = -1;
-            s_list[x as usize].reverse_index = -1;
-        }
+        self.item_list.iter_mut().for_each(|x| x.replaced_index = 0);
         self.engage_weapon = [2, 6, 66, 64, 2, 31, 18, 18, 10, 2, 514, 6, 28, 512, 14, 64, 64, 72, 66, 258, 0];
         self.custom_engage_weapon = [0; 20];
     }
-    pub fn get_replacement(&self, item_index: i32) -> &'static ItemData {
+    pub fn get_replacement(&self, item_index: i32) -> &'static mut ItemData {
         if let Some(found) = self.item_list.iter().find(|x| x.item_index == item_index) {
-            let new_index = found.replaced_index;
-            if new_index == -1 { return ItemData::try_index_get(item_index).unwrap();  }
-            let new_item_index = self.item_list[new_index as usize].item_index;
-            return ItemData::try_index_get(new_item_index).unwrap(); 
+            let index = if found.replaced_index <= 3 { found.item_index } else {  found.replaced_index };
+            ItemData::try_index_get_mut(index)
         }
-        else { return ItemData::try_index_get(item_index).unwrap(); }
+        else { ItemData::try_index_get_mut(item_index) }.unwrap()
     }
     pub fn get_replacement_iid(&self, iid: &'static Il2CppString) -> &'static Il2CppString {
         if let Some(item) = ItemData::get(iid) {
@@ -284,83 +161,38 @@ impl EngageItemList {
     pub fn add_weapon_flag(&mut self, god_index: i32, item: &ItemData){
         if item.kind == 0 { return; }
         if item.kind == 7 || item.kind >= 9 { return; }
-        if god_index < 30 {
-            self.engage_weapon[god_index as usize] = self.engage_weapon[god_index as usize] | ( 1 << item.kind );
+        if god_index < 20 {
+            self.engage_weapon[god_index as usize] |= ( 1 << item.kind );
         }
         else {
-            let index = god_index - 30;
-            self.custom_engage_weapon[index as usize] = self.custom_engage_weapon[index as usize] | ( 1 << item.kind );
+            let index = god_index - 20;
+            self.custom_engage_weapon[index as usize] |= ( 1 << item.kind );
         }
     }
     pub fn commit(&mut self){
-        for x in 0..20 {
-            if x == 13 { 
-                self.engage_weapon[13] = 512;
-                continue; 
-            }
-            self.engage_weapon[x as usize] = 0;
-            let level_data = GodGrowthData::get_level_data(GGIDS[x]).unwrap();
-            level_data.iter_mut().for_each(|level|level.style_items.clear());
-             //clearing the list
-            for z in 0..9 {
-                let index = self.god_items_list[x as usize].items[z as usize];
-                if index != -1 {
-                    let item = self.get_replacement(index);
-                    for y in 0..level_data.len() { level_data[y].style_items.add_item(z, item); }
-                    self.add_weapon_flag(x as i32, item);
-                }
-                let index2 = self.god_items_list[x as usize].items[9+z as usize];
-                if index2 != -1 {
-                    let item2 = self.get_replacement(index2);
-                    for y in 10..level_data.len() { level_data[y].style_items.add_item(z, item2); }
-                    level_data[0].style_items.add_item(z, item2);
-                    self.add_weapon_flag(x as i32, item2);
-                }
-                let index_3 = self.god_items_list[x as usize].items[18+z as usize];
-                if index_3 != -1 {
-                    let item3 = self.get_replacement(index_3);
-                    for y in 15..level_data.len() { level_data[y].style_items.add_item(z, item3); }
-                    level_data[0].style_items.add_item(z, item3);
-                    self.add_weapon_flag(x as i32, item3);
+        EMBLEM_LIST.get().unwrap().iter()
+            .flat_map(|&h| GodData::try_get_hash_mut(h))
+            .flat_map(|god| god.get_level_data())
+            .enumerate()
+            .for_each(|(god, level_data)|{
+                if god == 13 {  self.engage_weapon[13] = 512; }
+                else {
+                    if  god < 20 { self.engage_weapon[god] = 0; } else { self.custom_engage_weapon[god - 20] = 0; }
+                    level_data.iter_mut()
+                        .flat_map(|level| level.style_items.items.iter_mut())
+                        .flat_map(|list| list.iter_mut())
+                        .for_each(|item|{
+                            *item = self.get_replacement(item.parent.index);
+                            self.add_weapon_flag(god as i32, item);
+                        }
+                    );
                 }
             }
-        }
-        if CUSTOM_EMBLEMS.lock().unwrap()[0] < 1 { return; }
-        println!("Randomizing Custom Engage Weapons");
-        let n_customs = CUSTOM_EMBLEMS.lock().unwrap()[0] as usize;
-        let mut custom_god_index = -1;
-        for x in 0..n_customs {
-            let index = CUSTOM_EMBLEMS.lock().unwrap()[x+1];
-            if let Some(level_data) = super::emblem_skill::get_god_level_data_by_index(index) {
-                custom_god_index += 1; 
-                level_data.iter_mut().for_each(|level|level.style_items.clear());
-                for z in 0..9 {
-                    let index = self.custom_god_items_list[custom_god_index as usize].items[z as usize];
-                    if index != -1 {
-                        let item = self.get_replacement(index);
-                        for y in 0..level_data.len() { level_data[y].style_items.add_item(z, item); }
-                        self.add_weapon_flag(30 + x as i32, item);
-                    }
-                    let index2 = self.custom_god_items_list[custom_god_index as usize].items[9+z as usize];
-                    if index2 != -1 {
-                        let item2 = self.get_replacement(index2);
-                        for y in 10..level_data.len() { level_data[y].style_items.add_item(z, item2); }
-                        level_data[0].style_items.add_item(z, item2);
-                        self.add_weapon_flag(30 + x as i32, item2);
-                    }
-                    let index_3 = self.custom_god_items_list[custom_god_index as usize].items[18+z as usize];
-                    if index_3 != -1 {
-                        let item3 = self.get_replacement(index_3);
-                        for y in 15..level_data.len() { level_data[y].style_items.add_item(z, item3); }
-                        level_data[0].style_items.add_item(z, item3);
-                        self.add_weapon_flag(30 + x as i32, item3);
-                    }
-                }
-            }
-        }
+        );
     }
     pub fn print(&self, emblem: i32, level: i32) -> String {
         let mut out = "".to_string();
+        /* 
         let mut unique_items: Vec<(i32,i32)> = Vec::new();
         let start;
         let end;
@@ -368,7 +200,7 @@ impl EngageItemList {
         else if level == 1 { start = 9; end = 18; }
         else { start = 18; end = 27; }
         for i in start..end {
-            let item_i = self.god_items_list[emblem as usize].items[i as usize];
+            let item_i = self.god_items_list[emblem as usize].item[i as usize];
             if unique_items.iter().find(|x| item_i == x.0).is_none() {
                 unique_items.push( (item_i, i % 9) );
             }
@@ -382,29 +214,20 @@ impl EngageItemList {
                 out = format!("{} {} ({})", out, Mess::get(item.name).to_string(), style_name);
             }
         }
+        */
         return out;
     }
 }
 
-pub fn can_engage_bow(engage_atk: &String) -> bool {
-    if let Some(pos) = EMBLEM_ASSET.iter().position(|emblem| engage_atk.contains(emblem)) {
-        match pos {
-            0|1|4|6|8|11|14|17|18|19 => { return false; }
-            _ => { return true; }
-        }
+pub fn can_engage_bow(god: &GodData) -> bool { engage_atk_can_use_bow(god.engage_attack) && engage_atk_can_use_bow(god.engage_attack_link) }
+pub fn can_equip_non_weapons(god: &GodData) -> bool { engage_atk_can_equip_non_weapons(god.engage_attack) && engage_atk_can_equip_non_weapons(god.engage_attack_link) }
 
-    }
-    return true;
+pub fn engage_atk_can_use_bow(engage_atk: Option<&Il2CppString>) -> bool {
+    engage_atk.map_or_else(||true, |atk|SkillData::get(atk).map_or(true, |engage| engage.weapon_prohibit.value & 32 != 0 || engage.weapon_prohibit.value == 0))
 }
-pub fn can_equip_non_weapons(engage_atk: &String) -> bool {
-    if let Some(pos) = EMBLEM_ASSET.iter().position(|emblem| engage_atk.contains(emblem)) {
-        match pos {
-            2|3|5|9|10|12|13|15|16 => { return true; }
-            _ => { return false; }
-        }
 
-    }
-    return true;    //Three Houses
+pub fn engage_atk_can_equip_non_weapons(engage_atk: Option<&Il2CppString>) -> bool {
+    engage_atk.map_or_else(||true, |atk| SkillData::get(atk).map_or(true, |engage| engage.weapon_prohibit.value == 0))
 }
 
 pub fn randomized_emblem_apts() {
@@ -412,19 +235,12 @@ pub fn randomized_emblem_apts() {
     let mode = GameVariableManager::get_number(DVCVariables::WEAPON_PROF_KEY);
     if mode == 0  { return; }
     let rng = crate::utils::get_rng();
-    EMBLEM_GIDS.iter().for_each(|gid|{
-        randomize_god_apts(GodData::get(gid).unwrap(), mode, rng);
-    });
-    if CUSTOM_EMBLEMS.lock().unwrap()[0] < 1 { return; }
-    let god_list = GodData::get_list().unwrap();
-    println!("Adding Weapons from Custom Emblems");
-    let n_customs = CUSTOM_EMBLEMS.lock().unwrap()[0] as usize;
-    for x in 0..n_customs {
-        let index = CUSTOM_EMBLEMS.lock().unwrap()[x+1] as usize;
-        if index >= god_list.len() { continue; }
-        let god = &god_list[index];
-        randomize_god_apts(god, mode, rng);
-    }
+    EMBLEM_LIST.get().unwrap().iter()
+        .flat_map(|&h| GodData::try_get_hash_mut(h))
+        .for_each(|god|{ 
+            randomize_god_apts(god, mode, rng); 
+        }
+    );
     let _ = crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.emblem_apt_randomized = true);
 }
 

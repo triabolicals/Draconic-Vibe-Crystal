@@ -163,7 +163,7 @@ pub fn auto_level_unit_for_random_map(unit: &mut Unit, leader: bool){
     let map_sit_level = get_instance::<MapSituation>().average_level;
     if map_sit_level > level { level = (map_sit_level + level + 1) / 2; }
     let current_job = &unit.job;
-    let is_special = current_job.max_level > 20 && current_job.is_low();
+    // let is_special = current_job.max_level > 20 && current_job.is_low();
 
     if level <= current_job.max_level as i32 {
         let job_len = current_job.get_low_jobs().len();

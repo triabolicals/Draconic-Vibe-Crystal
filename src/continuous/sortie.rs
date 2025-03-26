@@ -19,12 +19,11 @@ pub fn sortie_continious_menu_install() {
         let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
         menu_mut.get_virtual_method_mut("GetMapAttribute").map(|method| method.method_ptr = sortie_top_menu_back_get_map_attr as _);
     }
-    sortie_top_menu_class.get_nested_types().iter()
-        .for_each(|class|{
-            let menu_mut = Il2CppClass::from_il2cpptype(class.get_type()).unwrap();
+    if let Some(cc) = sortie_top_menu_class.get_nested_types().iter()
+        .find(|x| x.get_name() == "SortieTopMenuBase"){
+            let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
             menu_mut.get_virtual_method_mut("BCall").map(|method| method.method_ptr = sortie_top_menu_base_b_call as _);
         }
-    );
 }
 
 #[skyline::from_offset(0x01d76320)]

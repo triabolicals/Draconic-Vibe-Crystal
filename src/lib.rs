@@ -1,8 +1,9 @@
 #![feature(ptr_sub_ptr)]
 use cobapi::{Event, SystemEvent};
+use unity::prelude::OptionalMethod;
 use std::sync::{Mutex, LazyLock};
 use crate::config::*;
-
+use skyline::patching::Patch;
 pub mod config;
 pub mod randomizer;
 pub mod utils;
@@ -17,9 +18,10 @@ pub mod talk;
 pub mod events;
 pub mod script;
 pub mod misc;
+pub mod assets;
 
 pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| DeploymentConfig::new().into() );
-pub const VERSION: &str = "2.10.8";
+pub const VERSION: &str = "2.11.0";
 
 extern "C" fn event_install(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
@@ -59,19 +61,20 @@ pub fn main() {
     randomizer::intialize_added_data();
     cobapi::install_lua_command_registerer(randomizer::map::register_script_commands);
     CONFIG.lock().unwrap().save();
+    assets::get_accessory_count();
     skyline::install_hooks!( 
-        randomizer::job::add_job_list_unit, 
+        randomizer::job::reclass::add_job_list_unit, 
         randomizer::try_get_index, 
         deployment::create_player_team, 
         script::script_get_string,
         randomizer::item::random_well_item,
         randomizer::person::unit::unit_create_impl_2_hook, 
-        // randomizer::person::unit::create_from_dispos_hook,
-        randomizer::assets::asset_table_result_setup_hook,
-        randomizer::assets::emblem::asset_table_result_god_setup,
-        randomizer::assets::emblem::asset_table_robin_hook,
+        assets::asset_table_result_setup_hook,
+        assets::emblem::asset_table_result_god_setup,
+        assets::emblem::asset_table_robin_hook,
         script::event_sequence_map_opening_hook,
-        randomizer::assets::transform::change_dragon2,
+        assets::transform::change_dragon2,
+        assets::transform::tranformation_chain_atk,
         randomizer::emblem::arena_emblem_weapon,
         randomizer::bgm::special_bgm_hook,
         talk::get_cmd_info_from_cmd_lines_hook,
@@ -82,13 +85,13 @@ pub fn main() {
         randomizer::person::get_thumb_face,
         randomizer::person::get_god_face,
         randomizer::person::get_god_thumb_face,
-        randomizer::assets::emblem::asset_table_result_get_preset_name,
+        assets::emblem::asset_table_result_get_preset_name,
         talk::talk_ptr,
         talk::calculate_str_width,
         randomizer::skill::learn::unit_learn_job_skill_hook,
         randomizer::skill::learn::class_change_job_menu_content_hook,
     ); 
-
+    Patch::in_text(0x01bb272c).nop().unwrap(); // AssetTableResult Setup Prevents Commit
     crate::misc::code_patches();
     menus::install_vibe();
     std::panic::set_hook(Box::new(|info| {

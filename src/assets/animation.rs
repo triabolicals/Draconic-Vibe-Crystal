@@ -1,6 +1,7 @@
 use super::{accessory::*, data::{job::Mount, *}};
 use concat_string::concat_string;
 use transform::has_enemy_tiki;
+use engage::mapmind::MapMind;
 use super::*;
 
 pub const MONSTERS: [&str; 8] = ["JID_幻影飛竜", "JID_異形飛竜", "JID_幻影狼", "JID_異形狼",  "JID_E006ラスボス", "JID_幻影竜", "JID_異形竜", "JID_邪竜"];
@@ -41,10 +42,10 @@ pub fn fix_common_male_swords() {
 pub fn set_class_animations(result: &mut AssetTableResult, job: &JobData, item: Option<&ItemData>, unit: &Unit, mode: i32, conditions: ConditionFlags) {
     let kind = item.map_or_else(||0, |i| i.get_kind());
     let gen = unit.get_dress_gender();
-    let gen_str = if gen == Gender::Male { "M" } else { "F" };
+    let gen_str = if conditions.contains(ConditionFlags::Male) { "M" } else { "F" };
     let is_morph = unit.person.aid.is_some_and(|aid| aid.to_string() == "AID_異形兵");
-    if unit.person.gender == 0 || unit.person.get_bmap_size() > 1 || unit.person.parent.index == 0{ return; }
-    if unit.status.value & 8388608 != 0 {
+    if unit.person.gender == 0 || unit.person.get_bmap_size() > 1 || unit.person.parent.index == 0 { return; }
+    if conditions.contains(ConditionFlags::Engaged) && ( conditions.contains(ConditionFlags::Male) ||  conditions.contains(ConditionFlags::Female) ) {
         remove_mounts_accs(result);
         if !is_tiki_engage(result) {
             if mode == 2 {
@@ -57,29 +58,35 @@ pub fn set_class_animations(result: &mut AssetTableResult, job: &JobData, item: 
                     "重装スタイル" => { result.body_anims.add(Il2CppString::new_static(concat_string!("Enh0A",  gen_str, "-", WEP_PRE[kind as usize], "1_c000_N"))); }  // Armor
                     _ => { result.body_anims.add(Il2CppString::new_static(concat_string!("Enb0A",  gen_str, "-", WEP_PRE[kind as usize], "1_c000_N"))); }   // Backup
                 }
-
             }
             else { 
                 result.body_anims.add(Il2CppString::new_static(concat_string!("UAS_Enb0A",  gen_str)));
                 result.body_anim = Some(concat_string!("UAS_Enb0A", gen_str).into()); 
             }
-            if kind == 9 && unit.job.parent.hash == 1398652429 {
-                if mode == 2 { result.body_anims.add(Il2CppString::new_static(concat_string!("Enh0A", gen_str, "-Mg2_c000_M"))); }
-                else {
-                    let body = concat_string!("UAS_Enh2A", gen_str);
-                    result.body_anims.add(Il2CppString::new_static(body.as_str()));
-                    result.body_anim = Some(body.into());
-
+            if kind == 9 {
+                if SEARCH_LIST.get().unwrap().job_can_use_canon(job) {
+                    if mode == 2 { result.body_anims.add(Il2CppString::new_static(concat_string!("Enh0A", gen_str, "-Mg2_c000_M"))); }
+                    else {
+                        let body = concat_string!("UAS_Enh2A", gen_str);
+                        result.body_anims.add(Il2CppString::new_static(body.as_str()));
+                        result.body_anim = Some(body.into());
+                    }
+                }
+                else if SEARCH_LIST.get().unwrap().job_can_use_dragonstone(job) {
+                    if mode == 2 {
+                        result.right_hand = "null".into();
+                        if conditions.contains(ConditionFlags::Male)  { result.body_anims.add(Il2CppString::new_static("End0AM-No2_c049_N")); }
+                        else { result.body_anims.add(Il2CppString::new_static("End0AF-No2_c099_N"));}
+                    }
                 }
             }
         }
-        return;
     }
     else {
         let job_hash = job.parent.hash; 
         let search_lists = SEARCH_LIST.get().unwrap();
         if conditions.contains(ConditionFlags::Generic) && 
-            job.parent.index > 25 && search_lists.job.iter().find(|a| a.job_hash == job_hash && mode == a.mode).is_some_and(|a| !a.unique || a.mound == Mount::Pegasus) {
+            job.parent.index > 25 && search_lists.job.iter().find(|a| a.job_hash == job_hash && mode == a.mode).is_some_and(|a| !a.unique || a.mount == Mount::Pegasus) {
                 // Generic in a Generic Class
                 return;
             }
@@ -87,7 +94,7 @@ pub fn set_class_animations(result: &mut AssetTableResult, job: &JobData, item: 
             println!("Found Class: {} for {} (Unique?: {})", Mess::get_name(job.jid), Mess::get_name(unit.person.pid), data.unique);
             result.body_anims.clear();
             if mode == 1 {
-                match data.mound {
+                match data.mount {
                     Mount::None => { result.body_anims.add(Il2CppString::new_static(concat_string!("UAS_oBody_A", gen_str))); }
                     Mount::Cav | Mount::Wolf => { result.body_anims.add(Il2CppString::new_static(concat_string!("UAS_oBody_B", gen_str))); }
                     Mount::Pegasus | Mount::Griffin | Mount::Wyvern => { result.body_anims.add(Il2CppString::new_static(concat_string!("UAS_oBody_F", gen_str))); }
@@ -96,7 +103,7 @@ pub fn set_class_animations(result: &mut AssetTableResult, job: &JobData, item: 
             else {
                 result.body_anims.add(Il2CppString::new_static(concat_string!("Com0A", gen_str, "-No1_c000_N"))); 
                 result.body_anims.add(Il2CppString::new_static(concat_string!("Com0A", gen_str, "-", WEP_PRE[kind as usize], "1_c000_N"))); 
-                match data.mound {
+                match data.mount {
                     Mount::Cav | Mount::Wolf => {
                         match kind {
                             0|1|2|3|7 => { result.body_anims.add(Il2CppString::new_static(concat_string!("Com0B",  gen_str, "-", WEP_PRE[kind as usize], "1_c000_N"))); }
@@ -108,21 +115,26 @@ pub fn set_class_animations(result: &mut AssetTableResult, job: &JobData, item: 
                 }
             }
             data.get_body_anims(result, kind, gen, is_morph);
-            if kind == 9 && mode == 2 {         
+            if kind == 9 { 
+                remove_mounts_accs(result);    
                 if data.dragon_stone {  //DragonStone
                     result.right_hand = "null".into();
                     if conditions.contains(ConditionFlags::Female) { result.body_anims.add(Il2CppString::new_static("Sds0AF-No2_c099_N"));  }
                     else { result.body_anims.add(Il2CppString::new_static("Sds0AM-No2_c049_N")); }
                 }
-                else {  // Bullet
-                    result.right_hand = "uWep_Mg28".into();
-                    result.body_anims.add(Il2CppString::new_static(concat_string!("Mcn3A", gen_str, "-Mg2_c000_M"))); 
+                else if data.cannon {
+                    if mode == 2 {  // Bullet
+                        result.right_hand = "uWep_Mg28".into();
+                        result.body_anims.add(Il2CppString::new_static(concat_string!("Mcn3A", gen_str, "-Mg2_c000_M"))); 
+                    }
+                    else {
+                        result.right_hand = "oWep_Mg28".into();
+                        result.body_anim = Some(concat_string!("UAS_Mcn3A", gen_str).into());
+                    }
                 }
-                remove_mounts_accs(result);
             }
-            if kind == 4 || kind == 6 { change_accessory(result.accessory_list, "null", "l_shld_loc");  }
-            if dismount(data.mound, gen, kind) { remove_mounts_accs(result); }
-
+            if kind == 4 || kind == 6 { change_accessory(result.accessory_list, "null", "l_shld_loc");  }   // Remove Shield for Bows / Tome
+            if dismount(data.mount, gen, kind) { remove_mounts_accs(result); }
         }
     }
     if conditions.contains(ConditionFlags::Transforming) { edit_result_for_monster_trans(result, unit, item, mode);}
@@ -180,20 +192,16 @@ pub fn change_hair_change(unit: &Unit, result: &mut AssetTableResult) {
 
 pub fn adjust_engaging_animations(result: &mut AssetTableResult, unit: &Unit) {
     if unit.person.get_asset_force() == 0 {
-        result.body_anims.clear();
-        if ASSET_STATUS.try_read().unwrap().engaging_count == 0 {
-            result.body_anims.add(Il2CppString::new_static( if unit_dress_gender(unit) == 1 { "Tsf0AM-No1_c001_N "} else { "Tsf0AF-No1_c051_N" } ));
-            let _ = ASSET_STATUS.try_write().map(|mut lock| lock.engaging_count = 1);
-        }
-        else {
+        if  MapMind::get_target_unit().is_some_and(|target| unit.person.parent.index == target.person.parent.index) {
+            result.body_anims.clear();
             result.body_anims.add(Il2CppString::new_static( if unit_dress_gender(unit) == 1 { "Com0AM-No1_c000_N"} else {  "Com0AF-No1_c000_N" } ));
-            let _ = ASSET_STATUS.try_write().map(|mut lock| lock.engaging_count = 0);
+        }
+        else if MapMind::get_target_unit().is_some() {
+            result.body_anims.clear();
+            result.body_anims.add(Il2CppString::new_static( if unit_dress_gender(unit) == 1 { "Tsf0AM-No1_c001_N "} else { "Tsf0AF-No1_c051_N" } ));
         }
     }
-    else { 
-        let _ = ASSET_STATUS.try_write().map(|mut lock| lock.engaging_count = 0);
-        emblem::random_engage_voice(result); 
-    }
+    else {  emblem::random_engage_voice(result);   }
 }
 
 
@@ -297,6 +305,23 @@ pub fn replace_body_anim_for_transformation(result: &mut AssetTableResult, mode:
         if gender == 1 { result.body_anims.add( Il2CppString::new_static("Sds0AM-No2_c049_N")); }
         else {  result.body_anims.add( Il2CppString::new_static("Sds0AF-No2_c099_N")); }
     }
+}
+
+pub fn lueur_engage_atk(result: &mut AssetTableResult, unit: &Unit, flags: ConditionFlags) {
+    let mut gen_str = if flags.contains(ConditionFlags::Male) { "M" } else { "F"};
+    remove_mounts_accs(result);
+    if is_tiki_engage(result) {
+        SEARCH_LIST.get().unwrap().replace_with_god(result, 2, 13, false);
+        gen_str = "F";
+    }
+    if let Some(god) = unit.god_link.or(unit.god_unit) {
+        result.body_anims.clear();
+        if god.child.is_none() { result.body_anims.add(Il2CppString::new_static(concat_string!("Ler1A",gen_str,"-Sw1_c000_N"))); }
+        else if flags.contains(ConditionFlags::EngageAttackComboMain){ result.body_anims.add(Il2CppString::new_static(concat_string!("Ler2A", gen_str,"-Sw1_c000_N"))); }
+        else { result.body_anims.add(Il2CppString::new_static(concat_string!("Ler2A", gen_str,"-Sw1_p000_N")));  }
+        return;
+    }
+
 }
 
 #[skyline::from_offset(0x01bafdd0)]

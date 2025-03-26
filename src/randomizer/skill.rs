@@ -42,7 +42,6 @@ fn add_skill_to_pool(skill: &SkillData) {
         SYNCHO_RANDOM_LIST.lock().unwrap().add_list(skill, false); // Chaos Skills
         if MADDENING_BLACK_LIST.iter().find(|lol| **lol == skill.sid.to_string() ).is_none() {
             MADDENING_POOL.lock().unwrap().push(index);
-            ENGAGE_SKILLS_CHAOS.lock().unwrap().push(SkillIndex::new(index));
         }
     }
 }
@@ -135,6 +134,8 @@ pub fn create_skill_pool() {
     skill_list.iter().for_each(|skill| add_skill_to_pool(skill));
   //  }
     SYNCHO_RANDOM_LIST.lock().unwrap().add_by_sid("SID_超越_闇", true, false); 
+    ENGAGE_SKILLS_CHAOS.get_or_init(|| MADDENING_POOL.lock().unwrap().iter().map(|x| *x).collect());
+
     println!("Total Maddening Skills in Pool: {}",  MADDENING_POOL.lock().unwrap().len());
     println!("Total Skills in Pool: {}", SKILL_POOL.lock().unwrap().len());
     create_emblem_skill_pool();
@@ -525,10 +526,7 @@ fn change_personal_sid(person: &mut PersonData, skill: &SkillData) {
             format!("Person #{}: {} doesn't have skills!", person.parent.index, Mess::get_name(person.pid)).as_str()
         );
 
-    if let Some(sid) = personal_sid.iter_mut().find(|sid|{
-        if let Some(skill2) = SkillData::get(sid.to_string()) { skill2.get_flag() & 1 == 0 }
-        else { false }
-    }){
+    if let Some(sid) = personal_sid.iter_mut().find(|sid| SkillData::get(sid.to_string()).is_some_and(|s| s.flag & 1 == 0)){
         person.get_common_skills().replace_sid(sid, skill);
         person.get_normal_skills().replace_sid(sid, skill);
         person.get_hard_skills().replace_sid(sid, skill);

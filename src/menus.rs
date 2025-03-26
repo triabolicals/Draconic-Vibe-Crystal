@@ -37,8 +37,9 @@ fn add_dvc_menu_options(config_menu: &mut ConfigMenu<ConfigBasicMenuItem>){
     config_menu.add_item(randomizer::terrain::menu::vibe_fow());
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<autolevel::menu::AutolevelMod>("Level Scale Units")); 
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::bgm::RandomBGMMod>("Map BGM Setting")); 
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::assets::accessory::RandomAssets>("Random Assets"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::assets::accessory::RandomAssets>("Random Assets"));
     config_menu.add_item(randomizer::map::vibe_tile());
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::learn::EquipLearnSkill>("Equip Class Learn Skills"));
 }
 
 pub struct TriabolicalMenu;
@@ -88,6 +89,7 @@ pub fn install_vibe() {
     cobapi::install_global_game_setting(global::vibe_enable);
     cobapi::install_global_game_setting(global::vibe_post_save);
     cobapi::install_global_game_setting(vibe); 
+    cobapi::install_global_game_setting(randomizer::skill::learn::vibe_equip_job_learn_skills);
     cobapi::install_game_setting(ingame::vibe2);
 }
 
@@ -105,7 +107,7 @@ pub fn menu_calls_install() {
 
     if let Some(cc) = Il2CppClass::from_name("App", "ClassChangeJobMenu").unwrap().get_nested_types().iter().find(|x| x.get_name() == "ClassChangeJobMenuItem"){
         let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
-        menu_mut.get_virtual_method_mut("ACall").map(|method| method.method_ptr = crate::randomizer::job::class_change_a_call_random_cc as _);
+        menu_mut.get_virtual_method_mut("ACall").map(|method| method.method_ptr = crate::randomizer::job::reclass::class_change_a_call_random_cc as _);
         println!("Replaced ACall of ClassChangeJobMenuItem");
     }
     if let Some(cc) = Il2CppClass::from_name("App", "HubMenu").unwrap().get_nested_types().iter().find(|x| x.get_name() == "NextItem"){
