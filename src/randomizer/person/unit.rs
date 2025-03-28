@@ -1,7 +1,7 @@
 use super::{*, ai};
 use engage::godpool::GodPool;
 use crate::{
-    assets::animation::MONSTERS, config::DVCVariables, randomizer::{emblem::{self, EMBLEM_LIST, ENEMY_EMBLEM_LIST}, grow, item::unit_items, job, skill}
+    assets::animation::MONSTERS, config::DVCVariables, randomizer::{emblem::{EMBLEM_LIST, ENEMY_EMBLEM_LIST}, grow, item::unit_items, job, skill}
 };
 #[unity::hook("App", "Unit", "CreateImpl2")]
 pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
@@ -125,81 +125,43 @@ pub fn adjust_unit_items(unit: &mut Unit) {
     let job = unit.get_job();
     let weapon_mask = job.get_weapon_mask_with_selected(unit.weapon_mask, unit.selected_weapon_mask).value;
     let jid = job.jid.to_string();
+    let is_enemy = unit.person.get_asset_force() != 0;
     if MONSTERS.iter().any(|&x| jid == x) {
+        unit.item_list.put_off_all_item();
         unit_items::add_monster_weapons(unit);
         return;
     }
-    let list_count = unit.item_list.get_count();
-    let name =  unit.person.get_name().unwrap().to_string();
-    if list_count == 0 { return; }
-    let mut slot = 0;
-    let mut weapon_mask_array: [i32; 4] = [0; 4];
-    let mut weapon_level: [i32; 4] = [0; 4];
-    let enemy = unit.person.get_asset_force() != 0;
-    for x in 1..9 {
-        if x == 7 { continue; }
-        if weapon_mask & (1 << x) != 0 {
-            weapon_mask_array[slot as usize] =  weapon_mask & (1 << x);
-            weapon_level[slot as usize] = job.get_max_weapon_level(x);
-            // println!("Job has weapon type: {}, max level: {}", x, weapon_level[slot as usize]);
-            slot += 1;
-        }
-        if slot == 4 { break; }
-    }
-    let n_weapons = slot;
-    slot = 0;
-    let jid = unit.get_job().jid.to_string();
-    for x in 0..8 {
-        let item = unit.item_list.get_item(x);
-        if item.is_some() {
-            let weapon = &item.unwrap();
-            let kind = weapon.item.get_kind(); 
-            if kind > 8 || kind == 0 || kind == 7 { continue; }
-            if weapon.item.get_flag().value & 128 != 0 || ( weapon.item.get_flag().value & 2 != 0 && !enemy) { continue;  }
-            //let rank = weapon.item.get_weapon_level();
-            //println!("{}: Weapon Mask {} & {} (kind = {}, rank {} ) = {} for {} ", name, weapon_mask, 1 << kind, kind, rank, weapon_mask & ( 1 <<  kind ), weapon.item.name.to_string());
-            if weapon_mask & ( 1 <<  kind ) == 0 {
-                // For Veyle
-                if name == MPIDS[32] && weapon_mask_array[slot] == 64 {
-                    if slot == 0 { weapon.ctor(ItemData::get("IID_オヴスキュリテ").unwrap());  }
-                    else if slot == 1 { weapon.ctor(ItemData::get("IID_ミセリコルデ").unwrap());  }
-                }
-                else if jid == "JID_マージカノン" { // mage cannon
-                    if slot == 0 { 
-                        weapon.ctor_str("IID_弾_物理"); 
-                        slot +=1;
-                    }
-                    if slot == 1 {
-                        weapon.ctor_str("IID_弾_魔法");
-                        slot += 1;
-                    }
-                }
-                else if jid == "JID_異形狼" || jid == "JID_幻影狼" {
-                    if slot == 0 {
-                        weapon.ctor_str("IID_牙");
-                        slot +=1;
-                    }
-                    else if slot == 1 {
-                        weapon.ctor_str("IID_HPの薬");
-                        slot +=1;
-                    }
-                }
-                else {
-                   // println!("{} has Weapon {} to be replaced", name, weapon.item.name.to_string());
-                    if slot < n_weapons {
-                        unit_items::replace_weapon(weapon, weapon_mask_array[slot as usize], weapon_level[slot as usize], enemy);
-                        if n_weapons > 1 { slot += 1; }
-                    }
-                    else if slot < 4 && slot >= 1 {
-                        unit_items::replace_weapon(weapon, weapon_mask_array[slot - 1 as usize], weapon_level[slot - 1 as usize], enemy);
-                    }
-                }
+    unit_items::simple_replacement(unit);
+    /*
+    if unit_items::get_number_of_usable_weapons(unit) < 1 { unit_items::adjust_missing_weapons(unit); }
+    else {
+        let ran_map = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
+        if !is_enemy {
+            if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) { 
+                unit.item_list.put_off_all_item();
+                unit_items::add_generic_weapons(unit);
             }
+            else { unit_items::simple_replacement(unit);  }
+        }
+        else if GameVariableManager::get_number(DVCVariables::ITEM_KEY) == 0 || ( DVCVariables::is_main_chapter_complete(11) && ran_map ) || DVCVariables::is_main_chapter_complete(9) {
+            unit_items::simple_replacement(unit);
+        }
+        else {
+            unit.item_list.put_off_all_item();
+            unit_items::add_generic_weapons(unit);
         }
     }
-    unit_items::adjust_unit_items(unit);
+    */
+    unit_items::assign_staffs(unit);
+    unit_items::assign_tomes(unit);
+    unit_items::assign_unique_items(unit);
+    unit_items::add_equip_condition(unit);
+    if !is_enemy { // Vul or Elixir
+        if unit.get_capability(0, false) >= 45 { unit.item_list.add_iid_no_duplicate("IID_特効薬");   }
+        else { unit.item_list.add_item_no_duplicate(ItemData::get("IID_傷薬").unwrap());  }
+    }
     unit_items::adjust_melee_weapons(unit);
-    unit_items::remove_duplicates(unit.item_list);
+    unit_items::adjust_missing_weapons(unit);
     unit.auto_equip();
    // println!("Finished adjusting items");
 }
@@ -518,10 +480,7 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                 let maps_completed = crate::continuous::get_continious_total_map_complete_count();
                 if maps_completed < 16 {
                     unit.item_list.put_off_all_item();
-                    unit_items::adjust_unit_items(unit);
-                    unit_items::add_generic_weapons(unit);
-                    unit_items::adjust_melee_weapons(unit);
-                    unit_items::remove_duplicates(unit.item_list);
+                    adjust_unit_items(unit); 
                     unit.auto_equip();
                 }
                 else { adjust_unit_items(unit);  }
@@ -576,14 +535,10 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                     if crate::autolevel::enemy::try_equip_emblem(unit, emblem) {  ai::adjust_enemy_emblem_unit_ai_flags(unit);   }
                 }
             } 
-            else if unit.person.get_engage_sid().is_some() {
-                let ty = emblem::get_engage_attack_type(unit.get_engage_attack());
-                
-            }
-            crate::autolevel::auto_level_unit(unit, is_boss);
-            if unit.get_engage_attack().is_some() {
+            else if unit.person.get_engage_sid().is_some() || unit.get_engage_attack().is_some()  {
                 ai::adjust_ai_for_engage_attack(unit);
             }
+            crate::autolevel::auto_level_unit(unit, is_boss);
         }
         unit_items::adjust_enemy_meteor(unit);
         if has_master {  unit.item_list.add_iid_no_duplicate("IID_マスタープルフ"); }    // Add Seal if lost seal

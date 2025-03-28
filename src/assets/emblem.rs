@@ -1,7 +1,7 @@
 use super::*;
 use crate::assets::accessory::add_accessory_to_list;
 use crate::DVCVariables;
-use accessory::{change_accessory, clear_accessory_from_list};
+use accessory::change_accessory;
 use conditions::{add_condition, remove_condition};
 use data::search::search_by_2_keys;
 
@@ -289,7 +289,7 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
         });
 
         let gender = unit_dress_gender(unit);
-        let mut gender_str = if gender == 2 { "F" } else { "M" };
+        let gender_str = if gender == 2 { "F" } else { "M" };
         let mut gender_con = SEARCH_LIST.get().unwrap().get_gender_condition(gender);
     // Replace Generic with random character voices
         random_engage_voice(result);
@@ -323,10 +323,7 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
             if let Some(engage_atk_data) = engage_atks.iter().find(|x| x.original_god_index == 50 && x.is_engage_atk(engage_attack)) {
                 println!("Found Custom Engage Atk");
                 engage_atk_result_clear(result, equipped);
-                if is_tiki_engage(result) {
-                    SEARCH_LIST.get().unwrap().replace_with_god(result, 2, 13, false);
-                    gender_str = "F";
-                }
+                if is_tiki_engage(result) { SEARCH_LIST.get().unwrap().replace_with_god(result, 2, 13, false); }
                 engage_atk_data.apply(result, unit, gender_con);
             }
             return;

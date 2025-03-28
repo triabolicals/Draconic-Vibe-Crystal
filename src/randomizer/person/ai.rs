@@ -86,6 +86,29 @@ fn unit_get_engage_atk(this: &Unit, method_info: OptionalMethod) -> Option<&'sta
 #[unity::from_offset("App", "AIData", ".ctor")]
 fn ai_data_ctor(this: &AIData, method_info: OptionalMethod);
 
+#[unity::from_offset("App", "Unit", "SetDisposAi")]
+fn unit_set_dispos_ai(this: &Unit, data: &DisposData, method_info: OptionalMethod);
+
+#[unity::from_offset("App", "DisposData", "AddUnitItem")]
+fn disposdata_add_unit_item(this: &DisposData, unit: &Unit, method_info: OptionalMethod);
+
+pub fn reset_enemy_ai_and_items(unit: &mut Unit) {
+    if let Some(data) = DisposData::get_list().unwrap().iter()
+        .flat_map(|array| array.iter())
+        .find(|data| 
+            unit.force.map_or_else(|| 1, |f| f.force_type) == data.force as i32 &&
+            data.get_person().is_some_and(|dispos_person| dispos_person.parent.hash == unit.person.parent.hash) && data.dispos_x == unit.dispos_y as i8  && data.dispos_y == unit.dispos_z as i8 )
+    {
+        unit.item_list.put_off_all_item();;
+        unsafe { 
+            disposdata_add_unit_item(data, unit, None);
+            unit_set_dispos_ai(unit, data, None);
+        }
+        adjust_person_unit_ai(unit);
+    }
+}
+
+
 pub fn adjust_unitai(unit: &mut Unit) {
     let job = unit.get_job();
     let m022 = GameUserData::get_chapter().cid.to_string() == "CID_M022";

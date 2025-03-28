@@ -12,6 +12,7 @@ pub use engage::{
     mess::*,
     pad::Pad,
     random::*,
+    proc::*, script::DynValue,
     gamedata::{*, unit::*, ring::RingData, item::RewardData, skill::*, item::*, god::*, dispos::*},
 };
 pub use super::enums::*;
@@ -35,7 +36,6 @@ pub mod names;
 pub mod map;
 pub mod terrain;
 
-use engage::{godpool::GodPool, proc::*, script::DynValue};
 use engage::proc::desc::ProcDesc;
 
 pub use super::{CONFIG, VERSION};
@@ -211,11 +211,13 @@ pub fn tutorial_check(){
         GameVariableManager::set_bool("G_CC_エンチャント", true);
         GameVariableManager::set_bool("G_CC_マージカノン", true);
     }
+    /* 
     if CONFIG.lock().unwrap().debug {
         GameVariableManager::find_starts_with("G_GmapSpot_").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
         EMBLEM_LIST.get().unwrap().iter().flat_map(|&i| GodData::try_get_hash(i))
             .for_each(|god| { GodPool::create(god); });
     }
+    */
 }
 #[skyline::from_offset(0x01fde850)]
 pub fn keyboard_create_bind<P: Bindable>(this: &P, length: i32, text: &Il2CppString, header: &Il2CppString, sub: &Il2CppString, preset: i32, call_back: u64, method_info: OptionalMethod);
@@ -228,9 +230,14 @@ pub fn write_seed_output_file() {
     let mut f = if file.is_err() { println!("Cannot create output file");
         File::options().create(true).write(true).truncate(true).open("sd:/Draconic Vibe Crystal/output.log") }
          else { file}.unwrap();
-    writeln!(&mut f, "------------- Triabolical Randomization Settings - Version {} -------------", VERSION).unwrap();
+    writeln!(&mut f, "------------- Triabolical Draconic Vibe Crystal Randomization Settings - Version {} -------------", VERSION).unwrap();
     if GameVariableManager::get_bool("G_Ironman") { writeln!(&mut f, "* Ironman Mode").unwrap(); }
-    if GameVariableManager::get_number(DVCVariables::CONTINIOUS) != 0 { writeln!(&mut f, "* Continuious Mode").unwrap(); }
+    match GameVariableManager::get_number(DVCVariables::CONTINIOUS){
+        1|2 => { writeln!(&mut f, "* Continuious Mode").unwrap();} 
+        3 => { writeln!(&mut f, "* Random Map Mode").unwrap();}
+        4 => { writeln!(&mut f, "* Open Map Mode").unwrap();} 
+        _ => {}
+    }
     writeln!(&mut f, "* Seed: {}", seed).unwrap();
     match GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) {
         1 => { writeln!(&mut f, "* Random Recruitment").unwrap(); },
@@ -267,146 +274,99 @@ pub fn write_seed_output_file() {
         3 => { writeln!(&mut f, "* Emblem Sync Data: Stats / Sync Skills / Engage Skills").unwrap(); },
         _ => { writeln!(&mut f, "* Emblem Sync Data: No Randomization").unwrap(); },
     }
+    match GameVariableManager::get_number(DVCVariables::SP_KEY) {
+        1 => { writeln!(&mut f, "* Random SP Cost").unwrap(); },
+        2 => { writeln!(&mut f, "* Random SP Cost + Chaos Skill Inheritance Mode").unwrap(); },
+        _ => {}
+    }
+
     if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
         writeln!(&mut f, "\n--------------- Person Recruitment Order ---------------").unwrap();
-        let mut count = 0;
-        let playable = PLAYABLE.get().unwrap();
-        playable.iter().for_each(|&pindex|{
-            let person = PersonData::try_index_get(pindex).unwrap();
-            let name1 = Mess::get_name(person.pid).to_string();
-            let key = format!("G_R_{}", person.pid.to_string());
-            count +=1; 
-            if GameVariableManager::exist(key.as_str()) {
-                let new_pid = GameVariableManager::get_string(key.as_str());
-                let mut name2 = String::new();
-                if PersonData::get(&new_pid.to_string()).is_some() {
-                    name2 = Mess::get_name(new_pid).to_string();
-                } 
-                writeln!(&mut f, "* {} - {} ({}) -> {} ({})", count, name1, person.pid.to_string(), name2, new_pid.to_string()).unwrap();
+        PLAYABLE.get().unwrap().iter().flat_map(|&i| PersonData::try_index_get(i)).enumerate()
+            .for_each(|(index, person)|{
+                let key = format!("G_R_{}", person.pid.to_string());
+                if GameVariableManager::exist(key.as_str()) {
+                    let new_pid = GameVariableManager::get_string(key.as_str());
+                    writeln!(&mut f, "* {} - {} ({}) -> {} ({})", index, Mess::get_name(person.pid), person.pid, Mess::get_name(new_pid), new_pid).unwrap();
+                }
+                else { writeln!(&mut f, "* {} - {} ({}) -> {} ({})", index, Mess::get_name(person.pid), person.pid, Mess::get_name(person.pid), person.pid).unwrap(); }
             }
-            else { writeln!(&mut f, "* {} - {} ({}) -> {} ({})", count, name1, person.pid.to_string(), name1, person.pid.to_string()).unwrap(); }
-        });
+        );
     }
     if emblem_mode != 0 {
         writeln!(&mut f, "\n-------------- Emblems Recruitment Order Randomization ---------------").unwrap();
-        let mut count = 0;
-        for x in 0..19 { 
-            let string = format!("G_R_{}", EMBLEM_GIDS[x]);
-            let name1 = Mess::get( GodData::get(EMBLEM_GIDS[x]).unwrap().mid ).to_string();
-            let new_gid = GameVariableManager::get_string(&string);
-            let mut name2 = String::new();
-            if GodData::get(&new_gid.to_string()).is_some() { name2 = Mess::get( GodData::get(&new_gid.to_string()).unwrap().mid).to_string(); }
-            count += 1;
-            writeln!(&mut f, "* {} - {} ({}) -> {} ({})", count, name1, x, name2, new_gid.to_string()).unwrap();
-        }
+        EMBLEM_LIST.get().unwrap().iter().flat_map(|&h| GodData::try_get_hash(h)).enumerate()
+            .for_each(|(index, god)|{
+                let key = format!("G_R_{}", god.gid.to_string());
+                if GameVariableManager::exist(key.as_str()) {
+                    let new_god = GodData::get(GameVariableManager::get_string(key.as_str())).unwrap();
+                    writeln!(&mut f, "* {} - {} ({}) -> {} ({})", index,  Mess::get(god.mid), god.gid,  Mess::get(new_god.mid), new_god.gid).unwrap();
+                } 
+                else { writeln!(&mut f, "* {} - {} ({}) -> {} ({})", index,  Mess::get(god.mid), god.gid,   Mess::get(god.mid), god.gid).unwrap(); }
+            }
+        )
     }
     if GameVariableManager::get_number("G_Random_Grow_Mode") & 1 != 0 {
         writeln!(&mut f, "\n--------------- Personal Growth Rates Randomization ---------------").unwrap();
-        let person_list = PersonData::get_list().unwrap();
-        for x in 0..person_list.len() {
-            let grow = person_list[x].get_grow();
-            if grow.is_zero() { continue; } 
-            let line = utils::get_person_growth_line(person_list[x]);
-            writeln!(&mut f, "* {} - {}", x+1, line).unwrap();
-        }
+        PersonData::get_list().unwrap().iter()
+            .filter(|p| p.parent.index > 0 && !p.get_grow().is_zero())
+            .for_each(|person|{ 
+                writeln!(&mut f, "* {} - {}", person.parent.index, utils::get_person_growth_line(person)).unwrap(); 
+            }
+        );
     }
     if GameVariableManager::get_number("G_Random_Grow_Mode") & 2 != 0 {
-        let job_list = JobData::get_list_mut().unwrap();
         writeln!(&mut f, "\n--------------- Class Growth Rates Modifers Randomization ---------------").unwrap();
-        for x in 0..job_list.len() {
-            let grow = job_list[x].get_diff_grow();
-            if grow.is_zero() { continue; } 
-            let jid = job_list[x].jid.to_string();
-            let job_name = Mess::get(job_list[x].name).to_string();
-            writeln!(&mut f, "* {} - {} ({})\t| {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% |", x+1, job_name, jid, 
-            Mess::get("MID_SYS_HP").to_string(), grow[0], Mess::get("MID_SYS_Str").to_string(), grow[1], Mess::get("MID_SYS_Mag").to_string(), grow[6], 
-            Mess::get("MID_SYS_Tec").to_string(), grow[2], Mess::get("MID_SYS_Spd").to_string(), grow[3], Mess::get("MID_SYS_Lck").to_string(), grow[4],
-            Mess::get("MID_SYS_Def").to_string(), grow[5], Mess::get("MID_SYS_Res").to_string(), grow[7], Mess::get("MID_SYS_Phy").to_string(), grow[8]).unwrap();
-        }
+        JobData::get_list_mut().unwrap().iter()
+            .filter(|job| job.parent.index > 0 && !job.get_diff_grow().is_zero())
+            .for_each(|job|{
+                let grow = job.get_diff_grow();
+                writeln!(&mut f, "* {} - {} ({})\n\t| {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% |", job.parent.index, Mess::get_name(job.jid), job.jid, 
+                Mess::get("MID_SYS_HP").to_string(), grow[0], Mess::get("MID_SYS_Str").to_string(), grow[1], Mess::get("MID_SYS_Mag").to_string(), grow[6], 
+                Mess::get("MID_SYS_Tec").to_string(), grow[2], Mess::get("MID_SYS_Spd").to_string(), grow[3], Mess::get("MID_SYS_Lck").to_string(), grow[4],
+                Mess::get("MID_SYS_Def").to_string(), grow[5], Mess::get("MID_SYS_Res").to_string(), grow[7], Mess::get("MID_SYS_Phy").to_string(), grow[8]).unwrap();
+            }
+        );
     }
     if GameVariableManager::get_bool(DVCVariables::SKILL_KEY) {
         writeln!(&mut f, "\n--------------- Personal Skills Randomization ---------------").unwrap();
-        let playable_size = person::PLAYABLE.get().unwrap().len();
-        let person_list = PersonData::get_list().unwrap();
-        for x in 0..playable_size {
-            let p_index = person::PLAYABLE.get().unwrap()[x as usize] as usize;
-            let person = &person_list[p_index]; 
-            let mut name = Mess::get(person.get_name().unwrap()).to_string();
-            if name.len() == 0 { name = person.get_name().unwrap().to_string(); }
-            let personal_sid = person.get_common_sids().unwrap();
-            for y in 0..personal_sid.len() {
-                let error_message = format!("{} missing skill in common sid index {}", person.get_name().unwrap().to_string(), y);
-                let skill = SkillData::get( &personal_sid[y as usize].to_string() ).expect(&error_message);
-                if skill.get_flag() & 1 == 0 {
-                    let skill_name = Mess::get( SkillData::get(&personal_sid[y as usize].to_string()).unwrap().name.unwrap() ).to_string();
-                    let sid = SkillData::get(&personal_sid[y as usize].to_string()).unwrap().sid.to_string();
-                    writeln!(&mut f, "* {} ({}):\t{} ({})",  name, person.pid.to_string(), skill_name, sid).unwrap();
-                    break;
-                }
+        person::PLAYABLE.get().unwrap().iter()
+            .flat_map(|&index| PersonData::try_index_get(index))
+            .for_each(|person|{
+                let skill_name = 
+                person.get_common_skills().iter()
+                    .flat_map(|skill| skill.get_skill())
+                    .find(|skill| skill.flag & 1 == 0)
+                    .and_then(|skill| skill.name)
+                    .map_or_else(|| "-".into(), |msid| Mess::get(msid));
+                writeln!(&mut f, "* {} ({}):\t{}",  Mess::get_name(person.pid), person.pid, skill_name).unwrap();
             }
-        }
-        writeln!(&mut f, "\n--------------- Class Learn Skill / Lunatic Skill Randomization --------------").unwrap();
-        let job_list = JobData::get_list_mut().unwrap();
-        for x in 0..job_list.len() {
-            let job = &job_list[x as usize];
-            let job_name = Mess::get(job.name).to_string();
-            let mut string = " ------  ".into();
-            let mut string2 = "  ------ ".into();
-            if job.learn_skill.is_some() {
-                let skill_name = SkillData::get(&job.learn_skill.unwrap().to_string()).unwrap().name.unwrap();
-                string = format!("{} ({})", Mess::get( skill_name ).to_string(), job.learn_skill.unwrap().to_string());
-            }   
-            if job.lunatic_skill.is_some() {
-                let skill_name = SkillData::get(&job.lunatic_skill.unwrap().to_string()).unwrap().name.unwrap();
-                string2 = format!("{} ({})", Mess::get(skill_name ).to_string(), job.lunatic_skill.unwrap().to_string());
+        );
+        writeln!(&mut f, "\n--------------- Class Learn Skills --------------").unwrap();
+        JobData::get_list_mut().unwrap().iter().filter(|job| job.learn_skill.is_some())
+            .for_each(|job|{
+                let learn_skill_name = job.learn_skill
+                    .and_then(|sid| SkillData::get(sid))
+                    .and_then(|skill| skill.name)
+                    .map_or_else(|| "-----".into(), |name| Mess::get(name) );
+
+                writeln!(&mut f, "* {} - {} ({}):\t {}", job.parent.index, Mess::get_name(job.jid), job.jid, learn_skill_name).unwrap();
             }
-            if job.learn_skill.is_none() && job.lunatic_skill.is_none() { continue;}
-            else { 
-                let jid = job.jid.to_string();
-                writeln!(&mut f, "* {} - {} ({}):\t {} / {}", x, job_name, jid, string, string2).unwrap();
-            }
-        }
-        let n_skills = skill::SKILL_POOL.lock().unwrap().len();
-        let skill_list = SkillData::get_list().unwrap();
-        let ring_list = RingData::get_list().unwrap();
-        writeln!(&mut f, "\n--------------- Bond Ring Randomization --------------").unwrap();
+        );
+        writeln!(&mut f, "\n--------------- Bond Ring Skill Randomization --------------").unwrap();
         let bond_ring_rates = CONFIG.lock().unwrap().get_bond_ring_rates();
         let ranks = ["S", "A", "B", "C"];
-        for x in 0..4 {
-            writeln!(&mut f, "-- {} Rank Rate: {}", ranks[x as usize], bond_ring_rates[x as usize]).unwrap();
-        }
-        for x in 0..ring_list.len() {
-            let skills = utils::skill_array_string(ring_list[x].get_equip_skills());
-            if skills.len() <= 2 { continue; }
-            let name = Mess::get(ring_list[x].name).to_string();
-            let rank;
-            if ring_list[x].rank == 3 { rank = "S"; }
-            else if ring_list[x].rank == 2 { rank = "A"; }
-            else if ring_list[x].rank == 1 { rank = "B"; }
-            else { rank = "C"; }
-            if ring_list[x].gid.is_some() { writeln!(&mut f, "* {}: {} {} - {}", utils::get_emblem_name(&ring_list[x].gid.unwrap().to_string()), name, rank, skills).unwrap(); }
-            else { writeln!(&mut f, "* {} - {}", name, skills).unwrap(); }
-        }
-        writeln!(&mut f, "\n--------------- Randomization Skill Pool Availiablity ({} skills)  ---------------", n_skills).unwrap();
-        for x in 0..n_skills {
-            let skill_index = skill::SKILL_POOL.lock().unwrap()[x as usize].index as usize;
-            let skill = &skill_list[skill_index ];
-            let sid = skill.sid.to_string();
-            let name = Mess::get(skill_list[skill_index ].name.unwrap()).to_string();
-            let personal;
-            let cost; 
-            if skill.get_inheritance_cost() != 0 {
-                if skill.can_override_skill() { personal = "Enemy"; }
-                else { personal = "Class | Enemy"; }
-                cost = format!("{} SP", skill.get_inheritance_cost());
+        for x in 0..4 { writeln!(&mut f, "-- {} Rank Rate: {}", ranks[x as usize], bond_ring_rates[x as usize]).unwrap(); }
+        RingData::get_list().unwrap().iter()
+            .for_each(|ring|{
+                let skills = utils::skill_array_string(ring.get_equip_skills());
+                if skills.len() > 0 {
+                    let rank = ranks.get(ring.rank as usize).map_or_else(||"??", |f| *f);
+                    let god_name = ring.gid.map_or_else(|| "".into(), |f| Mess::get(GodData::get(f).unwrap().mid));
+                    writeln!(&mut f, "* {} {} {}:\n\tSkills: {}", god_name, Mess::get(ring.name), rank, skills).unwrap();
+                }
             }
-            else {
-                if skill.can_override_skill() { personal = "Personal | Enemy"; }
-                else { personal = "Personal | Class | Enemy"; }
-                cost = "N/A".to_string();
-            }
-            writeln!(&mut f, "* {} ({}) \t {} \tCost: {}", name, sid, personal, cost).unwrap();
-        }
+        );
     }
     if GameVariableManager::get_number("G_InteractSetting") != 0 {
         let kinds = ["None", "Sword", "Lance", "Axe", "Bow", "Dagger", "Tome", "Rod", "Arts", "Special"];
@@ -416,12 +376,8 @@ pub fn write_seed_output_file() {
             let mut string = format!("{}: ", kinds[x]);
             let flag_value = interact_list[x].flag.value;
             for y in 1..10 {
-                if flag_value & ( 1 << y ) != 0 {
-                    string = format!("{}{} (S) ", string, kinds[y]);
-                }
-                if flag_value & ( 1 << (y + 10) ) != 0 {
-                    string = format!("{}{} (W) ", string, kinds[y]);
-                } 
+                if flag_value & ( 1 << y ) != 0 { string = format!("{}{} (S) ", string, kinds[y]); }
+                if flag_value & ( 1 << (y + 10) ) != 0 { string = format!("{}{} (W) ", string, kinds[y]); } 
             }
             writeln!(&mut f, "#{} - {}", x, string).unwrap();
         }
@@ -429,33 +385,31 @@ pub fn write_seed_output_file() {
             let mut string = format!("{}: ", kinds[x]);
             let flag_value = interact_list[x].flag.value;
             for y in 1..10 {
-                if flag_value & ( 1 << y ) != 0 {
-                    string = format!("{}{} (S) ", string, kinds[y]);
-                }
-                if flag_value & ( 1 << (y + 10) ) != 0 {
-                    string = format!("{}{} (W) ", string, kinds[y]);
-                } 
+                if flag_value & ( 1 << y ) != 0 { string = format!("{}{} (S) ", string, kinds[y]); }
+                if flag_value & ( 1 << (y + 10) ) != 0 { string = format!("{}{} (W) ", string, kinds[y]); } 
             }
             writeln!(&mut f, "# Reversed {} - {}", x, string).unwrap();
         }
     }
     if GameVariableManager::get_number("G_Random_God_Mode") >= 2 {
         writeln!(&mut f, "\n--------------- Emblem Engage / Linked Engage Attack Randomization ---------------").unwrap();
-        for x in 0..20 {
-            let gid = format!("GID_{}", EMBLEM_ASSET[x as usize]); 
-            let line = crate::message::god_engage_random_str(&gid);
-            writeln!(&mut f, "{}", line).unwrap();
-        }
+        EMBLEM_LIST.get().unwrap().iter().flat_map(|&h| GodData::try_get_hash(h))
+            .for_each(|god|{ 
+                writeln!(&mut f, "{}", crate::message::god_engage_random_str(god)).unwrap();
+            } 
+        );
     }
     writeln!(&mut f, "\n--------------- Emblem Engrave Data ---------------").unwrap();
-    for x in EMBLEM_GIDS {
-        let god = GodData::get(x).unwrap();
-        let line = format!("* {} - \t{}: {}, {}: {}, {}: {}, {}: {}, {}: {}, {}: {}", 
-        utils::mess_get(god.mid), 
-        utils::get_stat_label(11), god.get_engrave_avoid(),  utils::get_stat_label(12), god.get_engrave_critical(), utils::get_stat_label(13), god.get_engrave_hit(), 
-        utils::get_stat_label(14), god.get_engrave_power(), utils::get_stat_label(15), god.get_engrave_secure(), utils::get_stat_label(16), god.get_engrave_weight());
-        writeln!(&mut f, "{}", line).unwrap();
-    }
+    EMBLEM_LIST.get().unwrap().iter().flat_map(|&h| GodData::try_get_hash(h))
+        .for_each(|god|{
+            let line = format!("* {} - \t{}: {}, {}: {}, {}: {}, {}: {}, {}: {}, {}: {}", 
+                Mess::get(god.mid), 
+                utils::get_stat_label(11), god.get_engrave_avoid(),  utils::get_stat_label(12), god.get_engrave_critical(), utils::get_stat_label(13), god.get_engrave_hit(), 
+                utils::get_stat_label(14), god.get_engrave_power(), utils::get_stat_label(15), god.get_engrave_secure(), utils::get_stat_label(16), god.get_engrave_weight()
+            );
+            writeln!(&mut f, "{}", line).unwrap();
+        }
+    );
     writeln!(&mut f, "\n--------------- Emblem Sync / Engage Data --------------").unwrap();
     match god_mode {
         1 => { writeln!(&mut f, "* Emblem Data: Inheritable Skills").unwrap();  }
@@ -469,36 +423,38 @@ pub fn write_seed_output_file() {
         3 => { writeln!(&mut f, "* Emblem Sync Data: Stats / Sync Skills / Engage Skills").unwrap(); },
         _ => { writeln!(&mut f, "* Emblem Sync Data: No Randomization").unwrap(); },
     }
-    let mut index: usize = 0;
-    for x in EMBLEM_ASSET {
-        if x == "ディミトリ" { break; }
-        let growth_id = format!("GGID_{}", x);
-        let level_data = GodGrowthData::get_level_data(&growth_id).unwrap();
-        let god_id = format!("GID_{}", x);
-        let engage_skill = level_data[0].engage_skills.list.item[0].get_skill().unwrap();
-        let god = GodData::get(x).unwrap(); 
-        let god_grow = GodGrowthData::try_get_from_god_data(god).unwrap();
-        writeln!(&mut f, "\n*** {} Engage Skill: {}, Engage Atk/Link: {}\n", utils::get_emblem_name(&god_id), utils::get_skill_name(engage_skill), crate::message::god_engage_random_str(&god_id)).unwrap();
-        let weapons_str = emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().print(index as i32, 0);
-        writeln!(&mut f, "\t* Engage Weapons 1: {}", weapons_str).unwrap();
-        let weapons_str2 = emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().print(index as i32, 1);
-        writeln!(&mut f, "\t* Engage Weapons 2: {}", weapons_str2).unwrap();
-        let weapons_str3 = emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().print(index as i32, 2);
-        writeln!(&mut f, "\t* Engage Weapons 3: {}\n", weapons_str3).unwrap();
-        for y in 1..level_data.len() {
-            writeln!(&mut f, "\t* {} Lv. {} Stats: {}", utils::get_emblem_name(&god_id), y, utils::stats_from_skill_array(level_data[y as usize].synchro_skills)).unwrap();
-            writeln!(&mut f, "\t\tSyncho Skills:  {}", utils::skill_array_string(level_data[y as usize].synchro_skills)).unwrap();
-            writeln!(&mut f, "\t\tEngaged Skills: {}", utils::skill_array_string(level_data[y as usize].engaged_skills)).unwrap();
-            if y-1 < god_grow.len() {
-                let level = god_grow[y-1].get_inheritance_skills();
-                if level.is_none() { writeln!(&mut f, "").unwrap(); continue;}
-                let inherit_skills = level.unwrap();
-                writeln!(&mut f, "\t\tInherit Skills: {}", utils::sid_array_string(inherit_skills)).unwrap();
+    EMBLEM_LIST.get().unwrap().iter().flat_map(|&h| GodData::try_get_hash(h)).enumerate()
+        .for_each(|(index, god)|{
+            let level_data = god.get_level_data().unwrap();
+            let grow_data = GodGrowthData::try_get_from_god_data(god).unwrap();
+            let engage_skill = level_data[0].engage_skills.list.item[0].get_skill().map_or_else(|| String::from(" ------- "), |skill| Mess::get(skill.name.unwrap()).to_string());
+            let god_name =                  Mess::get(god.mid);
+            writeln!(&mut f, "\n****** {} *******\nEngage Skill: {}, Engage Atk/Link: {} / {} with ({} / {} )\n",
+                god_name,
+                engage_skill, 
+                utils::get_skill_name_from_sid(god.get_engage_attack()), crate::message::god_link_engage_atk_str(god), 
+                crate::message::god_link_god(god), crate::message::god_link_pid(god)
+            ).unwrap();
+
+            let blevels = [1, 10, 15];
+            for weapon_slot in 0..3 {
+                writeln!(&mut f, "\t* Engage Weapons {}: {}",  blevels[weapon_slot], emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().print(index as i32,  weapon_slot as i32)).unwrap();
             }
             writeln!(&mut f, "").unwrap();
+            for y in 1..level_data.len() {
+                writeln!(&mut f, "\t* {} Lv. {} Stats: {}", god_name, y, utils::stats_from_skill_array(level_data[y as usize].synchro_skills)).unwrap();
+                writeln!(&mut f, "\t\tSyncho Skills:  {}", utils::skill_array_string(level_data[y as usize].synchro_skills)).unwrap();
+                writeln!(&mut f, "\t\tEngaged Skills: {}", utils::skill_array_string(level_data[y as usize].engaged_skills)).unwrap();
+                if y-1 < grow_data.len() {
+                    let level = grow_data[y-1].get_inheritance_skills();
+                    if level.is_none() { writeln!(&mut f, "").unwrap(); continue;}
+                    let inherit_skills = level.unwrap();
+                    writeln!(&mut f, "\t\tInherit Skills: {}", utils::sid_array_string(inherit_skills)).unwrap();
+                }
+                writeln!(&mut f, "").unwrap();
+            }
         }
-        index += 1;
-    }
+    );
     println!("Randomization Print to file");
 }
 
@@ -638,7 +594,6 @@ pub fn reset_gamedata() {
             person.set_link_god(None);
         }
     }
-    names::give_names_to_generics();
     PersonData::get_list_mut().unwrap().iter().for_each(|x| x.on_completed() );
     person::check_playable_classes();
     GodData::unload();

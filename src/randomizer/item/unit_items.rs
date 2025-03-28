@@ -1,5 +1,6 @@
 use engage::menu::BasicMenuItemAttribute;
 use engage::unitpool::UnitPool;
+use utils::clamp_value;
 
 use super::*;
 use super::data::*;
@@ -47,192 +48,6 @@ pub extern "C" fn vibe_prw() ->  &'static mut ConfigBasicMenuItem {
     switch
 }
 
-pub const STANDARD_WEPS: [&str; 35] = [ // S L A B K T F
-    "IID_鉄の剣", "IID_鉄の槍", "IID_鉄の斧", "IID_鉄の弓", "IID_鉄のナイフ", "IID_ファイアー", "IID_鉄身の法" ,    //D
-    "IID_鋼の剣", "IID_鋼の槍", "IID_鋼の斧", "IID_鋼の弓", "IID_鋼のナイフ", "IID_エルファイアー", "IID_鋼身の法", //C
-    "IID_銀の剣", "IID_銀の槍", "IID_銀の斧", "IID_銀の弓", "IID_銀のナイフ", "IID_エルファイアー", "IID_銀身の法", //B
-    "IID_勇者の剣", "IID_勇者の槍", "IID_勇者の斧", "IID_勇者の弓", "IID_ペシュカド", "IID_ボルガノン", "IID_閃進の法", //A
-    "IID_クラドホルグ", "IID_ブリューナク", "IID_フラガラッハ", "IID_レンダウィル", "IID_シンクエディア", "IID_ノヴァ", "IID_覇神の法", //S
-];
-// Item Randomization and replacement
-pub fn is_smash(item: &UnitItem) -> bool {
-    let e_skills = item.get_equipped_skills();
-    if e_skills.is_some() { return e_skills.unwrap().find_sid("SID_スマッシュ".into()).is_some();  }
-    return false;
-}
-
-pub fn is_thunder(item: &UnitItem) -> bool {
-    let e_skills = item.get_equipped_skills();
-    if e_skills.is_some() { return e_skills.unwrap().find_sid("SID_轟雷発動可能".into()).is_some();}
-    return false;
-}
-pub fn get_replacement_type(item: &UnitItem) -> i32 {
-    if let Some(e_skills) = item.get_equipped_skills() {
-        if e_skills.find_sid("SID_スマッシュ".into()).is_some() { return 6; }  // Smash
-        if e_skills.find_sid("SID_轟雷発動可能".into()).is_some() { return 7; } // Thunder
-    }
-    let iid = item.item.iid.to_string();
-    match iid.as_str() {
-        "IID_いかづちの剣"|"IID_ほのおの槍"|"IID_かぜの大斧"| "IID_光の弓" => { 2 },    //magic
-        "IID_ほそみの剣"|"IID_ほそみの槍"| "IID_ショートアクス" => { 1 },   //silm
-        "IID_キルソード"|"IID_キラーランス"|"IID_キラーアクス"|"IID_キラーボウ"|"IID_エルサージ" => { 3 }, //crit
-        "IID_手槍"|"IID_スレンドスピア"|"IID_手斧"|"IID_トマホーク"|"IID_長弓" => { 4 }, //Range
-        "IID_アーマーキラー"|"IID_ナイトキラー"|"IID_ポールアクス"|"IID_ドラゴンキラー" => { 5 }, //Effective
-        _ => { 0 }, // Standard
-    }
-}
-pub fn is_slim(item: &UnitItem) -> bool {
-    let iid = item.item.iid.to_string();
-    if iid == "IID_ほそみの剣" { return true; }
-    if iid == "IID_ほそみの槍" { return true; }
-    if iid == "IID_ショートアクス" { return true; }
-    return false; 
-}
-pub fn is_magic_weapon(item: &UnitItem) -> bool {
-    let iid = item.item.iid.to_string();
-    if iid == "IID_いかづちの剣" { return true; }
-    if iid == "IID_ほのおの槍" { return true; }
-    if iid == "IID_かぜの大斧" { return true; }
-    if iid == "IID_光の弓" { return true;}
-    return false; 
-}
-pub fn is_crit_weapon(item: &UnitItem) -> bool {
-    let iid = item.item.iid.to_string();
-    if iid == "IID_キルソード" { return true; }
-    if iid == "IID_キラーランス" { return true; }
-    if iid == "IID_キラーアクス" { return true; }
-    if iid == "IID_キラーボウ" { return true;}
-    if iid == "IID_エルサージ" { return true;}
-    return false; 
-}
-pub fn range_weapon(item: &UnitItem) -> bool {
-    let iid = item.item.iid.to_string();
-    if iid == "IID_手槍" { return true; }
-    if iid == "IID_スレンドスピア" { return true; }
-    if iid == "IID_手斧" { return true; }
-    if iid == "IID_トマホーク" { return true;}
-    if iid == "IID_長弓" { return true;}
-    return false;
-}
-pub fn is_effective_weapon(item: &UnitItem) -> bool {
-    let iid = item.item.iid.to_string();
-    if iid == "IID_アーマーキラー" { return true; }
-    if iid == "IID_ナイトキラー" { return true; }
-    if iid == "IID_ポールアクス" { return true; }
-    return false;
-}
-
-pub fn replace_weapon(item: &UnitItem, weapon_mask: i32, max_rank: i32, is_enemy: bool) {
-    if item.item.get_flag().value & 128 != 0 { return; }
-    if item.item.get_flag().value & 2 != 0 { return; }
-    let mut level = item.item.get_weapon_level();
-    if max_rank < level { level = max_rank; }
-    let mut new_weapon_type: i32  = -1;
-    let flag = item.flags;
-    for x in 1..9 {
-        if weapon_mask & ( 1 << x ) != 0 {
-            new_weapon_type = x-1;
-            break;
-        }
-    }
-    if new_weapon_type < 0 { 
-        let rng = Random::get_game().get_value(3);
-        new_weapon_type = rng;
-    }
-    // Random Weapons for Enemy
-    let ran_map = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
-    if !is_enemy && GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) {
-        if let Some(new_item) = data::WEAPONDATA.lock().unwrap().get_new_weapon(item, new_weapon_type, false) {
-            item.ctor(new_item);
-            return;
-        }
-    }
-    if is_enemy && ( DVCVariables::is_main_chapter_complete(11) || ran_map ) {
-       // println!("Enemy Item Replacement for rank: {}, Weapon: {}", max_rank, new_weapon_type);
-        if get_continious_total_map_complete_count() < 11 && ran_map {
-            if let Some(generic_weapon) = data::WEAPONDATA.lock().unwrap().get_generic_weapon(new_weapon_type, level) {
-               // println!("Replacement Generic Item: {}", Mess::get(generic_weapon.name));
-                item.ctor(generic_weapon);
-                item.set_flags(flag);
-                return;
-            } 
-        }
-        if let Some(new_item) = data::WEAPONDATA.lock().unwrap().get_new_weapon(item, new_weapon_type, true) {
-            // println!("Replacement Item: {}", Mess::get(new_item.name));
-            item.ctor(new_item);
-            if new_item.flag.value & 2 == 0 { item.set_flags(flag); }
-            return;
-        }
-        if let Some(generic_weapon)= data::WEAPONDATA.lock().unwrap().get_generic_weapon(new_weapon_type, level) {
-           // println!("Replacement Generic Item: {}", Mess::get(generic_weapon.name));
-            item.ctor(generic_weapon);
-            item.set_flags(flag);
-            return;
-        } 
-    }
-    // println!("Normal Item Replacement");
-    if new_weapon_type == 7 { new_weapon_type = 6; }
-    if new_weapon_type < 0 || new_weapon_type > 6 { return; }
-    if weapon_mask & 512 != 0 { return;  }
-    let mut weapons: [&str; 7];
-    // Standard Set
-    weapons = match level { 
-        0|1 => { ["IID_鉄の剣", "IID_鉄の槍", "IID_鉄の斧", "IID_鉄の弓", "IID_鉄のナイフ", "IID_ファイアー", "IID_鉄身の法"] },
-        2 => { ["IID_鋼の剣", "IID_鋼の槍", "IID_鋼の斧", "IID_鋼の弓", "IID_鋼のナイフ", "IID_エルファイアー", "IID_鋼身の法"] },
-        3 => { ["IID_銀の剣", "IID_銀の槍", "IID_銀の斧", "IID_銀の弓", "IID_銀のナイフ", "IID_エルファイアー", "IID_銀身の法"] },
-        4 => { ["IID_勇者の剣", "IID_勇者の槍", "IID_勇者の斧", "IID_勇者の弓", "IID_ペシュカド", "IID_ボルガノン", "IID_閃進の法"] },
-        _ => { ["IID_クラドホルグ", "IID_ブリューナク", "IID_フラガラッハ", "IID_レンダウィル", "IID_シンクエディア", "IID_ノヴァ", "IID_覇神の法"] },
-    };
-    match get_replacement_type(item) {
-        1 => { weapons = ["IID_ほそみの剣","IID_ほそみの槍", "IID_ショートアクス", "IID_ショートボウ", "IID_ショートナイフ" , "IID_サージ", "IID_初心の法"];  }, // slims
-        2 => {  weapons[0] = "IID_いかづちの剣"; 
-                weapons[1] = "IID_ほのおの槍"; 
-                weapons[2] = "IID_かぜの大斧"; 
-                weapons[3] = "IID_光の弓";
-            },  //magic 
-        3 => {
-            weapons[0] = "IID_キルソード"; 
-            weapons[1] = "IID_キラーランス"; 
-            weapons[2] = "IID_キラーアクス"; 
-            weapons[3] = "IID_キラーボウ"; 
-            weapons[5] = "IID_エルサージ";
-        },  // Crit
-        4 => {
-            match level {
-                1 => { weapons[1] = "IID_手槍"; weapons[2] = "IID_手斧"; },
-                2 => { weapons[3] = "IID_長弓"; weapons[1] = "IID_手槍"; weapons[2] = "IID_手斧"; },
-                _ => { weapons[3] = "IID_長弓"; weapons[2] = "IID_トマホーク"; weapons[1] = "IID_スレンドスピア"; },
-            };
-        },
-        5 => {  //
-            if level == 2 { weapons[0] = "IID_アーマーキラー"; }
-            else if level > 2 { weapons[0] = "IID_ドラゴンキラー"; }
-            weapons[1] = "IID_ナイトキラー"; 
-            weapons[2] = "IID_ポールアクス";
-        },
-        6 => {  // Smash
-            match level {
-                2 => { weapons[0] = "IID_鉄の大剣"; weapons[1] = "IID_鉄の大槍"; weapons[2] = "IID_鉄の大斧"; },
-                3 => { weapons[0] = "IID_鋼の大剣";  weapons[1] = "IID_鋼の大槍"; weapons[2] = "IID_鋼の大斧"; },
-                4 => { weapons[0] = "IID_銀の大剣";  weapons[1] = "IID_銀の大槍";  weapons[2] = "IID_銀の大斧"; },
-                _ => {},
-            }
-        },
-        7 => {  //Thunder
-            weapons = match level {
-                1 =>  { ["IID_鉄の剣", "IID_手槍", "IID_ショートアクス", "IID_ショートボウ", "IID_ショートナイフ", "IID_サンダー", "IID_初心の法"] },
-                2 => { ["IID_いかづちの剣", "IID_ほのおの槍", "IID_手斧", "IID_長弓", "IID_カルド", "IID_エルサンダー", "IID_護身の法"] },
-                3 => { ["IID_ドラゴンキラー", "IID_スレンドスピア", "IID_トマホーク", "IID_光の弓", "IID_スティレット", "IID_エルサンダー", "IID_護身の法"] },
-                _ => { ["IID_ドラゴンキラー", "IID_スレンドスピア", "IID_トマホーク", "IID_光の弓", "IID_ペシュカド", "IID_トロン", "IID_閃進の法"] },
-            };
-        }
-        _ => {},
-    }
-    //println!("Replace item {} , weapon mask {}, max level {}", item.item.name.to_string(), weapon_mask, max_rank);
-    item.ctor_str(weapons[new_weapon_type as usize]);
-    item.set_flags(flag);
-}
-
 //Has Healing staff
 pub fn replace_staves(item_list: &UnitItemList){
     for x in 0..8 {
@@ -254,7 +69,7 @@ pub fn dispose_item_type(item_list: &UnitItemList, item_kind: i32){
     for x in 0..8 {
         if let Some(item) = item_list.get_item(x){
             let kind = item.item.get_kind(); 
-            if kind ==  item_kind { item.dispose(); }
+            if  item.item.flag.value & 128 == 0 && kind ==  item_kind { item.dispose(); }
         }
     }
 }
@@ -293,27 +108,22 @@ pub fn dispose_unusables(unit: &Unit) {
 
 pub fn remove_duplicates(item_list: &UnitItemList) {
     for x in 0..8 {
-        if let Some(unit_item) = item_list.get_item(x as i32) { 
-            if unit_item.is_drop() {  if unit_item.item.flag.value & 131 != 0 { unit_item.flags = 0; } }
-            if unit_item.item.parent.index < 3 { continue; }
-            let iid1 =  unit_item.item.iid.to_string();
+        if let Some(item) = item_list.get_item(x as i32) { 
+            let iid1 = item.item.iid.to_string();
             for y in x+1..8 {
-                let item2 = item_list.get_item(y as i32 );
-                if item2.is_some() {
-                    let unit_item2 = item2.unwrap(); 
-                    if unit_item2.is_drop() { continue; }
-                    let iid2 =  unit_item2.item.iid.to_string();
-                    if iid2 == iid1 { 
-                        unit_item2.dispose(); 
-                       //  println!("Dispose of {}", unit_item2.item.name.to_string());
+                if let Some(item2) = item_list.get_item(y as i32 ) {
+                    let iid2 = item2.item.iid.to_string();
+                    if item2.item.parent.index == item.item.parent.index { 
+                        if item2.is_drop() { item.flags |= 2; }
+                        item2.dispose(); 
                     }
-                    // remove vuls if exlixir/antitoxin exists
-                    else if (iid1 == "IID_毒消し" || iid1 == "IID_特効薬") && iid2 == "IID_傷薬" { unit_item2.dispose();  }
-                    else if iid1 == "IID_傷薬" && (iid2 == "IID_特効薬" || iid2 == "IID_毒消し")  { unit_item.dispose(); break;}
+                    else if (iid1 == "IID_毒消し" || iid1 == "IID_特効薬") && iid2 == "IID_傷薬" { item2.dispose();  }
+                    else if iid1 == "IID_傷薬" && (iid2 == "IID_特効薬" || iid2 == "IID_毒消し")  { item.dispose(); }
                 }
             }
         }
     }
+
     for x in 0..8 {
         let item = item_list.unit_items[x].as_ref().unwrap();
         let iid1 =  item.item.iid.to_string();
@@ -369,10 +179,9 @@ pub fn can_change_weapon(weapon: &UnitItem, melee: bool) -> bool {
     else { return kind > 0 && kind < 9; }
 }
 
-pub fn adjust_unit_items(unit: &Unit) {
+pub fn assign_tomes(unit: &Unit) {
     let job = unit.get_job();
     let weapon_mask = job.get_weapon_mask();
-    let jid = job.jid.to_string();
     remove_duplicates(unit.item_list);
     let is_vander = GameVariableManager::get_string("G_R_PID_ヴァンドレ").to_string() == unit.person.pid.to_string();
     let is_veyle = unit.person.pid.to_string() == PIDS[32];
@@ -380,13 +189,12 @@ pub fn adjust_unit_items(unit: &Unit) {
     let story_chapter = get_story_chapters_completed();
     let continous = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
     let is_player = unit.person.get_asset_force() == 0;
-   // println!("Adjusting Tomes");
     if weapon_mask.value & 64 != 0 && (!is_vander && !is_veyle) {
         dispose_item_type(unit.item_list, 6);
         if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) && is_player {
             let mut count = 0;
             while count < 10 {
-                if let Some(new_item) = data::WEAPONDATA.lock().unwrap().get_random_weapon(5, false) {
+                if let Some(new_item) = data::WEAPONDATA.get().unwrap().get_random_weapon(5, false) {
                     if new_item.get_weapon_level() <= job.weapon_levels[6]  { 
                         unit.item_list.add_item_no_duplicate(new_item); 
                         break;
@@ -440,11 +248,59 @@ pub fn adjust_unit_items(unit: &Unit) {
             }
         }
     }
+}
+
+pub fn assign_unique_items(unit: &Unit) {
+    unit_items::remove_duplicates(unit.item_list);
+    let pid = unit.person.pid.to_string();
+    let veyle = pid == PIDS[32];
+    let job_hash = unit.job.parent.hash;
+    let enemy = unit.person.get_asset_force() != 0;
+    if veyle { 
+        magic_dagger_weapon_change(unit.get_job());
+         unit.item_list.add_iid_no_duplicate("IID_ミセリコルデ");
+    }  // Misercode for Veyle
+    if job_hash == 185670709 || veyle  {  unit.item_list.add_iid_no_duplicate("IID_オヴスキュリテ");  } // Obscurite for Veyle / Fell Child Veyle
+
+    if unit.job.get_max_weapon_level(9) > 1 &&  unit.job.mask_skills.find_sid("SID_竜石装備".into()).is_some() && (pid != PIDS[36] && pid != PIDS[37]) { 
+        dispose_item_type(unit.item_list, 9);   // Dragonstone for classes that have the equip dragonstone skill
+        if let Some(stone1) = WEAPONDATA.get().unwrap().get_dragon_stone(enemy) { unit.item_list.add_item_no_duplicate(stone1);  }
+        if let Some(stone2) = WEAPONDATA.get().unwrap().get_dragon_stone(enemy) { unit.item_list.add_item_no_duplicate(stone2); }
+    }
+    // Mage Canon
+    if unit.job.get_max_weapon_level(9) > 1 && unit.job.mask_skills.find_sid("SID_弾丸装備".into()).is_some() {
+        dispose_item_type(unit.item_list, 9);
+        let len = WEAPONDATA.get().unwrap().bullet_list.len();
+        if len > 1 {
+            let rng = Random::get_game();
+            let bullet_1 = WEAPONDATA.get().unwrap().bullet_list[ rng.get_value(len as i32) as usize].item_index;
+            unit.item_list.add_item_no_duplicate(ItemData::try_index_get(bullet_1).unwrap());
+            let bullet_2 = WEAPONDATA.get().unwrap().bullet_list[ rng.get_value(len as i32) as usize].item_index;
+            unit.item_list.add_item_no_duplicate(ItemData::try_index_get(bullet_2).unwrap());
+        }
+    }
+    if pid == PIDS[36] {
+        unit.item_list.add_iid_no_duplicate("IID_邪竜石"); 
+        unit.item_list.add_iid_no_duplicate("IID_邪竜石_騎馬特効"); 
+    }
+    if pid == PIDS[37] {    
+        unit.item_list.add_iid_no_duplicate("IID_邪竜石"); 
+        unit.item_list.add_iid_no_duplicate("IID_邪竜石_騎馬特効");
+    }
+}
+
+pub fn assign_staffs(unit: &Unit) {
+    let job = unit.get_job();
+    let weapon_mask = job.get_weapon_mask();
+    let jid = job.jid.to_string();
+    let rng = Random::get_system();
+    let is_player = unit.person.get_asset_force() == 0;
+
     let staff_level = if  has_sid(unit, "SID_杖使い＋＋") { 4 } 
         else if has_sid(unit, "SID_杖使い＋") { 3 }
         else if has_sid(unit, "SID_杖使い") { 2 } 
         else { job.get_max_weapon_level(7) };
-   // println!("Adjusting Staff");
+    let total_level = unit.level as i32 + unit.internal_level as i32;
     if weapon_mask.value & ( 1 << 7 ) == 0 { replace_staves(unit.item_list); }
     else if weapon_mask.value & ( 1 << 7 ) != 0 && staff_level > 0 {
         dispose_item_type(unit.item_list, 7);
@@ -470,154 +326,64 @@ pub fn adjust_unit_items(unit: &Unit) {
         else {
             for x in 1..4 {
                 if x == 3 && rng.get_value(3) > 1 {  continue; }
-                if let Some(staff_) = WEAPONDATA.lock().unwrap().get_staff(x, staff_level){
+                if let Some(staff_) = WEAPONDATA.get().unwrap().get_staff(total_level, x, staff_level){
                     unit.item_list.add_item_no_duplicate(staff_);
                 }
             }
         }
-    }
-    let pid = unit.person.pid.to_string();
-    add_equip_condition(unit);
-    dispose_unusables(unit);
-    remove_duplicates(unit.item_list);
-    let enemy = unit.person.get_asset_force() != 0;
-    if jid == "JID_裏邪竜ノ娘" || jid == "JID_裏邪竜ノ子" { 
-        unit.private_skill.add_sid("SID_オヴスキュリテ装備可能", 10, 0);    //Equip Obscurite
-        if pid != "PID_エル" && pid != "PID_ラファール" {
-            if let Some(stone1) =  WEAPONDATA.lock().unwrap().get_dragon_stone(enemy) {
-                unit.item_list.add_item_no_duplicate(stone1);
-            }
-            if let Some(stone2) = WEAPONDATA.lock().unwrap().get_dragon_stone(enemy) {
-                unit.item_list.add_item_no_duplicate(stone2);
-            }
-        }
-    }
-    if jid == "JID_神竜ノ子" || jid == "JID_神竜ノ王" {
-        unit.private_skill.add_sid("SID_リベラシオン装備可能", 10, 0);
-        unit.private_skill.add_sid("SID_ヴィレグランツ装備可能", 10, 0);
-    }
-    let completed_m017 = ( !continous && DVCVariables::is_main_chapter_complete(17) ) || (continous && story_chapter >= 16);
-    fix_weapons_by_rank(unit, completed_m017);
-    if is_veyle {
-        if is_player && !GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) {
-            unit.item_list.add_iid_no_duplicate("IID_オヴスキュリテ"); 
-        }
-        unit.item_list.add_iid_no_duplicate("IID_ミセリコルデ");
-        magic_dagger_weapon_change(unit.get_job());
-    }
-    if pid == "PID_エル" {
-        unit.item_list.add_iid_no_duplicate("IID_邪竜石"); 
-        unit.item_list.add_iid_no_duplicate("IID_邪竜石_騎馬特効"); 
-    }
-    if pid == "PID_ラファール" {    
-        unit.item_list.add_iid_no_duplicate("IID_邪竜石"); 
-        unit.item_list.add_iid_no_duplicate("IID_邪竜石_騎馬特効");
-    }
-    if jid == "JID_マージカノン" {  //Mage Canon
-       // println!("Mage Cannon Adjustment");
-        let len = WEAPONDATA.lock().unwrap().bullet_list.len();
-        if len > 1 {
-            let index1 = WEAPONDATA.lock().unwrap().bullet_list[ rng.get_value(len as i32) as usize].item_index;
-            unit.item_list.add_item_no_duplicate(ItemData::try_index_get(index1).unwrap());
-            loop {
-                let index2 = WEAPONDATA.lock().unwrap().bullet_list[ rng.get_value(len as i32) as usize].item_index;
-                if index2 != index1 {
-                    unit.item_list.add_item_no_duplicate(ItemData::try_index_get(index2).unwrap());
-                    break;
-                }
-            }
-        }
-    }
-    if jid == "JID_邪竜ノ娘" && !is_veyle {
-        if !GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) && is_player {
-            dispose_all_but_drops(unit.item_list);
-            unit.item_list.add_iid_no_duplicate("IID_オヴスキュリテ"); 
-        }
-        unit.private_skill.add_sid("SID_オヴスキュリテ装備可能", 10, 0); //Equip Obscurite
-        unit.private_skill.add_sid("SID_ミセリコルデ装備可能", 10, 0);  //Equip Misercode
-    }
-    if is_player { // Vul or Elixir
-        if unit.get_capability(0, false) >= 45 { unit.item_list.add_iid_no_duplicate("IID_特効薬");   }
-        else { unit.item_list.add_item_no_duplicate(ItemData::get("IID_傷薬").unwrap());  }
-    }
-    add_generic_weapons(unit);
-    adjust_melee_weapons(unit);
-    remove_duplicates(unit.item_list);
-    add_equip_condition(unit);
-    adjust_missing_weapons(unit);
+    };
 }
 
 pub fn adjust_missing_weapons(unit: &Unit) {
     if get_number_of_usable_weapons(unit) < 1 {
         println!("{} has no usable weapons!", Mess::get_name(unit.person.pid));
         dispose_unusables(unit);
-        if unit.job.jid.to_string() == "JID_マージカノン" {  //Mage Canon
-            let len = WEAPONDATA.lock().unwrap().bullet_list.len();
+        if unit.job.mask_skills.find_sid("SID_弾丸装備".into()).is_some() {  //Mage Canon
+            let len = WEAPONDATA.get().unwrap().bullet_list.len();
             let rng = Random::get_game();
             if len > 1 {
-                let index1 = WEAPONDATA.lock().unwrap().bullet_list[ rng.get_value(len as i32) as usize].item_index;
+                let index1 = WEAPONDATA.get().unwrap().bullet_list[ rng.get_value(len as i32) as usize].item_index;
                 unit.item_list.add_item_no_duplicate(ItemData::try_index_get(index1).unwrap());
-                loop {
-                    let index2 = WEAPONDATA.lock().unwrap().bullet_list[ rng.get_value(len as i32) as usize].item_index;
-                    if index2 != index1 {
-                        unit.item_list.add_item_no_duplicate(ItemData::try_index_get(index2).unwrap());
-                        break;
-                    }
-                }
+                let index2 = WEAPONDATA.get().unwrap().bullet_list[ rng.get_value(len as i32) as usize].item_index;
+                unit.item_list.add_item_no_duplicate(ItemData::try_index_get(index2).unwrap());
             }
             return;
         }
         add_generic_weapons(unit);
+        unit.auto_equip();
     }
-    if unit.person.get_asset_force() == 0 { // Vul or Elixir
-        if unit.get_capability(0, false) >= 45 { unit.item_list.add_iid_no_duplicate("IID_特効薬");   }
-        else { unit.item_list.add_item_no_duplicate(ItemData::get("IID_傷薬").unwrap());  }
-    }
-}
-
-
-pub fn fix_weapons_by_rank(unit: &Unit, upgrade_weapon: bool) {
-   // println!("Fixing weapons by rank for {}", Mess::get(unit.person.get_name().unwrap()).to_string());
-    let unit_level = unit.level as i32 + unit.internal_level as i32;
-    let weapon_rank = if !upgrade_weapon { 0 }
-    else if unit_level < 25 { 2 }
-    else { 3 };
-
-    let job = unit.get_job();
-    let pid = unit.person.pid.to_string();
-    for x in 0..unit.item_list.unit_items.len() {
-        let weapon = unit.item_list.get_item(x as i32).unwrap();
-        if !can_change_weapon(weapon, false) { continue; }
-        let iid = weapon.item.iid.to_string();
-        if iid == "IID_エンゲージ枠" || iid == "IID_不明" { continue; } // if engage weapon slot or none skip
-        if iid == "IID_ミセリコルデ" && pid != "PID_ヴェイル" {
-            weapon.dispose();
-            continue;
-        }
-        let kind = weapon.item.kind;
-
-        let weapon_level = job.get_max_weapon_level(kind as i32) as i32;
-       //  println!("Item {}: {} Kind: {}, Rank: {}", x, weapon.item.name.to_string(), kind, weapon_level);
-        if weapon_level == 0 && !weapon.is_drop(){ weapon.dispose(); continue;  }
-        if weapon_level < weapon.item.get_weapon_level() && weapon_level > 0 { // Weapon is higher than the Job's rank
-            let weapon_index;
-            if kind > 8 { continue; }
-            if kind == 8 { weapon_index = 6;}
-            else { weapon_index = (kind - 1 ) as i32;}
-            let index = ( (7* (weapon_level - 1) ) + weapon_index ) as usize;
-            if index < 35 { weapon.ctor_str(  STANDARD_WEPS[ index as usize ] ); }
-        }
-        if upgrade_weapon {
-            if weapon_rank > 0 && ( weapon.item.get_weapon_level() < weapon_rank && weapon_level >= weapon_rank ) {    // Weapon is lower than level rank and Job can use it
-                let weapon_index;
-                if kind == 8 { weapon_index = 6;}
-                else { weapon_index = (kind - 1 ) as i32;}
-                let index = ( (7* (weapon_rank - 1) ) + weapon_index ) as usize;
-                if index < 35 {  weapon.ctor_str(  STANDARD_WEPS[ index ] );}
+    let total_level = unit.level as i32 + unit.internal_level as i32;
+    if get_number_of_usable_weapons(unit) < 2 && total_level > 15 {
+        println!("{} has only one weapons!", Mess::get_name(unit.person.pid));
+        if let Some(uitem) = unit.item_list.unit_items.iter().flatten().find(|x| x.is_weapon() ) {
+            println!("Found Weapon: {}", Mess::get_name(uitem.item.iid));
+            if let Some(item) = WEAPONDATA.get().unwrap().get_additional_weapon(uitem.item) {
+                unit.item_list.add_item_no_duplicate(item);
             }
         }
     }
 }
+
+pub fn simple_replacement(unit: &Unit) {
+    let job = unit.get_job();
+    let mut combine_mask = unit.selected_weapon_mask.value | job.get_weapon_mask().value;
+    unit.item_list.unit_items.iter().flatten()
+        .filter(|uitem| uitem.item.is_weapon() && uitem.item.flag.value & 128 == 0)
+        .for_each(|uitem|{
+            if let Some(new_item) = WEAPONDATA.get().unwrap().get_simple_replacement(uitem.item, combine_mask, job.weapon_levels) {
+                println!("Unit {} ({}): Simple Replacing {} -> {} ({} -> {})", Mess::get_name(unit.person.pid), Mess::get_name(unit.job.jid), Mess::get_name(uitem.item.iid), Mess::get_name(new_item.iid), uitem.item.power, new_item.power);
+                uitem.ctor(new_item);
+                combine_mask &= !(1 << new_item.kind); // remove kind mask
+            }
+        }
+    );
+    remove_duplicates(unit.item_list);
+    dispose_unusables(unit);
+    if combine_mask & 62 != 0 && get_number_of_usable_weapons(unit) < 2 { add_generic_weapons(unit); }
+}
+
+
+
 pub fn add_generic_weapons(unit: &Unit) {
     //if unit.person.get_asset_force() != 0 { // Making sure enemies have weapon
     let job = unit.get_job();
@@ -632,30 +398,35 @@ pub fn add_generic_weapons(unit: &Unit) {
     let combine_mask = unit.selected_weapon_mask.value | job_mask;
     let unit_level = unit.level as i32 + unit.internal_level as i32;
     let player = unit.person.get_asset_force() == 0;
-    let weapon_rank = if get_story_chapters_completed() < 7 { 1 }
+    let mut weapon_rank = if unit_level < 10 { 1 }
         else if unit_level < 21 { 2 }
         else { 3 };
+
     let mut has_weapon: [bool; 10] = [false; 10];
     has_weapon[7] = true;
-    for x in 0..unit.item_list.unit_items.len() {
-        let item = unit.item_list.get_item(x as i32);
-        if item.is_none() { continue;}
-        let weapon = item.unwrap();
-        if !weapon.item.is_weapon() { continue; }
-        let kind = weapon.item.kind;
-        if kind > 9 || kind == 0 { continue; }
-        let weapon_level = job.get_max_weapon_level(kind as i32) as i32;
-        if weapon.item.get_weapon_level() <= weapon_level && combine_mask & ( 1 << kind ) != 0 { has_weapon[kind as usize] = true; }
-        else if weapon.flags & 2 != 0 { weapon.dispose();  }
-    }
+    unit.item_list.unit_items.iter()
+        .flatten()
+        .filter(|uitem| uitem.item.is_weapon() && uitem.item.flag.value & 128 == 0)
+        .for_each(|uitem|{
+            let kind = uitem.item.kind;
+            let item_level = uitem.item.get_weapon_level();
+            let weapon_level = job.get_max_weapon_level(kind as i32) as i32;
+            if item_level <= weapon_level && combine_mask & ( 1 << kind ) != 0 { 
+                if weapon_rank < item_level { weapon_rank = item_level; }
+                has_weapon[kind as usize] = true; 
+            
+            }
+            else if uitem.flags & 2 != 0 { uitem.dispose();  }
+        }
+    );
     for i in 1..9 {
         if has_weapon[i as usize] { continue; }
-        let rank = if job.get_max_weapon_level(i) < weapon_rank { job.get_max_weapon_level(i) } else { weapon_rank };
+        let rank = clamp_value(weapon_rank, 0, job.get_max_weapon_level(i));
         let mut added_weapon = false;
         if combine_mask & (1 << i ) != 0 && rank > 0 {
             if player {
                 if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) {
-                    if let Some(item) = WEAPONDATA.lock().unwrap().get_random_weapon(i-1, false) {
+                    if let Some(item) = WEAPONDATA.get().unwrap().get_random_weapon(i-1, false) {
                         if item.get_weapon_level() <= rank { 
                             unit.item_list.add_item_no_duplicate(item);  
                             added_weapon = true;
@@ -665,7 +436,7 @@ pub fn add_generic_weapons(unit: &Unit) {
             }
             else {
                 if GameVariableManager::get_number(DVCVariables::ITEM_KEY) != 0 && get_continious_total_map_complete_count() > 10 {
-                    if let Some(item) = WEAPONDATA.lock().unwrap().get_random_weapon(i-1, true) {
+                    if let Some(item) = WEAPONDATA.get().unwrap().get_random_weapon(i-1, true) {
                         if item.get_weapon_level() <= rank {
                             unit.item_list.add_item_no_duplicate(item); 
                             added_weapon = true;
@@ -676,7 +447,7 @@ pub fn add_generic_weapons(unit: &Unit) {
             if !added_weapon {
                 let mut search_rank = rank;
                 while search_rank > 0 {
-                    if let Some(item) = WEAPONDATA.lock().unwrap().get_generic_weapon(i-1, search_rank) { 
+                    if let Some(item) = WEAPONDATA.get().unwrap().get_generic_weapon(i-1, search_rank) { 
                         unit.item_list.add_item_no_duplicate(item); 
                         break;
                     }
@@ -692,8 +463,7 @@ pub fn add_generic_weapons(unit: &Unit) {
 pub fn random_items_drops(unit: &Unit){
     let rng = Random::get_system();
     let mut none_count = 0;
-    let mut rate =
-        if GameUserData::get_difficulty(false) == 2 {1 / 2} else { 1 } * GameVariableManager::get_number(DVCVariables::ITEM_DROP_GAUGE_KEY);
+    let mut rate = if GameUserData::get_difficulty(false) == 2 {1 / 2} else { 1 } * GameVariableManager::get_number(DVCVariables::ITEM_DROP_GAUGE_KEY);
         
     for x in 0..8 {
         if let Some(u_item) = unit.item_list.get_item(x) {

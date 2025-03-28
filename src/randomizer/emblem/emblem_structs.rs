@@ -1,6 +1,5 @@
 use super::*;
 use super::super::skill::SKILL_POOL;
-use std::fmt::{Display, Formatter};
 
 pub struct EngageAttackIndex {
     pub index_1: i32,
@@ -173,18 +172,19 @@ impl SynchoList {
             let mut avail: Vec<_> = intersection_si.0.iter_mut().filter(|s| ( s.max_priority - s.min_priority) == dp).map(|s| s.index).collect();
             intersection_si.0.iter_mut().filter(|s| ( s.max_priority - s.min_priority) == dp)
                 .for_each(|inherit|{
-                    inherit.randomized_index = avail.get(rng.get_value(avail.len() as i32) as usize).map_or_else(|| inherit.index, |r| *r); 
+                    inherit.randomized_index = get_random_and_remove(&mut avail, rng).unwrap_or(inherit.index);
+                    //avail.get(rng.get_value(avail.len() as i32) as usize).map_or_else(|| inherit.index, |r| *r); 
                     if let Some(pos) = avail.iter().position(|&x| x == inherit.randomized_index) { avail.remove(pos); }
                     if let Some(pos) = s_list_avail.iter().position(|x| x.0 == inherit.randomized_index) { s_list_avail.remove(pos); }
-                    let _ = s_list.iter_mut().find(|x| x.index == inherit.index).map(|x| { x.randomized_index = inherit.randomized_index; } );
+                    if let Some( sync ) = s_list.iter_mut().find(|x| x.index == inherit.index) { sync.randomized_index = inherit.randomized_index; }
                 }
             );
             // Inherit Skills that are not Sync Skills
             let mut avail: Vec<_> = intersection_si.1.iter_mut().filter(|s| ( s.max_priority - s.min_priority) == dp).map(|s| s.index).collect();
             intersection_si.1.iter_mut().filter(|s| ( s.max_priority - s.min_priority) == dp)
                 .for_each(|inherit|{
-                    inherit.randomized_index = avail.get(rng.get_value(avail.len() as i32) as usize).map_or_else(|| inherit.index, |r| *r); 
-                    if let Some(pos) = avail.iter().position(|&x| x == inherit.randomized_index) { avail.remove(pos); }
+                    inherit.randomized_index = get_random_and_remove(&mut avail, rng).unwrap_or( inherit.index);
+                    // if let Some(pos) = avail.iter().position(|&x| x == inherit.randomized_index) { avail.remove(pos); }
                 }
             );
         }
@@ -196,8 +196,9 @@ impl SynchoList {
             let mut avail_dp_pool: Vec<_> = s_list_avail.iter().filter(|s| s.1 == dp).collect();
             s_list.iter_mut().filter(|s| ( s.max_priority - s.min_priority )  == dp && s.randomized_index == 0 && !self.non_random_skills.iter().any(|&i| i == s.index))
                 .for_each(|s|{
-                    s.randomized_index = if avail_dp_pool.len() > 0 { avail_dp_pool[rng.get_value(avail_dp_pool.len() as i32) as usize].0 } else { s.index };
-                    if let Some(pos) = avail_dp_pool.iter().position(|x| x.0 == s.randomized_index){ avail_dp_pool.remove(pos);  }
+                    s.randomized_index =  get_random_and_remove(&mut avail_dp_pool, rng).map_or_else(|| s.index, |v| v.0);
+                    //s.randomized_index = if avail_dp_pool.len() > 0 { avail_dp_pool[rng.get_value(avail_dp_pool.len() as i32) as usize].0 } else { s.index };
+                    // if let Some(pos) = avail_dp_pool.iter().position(|x| x.0 == s.randomized_index){ avail_dp_pool.remove(pos);  }
                 }
             );
         }
@@ -208,8 +209,9 @@ impl SynchoList {
             c_list.iter_mut().filter(|s| ( s.max_priority - s.min_priority )  == dp )
                 .for_each(|s|{
                     s.randomized_index = 0;
-                    s.randomized_index = if avail_dp_pool.len() > 0 { avail_dp_pool[rng.get_value(avail_dp_pool.len() as i32) as usize] } else { s.index };
-                    if let Some(pos) = avail_dp_pool.iter().position(|x| *x == s.randomized_index){  avail_dp_pool.remove(pos);  }
+                    s.randomized_index = get_random_and_remove(&mut avail_dp_pool, rng).unwrap_or( s.index);
+                    // s.randomized_index = if avail_dp_pool.len() > 0 { avail_dp_pool[rng.get_value(avail_dp_pool.len() as i32) as usize] } else { s.index };
+                    // if let Some(pos) = avail_dp_pool.iter().position(|x| *x == s.randomized_index){  avail_dp_pool.remove(pos);  }
                 }
             );
         }

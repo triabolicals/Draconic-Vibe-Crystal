@@ -5,13 +5,12 @@ use concat_string::concat_string;
 use god::{EngageAtkAsset, GodAssets};
 use item::WeaponAssets;
 use engage::{gamedata::{*, skill::*, unit::*, assettable::*}, random::Random, gamedata::item::ItemData, gamevariable::GameVariableManager};
-use crate::{DVCVariables, randomizer::emblem::EMBLEM_LIST, assets::animation::{INF_ACT, WEP_PRE}};
+use crate::{DVCVariables, randomizer::emblem::EMBLEM_LIST};
 use job::{Mount, *};
 use search::*;
-use animation::*;
-use super::{result_commit_scaling, AnimSetDB, ConditionFlags, EMBLEM_ASSET, accessory::{change_accessory, clear_accessory_at_locator}};
+// use animation::*;
+use super::{result_commit_scaling, ConditionFlags, EMBLEM_ASSET, accessory::{change_accessory, clear_accessory_at_locator}};
 
-pub static ACTDATA: OnceLock<Vec<AnimData>> = OnceLock::new();
 pub static SEARCH_LIST: OnceLock<AssetData> = OnceLock::new();
 
 pub mod item;
@@ -19,49 +18,8 @@ pub mod job;
 pub mod accessory;
 pub mod search;
 pub mod god;
-pub mod animation;
 
-pub fn initialize_anim_data() {
-    let data = AnimSetDB::get_list().unwrap();
-    let wep = ["No", "Sw", "Lc", "Ax", "Bw", "Dg", "Mg", "Rd", "Ft"];
-    let prefixes: HashSet<String> = data.iter().map(|x| x.name.to_string().split_at(6).0.to_string() ).collect();
-
-    ACTDATA.get_or_init(||{
-        let mut list: Vec<AnimData> = Vec::new();
-        prefixes.iter().for_each(|act|{
-            let set: Vec<_> = data.iter().filter(|x| x.name.to_string().contains(act)).map(|x| x.name.to_string() ).collect();
-            let mut mask = 0;
-
-            let mut anim = 
-                AnimData{ gender: determine_gender_str(act), act_name: act.to_string(), special: 0, mount: determine_mount_str(act), weapon_mask: 0, has_transformation: false, is_generic: false, has_morph: false, suffix: String::new() };
-
-            for x in 0..9 {
-                let search = concat_string!(act, "-", wep[x]);
-                if let Some(found) = set.iter().find(|x| x.contains(search.as_str())) {
-                    mask |= 1 << (x as i32);
-                    let suffix = found.split_at(found.find("_c").unwrap()+1).1;
-                    if found.contains("No2_c") { anim.has_transformation = true; }
-                    else if found.contains("2_c") { anim.special = x as i32; }
-                    if suffix.contains("000") { anim.is_generic = true; }
-                    if !anim.is_generic {
-                        anim.suffix = suffix.to_string();
-                    }   
-                }
-            }
-            if anim.act_name.contains("M-") { anim.has_morph = set.iter().any(|x| x.contains("c70")) }
-            else if anim.act_name.contains("F-") { anim.has_morph = set.iter().any(|x| x.contains("c70")) }
-            if mask != 0 {
-                anim.weapon_mask = mask;
-                list.push(anim);
-            }
-        });
-        println!("{} Animation Sets in DataBase", list.len());
-        list
-    });
-
-}
-
-
+pub fn initialize_anim_data() {}
 
 pub struct AssetData {
     pub bid: HashSet<i32>,
@@ -128,11 +86,11 @@ impl AssetData {
             let is_male = (gender == 1 && !cross_dressing) || (gender == 2 && cross_dressing);
 
             if let Some(aid) = person.aid {
-                let _ = search_by_key(0, aid).map(|entry| if is_male { self.m0.insert(entry.parent.index) } else { self.f0.insert(entry.parent.index) });
+                let _ = search_by_key(0, aid, None).map(|entry| if is_male { self.m0.insert(entry.parent.index) } else { self.f0.insert(entry.parent.index) });
                 let _ = search_by_key_with_dress(2, aid).map(|entry| if is_male { self.m_body.insert(entry.parent.index) } else { self.f_body.insert(entry.parent.index) });
             }
             if let Some(bid) = person.belong {
-                let _ = search_by_key(0, bid).map(|entry| self.bid.insert(entry.parent.index) );
+                let _ = search_by_key(0, bid, None).map(|entry| self.bid.insert(entry.parent.index) );
             }
             if let Some(entry) = search_by_key_with_dress(0, name) { 
                 if is_male { self.m0.insert(entry.parent.index); } else { self.f0.insert(entry.parent.index); }    }
@@ -185,6 +143,7 @@ impl AssetData {
 
     }
     pub fn add_job(&mut self, job: &JobData) {
+        if job.parent.index == 0 { return; }
         let hash = job.parent.hash;
         let canon = job.weapon_levels[9] > 1 && job.mask_skills.find_sid("SID_弾丸装備".into()).is_some();
         let dragonstone = job.weapon_levels[9] > 1 && job.mask_skills.find_sid("SID_弾丸装備".into()).is_none();
@@ -197,26 +156,43 @@ impl AssetData {
                 unique: false, 
                 cannon: canon,
                 dragon_stone: dragonstone,
+                gender_flag: 0,
             };
-            if job_data.dragon_stone { println!("Class: {} can use DragonStones", engage::mess::Mess::get_name(job.jid)); }
-            if get_job_entries(&mut job_data, mode, job.jid) { self.job.push(job_data); }
+            // let job_name = engage::mess::Mess::get_name(job.jid);
+            // if job_data.dragon_stone { println!("Class: {} can use DragonStones", engage::mess::Mess::get_name(job.jid)); }
+            if get_job_entries(&mut job_data, mode, job.jid) { 
+                job_data.unique |= job.parent.index < 20;
+                self.job.push(job_data); 
+            }
             else {
                 PersonData::get_list().unwrap().iter()
-                    .filter(|person| person.get_job().is_some_and(|job| job.parent.hash == hash))
+                    .filter(|person| person.parent.index > 0 && person.get_job().is_some_and(|sjob| sjob.parent.hash == hash))
                     .for_each(|person|{
-                        if let Some(entry) = search_by_jid(mode, person.aid.unwrap_or_else(|| person.pid)) {
+                        let mut start_index = 0;
+                        while let Some(entry) = search_by_key(mode, person.pid, Some(start_index)) {
                             if entry.dress_model.is_some_and(|b| b.to_string().contains("M_c")) || entry.dress_model.is_some_and(|b| b.to_string().contains("M_c")) {
                                 job_data.unique = true;
+                                job_data.gender_flag |= 1;
                                 job_data.entries.push(entry.parent.index);
+
                             }
                             else if entry.dress_model.is_some_and(|b| b.to_string().contains("F_c")) || entry.dress_model.is_some_and(|b| b.to_string().contains("F_c")) {
                                 job_data.unique = true;
+                                job_data.gender_flag |= 2;
                                 job_data.entries.push(entry.parent.index);
                             }
+                            if entry.body_anim.is_some() {
+                                job_data.unique = true;
+                                job_data.entries.push(entry.parent.index);
+                            }
+                            start_index = entry.parent.index;
                         }
                     }
                 );
-                if job_data.entries.len() > 0 { self.job.push(job_data); }
+                if job_data.entries.len() > 0 { 
+                    job_data.unique |= job.parent.index < 20;
+                    self.job.push(job_data);
+                }
             }
         }
     }
@@ -302,7 +278,7 @@ impl AssetData {
             }
         }
     }
-    pub fn random_head(&self, result: &mut AssetTableResult, unit: &Unit, conditions: ConditionFlags) {
+    pub fn random_head(&self, result: &mut AssetTableResult, unit: &Unit, conditions: ConditionFlags, with_dress: bool) {
         let rng = Random::instantiate().unwrap();
         rng.initialize(unit.grow_seed as u32);
         if conditions.contains(ConditionFlags::Male) || conditions.contains(ConditionFlags::Female) {
@@ -313,32 +289,45 @@ impl AssetData {
             let size = set.len();
             if size < 5 { return; }
 
-            let _ = set.iter().nth(rng.get_value(size as i32) as usize)
-                .map(|&index| AssetTable::try_index_get(index).map(|entry|
-                    {
-                        result_commit_scaling(result, entry);
-                        if !GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) { entry.dress_model.map(|dress| result.dress_model = dress);   }
+            if let Some(entry) = set.iter().nth(rng.get_value(size as i32) as usize).and_then(|&index|AssetTable::try_index_get(index)) {
+                result_commit_scaling(result, entry);
+                if with_dress {
+                    if !GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) { entry.dress_model.map(|dress| result.dress_model = dress);   }
+                }
+                if entry.head_model.is_some_and(|head| !head.to_string().contains("null")) {  result.head_model = entry.head_model.unwrap(); }
+                if entry.accessory_list.list.iter()
+                    .any(|acc| acc.model.is_some_and(|model| model.to_string().contains("_Hair"))) { result.hair_model = "uHair_null".into(); }
 
-                        if entry.head_model.is_some_and(|head| !head.to_string().contains("null")) {  result.head_model = entry.head_model.unwrap(); }
-                        if entry.accessory_list.list.iter()
-                            .any(|acc| acc.model.is_some_and(|model| model.to_string().contains("_Hair"))) { result.hair_model = "uHair_null".into(); }
+                else if entry.hair_model.is_some_and(|hair| !hair.to_string().contains("null")) {  result.hair_model = entry.hair_model.unwrap(); }
 
-                        else if entry.hair_model.is_some_and(|hair| !hair.to_string().contains("null")) {  result.hair_model = entry.hair_model.unwrap(); }
+                crate::assets::accessory::accessory_clear_all(result.accessory_list);
 
-                        crate::assets::accessory::accessory_clear_all(result.accessory_list);
+                entry.accessory_list.list.iter()
+                    .filter(|acc| 
+                        acc.model.is_some_and(|model| !model.to_string().contains("shld")) && acc.locator.is_some())
+                    .for_each(|acc| result.accessory_list.try_add(acc) );
 
-                        entry.accessory_list.list.iter()
-                            .filter(|acc| 
-                                acc.model.is_some_and(|model| !model.to_string().contains("shld")) && acc.locator.is_some())
-                            .for_each(|acc| result.accessory_list.try_add(acc) );
-
-                        clear_accessory_at_locator(result.accessory_list, "c_trans");
-                        clear_accessory_at_locator(result.accessory_list, "c_hip_jnt");
-                    }
-                )
-            );
+                clear_accessory_at_locator(result.accessory_list, "c_trans");
+                clear_accessory_at_locator(result.accessory_list, "c_hip_jnt");
+            }
         }
     }
+    pub fn adjust_head(&self, result: &mut AssetTableResult, unit: &Unit) {
+        if !result.dress_model.is_null() {  // Somboro Head if using Somboro Body
+            if result.dress_model.to_string().contains("Sdk0AM") {
+                result.head_model = "uHead_c504".into();
+                result.magic = "MG_Obscurite".into();
+            }
+        }
+        if !result.head_model.is_null() {
+            let head = result.head_model.to_string();
+            if self.job_is_unique(unit.job) {
+                if head.contains("801") { self.random_head(result, unit, ConditionFlags::Male, false);  }
+                else if head.contains("851") { self.random_head(result, unit, ConditionFlags::Female, false);  }
+            } 
+        }
+    }
+
     pub fn get_gender_condition(&self, gender: i32) -> i32 {
         if gender == 1 { self.male_index } else if gender == 2 { self.female_index } else { 0 }
     }
@@ -355,6 +344,7 @@ impl AssetData {
     }
     pub fn job_can_use_canon(&self, job_data: &JobData) -> bool { self.job.iter().find(|x| x.job_hash == job_data.parent.hash).map_or_else(|| false, |x| x.cannon) }
     pub fn job_can_use_dragonstone(&self, job_data: &JobData) -> bool { self.job.iter().find(|x| x.job_hash == job_data.parent.hash).map_or_else(|| false, |x| x.dragon_stone) }
+    pub fn job_is_unique(&self, job_data: &JobData) -> bool { self.job.iter().find(|x| x.job_hash == job_data.parent.hash).map_or_else(|| false, |x| x.unique) }
 }
 
 pub struct SearchData {

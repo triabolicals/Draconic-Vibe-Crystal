@@ -134,7 +134,7 @@ impl ConfigBasicMenuItemCommandMethods for  RerandomizeJobs {
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let pad_instance = get_instance::<Pad>();
         if pad_instance.npad_state.buttons.a() {
-            YesNoDialog::bind::<RerandomizeJobsConfirm>(this.menu, "Randomize Classes for Ally Units?\nItems will be replaced.", "Do it!", "Nah..");
+            YesNoDialog::bind::<RerandomizeJobsConfirm>(this.menu, "Randomize Classes?\nItems will be replaced.", "Do it!", "Nah..");
             BasicMenuResult::se_cursor()
         }
         else { BasicMenuResult::new() }
@@ -142,7 +142,7 @@ impl ConfigBasicMenuItemCommandMethods for  RerandomizeJobs {
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { this.command_text = "Randomize".into(); }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { 
         this.help_text = if !DVCVariables::is_main_chapter_complete(3) { "Re-randomize all player units' classes." }
-            else { "Re-randomize allies/unrecruited player units' classes."}.into(); 
+            else { "Re-randomize enemy / ally units' classes."}.into(); 
     }
 }
 
@@ -157,12 +157,7 @@ impl TwoChoiceDialogMethods for RerandomizeJobsConfirm {
 
 pub fn re_randomize_build_attr(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
     if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 == 0 { return  BasicMenuItemAttribute::Hide; }
-    if DVCVariables::is_main_chapter_complete(3) {
-        let count = if Force::get(ForceType::Ally).is_some() { Force::get(ForceType::Ally).unwrap().get_count() } else { 0 };
-        if GameUserData::get_chapter().cid.contains("M018") && GameUserData::get_sequence() == 2 { BasicMenuItemAttribute::Enable }
-        else if GameUserData::get_sequence() == 2 && count > 0 { BasicMenuItemAttribute::Enable }
-        else {  BasicMenuItemAttribute::Hide  }
-    }
+    if DVCVariables::is_main_chapter_complete(3) && GameUserData::get_sequence() == 2 { BasicMenuItemAttribute::Enable }
     else if GameUserData::get_sequence() == 3 && GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 { BasicMenuItemAttribute::Enable }
     else {  BasicMenuItemAttribute::Hide  }
 }

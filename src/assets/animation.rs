@@ -85,19 +85,19 @@ pub fn set_class_animations(result: &mut AssetTableResult, job: &JobData, item: 
     else {
         let job_hash = job.parent.hash; 
         let search_lists = SEARCH_LIST.get().unwrap();
-        if conditions.contains(ConditionFlags::Generic) && 
-            job.parent.index > 25 && search_lists.job.iter().find(|a| a.job_hash == job_hash && mode == a.mode).is_some_and(|a| !a.unique || a.mount == Mount::Pegasus) {
-                // Generic in a Generic Class
-                return;
-            }
+        if conditions.contains(ConditionFlags::Generic) && job.parent.index > 25 && search_lists.job.iter().find(|a| a.job_hash == job_hash && mode == a.mode).is_some_and(|a| !a.unique ) {
+            // Generic in a Generic Class
+            return;
+        }
         if let Some(data) = search_lists.job.iter().find(|a| a.job_hash == job_hash && mode == a.mode) {
-            println!("Found Class: {} for {} (Unique?: {})", Mess::get_name(job.jid), Mess::get_name(unit.person.pid), data.unique);
+            // println!("Found Class: {} for {} (Unique?: {})", Mess::get_name(job.jid), Mess::get_name(unit.person.pid), data.unique);
             result.body_anims.clear();
             if mode == 1 {
                 match data.mount {
                     Mount::None => { result.body_anims.add(Il2CppString::new_static(concat_string!("UAS_oBody_A", gen_str))); }
                     Mount::Cav | Mount::Wolf => { result.body_anims.add(Il2CppString::new_static(concat_string!("UAS_oBody_B", gen_str))); }
-                    Mount::Pegasus | Mount::Griffin | Mount::Wyvern => { result.body_anims.add(Il2CppString::new_static(concat_string!("UAS_oBody_F", gen_str))); }
+                    Mount::Griffin | Mount::Wyvern => { result.body_anims.add(Il2CppString::new_static(concat_string!("UAS_oBody_F", gen_str))); }
+                    Mount::Pegasus => { result.body_anims.add(Il2CppString::new_static("UAS_oBodyFF")); }
                 }
             }
             else {
@@ -134,47 +134,59 @@ pub fn set_class_animations(result: &mut AssetTableResult, job: &JobData, item: 
                 }
             }
             if kind == 4 || kind == 6 { change_accessory(result.accessory_list, "null", "l_shld_loc");  }   // Remove Shield for Bows / Tome
-            if dismount(data.mount, gen, kind) { remove_mounts_accs(result); }
+            if remove_mount_asset_anim_check(result, data.mount, gen, kind) && mode == 2 { remove_mounts_accs(result); }
         }
     }
     if conditions.contains(ConditionFlags::Transforming) { edit_result_for_monster_trans(result, unit, item, mode);}
 }
 
-pub fn dismount(mount: Mount, gender: Gender, kind: i32) -> bool {
+pub fn create_anim_from_mount(mount: Mount, gender: Gender, item_kind: i32) -> String {
+    let gen = if gender == Gender::Male { "M" } else { "F" };
     match mount {
-        Mount::None => { false }
-        Mount::Cav => {
-            match kind {
-                5|8|9 => { true }
-                _ => { false }
+        Mount::Cav => { 
+            match item_kind {
+                1|2|3 => { return concat_string!("Cav0B", gen, "-", WEP_PRE[item_kind as usize], "1_c000_N"); }
+                4 => { return concat_string!("Bow2B", gen, "-", WEP_PRE[item_kind as usize], "1_c000_L"); }
+                6 => { return concat_string!("Mag2BM-Mg1_c000_M"); }
+                7 => { return concat_string!("Com0B", gen, "-", WEP_PRE[item_kind as usize], "1_c000_N"); }
+                5|8|9 => { return concat_string!(INF_ACT[item_kind as usize], gen, "-", WEP_PRE[item_kind as usize], "1_c000_N"); }
+                _ => {  return concat_string!("Com0B", gen, "-No1_c000_N"); }
             }
         }
-        Mount::Pegasus => {
-            match kind {
-                4|5|8|9 => { true }
-                _ => { false }
+        Mount::Pegasus => { 
+            match item_kind {
+                1|2|3|7 => { return concat_string!("Wng0EF-", WEP_PRE[item_kind as usize], "1_c000_N"); }
+                6 => { return String::from("Slp0EF-Mg1_c351_M"); }
+                4|5|8|9 => { return concat_string!(INF_ACT[item_kind as usize], gen, "-", WEP_PRE[item_kind as usize], "1_c000_", if item_kind ==  4 { "L" } else { "N"}); }
+                _ => { return String::from("Wng0EF-No1_c000_N"); }
             }
         }
-        Mount::Wolf => {
-            match kind {
-                4|6|9 => { true }
-                _ => { false }
+        Mount::Wolf => { 
+            match item_kind {
+                1|2|3|5|7 => { return concat_string!("Cav2C", gen, "-", WEP_PRE[item_kind as usize], "1_c000_N"); }
+                4|6|8|9 =>  { return concat_string!(INF_ACT[item_kind as usize], gen, "-", WEP_PRE[item_kind as usize], "1_c000_", if item_kind ==  4 { "L" } else { "N"}); }
+                _ => {  return concat_string!("Com0B", gen, "-No1_c000_N"); }
             }
         }
-        Mount::Wyvern => {
-            match kind {
-                4|5|8|9 => { true }
-                6 => { gender == Gender::Male }
-                _ => { false }
+        Mount::Wyvern => { 
+            match item_kind {
+                1|2|3|7 => { return concat_string!("Wng2D", gen, "-", WEP_PRE[item_kind as usize], "1_c000_N"); }
+                6 => {
+                    if gen == "F" { return String::from("Cmi0DF-Mg1_c561_M") }
+                    else { return String::from("Mag1AM-Mg1_c000_M") }
+                }
+                4|5|8|9 => { return concat_string!(INF_ACT[item_kind as usize], gen, "-", WEP_PRE[item_kind as usize], "1_c000_", if item_kind ==  4 { "L" } else { "N"}); }
+                _ => { return concat_string!("Wng2D", gen, "-No1_c000_N"); }
             }
         }
-        Mount::Griffin => {
-            match kind {
-                4|5|6|8|9 => { true }
-                _ => { false }
-            }
-        }
+        _ => { return concat_string!(INF_ACT[item_kind as usize], gen, "-", WEP_PRE[item_kind as usize], "1_c000_N"); }
     }
+}
+
+
+pub fn remove_mount_asset_anim_check(result: &mut AssetTableResult, mount: Mount, gender: Gender, kind: i32) -> bool {
+    let anim_type = concat_string!(data::job::create_anim_type(mount, gender), "-", WEP_PRE[kind as usize]);
+    !result.body_anims.iter().any(|x| x.to_string().contains(anim_type.as_str()))
 }
 
 pub fn change_hair_change(unit: &Unit, result: &mut AssetTableResult) {
@@ -210,7 +222,7 @@ pub fn edit_result_for_monster_trans(result: &mut AssetTableResult, unit: &Unit,
     let kind = if equipped.is_none() { 0 } else { equipped.unwrap().kind } as usize;
     let gender = unit_dress_gender(unit);
     let state = unit.get_god_state();
-    println!("Unit God State transformation: {}", state);
+    // println!("Unit God State transformation: {}", state);
     if state == 2 {
         if has_enemy_tiki(unit) { replace_body_anim_for_transformation(result, mode, kind, gender); }
     }
@@ -319,9 +331,12 @@ pub fn lueur_engage_atk(result: &mut AssetTableResult, unit: &Unit, flags: Condi
         if god.child.is_none() { result.body_anims.add(Il2CppString::new_static(concat_string!("Ler1A",gen_str,"-Sw1_c000_N"))); }
         else if flags.contains(ConditionFlags::EngageAttackComboMain){ result.body_anims.add(Il2CppString::new_static(concat_string!("Ler2A", gen_str,"-Sw1_c000_N"))); }
         else { result.body_anims.add(Il2CppString::new_static(concat_string!("Ler2A", gen_str,"-Sw1_p000_N")));  }
-        return;
     }
+}
 
+pub fn anim_exists(body: &str) -> bool {
+    let search = body.split_at(9).0;
+    AnimSetDB::get_list().unwrap().iter().find(|x| x.name.to_string().contains(search)).is_some()
 }
 
 #[skyline::from_offset(0x01bafdd0)]

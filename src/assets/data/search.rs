@@ -19,15 +19,17 @@ pub fn search_by_jid(mode: i32, jid: &Il2CppString) -> Option<&'static &'static 
     let jid_index  = AssetTableStaticFields::get_condition_index(jid);
     if jid_index < 1 { return None; }
     asset_table_sf.search_lists[mode as usize].iter().find(|entry| 
-        entry.condition_indexes.list.iter().any(|s| s.iter().any(|&index| index == jid_index)) &&
-        entry.dress_model.is_some() || entry.body_model.is_some() )
+        has_condition(entry, jid_index) &&
+        ( entry.dress_model.is_some_and(|x| !x.to_string().contains("Box")) || entry.body_model.is_some() )
+    )
 }
 
-pub fn search_by_key<'a>(mode: i32, key: impl Into<&'a Il2CppString>) -> Option<&'static &'static mut AssetTable> {
+pub fn search_by_key<'a>(mode: i32, key: impl Into<&'a Il2CppString>, start: Option<i32>) -> Option<&'static &'static mut AssetTable> {
     let asset_table_sf = AssetTableStaticFields::get();
     let key_index  = AssetTableStaticFields::get_condition_index(key);
     if key_index < 1 { return None; }
-    asset_table_sf.search_lists[mode as usize].iter().find(|entry| has_condition(entry, key_index))
+    let start_index = start.unwrap_or(0);
+    asset_table_sf.search_lists[mode as usize].iter().find(|entry| entry.parent.index > start_index && has_condition(entry, key_index))
 }
 
 pub fn search_by_key_with_dress<'a>(mode: i32, key: impl Into<&'a Il2CppString>) -> Option<&'static &'static mut AssetTable> {

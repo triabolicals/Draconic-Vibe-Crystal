@@ -1,4 +1,5 @@
 use super::*;
+use data::WeaponDatabase;
 pub use engage::{
     mess::*,
     hub::{access::*, hubsequence::HubSequence}, 
@@ -193,7 +194,11 @@ pub fn create_item_pool() {
         }
     );
     println!("{} items are in the Random Item Pool", RANDOM_ITEM_POOL.lock().unwrap().len());
-    data::WEAPONDATA.lock().unwrap().intitalize();
+    data::WEAPONDATA.get_or_init(||{
+        let mut db =  WeaponDatabase::new();
+        db.intitalize();
+        db
+    });
 }
 
 pub fn random_item(item_type: i32, allow_rare: bool) -> &'static Il2CppString {

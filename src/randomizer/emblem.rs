@@ -12,7 +12,6 @@ use skyline::patching::Patch;
 use super::CONFIG;
 use super::person::pid_to_index;
 use crate::utils::*;
-use std::sync::Mutex;
 
 pub mod emblem_item;
 pub mod emblem_structs;

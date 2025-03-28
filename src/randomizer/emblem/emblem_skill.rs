@@ -1,8 +1,6 @@
 use super::*;
 use super::{emblem_item::*, emblem_structs::*};
-use super::super::skill::SkillIndex;
 use std::sync::{OnceLock, Mutex};
-use concat_string::concat_string;
 
 use engage::menu::BasicMenuItemAttribute;
 use engage::{
@@ -193,7 +191,6 @@ pub fn randomized_god_data(){
     let rng = Random::instantiate().unwrap();
     let seed = DVCVariables::get_seed();
     rng.ctor(3*seed as u32 );
-    let skill_list = SkillData::get_list().unwrap();
     let rng2 = Random::instantiate().unwrap();
     rng2.ctor( 2*seed as u32);
     let emblem_list = &EMBLEM_LIST.get().unwrap();
@@ -208,7 +205,6 @@ pub fn randomized_god_data(){
             println!("Randomizing Engage Attacks");
             let engage_atks = &ENGAGE_ATTACKS.get().unwrap();
             let mut engage_atk_pool: Vec<_> = engage_atks.iter().collect();
-            let mut count = 0;
             Patch::in_text(0x01c77620).bytes(&[0xc0,0x03, 0x5f, 0xd6]).unwrap();
             let mut emblem_link_list: Vec<usize> = (0..emblem_list.len()).collect();
             let mut available_emblem_list: Vec<usize> = (0..emblem_list.len()).collect();
@@ -239,7 +235,7 @@ pub fn randomized_god_data(){
                 .for_each(|h|{
                     let size = engage_atk_pool.len();
                     if size > 1 {
-                        let mut index = rng.get_value( engage_atk_pool.len() as i32) as usize;
+                        let mut index;
                         loop {
                             index = rng.get_value( engage_atk_pool.len() as i32) as usize;
                             if (h.0 == 9 || h.0 == 13 || h.0 > 19) && index == 7 { continue; }
@@ -317,8 +313,6 @@ fn adjust_growth_data_weapons(level_data: &mut Vec<&mut List<GodGrowthData>>) {
 fn randomize_engage_skills(rng: &Random, grow_data: &mut Vec<&mut List<GodGrowthData>>, level_data: &mut Vec<&mut List<GodGrowthDataLevelData>> ){
     if GameVariableManager::get_number(DVCVariables::EMBLEM_SYNC_KEY ) & 2 == 0 { return; }
     println!("Random Engage Skills");
-    let skill_list = SkillData::get_list().unwrap();
-    let mut count: usize = 0;
     let mut engage_sid: [i32; 40] = [-1; 40];
     let skill_pool = if GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY) & 2 != 0 { &ENGAGE_SKILLS_CHAOS } else { &ENGAGE_SKILLS }.get().unwrap();
     let mut avail_pool = skill_pool.clone();
@@ -554,7 +548,7 @@ fn adjust_engage_weapon_type(god: &Vec<&mut GodData>) {
         let engage_skills = ENGAGE_ATTACKS.get().unwrap();
         let mut engage_weapon_mask = EMBLEM_WEAPON.clone();
         engage_skills.iter()
-            .filter(|&(sid_index, gindex)| *gindex < 20)
+            .filter(|x| x.1 < 20)
             .for_each(|&(index, original_god)|{
                 if original_god < 20 {
                     if let Some(pos) = god.iter().position(|god| god.engage_attack.is_some_and(|sid| SkillData::get(sid).is_some_and(|skill| skill.parent.index == index))){

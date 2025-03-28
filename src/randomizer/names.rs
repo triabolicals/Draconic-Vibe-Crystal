@@ -1,8 +1,6 @@
 use super::*;
 use engage::force::*;
 use crate::{utils::*, CONFIG};
-
-use super::person::PLAYABLE;
 pub static mut EMBLEM_NAMES: [i32; 25] = [-1; 25];
 
 pub struct RandomNameMods;
@@ -121,23 +119,6 @@ fn set_drop_seed(this: &Unit, value: i32, _method_info: OptionalMethod);
 
 #[unity::from_offset("App", "PersonData", "get_Belong")]
 pub fn get_person_bid(this: &PersonData, method_info: OptionalMethod) -> Option<&Il2CppString>;
-
-pub fn give_names_to_generics() {
-    let list = PersonData::get_list_mut().unwrap();
-    list.iter_mut()
-        .filter(|p| 
-            unsafe { get_person_bid(p, None ).is_some() } && p.gender != 0 
-            && !PLAYABLE.get().unwrap().iter().any(|&y| y == p.parent.index) 
-            && !p.pid.to_string().contains("Boss")
-            && p.get_flag().value & 2048 == 0
-                //&& !name_list.male.iter().any(|&y| y == p.parent.index as i16) && !name_list.female.iter().any(|&y| y ==  p.parent.index as i16)
-        )
-        .for_each(|person|{
-            let flag_value = person.get_flag();
-            flag_value.value |= 2048;
-        }
-    );
-}
 
 pub fn randomize_emblem_names() {
     let name_size = if dlc_check() { 40 } else { 35 };

@@ -7,7 +7,7 @@ use engage::{
 };
 use crate::{
     enums::*,
-    randomizer::{emblem::{emblem_item::ENGAGE_ITEMS, emblem_skill::EIRIKA_INDEX}, *},
+    randomizer::{emblem::emblem_skill::EIRIKA_INDEX, *},
     utils::*,
 };
 use std::sync::OnceLock;
@@ -123,28 +123,24 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
     return result;
 }
 
-pub fn god_engage_random_str(gid: &str) -> String {
-    let god = GodData::get(gid).unwrap();
-    let emblem_name = Mess::get( god.mid).to_string();
-    let engage_attack = Mess::get( SkillData::get( &god.get_engage_attack().to_string() ).unwrap().name.unwrap() ).to_string();
-    let mut string = " ------  ".into();
-    let mut string2 = "  ------ ".into();
-    let mut string3 = " ------ ".into();
-    if let Some(sid) = god.get_engage_attack_link() {
-        string2 = Mess::get( SkillData::get(&sid.to_string()).unwrap().name.unwrap()).to_string();
-    }
-    if let Some(gid) = god.get_link_gid() {
-        string = Mess::get( GodData::get(&gid.to_string()).unwrap().mid).to_string(); 
-    }
-    if let Some(pid) = god.get_link() {
-        string3 = Mess::get_name(pid).to_string();
-    }
-    else {
-        if let Some(found) = EMBLEM_GIDS.iter().position(|&r| r == gid){
-            if unsafe { LINKED[ found ] } != -1 { string3 = Mess::get_name( PIDS[ unsafe { LINKED[ found ] as usize } ] ).to_string(); }
-        }
-    }
-    return format!("* {}: {} / {} ( {} | {} )", emblem_name, engage_attack, string2, string, string3);
+pub fn god_engage_random_str(god: &GodData) -> String {
+    return format!("* {}:\n\tEngage Atk:{}\n\tLink Engage Atk: {}\n\tLink Emblem / Person: {} / {}", Mess::get( god.mid), crate::utils::get_skill_name_from_sid(god.get_engage_attack()), god_link_engage_atk_str(god), god_link_god(god), god_link_pid(god));
+}
+
+pub fn god_link_god(god: &GodData) -> String { 
+    god.get_link_god_data().map_or_else(|| String::from(" ------ "), |link| Mess::get(link.mid).to_string()) 
+}
+
+pub fn god_link_engage_atk_str(god: &GodData) -> String { 
+    god.get_engage_attack_link().map_or_else(|| String::from(" ------ "), |sid| crate::utils::get_skill_name_from_sid(sid)) 
+}
+pub fn god_link_pid(god: &GodData) -> String { 
+    god.get_link().map_or_else(||{
+        let gid = god.gid.to_string();
+        EMBLEM_GIDS.iter().position(|&r| r == gid).filter(|&pos| unsafe { LINKED[ pos ] != -1 })
+            .map_or_else(||String::from(" ------ "), |pos| Mess::get_name( PIDS[ unsafe { LINKED[pos] as usize } ] ).to_string() )
+    },
+    |pid| Mess::get_name(pid).to_string())
 }
 
 // Prevents Alear or anyone with no cooking data from cooking 

@@ -1,5 +1,4 @@
 use concat_string::concat_string;
-use bitflags::Flags;
 use std::sync::RwLock;
 use data::SEARCH_LIST;
 use unity::{
@@ -83,9 +82,6 @@ pub fn get_accessory_count() { ACCESSORY_COUNT.get_or_init(|| unsafe { accessory
 #[unity::from_offset("App", "UnitAccessoryList", "get_Count")]
 fn accessory_list_get_count(this: u64, method_info: OptionalMethod) -> i32;
 
-
-// pub mod dress;
-
 #[unity::class("Combat", "AnimSetDB")]
 pub struct AnimSetDB{
     pub parent: StructBaseFields,
@@ -115,7 +111,14 @@ pub fn get_unit_outfit_mode(unit: &Unit) -> i32 {
 pub fn unlock_royal_classes(){
     SEARCH_LIST.get().unwrap().job.iter().filter(|x| x.unique)
         .for_each(|x|{
-            if let Some(job) = JobData::try_get_hash_mut(x.job_hash) { job.get_flag().value |= 3; }
+            if let Some(job) = JobData::try_get_hash_mut(x.job_hash) {
+                let job_flags = job.get_flag();
+                job_flags.value |= 3; 
+                if x.gender_flag != 3 {
+                    if x.gender_flag & 2 != 0 { job_flags.value |= 4; }
+                    if x.gender_flag & 1 != 0 { job_flags.value |= 16; }
+                }
+            }
         }
     );
 }
@@ -151,8 +154,8 @@ pub fn asset_table_result_setup_hook(this: &mut AssetTableResult, mode: i32, uni
         animation::edit_result_for_monster_trans(result, unit, equipped, mode); 
         return result;
     }
-
     // Class Animations
+    /* 
     if CONFIG.lock().unwrap().debug {
         println!("{}: Job: {} Mode: {}", Mess::get_name(unit.person.pid), Mess::get_name(unit.job.jid), mode);
         if mode == 2 {
@@ -174,7 +177,9 @@ pub fn asset_table_result_setup_hook(this: &mut AssetTableResult, mode: i32, uni
             result.body_anims.iter().for_each(|m| println!("After Body Act: {}", m));
         }
     }
-    else { set_class_animations(result, unit.job, equipped, unit, mode, conditions_flags); }
+    else {
+        */
+        set_class_animations(result, unit.job, equipped, unit, mode, conditions_flags); // }
     // Weapon 
     if mode == 2 { edit_asset_weapon(result, false, equipped); }
     result
@@ -195,33 +200,48 @@ pub fn edit_asset_weapon(result: &mut AssetTableResult, equipped: bool, item: Op
                         let weapon = weapons.get_random(6, rng);
                         let _ = AssetTable::try_index_get(weapon.asset_entry).map(|entry| result.commit_asset_table(entry));
                         if weapon.kind == 6 { result.magic = concat_string!("MG_", MAGIC[rng.get_value(31) as usize]).into();  }
-                        else if weapon.kind == 7 { result.magic = concat_string!("RD_", animation::ROD[rng.get_value(16) as usize]).into();  }
+                        else if weapon.kind == 7 { 
+                            if !result.left_hand.is_null() {
+                                result.right_hand = result.left_hand;
+                                result.left_hand = "null".into();
+                            }
+                            result.magic = concat_string!("RD_", animation::ROD[rng.get_value(16) as usize]).into(); 
+                        }
                     }
                 }
                 4 => {  // Bow
                     if rng.get_value(15) <= 1 { result.right_hand = "uBody_Msc0AT_c000".into(); }
-                    else {
-                        let _ = AssetTable::try_index_get(weapons.get_random(4, rng).asset_entry).map(|asset| asset.right_hand.map(|right| result.right_hand = right));
+                    else if let Some(right) = AssetTable::try_index_get(weapons.get_random(4, rng).asset_entry).and_then(|asset|asset.right_hand) {
+                        result.right_hand = right;
                     }
-                    let _ = AssetTable::try_index_get( weapons.get_random(4, rng).asset_entry ).map(|asset| asset.left_hand.map(|left| result.left_hand = left));
+                    else if let Some(left) = AssetTable::try_index_get(weapons.get_random(4, rng).asset_entry).and_then(|asset|asset.left_hand) {
+                        result.left_hand = left;
+                    }
                 }
                 1|2|3|5 => {
                     if rng.get_value(15) == 0 { result.right_hand = "uBody_Msc0AT_c000".into(); }
                     else {
                         let weapon = weapons.get_random(w_item.kind, rng);
                         let _ = AssetTable::try_index_get(weapon.asset_entry).map(|entry| result.commit_asset_table(entry));
-                        if weapon.kind == 7 { result.magic = concat_string!("RD_", animation::ROD[rng.get_value(16) as usize]).into();  }
+                        if weapon.kind == 7 { 
+                            result.magic = concat_string!("RD_", animation::ROD[rng.get_value(16) as usize]).into(); 
+                            if !result.left_hand.is_null() {
+                                result.right_hand = result.left_hand;
+                                result.left_hand = "null".into();
+                            }
+                         }
                     }
                 }
                 _ => {}
             }
         }
         else if equipped {
-            let _ = weapons.get_index(w_item.parent.index).map(|item| AssetTable::try_index_get(item.asset_entry).map(|asset| result.commit_asset_table(asset)));
-        }   
+            if let Some(entry) = weapons.get_index(w_item.parent.index).and_then(|item_asset| AssetTable::try_index_get(item_asset.asset_entry)) {
+                result.commit_asset_table(entry);
+            }
+        }
     }
 }
-
 
 
 pub fn unit_dress_gender(unit: &Unit) -> i32 {

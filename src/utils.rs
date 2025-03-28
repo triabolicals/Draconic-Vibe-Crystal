@@ -5,7 +5,7 @@ use engage::{
     force::*,
     mess::*,
     gameuserdata::GameUserData,
-    gamedata::{*, terrain::TerrainData, unit::Unit, item::*, skill::*},
+    gamedata::{*, terrain::TerrainData, unit::Unit, skill::*},
 };
 use engage::gamevariable::GameVariableManager;
 use skyline::patching::Patch;
@@ -22,6 +22,12 @@ pub fn get_random_element<'a, T>(vec: &'a mut Vec<T>, rng: &Random) -> Option<&'
     vec.get(rng.get_value(vec.len() as i32 ) as usize)
 }
 
+pub fn get_random_and_remove<'a, T: Clone>(vec: &'a mut Vec<T>, rng: &Random) -> Option<T> {
+    let index = rng.get_value(vec.len() as i32 ) as usize;
+    let v = vec.get(index).cloned();
+    if v.is_some() { vec.remove(index); }
+    return v;
+}
 
 pub fn get_rng() -> &'static Random {
     let rng = Random::instantiate().unwrap();
@@ -127,29 +133,14 @@ pub fn get_list_item_class() -> &'static Il2CppClass {
 pub fn str_contains(this: &Il2CppString, value: &str) -> bool { this.to_string().contains(value)  }
 pub fn str_contains2<'a>(this: &Il2CppString, value: impl Into<&'a Il2CppString>) -> bool { unsafe {string_contains(this, value.into(), None) } }
 
-pub fn get_person_name(person: &PersonData) -> String {
-    let name = person.get_name().unwrap();
-    return mess_get(name);
+pub fn get_skill_name_from_sid(sid: &Il2CppString) -> String {
+    SkillData::get(sid).map_or_else(||String::from(" --- "), |skill| get_skill_name(skill))
 }
 
 pub fn get_skill_name(skill: &SkillData) -> String {
-    if skill.name.is_some() { return format!("{} ({})", mess_get(skill.name.unwrap()), skill.sid.to_string()); }
+    if skill.name.is_some() { return format!("{} ({})", Mess::get(skill.name.unwrap()), skill.sid.to_string()); }
     else {  return format!(" --- ({})", skill.sid.to_string()); }
 }
-pub fn get_item_name(skill: &ItemData) -> String {
-    unsafe {  
-        if is_null_empty(skill.name, None) { 
-            return format!(" --- ({})", skill.iid.to_string()); 
-        }
-    }
-    
-    let item_name = Mess::get(skill.name ).to_string();
-    if item_name.len() != 0 { return format!("{} ({})", item_name, skill.iid.to_string()); }
-    else {
-        return format!(" --- ({})", skill.iid.to_string());
-    }
-}
-
 pub fn sid_array_string(sids: &Array<&Il2CppString> ) -> String {
     let n_skills = sids.len();
     let mut n_print = 0;
@@ -210,11 +201,6 @@ pub fn stats_from_skill_array(skills: &SkillArray) -> String {
     }
     return out;
 }
-pub fn get_emblem_name(key: &str) -> String {
-    let god = GodData::get(key);
-    if god.is_some() { return mess_get(god.unwrap().mid); }
-    else { return "".to_string(); }
-}
 
 pub fn find_emblem_stat_bonus_index(stat: i32, priority: i32) -> i32 {
     let skill_list = SkillData::get_list().unwrap();
@@ -262,8 +248,6 @@ pub fn get_nested_nested_virtual_method_mut(namespace: &str, class_name: &str, n
     }
     else { None }
 }
-
-pub fn mess_get(value: &Il2CppString) -> String { return Mess::get(value).to_string(); }
 
 pub fn get_random_number_for_seed() -> u32 {
     //Convet frame count to a random seed
@@ -320,11 +304,8 @@ pub fn get_stat_label(index: usize) -> String {
 }
 
 pub fn get_person_growth_line(person: &PersonData) -> String {
-    let pid = person.pid.to_string();
-    let mut name = " -- ".to_string();
-    if person.get_name().is_some() { name = get_person_name(person); }
     let grow = person.get_grow();
-    return format!("{} ({})\t| {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% |", name, pid, 
+    return format!("{} ({})\n\t| {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% |",  Mess::get_name(person.pid), person.pid, 
     Mess::get("MID_SYS_HP").to_string(), grow[0], Mess::get("MID_SYS_Str").to_string(), grow[1], Mess::get("MID_SYS_Mag").to_string(), grow[6], 
     Mess::get("MID_SYS_Tec").to_string(), grow[2], Mess::get("MID_SYS_Spd").to_string(), grow[3], Mess::get("MID_SYS_Lck").to_string(), grow[4],
     Mess::get("MID_SYS_Def").to_string(), grow[5], Mess::get("MID_SYS_Res").to_string(), grow[7], Mess::get("MID_SYS_Phy").to_string(), grow[8]);
@@ -361,16 +342,11 @@ pub fn is_valid_skill_index(index: i32 ) -> bool {
     }
     return false;
 }
-pub fn pid_to_mpid(pid: &String) -> String { return PersonData::get(&pid).unwrap().get_name().unwrap().to_string(); }
 
-pub fn clamp_value(v: i32, min: i32, max: i32) -> i32 {
-    unsafe { clamp(v, min, max, None)  }
-}
+pub fn clamp_value(v: i32, min: i32, max: i32) -> i32 { unsafe { clamp(v, min, max, None)  } }
 
 pub fn replace_strs(this: &Il2CppString, str1: &str, str2: &str) -> &'static Il2CppString {
-    unsafe {
-        replace_str(this, str1.into(), str2.into(), None)
-    }
+    unsafe { replace_str(this, str1.into(), str2.into(), None) }
 }
 
 pub fn replace_strs_il2str<'a>(this: &Il2CppString, str1: impl Into<&'a Il2CppString>, str2: impl Into<&'a Il2CppString>) -> &'static mut Il2CppString {
@@ -388,17 +364,13 @@ pub fn il2_str_substring(this: &Il2CppString, start: i32) -> &'static Il2CppStri
 #[skyline::from_offset(0x032dfb20)]
 pub fn clamp(value: i32, min: i32, max: i32, method_info: OptionalMethod) -> i32;
 
-pub fn max(v1: i32, v2: i32) -> i32 {
-    if v1 > v2 { v1 } else { v2 }
+pub fn max(v1: i32, v2: i32) -> i32 { if v1 > v2 { v1 } else { v2 }
 }
-pub fn min(v1: i32, v2: i32) -> i32 {
-    if v1 > v2 { v2 } else { v1 }
-}
+pub fn min(v1: i32, v2: i32) -> i32 { if v1 > v2 { v2 } else { v1 } }
+
 pub fn in_map_chapter() -> bool { GameUserData::get_sequence() == 3 }
 
-pub fn get_fnv_hash<'a>(value: impl Into<&'a Il2CppString>) -> i32 {
-    unsafe { fnv_hash_string(value.into(), None ) }
-}
+pub fn get_fnv_hash<'a>(value: impl Into<&'a Il2CppString>) -> i32 { unsafe { fnv_hash_string(value.into(), None ) } }
 //
 // Unity Functions from Engage
 //DLC Check 

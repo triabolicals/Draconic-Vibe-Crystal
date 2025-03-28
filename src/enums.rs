@@ -105,7 +105,7 @@ pub fn generate_black_list() {
     PERSONAL_BLIST.lock().unwrap().clear();
     SET_RECRUITMENT.lock().unwrap().clear();
     JOB_BLACK_LIST.lock().unwrap().clear();
-    
+
     BLACKLIST_SKILL.iter().for_each(|x| if let Some(skill) = SkillData::get(x) { SKILL_BLACK_LIST.lock().unwrap().push(skill.parent.index); });
     BLACKLIST_ITEMS.iter().for_each(|x| if let Some(item) = ItemData::get(x) { ITEM_BLACK_LIST.lock().unwrap().push(item.parent.index);  });
     PERSONAL_BLACK_LIST.iter().for_each(|x| if let Some(skill) = SkillData::get(x) { PERSONAL_BLIST.lock().unwrap().push(skill.parent.index); });
@@ -155,7 +155,7 @@ pub fn generate_black_list() {
                             if let Some(item) = ItemData::get(&spilt[z]) {
                                 let index = item.parent.index; 
                                 if ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == index).is_none() {
-                                    println!("Added General Item Blacklist #{}: {}", index, crate::utils::get_item_name(item));
+                                    println!("Added General Item Blacklist #{}: {}", index, Mess::get_name(item.iid));
                                     ITEM_BLACK_LIST.lock().unwrap().push(index);
                                 }
                             }

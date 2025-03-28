@@ -21,6 +21,7 @@ pub struct JobAssetSets {
     pub unique: bool,
     pub dragon_stone: bool,
     pub cannon: bool,
+    pub gender_flag: i32,
     pub entries: Vec<i32>,
 }
 
@@ -118,12 +119,17 @@ impl JobAssetSets {
             }
             return;
         }
-        let act_data = ACTDATA.get().unwrap();
         let gen = if gender == Gender::Male { "M-"} else { "F-" };
         let engage = AssetTableStaticFields::get_condition_index("エンゲージ技");
+        let dragonstone = AssetTableStaticFields::get_condition_index("竜石");
+        let engage2 = AssetTableStaticFields::get_condition_index("エンゲージ中");
+        let bullet = AssetTableStaticFields::get_condition_index("弾丸");
         // let weapon_kind_index = SEARCH_LIST.get().unwrap().weapon_conditions[kind as usize];
+        let mut custom_made = false;
         self.entries.iter().flat_map(|&i| AssetTable::try_index_get(i))
-            .filter(|entry| weapon_condition_met(entry, kind) && !has_condition(entry, engage) &&
+            .filter(|entry| weapon_condition_met(entry, kind) && 
+                !has_condition(entry, engage) && !has_condition(entry, dragonstone) && !has_condition(entry, engage2) &&
+                !has_condition(entry, bullet) &&
                 entry.body_anim.is_some_and(|x| x.to_string().contains(gen))
             )
             .for_each(|entry|{
@@ -131,30 +137,21 @@ impl JobAssetSets {
                 let body_anim = entry.body_anim.unwrap().to_string();
                 // println!("Body_Anim: {}", body_anim.as_str());
                 if body_anim.contains("-#") {
-                    /*
-                    let act = body_anim.split_at(6).0;
-                    if let Some(anim_set) = act_data.iter().find(|x| x.act_name == act) {
-                        let new_body = anim_set.create_anim(kind, is_morph);
-                        // println!("New Created Body Added: {}", new_body.as_str());
+                    let new_body = body_anim.replace("#", WEP_PRE[kind as usize]).replace("_c", "1_c");
+                    if super::super::animation::anim_exists(new_body.as_str()) {
                         result.body_anims.add(Il2CppString::new_static(new_body));
                     }
-                    else {
-                        */
-                        let new_body = body_anim.replace("#", WEP_PRE[kind as usize]).replace("_c", "1_c");
-                       // println!("New Replaced Body Added: {}", new_body.as_str());
-                        result.body_anims.add(Il2CppString::new_static(new_body));
-                   // }
+                    else if !custom_made {
+                        let new_anim = super::super::animation::create_anim_from_mount(self.mount, gender, kind);
+                        result.body_anims.add(Il2CppString::new_static(new_anim));
+                        custom_made = true;
+                    }
                 }
                 else { 
-                    // println!("Added: {}", body_anim.as_str());
                     result.body_anims.add(Il2CppString::new_static(body_anim));
                 }
-                if entry.right_hand.is_some_and(|str| str.to_string().contains("00")) {
-                    result.right_hand = entry.right_hand.unwrap();
-                }
-                if entry.left_hand.is_some_and(|str| str.to_string().contains("00")) {
-                    result.left_hand = entry.left_hand.unwrap();
-                }
+                if entry.right_hand.is_some_and(|str| str.to_string().contains("00")) { result.right_hand = entry.right_hand.unwrap(); }
+                if entry.left_hand.is_some_and(|str| str.to_string().contains("00")) { result.left_hand = entry.left_hand.unwrap(); }
             }
         );
     }
@@ -184,19 +181,21 @@ pub fn get_job_entries(table: &mut JobAssetSets, mode: i32, jid: &Il2CppString) 
 
     table.entries.clear();
     table.mode = mode;
-    let mut not_unique = false;
+    let mut female = false;
+    let mut male = false;
     asset_table_sf.search_lists[mode as usize].iter()
         .filter(|entry| entry.condition_indexes.list.iter().any(|s| s.iter().any(|&x| x == jid_index)))
             //entry.condition_indexes.list.iter().flat_map(|s| s.iter().any(|&index| jid_index == index)))
         .for_each(|entry|{
             if table.mount == Mount::None { table.mount = determine_mount(entry); }
-            if !not_unique {
-                not_unique = entry.condition_indexes.list.iter().any(|c1| c1.iter().any(|&i| i == male_con || i == female_con));
-            }
+            male |= has_condition(entry, male_con);
+            female |= has_condition(entry, female_con);
+            if entry.dress_model.is_some_and(|x| x.to_string().contains("M_c")) { table.gender_flag |= 1; }
+            if entry.dress_model.is_some_and(|x| x.to_string().contains("F_c")) { table.gender_flag |= 2; }
             table.entries.push(entry.parent.index);
         }
     );
-    table.unique = !not_unique;
+    table.unique = !(male && female);
     table.entries.len() > 0
 }
 

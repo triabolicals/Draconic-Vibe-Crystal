@@ -1,7 +1,4 @@
-use crate::randomizer::emblem::custom;
-
 use super::*;
-use engage::gamedata::skill::*;
 
 pub struct EngageAtkAsset {
     pub original_god_index: i32,
@@ -18,7 +15,7 @@ pub struct GodAssets {
 }
 
 impl EngageAtkAsset {
-    pub fn new(god: &GodData, god_index: i32, emblem_asset_index: i32, engage_atk_index: i32) -> Self {
+    pub fn new(_god: &GodData, god_index: i32, emblem_asset_index: i32, engage_atk_index: i32) -> Self {
         let sf = AssetTableStaticFields::get();
         Self {
             original_god_index: god_index,

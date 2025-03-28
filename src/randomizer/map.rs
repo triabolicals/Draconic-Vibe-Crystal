@@ -56,6 +56,7 @@ pub extern "C" fn register_script_commands(script: &EventScript) {
     effects::install_tilebolical_effects(script);
     GameVariableManager::make_entry_norewind(DVCVariables::TILE, 0);
     super::RANDOMIZER_STATUS.try_write().map(|mut lock| { lock.map_tile = false;   }  ).unwrap();
+    /*
     if CONFIG.lock().unwrap().debug {
         Force::get(ForceType::Player).unwrap().iter().chain( Force::get(ForceType::Absent ).unwrap().iter())
             .for_each(|unit|{
@@ -72,6 +73,7 @@ pub extern "C" fn register_script_commands(script: &EventScript) {
             }
         );
     }
+    */
     /*
     if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
         EventScript::register_action(script, "UnitJoin", crate::script::unit_join);

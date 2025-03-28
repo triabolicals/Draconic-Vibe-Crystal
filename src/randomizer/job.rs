@@ -34,10 +34,13 @@ pub struct UnitPoolStaticFieldsMut {
 fn rerandomize_jobs() {
     if DVCVariables::is_main_chapter_complete(3) {
         UnitPool::class().get_static_fields_mut::<UnitPoolStaticFieldsMut>().s_unit
-        .iter_mut().filter(|unit| unit.force.is_some_and(|f| f.force_type == 2 || f.force_type == 1 )).for_each(|unit|{
+        .iter_mut().filter(|unit| unit.force.is_some_and(|f| (1 << f.force_type) & 6 != 0 )).for_each(|unit|{
             if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 {
                 if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit); }
-                else { enemy_unit_change_to_random_class(unit); }
+                else { 
+                    super::person::ai::reset_enemy_ai_and_items(unit);
+                    enemy_unit_change_to_random_class(unit); 
+                }
                 crate::autolevel::auto_level_unit_for_random_map(unit, false);
                 super::person::unit::adjust_unit_items(unit);
                 unit.auto_equip();
@@ -51,8 +54,9 @@ fn rerandomize_jobs() {
         .iter_mut().filter(|unit| unit.force.is_some_and(|f| f.force_type == 0 )).for_each(|unit|{
             if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 {
                 if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit); }
-                else { enemy_unit_change_to_random_class(unit); }
+                else {  enemy_unit_change_to_random_class(unit); }
                 crate::autolevel::auto_level_unit_for_random_map(unit, false);
+                super::person::unit::adjust_unit_items(unit);
                 unit.auto_equip();
                 unit.reload_actor();
             }
@@ -325,7 +329,7 @@ pub fn get_weapon_for_asset_table(job: &JobData) -> Option<&'static ItemData> {
             weapon_level = job.get_max_weapon_level(x);
         }
     }
-    return crate::randomizer::item::data::WEAPONDATA.lock().unwrap().get_random_weapon(weapon_type - 1, true);
+    return crate::randomizer::item::data::WEAPONDATA.get().unwrap().get_random_weapon(weapon_type - 1, true);
 }
 
 pub fn correct_job_base_stats() {

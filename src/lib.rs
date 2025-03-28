@@ -1,9 +1,9 @@
 #![feature(ptr_sub_ptr)]
 use cobapi::{Event, SystemEvent};
-use unity::prelude::OptionalMethod;
 use std::sync::{Mutex, LazyLock};
 use crate::config::*;
 use skyline::patching::Patch;
+
 pub mod config;
 pub mod randomizer;
 pub mod utils;

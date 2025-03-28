@@ -1,3 +1,4 @@
+use concat_string::concat_string;
 use unity::prelude::*;
 use engage::{
     mess::*,
@@ -6,7 +7,7 @@ use engage::{
     menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}},
     gamevariable::*,
 };
-use std::sync::Mutex;
+use std::{collections::HashSet, sync::Mutex};
 use crate::{enums::*, randomizer::emblem::EMBLEM_LIST};
 use crate::{DVCVariables, CONFIG};
 
@@ -67,7 +68,7 @@ impl EngageItemList {
         let is_bow = item.kind == 4;
         let weapon = !(item.kind == 7 || item.kind >= 9);
 
-        let mut new_item = EngageItem::new(index, weapon, is_bow);
+        let new_item = EngageItem::new(index, weapon, is_bow);
         self.item_list.push(new_item);
     }
     // Get all engage items from GodGrowthData.LevelData
@@ -77,7 +78,7 @@ impl EngageItemList {
             .flat_map(|&h| GodData::try_get_hash_mut(h))
             .flat_map(|god| god.get_level_data())
             .enumerate()
-            .for_each(|(god, level_data)|{
+            .for_each(|(_god, level_data)|{
                 let mut style = GodStyleItems::new();
                 level_data[0].style_items.iter().enumerate().for_each(|(s, list)|{
                     let mut item_iter = list.iter();
@@ -105,14 +106,10 @@ impl EngageItemList {
                 else if data.engage_attack_link.is_some_and(|atk| atk.to_string().contains("リンエンゲージ技")) && god != 13 { 1 }
                 else { 3 };
                 if astra_storm_slot < 3 {
-                    let index = rng.get_value(engage_bows.len() as i32) as usize;
-                    let bow_index = engage_bows.get(index).map_or(0, |v| *v);
+                    let bow_index = crate::utils::get_random_and_remove(&mut engage_bows, rng).map_or(0, |f| f);
                     for style in 0..9{
-                        if let Some(original_item) = self.get_weapon_from_god_mut(style, god, astra_storm_slot) {
-                            original_item.replaced_index = bow_index;
-                        }
+                        if let Some(item) = self.get_weapon_from_god_mut(style, god, astra_storm_slot) { item.replaced_index = bow_index;  }
                     }
-                    let _ = avail_weapons.iter().position(|x| x.0 == bow_index).map(|pos| avail_weapons.remove(pos));
                 }
             }
         );
@@ -123,16 +120,16 @@ impl EngageItemList {
                     if god != 13 { // Not Tiki
                         let non_weapons = can_equip_non_weapons(data);
                         let can_bow = can_engage_bow(data);
-                        let selection: Vec<_> = avail_weapons.iter().filter(|x| ( slot == 0 && ( x.1 == !non_weapons || non_weapons) || ( x.2 == can_bow || can_bow ) ) || slot != 0 )
+                        let mut selection: Vec<_> = avail_weapons.iter().filter(|x| ( slot == 0 && ( x.1 == !non_weapons || non_weapons) || ( x.2 == can_bow || can_bow ) ) || slot != 0 )
                             .map(|x| x.0).collect();
                         for style in 0..9 {
-                            if let Some(original_item) = self.get_weapon_from_god_mut(style, god, slot) {
-                                if original_item.replaced_index < 1 { original_item.replaced_index = selection.get(rng.get_value(selection.len() as i32) as usize).map_or(0, |v| *v); }
+                            if let Some(item) = self.get_weapon_from_god_mut(style, god, slot).filter(|item| item.replaced_index < 1) {
+                                item.replaced_index = crate::utils::get_random_element(&mut selection, rng).map_or(0, |f| *f);
                             }
                         }
                         let replacement_item_index  = self.get_weapon_from_god_mut(0, god, slot).map_or(0, |f| f.replaced_index);
                         // Remove Only the 1st Style Item 
-                        let _ = avail_weapons.iter().position(|x| x.0 == replacement_item_index).map(|pos| avail_weapons.remove(pos));
+                        if let Some(pos) = avail_weapons.iter().position(|x| x.0 == replacement_item_index){ avail_weapons.remove(pos); }
                     }
                 }
             }
@@ -191,31 +188,49 @@ impl EngageItemList {
         );
     }
     pub fn print(&self, emblem: i32, level: i32) -> String {
-        let mut out = "".to_string();
-        /* 
-        let mut unique_items: Vec<(i32,i32)> = Vec::new();
-        let start;
-        let end;
-        if level == 0 { start = 0; end = 9;  }
-        else if level == 1 { start = 9; end = 18; }
-        else { start = 18; end = 27; }
-        for i in start..end {
-            let item_i = self.god_items_list[emblem as usize].item[i as usize];
-            if unique_items.iter().find(|x| item_i == x.0).is_none() {
-                unique_items.push( (item_i, i % 9) );
-            }
+        let set: HashSet<i32> = self.god_items_list[emblem as usize].item[level as usize].iter().map(|v| *v).collect();
+        if set.len() == 1 {
+            let index = set.iter().next().map_or_else(||0, |f|*f);
+            let item = self.get_replacement(index);
+            if item.parent.index > 2 { return Mess::get(item.name).to_string(); }
+            else { return String::from("None");}
         }
-        for x in unique_items {
-            if x.0 == -1 { continue; }
-            let item = self.get_replacement(x.0);
-            if x.1 == 0 { out = format!("{} {}", out, Mess::get(item.name).to_string()); }
-            else {
-                let style_name = Mess::get(&format!("MBSID_{}", STYLE[x.1 as usize])).to_string();
-                out = format!("{} {} ({})", out, Mess::get(item.name).to_string(), style_name);
-            }
+        else {
+            let mut style_masks: Vec<i32> = Vec::new();
+            set.iter()
+                .for_each(|&item|{
+                    let mut mask = 0;
+                    for x in 1..9 {
+                        if self.god_items_list[emblem as usize].item[level as usize][x] == item { mask |= (1 << (x as i32)); }
+                    }
+                    style_masks.push(mask);
+                }
+            );
+            let mut out = String::new();
+            set.iter().zip(style_masks.iter())
+                .for_each(|(item, style)| {
+                    if *style != 0 {
+                        let name = Mess::get(self.get_replacement(*item).name);
+                        let mut mask_name = String::new();
+                        for x in 1..9 {
+                            if *style & (1 << x) != 0 {
+                                let style_name = Mess::get(concat_string!("MBSID_", STYLE[x as usize])).to_string();
+                                if !mask_name.is_empty() { mask_name.push_str("/"); }
+                                mask_name.push_str(style_name.as_str());
+                            }
+                        }
+                        if !mask_name.is_empty() {
+                            if !out.is_empty() { out.push_str(", "); }
+                            out.push_str(name.to_string().as_str()); 
+                            out.push_str(" (");
+                            out.push_str(mask_name.as_str());
+                            out.push_str(")");
+                        }
+                    }
+                }
+            );
+            return out;
         }
-        */
-        return out;
     }
 }
 

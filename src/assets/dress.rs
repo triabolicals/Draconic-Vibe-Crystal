@@ -19,7 +19,7 @@ pub fn commit_for_unit_dress(result: &mut AssetTableResult, mode: i32, unit: &mu
         flags.set(ConditionFlags::AllyDarkEmblem, true);
         return flags;  
     }
-    if unit.status.value & 0x8000000 != 0 { flags.set(ConditionFlags::Vision, true); }
+    if unit.status.value & 0x8000000 != 0 { flags.set(ConditionFlags::Vision, true); }  // Vision Unit
     let condition_unit = 
         if flags.contains(ConditionFlags::Vision) {  UnitUtil::get_vision_owner(unit).unwrap_or(unit) } // Switch to conditioned unit if Doubles
         else { &unit  };
@@ -56,6 +56,7 @@ pub fn commit_for_unit_dress(result: &mut AssetTableResult, mode: i32, unit: &mu
         if condition_unit.god_link.is_some() { conditions::add_god_unit_engage_conditions(condition_unit.god_link.unwrap(), &mut flags);  }
         else if condition_unit.get_god_unit().is_some(){ conditions::add_god_unit_engage_conditions(condition_unit.god_unit.unwrap(), &mut flags);}
     }
+    // Accessories Conditions
     if condition_unit.person.get_asset_force() == 0 {
         let outfit = get_unit_outfit_mode(condition_unit);
         if flags.contains(ConditionFlags::TikiEngage) || flags.contains(ConditionFlags::Transform) {
@@ -76,6 +77,7 @@ pub fn commit_for_unit_dress(result: &mut AssetTableResult, mode: i32, unit: &mu
     }
     else { AssetTable::add_condition_key("私服");  }
 
+    // Vision Assets
     if flags.contains(ConditionFlags::Vision) {
         if ( condition_unit.person.gender == 0 || condition_unit.person.gender > 2 ) || condition_unit.person.get_bmap_size() > 1  {
             result.setup_for_person_job_item(mode, PersonData::get("PID_S004_リン"), JobData::get("JID_紋章士_リン"), equipped, conditions);
@@ -87,6 +89,7 @@ pub fn commit_for_unit_dress(result: &mut AssetTableResult, mode: i32, unit: &mu
 
         return flags;
     }
+    // Check if Unit will Transform and adjust conditions
     if condition_unit.person.gender > 0 && ( transform::is_emblem_class( condition_unit) || transform::is_monster_class( condition_unit ) ) {
         remove_condition(unit.job.jid);
         sf.condition_flags.add_by_key(unit.person.get_job().unwrap().jid);
@@ -109,17 +112,22 @@ pub fn commit_for_unit_dress(result: &mut AssetTableResult, mode: i32, unit: &mu
     if flags.contains(ConditionFlags::Transforming) { remove_mounts_accs(result);  }
 
     if mode == 2 {  dress::add_personal_outfit_accessory(result, unit, flags); }
+
+    // Unit Dress / Head Adjustment 
     dress::adjust_dress( result, mode, unit, flags);
 
+    SEARCH_LIST.get().unwrap().adjust_head(result, condition_unit);
+    // Generic Appearance Randomization
     if flags.contains(ConditionFlags::Generic) && !flags.contains(ConditionFlags::TikiEngage){  // Generic Appearance
         let generic_mode =  GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY);
         // let can_accessorize = crate::randomizer::RANDOMIZER_STATUS.read().unwrap().accessory;
-        if generic_mode & 1 == 1 && mode == 2 {  SEARCH_LIST.get().unwrap().random_head(result, condition_unit, flags); }
+        if generic_mode & 1 == 1 && mode == 2 {  SEARCH_LIST.get().unwrap().random_head(result, condition_unit, flags, true); }
             //data::HEAD_DATA.get().unwrap().replace_by_rng(unit, result);  }
         if generic_mode & 2 == 2 { change_hair_change(unit, result); }
     }
+    // Info Animation Randomization
     if GameVariableManager::get_number("G_RandAsset") > 1 && unit.person.gender != 0 && unit.person.get_bmap_size() == 1 {  
-        SEARCH_LIST.get().unwrap().random_aoc(condition_unit, result, flags); 
+         SEARCH_LIST.get().unwrap().random_aoc(condition_unit, result, flags); 
     }
     flags
 }

@@ -193,7 +193,6 @@ pub fn tranformation_chain_atk(this: &mut CombatRecord, calc_side: i32, param_3:
     let chain_atk_index = this.chain_attack_count;
     call_original!(this, calc_side, param_3, None);
     if chain_atk_index < this.chain_attack_count && chain_atk_index < this.chain_atk.len() as i32  {
-        let item = this.chain_atk[chain_atk_index as usize].weapon.as_ref().map(|uitem| uitem.item);
         let game_status = &this.chain_atk[chain_atk_index  as usize];
         if let Some(unit) = game_status.unit.as_ref() {
             let jid = unit.job.jid.to_string();

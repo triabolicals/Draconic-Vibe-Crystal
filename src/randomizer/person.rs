@@ -190,7 +190,6 @@ pub fn check_playable_classes() {
             }
         }
     });
-    super::names::give_names_to_generics();
 }
 
 fn get_custom_recruitment_list() -> Vec<(i32, i32)> {   // person_x to person_y
