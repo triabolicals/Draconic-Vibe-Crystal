@@ -93,13 +93,15 @@ fn unit_set_dispos_ai(this: &Unit, data: &DisposData, method_info: OptionalMetho
 fn disposdata_add_unit_item(this: &DisposData, unit: &Unit, method_info: OptionalMethod);
 
 pub fn reset_enemy_ai_and_items(unit: &mut Unit) {
+    let diff = 1 << GameUserData::get_difficulty(false);
     if let Some(data) = DisposData::get_list().unwrap().iter()
         .flat_map(|array| array.iter())
         .find(|data| 
+            data.flag.value & diff != 0 && 
             unit.force.map_or_else(|| 1, |f| f.force_type) == data.force as i32 &&
             data.get_person().is_some_and(|dispos_person| dispos_person.parent.hash == unit.person.parent.hash) && data.dispos_x == unit.dispos_y as i8  && data.dispos_y == unit.dispos_z as i8 )
     {
-        unit.item_list.put_off_all_item();;
+        unit.item_list.put_off_all_item();
         unsafe { 
             disposdata_add_unit_item(data, unit, None);
             unit_set_dispos_ai(unit, data, None);
@@ -112,11 +114,13 @@ pub fn reset_enemy_ai_and_items(unit: &mut Unit) {
 pub fn adjust_unitai(unit: &mut Unit) {
     let job = unit.get_job();
     let m022 = GameUserData::get_chapter().cid.to_string() == "CID_M022";
-    let jid = job.jid.to_string();
-    let not_ac_every_time = unit.ai.sequence[0].contains("AC_Everytime");
-    let old_ai_names: [String; 4] = [unit.ai.sequence[0].to_string(), unit.ai.sequence[1].to_string(),  unit.ai.sequence[2].to_string(), unit.ai.sequence[3].to_string() ];
-    let old_ac_values: [i16; 4] = [unit.ai.value[0].v16, unit.ai.value[1].v16, unit.ai.value[2].v16, unit.ai.value[3].v16];
+    let activation = unit.ai.sequence[0].to_string();
+    let ac_every_time = activation.contains("AC_Everytime");
+    let ac_turn =  activation.contains("Turn");
 
+    let old_ai_names: [String; 4] = [unit.ai.sequence[0].to_string(), unit.ai.sequence[1].to_string(),  unit.ai.sequence[2].to_string(), unit.ai.sequence[3].to_string() ];
+    let old_ac_values: [i32; 4] = [unit.ai.value[0].get_value(), unit.ai.value[1].get_value(), unit.ai.value[2].get_value(), unit.ai.value[3].get_value()];
+    
     if unit.person.get_asset_force() == 2 {
         unit.ai.set_sequence(2, "AI_AT_Attack");
         unit.ai.set_sequence(3, "AI_MV_NearestEnemy");
@@ -126,13 +130,12 @@ pub fn adjust_unitai(unit: &mut Unit) {
     if treasure { unit.private_skill.add_sid("SID_鍵開け", 10, 0);  }
 
     if old_ai_names[3].contains("Retreat") { unit.ai.set_sequence(3, "AI_MV_NearestEnemy"); }
-    if jid == "JID_ダンサー" {
+    if unit.job.mask_skills.find_sid("SID_踊り").is_some() || unit.mask_skill.unwrap().find_sid("SID_踊り").is_some() { // has Dance
         unit.ai.set_sequence(1, "AI_MI_Irregular");
-        if not_ac_every_time { unit.ai.set_sequence(0,  "AI_AC_AttackRange");  }
-        // Special Dance for Dancer if Chapter 19 is completed
+        if ac_every_time { unit.ai.set_sequence(0,  "AI_AC_AttackRange");  }
         if DVCVariables::is_main_chapter_complete(19) { unit.private_skill.add_sid("SID_特別な踊り", 10, 0);   }
     }
-    else if jid == "JID_エンチャント" {
+    else if unit.job.mask_skills.find_sid("SID_エンチャント").is_some() || unit.mask_skill.unwrap().find_sid("SID_エンチャント").is_some() { //
         unit.ai.set_sequence(2, "AI_AT_Enchant");
         set_ai_values_to_0(unit.ai, 2);
     }
@@ -150,7 +153,7 @@ pub fn adjust_unitai(unit: &mut Unit) {
                 unit.ai.set_sequence(2, "AI_AT_Interference");
                 unit.ai.set_sequence(3, "AI_MV_WeakEnemy");
             }
-            if not_ac_every_time { unit.ai.set_sequence(0,  "AI_AC_AttackRange"); }
+            if ac_every_time { unit.ai.set_sequence(0,  "AI_AC_AttackRange"); }
             set_ai_values_to_0(unit.ai, 2);
         }
         else if unit.has_heal_rod() {
@@ -167,11 +170,9 @@ pub fn adjust_unitai(unit: &mut Unit) {
         }
     }
     else {
-        if old_ai_names[0].contains("Guard") || old_ai_names[1].contains("Guard") { //Chain Guarder Unit
-            unit.private_skill.add_sid("SID_チェインガード許可", 10, 0); 
-        }
+        if old_ai_names[0].contains("Guard") || old_ai_names[1].contains("Guard") { unit.private_skill.add_sid("SID_チェインガード許可", 10, 0);  }
         // Healer turned non healer
-        if old_ai_names[1].contains("Heal") && not_ac_every_time { unit.ai.set_sequence(0,  "AI_AC_AttackRange"); }
+        if old_ai_names[1].contains("Heal") && ac_every_time { unit.ai.set_sequence(0,  "AI_AC_AttackRange"); }
         if old_ai_names[2].contains("Heal") {  
             if m022 { unit.ai.set_sequence(2, "AI_AT_ForceOnly"); }
             else {  unit.ai.set_sequence(2, "AI_AT_Attack"); }
@@ -194,9 +195,9 @@ pub fn adjust_unitai(unit: &mut Unit) {
     }
 
     if old_ai_names[3].contains( "Terrain") {  unit.ai.set_sequence(3, old_ai_names[3].as_str()); }
-    if unit.private_skill.find_sid("SID_リーダー".into()).is_some() ||  old_ai_names[0].contains("Turn") { 
+    if unit.private_skill.find_sid("SID_リーダー").is_some() ||  ac_turn { 
         unit.ai.set_sequence(0,  old_ai_names[0].as_str());
-        for x in 0..4 { unit.ai.set_value(0, x, old_ac_values[x as usize] as i32); }
+        for x in 0..4 { unit.ai.set_value(0, x, old_ac_values[x as usize]); }
     }
     adjust_ai_for_engage_attack(unit);
     if m022 {

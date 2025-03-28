@@ -158,12 +158,10 @@ impl EngageItemList {
     pub fn add_weapon_flag(&mut self, god_index: i32, item: &ItemData){
         if item.kind == 0 { return; }
         if item.kind == 7 || item.kind >= 9 { return; }
-        if god_index < 20 {
-            self.engage_weapon[god_index as usize] |= ( 1 << item.kind );
-        }
+        if god_index < 20 { self.engage_weapon[god_index as usize] |= 1 << item.kind;  }
         else {
             let index = god_index - 20;
-            self.custom_engage_weapon[index as usize] |= ( 1 << item.kind );
+            self.custom_engage_weapon[index as usize] |= 1 << item.kind;
         }
     }
     pub fn commit(&mut self){
@@ -201,7 +199,7 @@ impl EngageItemList {
                 .for_each(|&item|{
                     let mut mask = 0;
                     for x in 1..9 {
-                        if self.god_items_list[emblem as usize].item[level as usize][x] == item { mask |= (1 << (x as i32)); }
+                        if self.god_items_list[emblem as usize].item[level as usize][x] == item { mask |= 1 << (x as i32); }
                     }
                     style_masks.push(mask);
                 }

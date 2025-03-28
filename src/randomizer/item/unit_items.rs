@@ -262,13 +262,13 @@ pub fn assign_unique_items(unit: &Unit) {
     }  // Misercode for Veyle
     if job_hash == 185670709 || veyle  {  unit.item_list.add_iid_no_duplicate("IID_オヴスキュリテ");  } // Obscurite for Veyle / Fell Child Veyle
 
-    if unit.job.get_max_weapon_level(9) > 1 &&  unit.job.mask_skills.find_sid("SID_竜石装備".into()).is_some() && (pid != PIDS[36] && pid != PIDS[37]) { 
+    if unit.job.get_max_weapon_level(9) > 1 &&  unit.job.mask_skills.find_sid("SID_竜石装備").is_some() && (pid != PIDS[36] && pid != PIDS[37]) { 
         dispose_item_type(unit.item_list, 9);   // Dragonstone for classes that have the equip dragonstone skill
         if let Some(stone1) = WEAPONDATA.get().unwrap().get_dragon_stone(enemy) { unit.item_list.add_item_no_duplicate(stone1);  }
         if let Some(stone2) = WEAPONDATA.get().unwrap().get_dragon_stone(enemy) { unit.item_list.add_item_no_duplicate(stone2); }
     }
     // Mage Canon
-    if unit.job.get_max_weapon_level(9) > 1 && unit.job.mask_skills.find_sid("SID_弾丸装備".into()).is_some() {
+    if unit.job.get_max_weapon_level(9) > 1 && unit.job.mask_skills.find_sid("SID_弾丸装備").is_some() {
         dispose_item_type(unit.item_list, 9);
         let len = WEAPONDATA.get().unwrap().bullet_list.len();
         if len > 1 {
@@ -338,7 +338,7 @@ pub fn adjust_missing_weapons(unit: &Unit) {
     if get_number_of_usable_weapons(unit) < 1 {
         println!("{} has no usable weapons!", Mess::get_name(unit.person.pid));
         dispose_unusables(unit);
-        if unit.job.mask_skills.find_sid("SID_弾丸装備".into()).is_some() {  //Mage Canon
+        if unit.job.mask_skills.find_sid("SID_弾丸装備").is_some() {  //Mage Canon
             let len = WEAPONDATA.get().unwrap().bullet_list.len();
             let rng = Random::get_game();
             if len > 1 {
@@ -371,7 +371,7 @@ pub fn simple_replacement(unit: &Unit) {
         .filter(|uitem| uitem.item.is_weapon() && uitem.item.flag.value & 128 == 0)
         .for_each(|uitem|{
             if let Some(new_item) = WEAPONDATA.get().unwrap().get_simple_replacement(uitem.item, combine_mask, job.weapon_levels) {
-                println!("Unit {} ({}): Simple Replacing {} -> {} ({} -> {})", Mess::get_name(unit.person.pid), Mess::get_name(unit.job.jid), Mess::get_name(uitem.item.iid), Mess::get_name(new_item.iid), uitem.item.power, new_item.power);
+                // println!("Unit {} ({}): Simple Replacing {} -> {} ({} -> {})", Mess::get_name(unit.person.pid), Mess::get_name(unit.job.jid), Mess::get_name(uitem.item.iid), Mess::get_name(new_item.iid), uitem.item.power, new_item.power);
                 uitem.ctor(new_item);
                 combine_mask &= !(1 << new_item.kind); // remove kind mask
             }

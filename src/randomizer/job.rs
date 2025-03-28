@@ -44,7 +44,7 @@ fn rerandomize_jobs() {
                 crate::autolevel::auto_level_unit_for_random_map(unit, false);
                 super::person::unit::adjust_unit_items(unit);
                 if unit.force.unwrap().force_type != 0 { crate::randomizer::person::ai::adjust_unitai(unit);  }
-                unit.auto_equip();;
+                unit.auto_equip();
                 unit.reload_actor();
             }
         });

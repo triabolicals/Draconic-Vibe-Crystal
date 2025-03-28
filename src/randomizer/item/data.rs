@@ -1,4 +1,4 @@
-use utils::{clamp_value, str_contains};
+use utils::clamp_value;
 use std::sync::OnceLock;
 use super::*;
 
@@ -43,7 +43,7 @@ impl WeaponData {
             else { false }; 
 
         let e_skills = item.get_equip_skills();
-        let smash = e_skills.find_sid("SID_スマッシュ".into()).is_some();
+        let smash = e_skills.find_sid("SID_スマッシュ").is_some();
         let slim = item.secure > 15;
         let crit = item.critical > 15;
         let range = 
@@ -209,7 +209,7 @@ impl WeaponDatabase {
             if is_generic(item) {
                 self.generic_weapons.push(WeaponData::new(item, effectiveness)); 
                 let level = item.get_weapon_level();
-                if level < 5 && flag & 65536 == 0 && item.get_equip_skills().find_sid("SID_スマッシュ".into()).is_none() {
+                if level < 5 && flag & 65536 == 0 && item.get_equip_skills().find_sid("SID_スマッシュ").is_none() {
                     if self.base_might[level as usize ][ item.kind as usize ] < item.power  {
                         self.base_might[level as usize ][ item.kind as usize ] = item.power;
                     }
@@ -353,7 +353,7 @@ impl WeaponDatabase {
             }
             if index != 0 {
                 weapon_order[w] = index;
-                search_mask ^= (1 << index);
+                search_mask ^= 1 << index;
             }
         }
         if let Some(weapon) = self.weapon_list.iter().find(|x| x.item_index == item.parent.index) {

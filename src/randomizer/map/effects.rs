@@ -327,7 +327,7 @@ extern "C" fn inherit_skill(_args: &Array<DynValue>, _method_info: OptionalMetho
                 .for_each(|sid|{
                     if hash == 0 {
                         if let Some(skill) = SkillData::get(*sid) {
-                            if unit.equip_skill_pool.find_sid(sid).is_none() && !skill.can_override_skill() {
+                            if unit.equip_skill_pool.find_sid(*sid).is_none() && !skill.can_override_skill() {
                                 unit.add_to_equip_skill_pool(skill);
                                 hash = skill.parent.hash;
                             }

@@ -3,6 +3,7 @@ use std::sync::OnceLock;
 pub static JOB_RESTRICT_SKILLS_LIST: OnceLock<Vec<SkillWeaponRestrictions>> = OnceLock::new();
 use engage::force::*;
 use crate::randomizer::job::reclass::ChangeJobData;
+
 pub struct SkillWeaponRestrictions {
     pub hash: i32,
     pub mask: i32,
@@ -230,7 +231,7 @@ pub fn unit_learn_job_skill_hook(this: &Unit, job: &JobData, _method_info: Optio
         if CONFIG.lock().unwrap().equip_learn_skill && result.is_some() { this.add_to_equip_skill_pool(result.unwrap()); }
         return result; 
     }
-    if ( mode & 1 == 0 && this.person.get_asset_force() == 0 ) {
+    if mode & 1 == 0 && this.person.get_asset_force() == 0 {
         if CONFIG.lock().unwrap().equip_learn_skill && result.is_some() { this.add_to_equip_skill_pool(result.unwrap()); }
         return result; 
     }

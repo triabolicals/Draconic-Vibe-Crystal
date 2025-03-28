@@ -19,9 +19,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     ai::adjust_person_unit_ai(this);
     if !is_player_unit(this.person) {
         if is_playable_person(this.person) {
-            if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 {
-                job::unit_change_to_random_class(this);
-            }
+            if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 { job::unit_change_to_random_class(this);  }
             if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 ||  ( GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 ) {  adjust_unit_items(this);  }
             if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) { unit_items::adjust_missing_weapons(this); }
             grow::adaptive_growths(this);
@@ -31,9 +29,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             crate::assets::accessory::accesorize_enemy_unit(this); 
             enemy_unit_randomization(this);
             let rng = Random::get_game();
-            if rng.get_value(100) < 2*GameVariableManager::get_number(DVCVariables::ITEM_DROP_GAUGE_KEY) {
-                unit_items::random_items_drops(this);
-            }
+            if rng.get_value(100) < 2*GameVariableManager::get_number(DVCVariables::ITEM_DROP_GAUGE_KEY) { unit_items::random_items_drops(this);  }
         }
         this.auto_equip();
         this.set_hp(this.get_capability(0, true));
@@ -123,7 +119,6 @@ pub fn fixed_unit_weapon_mask(this: &mut Unit){
 
 pub fn adjust_unit_items(unit: &mut Unit) {
     let job = unit.get_job();
-    let weapon_mask = job.get_weapon_mask_with_selected(unit.weapon_mask, unit.selected_weapon_mask).value;
     let jid = job.jid.to_string();
     let is_enemy = unit.person.get_asset_force() != 0;
     if MONSTERS.iter().any(|&x| jid == x) {
@@ -132,7 +127,6 @@ pub fn adjust_unit_items(unit: &mut Unit) {
         return;
     }
     unit_items::simple_replacement(unit);
-    /*
     if unit_items::get_number_of_usable_weapons(unit) < 1 { unit_items::adjust_missing_weapons(unit); }
     else {
         let ran_map = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
@@ -151,7 +145,6 @@ pub fn adjust_unit_items(unit: &mut Unit) {
             unit_items::add_generic_weapons(unit);
         }
     }
-    */
     unit_items::assign_staffs(unit);
     unit_items::assign_tomes(unit);
     unit_items::assign_unique_items(unit);
@@ -403,7 +396,7 @@ pub fn has_sid(this: &Unit, sid: &str) -> bool {
     if let Some(learn) = this.learned_job_skill {
         if sid == learn.sid.to_string() { return true; }
     }
-    return this.mask_skill.unwrap().find_sid(sid.into()).is_some() | this.private_skill.find_sid(sid.into()).is_some() | this.equip_skill.find_sid(sid.into()).is_some();
+    return this.mask_skill.unwrap().find_sid(sid).is_some() | this.private_skill.find_sid(sid).is_some() | this.equip_skill.find_sid(sid).is_some();
 }
 
 pub fn reload_all_actors() {

@@ -145,8 +145,8 @@ impl AssetData {
     pub fn add_job(&mut self, job: &JobData) {
         if job.parent.index == 0 { return; }
         let hash = job.parent.hash;
-        let canon = job.weapon_levels[9] > 1 && job.mask_skills.find_sid("SID_弾丸装備".into()).is_some();
-        let dragonstone = job.weapon_levels[9] > 1 && job.mask_skills.find_sid("SID_弾丸装備".into()).is_none();
+        let canon = job.weapon_levels[9] > 1 && job.mask_skills.find_sid("SID_弾丸装備").is_some();
+        let dragonstone = job.weapon_levels[9] > 1 && job.mask_skills.find_sid("SID_弾丸装備").is_none();
         for mode in 1..3 { 
             let mut job_data = JobAssetSets{ 
                 job_hash: hash, 
