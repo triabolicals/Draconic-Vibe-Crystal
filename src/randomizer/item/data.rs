@@ -1,9 +1,8 @@
-use utils::clamp_value;
+use utils::{clamp_value, min};
 use std::sync::OnceLock;
 use super::*;
 
 pub static WEAPONDATA: OnceLock<WeaponDatabase> =  OnceLock::new();
-
 
 pub struct WeaponData {
     pub item_index: i32,
@@ -22,6 +21,7 @@ pub struct WeaponData {
     pub is_slim: bool,
     pub is_rare: bool,
     pub is_effective: bool,
+    pub no_follow_up: bool,
 }
 pub struct DragonStoneData {
     pub item_index: i32,
@@ -47,7 +47,7 @@ impl WeaponData {
         let slim = item.secure > 15;
         let crit = item.critical > 15;
         let range = 
-            if magic && item.range_o > 2 { true }
+            if magic && item.range_o > 3 { true }
             else if !magic && item.range_o > 1 { true }
             else { false };
         let is_rare = item.price == 100 || flags & 18 != 0;
@@ -67,7 +67,8 @@ impl WeaponData {
             is_crit: crit,
             is_range: range,
             is_effective: effectivness,
-            is_rare: ( flags & 2 != 0 || is_rare ),
+            is_rare: flags & 2 != 0 || is_rare || item.range_o > 5,
+            no_follow_up: e_skills.find_sid("SID_追撃不可").is_some(),
         }
     }
 
@@ -95,6 +96,7 @@ impl WeaponData {
 pub struct StaffData {
     pub item_index: i32,
     pub staff_type: u8,
+    pub rare: bool,
     pub rank: u8,
     pub availibility: [bool; 5],
 }
@@ -145,12 +147,14 @@ impl StaffData {
             item_index: item.parent.index,
             staff_type: staff_kind as u8,
             rank: item.get_weapon_level() as u8,
+            rare: item.flag.value & 3 != 0 || item.usetype == 27 || item.usetype == 7,
             availibility: avail,
         }
     }
-    pub fn can_add(&self, level: i32, staff_type: u8, max_rank: u8) -> bool {
+    pub fn can_add(&self, level: i32, staff_type: u8, max_rank: u8, enemy: bool) -> bool {
         let avail = get_magic_staff_by_level(level);
-        return self.availibility[avail] && self.staff_type == staff_type && self.rank <= max_rank;
+        if self.rare && !enemy { false }
+        else { self.availibility[avail] && self.staff_type == staff_type && self.rank <= max_rank }
     }
 }
 
@@ -278,8 +282,8 @@ impl WeaponDatabase {
         return None;
     }
 
-    pub fn get_staff(&self, level: i32, staff_type: i32, job_rank: i32) -> Option<&'static ItemData> {
-        let possible_staffs: Vec<&StaffData> = self.staff_list.iter().filter(|&x| x.can_add(level, staff_type as u8, job_rank as u8)).collect();
+    pub fn get_staff(&self, level: i32, staff_type: i32, job_rank: i32, enemy: bool) -> Option<&'static ItemData> {
+        let possible_staffs: Vec<&StaffData> = self.staff_list.iter().filter(|&x| x.can_add(level, staff_type as u8, job_rank as u8, enemy)).collect();
         if possible_staffs.len() == 1 { return ItemData::try_index_get(possible_staffs[0].item_index);   }
         if possible_staffs.len() > 1 {
             let rng = Random::get_system();
@@ -287,31 +291,29 @@ impl WeaponDatabase {
             let index = possible_staffs[selection].item_index;
             return ItemData::try_index_get(index);
         }
-        else {
-            println!("No available staffs for Staff Type: {}", staff_type);
-            return None; }
+        else { return None; }
     }
 
-    pub fn get_tome(&self, job_rank: i32, enemy: bool) -> Option<&'static ItemData> {
-        let magic_level = get_magic_staff();
-        let mut tome_rank = 
-            match magic_level {
-                0|1 => { 2 }
-                2 => { 3 }
-                3 => { 4 }
-                _ => { job_rank }
-            };
-        tome_rank = if tome_rank > job_rank { job_rank } else { tome_rank };
+    pub fn get_tome(&self, job_rank: i32, total_level: i32, enemy: bool) -> Option<&'static ItemData> {
+        let non_basic = total_level >= 10; 
+        let rank_level = 
+        if total_level < 14 { 1 }
+        else if total_level < 21 { 2 }
+        else if total_level < 28 { 3 }
+        else { 4 };
+        let rank = min(rank_level, job_rank) as u8;
 
-        let possible_weapons: Vec<&WeaponData> = self.weapon_list.iter().filter(|&x| x.is_valid_tome(tome_rank, enemy) ).collect();
-        if possible_weapons.len() == 1 { return ItemData::try_index_get(possible_weapons[0].item_index);   }
-        if possible_weapons.len() > 1 {
-            let rng = Random::get_system();
-            let selection = rng.get_value(possible_weapons.len() as i32) as usize;
-            let index = possible_weapons[selection].item_index;
-            return ItemData::try_index_get(index);
-        }
-        else { return None; }
+        let mut possible_weapons: Vec<_> = 
+            self.weapon_list.iter()
+                .filter(|&x|{
+                    x.weapon_type == 5 && x.rank == rank &&
+                    ((non_basic == (x.is_effective | x.no_follow_up | x.is_crit | x.is_rare)) || non_basic) && 
+                    ((enemy == x.is_rare) || enemy)
+                })
+                .map(|x| x.item_index)
+                .collect();
+
+        utils::get_random_element(&mut possible_weapons, Random::get_system()).and_then(|&index| ItemData::try_index_get(index))
     }
     pub fn get_dragon_stone(&self, is_enemy: bool) -> Option<&'static ItemData> {
         let possible_weapons: Vec<&DragonStoneData> = self.dragonstones.iter().filter(|&x|  (is_enemy == x.is_enemy_only) || is_enemy).collect();

@@ -166,11 +166,6 @@ pub fn clear_accessory_from_list(list: &mut AssetTableAccessoryList, model: &str
     }
 }
 
-pub fn accessory_clear_all(list: &mut AssetTableAccessoryList) {
-    list.list.iter_mut().for_each(|acc| { acc.model = None; });
-}
-
-
 pub fn clear_accessory_at_locator(list: &mut AssetTableAccessoryList, locator: &str) {
     if let Some(acc) = list.list.iter_mut()
         .find(|acc| acc.locator.is_some_and(|loc| loc.to_string() == locator)) {
@@ -187,17 +182,6 @@ pub fn change_accessory(list: &mut AssetTableAccessoryList, model: &str, locator
         acc.model = Some(model.into());
     }
     else { add_accessory_to_list(list, model, locator); }
-}
-
-pub fn accessory_at_locator(list: &List<AssetTableAccessory>, locator: &str) -> Option<String> {
-    if let Some(acc) = list.iter().find(|f| f.locator.filter(|m| m.to_string().contains(locator)).is_some() ) {
-        if let Some(model) = acc.model {
-            let str = model.to_string();
-            if str.len() == 0 { return None; }
-            else { return Some(str.clone()); }
-        }
-    }
-    None
 }
 
 pub fn next_unit_accessory(unit: &Unit, kind: i32, increase: bool) -> bool {

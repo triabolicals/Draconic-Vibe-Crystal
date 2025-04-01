@@ -276,7 +276,7 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
     engage_status.reset_engage_atk();
 
     if let Some(engage_attack) = unit.get_engage_attack()  {
-        println!("{} is Engage Attacking: {} hash: {}", Mess::get_name(unit.person.pid), Mess::get(engage_attack.name.unwrap()), engage_attack.parent.hash);
+        // println!("{} is Engage Attacking: {} hash: {}", Mess::get_name(unit.person.pid), Mess::get(engage_attack.name.unwrap()), engage_attack.parent.hash);
         let engage_sid = engage_attack.sid.to_string();
         engage_status.engage_atk_type = get_engage_attack_source(unit);
         engage_status.unit = unit.ident;
@@ -318,10 +318,10 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
             else if engage_sid.contains("三級長エンゲージ") { 12 }
             else { 50 };
         let engage_atks = &SEARCH_LIST.get().unwrap().engage_atks;
-    println!("Found Engage Attack {} and Old Emblem: {}", emblem_index, old_engage);
+        // println!("Found Engage Attack {} and Old Emblem: {}", emblem_index, old_engage);
         if emblem_index == 50 { 
             if let Some(engage_atk_data) = engage_atks.iter().find(|x| x.original_god_index == 50 && x.is_engage_atk(engage_attack)) {
-                println!("Found Custom Engage Atk");
+                // println!("Found Custom Engage Atk");
                 engage_atk_result_clear(result, equipped);
                 if is_tiki_engage(result) { SEARCH_LIST.get().unwrap().replace_with_god(result, 2, 13, false); }
                 engage_atk_data.apply(result, unit, gender_con);
@@ -348,7 +348,7 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
                     add_accessory_to_list(result.accessory_list, "uAcc_spine2_Hair560", "c_spine1_jnt");
                     add_accessory_to_list(result.accessory_list, "uAcc_head_Tiara560", "c_head_loc");
                     gender_con = SEARCH_LIST.get().unwrap().get_gender_condition(2);
-                    println!("Replacing Dragon Tiki with Human Tiki");
+                   //  println!("Replacing Dragon Tiki with Human Tiki");
                 }
             }
             (_, _) => { 
@@ -390,8 +390,8 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
 pub fn engage_animation_mode_1(this: &mut AssetTableResult, engage_atk_index: i32, gender: i32) {
     let gen_str = if gender == 1 { "M" } else { "F" };
     match engage_atk_index {
+        0..13|14..19 => { this.body_anim = Some(concat_string!("UAS_", "Mar1A", gen_str).into()); }
         13 => { return; }
-        0..12|14..19 => { this.body_anim = Some(concat_string!("UAS_", "Mar1A", gen_str).into()); }
         21 => { this.body_anim = Some(concat_string!("UAS_", "Ler1A", gen_str).into()); }
         _ => {this.body_anim = Some(concat_string!("UAS_", "Mar1A", gen_str).into()); }
     }

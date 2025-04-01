@@ -505,7 +505,10 @@ pub fn on_deserialize(this: &GodPool, stream: u64, version: i32, method_info: Op
     GodData::get_list().unwrap().iter().filter(|god| god.force_type == 0)
         .for_each(|god|{
             if let Some(g_unit) = GodPool::try_get(god, true) {
-                if g_unit.bonds == 0 {
+                if let Some(god_bonds) = unsafe { god_unit_get_bonds(g_unit, None) } {
+
+                }
+                else {
                     println!("GodUnit: {} has broken bonds!", Mess::get(god.mid));
                     let escape = g_unit.get_escape();
                     let gunit2 = unsafe { build_god_unit(g_unit, god, None) };
@@ -531,10 +534,21 @@ pub fn on_deserialize(this: &GodPool, stream: u64, version: i32, method_info: Op
                                 for _x in 0..level-1 { g_bond.level_up(); }
                                 unit.inherit_apt(g_unit);  
                             }
-                        }  
+                        }
                     );
                 }
             }
         }
-    );
+        );
 }
+
+#[unity::class("App", "GodBondHolder")]
+pub struct GodBondHolder {
+    parent: u128,
+    pub data: &'static GodData, 
+    reliance_s: u64,
+    pub bonds: Option<&'static Dictionary<&'static Il2CppString, GodBond>>,
+}
+
+#[unity::from_offset("App", "GodUnit", "get_GodBonds")]
+fn god_unit_get_bonds(this: &GodUnit, method_info: OptionalMethod) -> Option<&'static GodBondHolder>;

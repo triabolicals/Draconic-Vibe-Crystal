@@ -85,7 +85,7 @@ impl DVCVariables {
 
     pub fn get_dvc_person(pid_index: i32, reverse: bool) -> &'static Il2CppString {
         let key = 
-            if reverse {format!("G_R_{}", PIDS[pid_index as usize]) }
+            if !reverse {format!("G_R_{}", PIDS[pid_index as usize]) }
             else { format!("G_R2_{}", PIDS[pid_index as usize]) };
         if GameVariableManager::exist(key.as_str()) { GameVariableManager::get_string(key.as_str()) }
         else { PIDS[pid_index as usize].into() }

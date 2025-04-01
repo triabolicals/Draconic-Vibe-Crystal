@@ -184,69 +184,12 @@ pub fn assign_tomes(unit: &Unit) {
     let weapon_mask = job.get_weapon_mask();
     remove_duplicates(unit.item_list);
     let is_vander = GameVariableManager::get_string("G_R_PID_ヴァンドレ").to_string() == unit.person.pid.to_string();
-    let is_veyle = unit.person.pid.to_string() == PIDS[32];
-    let rng = Random::get_system();
-    let story_chapter = get_story_chapters_completed();
-    let continous = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
     let is_player = unit.person.get_asset_force() == 0;
-    if weapon_mask.value & 64 != 0 && (!is_vander && !is_veyle) {
+    let job_rank = job.get_max_weapon_level(6);
+    if weapon_mask.value & 64 != 0  && job_rank > 0 {
         dispose_item_type(unit.item_list, 6);
-        if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) && is_player {
-            let mut count = 0;
-            while count < 10 {
-                if let Some(new_item) = data::WEAPONDATA.get().unwrap().get_random_weapon(5, false) {
-                    if new_item.get_weapon_level() <= job.weapon_levels[6]  { 
-                        unit.item_list.add_item_no_duplicate(new_item); 
-                        break;
-                    }
-                    count += 1;
-                }
-            }
-        }
-        else {
-            let value = rng.get_value(10);
-            let job_level = job.get_max_weapon_level(6);
-            if job.is_low() && unit.level <= 20  { 
-                if DVCVariables::is_main_chapter_complete(9) || (continous && story_chapter >= 8 ){ 
-                    if value < 6 { unit.item_list.add_iid_no_duplicate("IID_エルファイアー"); }
-                    else { unit.item_list.add_iid_no_duplicate("IID_エルウィンド"); }
-                }
-                else { 
-                    if value % 2 == 0 { unit.item_list.add_iid_no_duplicate("IID_ファイアー");  }
-                    else {unit.item_list.add_iid_no_duplicate("IID_ティラミス魔道書");  }
-                }
-                if DVCVariables::is_main_chapter_complete(7) || (continous && story_chapter >= 6 ){
-                    if value & 2 == 0 { unit.item_list.add_iid_no_duplicate("IID_サージ");  }
-                    else if DVCVariables::is_main_chapter_complete(10) || (continous && story_chapter >= 10) { unit.item_list.add_iid_no_duplicate("IID_エルサージ"); }
-                    else { unit.item_list.add_iid_no_duplicate("IID_サージ");  }
-                }
-            }
-            else {
-                if ( unit.level < 10 && job.is_high() ) || ( job.is_low() && unit.level < 30 ) || job_level < 4 {
-                    if value < 6 { unit.item_list.add_iid_no_duplicate("IID_エルファイアー"); } //Elfire
-                    else { unit.item_list.add_iid_no_duplicate("IID_エルウィンド"); }   //Elwind
-                    if value % 2 == 0 { unit.item_list.add_iid_no_duplicate("IID_エルサンダー"); }  //Elthunder 50%
-                }
-                else {
-                    if job_level > 4 { // S-Rank
-                        if value % 4 == 0 { unit.item_list.add_iid_no_duplicate("IID_ノヴァ");  }  // Nova
-                        else if value % 4 == 1 { unit.item_list.add_iid_no_duplicate("IID_ボルガノン");   } // Bol
-                        else if value % 4 == 2 { unit.item_list.add_iid_no_duplicate("IID_エクスカリバー");  } //Excal
-                        else { unit.item_list.add_iid_no_duplicate("IID_トロン"); } // Thoron
-                        if ( unit.person.get_asset_force() != 0 && value == 1) && ( DVCVariables::is_main_chapter_complete(21) || GameVariableManager::get_bool("G_Cleared_S009")) {
-                            unit.item_list.add_iid_no_duplicate("IID_メティオ_G004");  //Meteor
-                        }
-                        else { unit.item_list.add_iid_no_duplicate("IID_トロン"); }
-                    }
-                    else {
-                        if value % 3 == 0 { unit.item_list.add_iid_no_duplicate("IID_ボルガノン");   } // Bol
-                        if value % 3 == 1 { unit.item_list.add_iid_no_duplicate("IID_エクスカリバー");  } //Excal
-                        if value % 3 == 2 { unit.item_list.add_iid_no_duplicate("IID_エルサージ");  } //Excal
-                        if value < 5 { unit.item_list.add_iid_no_duplicate("IID_トロン"); } // Thoron
-                    }
-                }
-            }
-        }
+        let total_level = if is_vander { 1 } else { unit.level as i32 + unit.internal_level as i32};
+        if let Some(item) = WEAPONDATA.get().unwrap().get_tome(job_rank, total_level, !is_player) { unit.item_list.add_item_no_duplicate(item); }
     }
 }
 
@@ -292,7 +235,6 @@ pub fn assign_unique_items(unit: &Unit) {
 pub fn assign_staffs(unit: &Unit) {
     let job = unit.get_job();
     let weapon_mask = job.get_weapon_mask();
-    let jid = job.jid.to_string();
     let rng = Random::get_system();
     let is_player = unit.person.get_asset_force() == 0;
 
@@ -304,31 +246,10 @@ pub fn assign_staffs(unit: &Unit) {
     if weapon_mask.value & ( 1 << 7 ) == 0 { replace_staves(unit.item_list); }
     else if weapon_mask.value & ( 1 << 7 ) != 0 && staff_level > 0 {
         dispose_item_type(unit.item_list, 7);
-        if is_player && !GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) { //Player Staff users
-            if job.is_low() { //Fracture for Wing Tamer Hortensia
-                if jid == "JID_スレイプニル下級" { unit.item_list.add_iid_no_duplicate("IID_コラプス"); }
-                if unit.level < 10 { unit.item_list.add_iid_no_duplicate("IID_ライブ"); }
-                else if unit.level < 15 {  unit.item_list.add_iid_no_duplicate("IID_リライブ") }
-                else {  unit.item_list.add_iid_no_duplicate("IID_リブロー");  }
-            }
-            else {
-                if jid == "JID_スレイプニル" { unit.item_list.add_iid_no_duplicate("IID_コラプス");  } 
-                if jid == "JID_ハイプリースト" {    // Warp/Fortify for High Priest
-                    let rng = Random::get_game();
-                    let value = rng.get_value(10);
-                    if value % 2 == 0 { unit.item_list.add_iid_no_duplicate("IID_ワープ");  }
-                    else {unit.item_list.add_iid_no_duplicate("IID_レスキュー");  }
-                    unit.item_list.add_iid_no_duplicate("IID_リザーブ");
-                }
-                else { unit.item_list.add_iid_no_duplicate("IID_リブロー"); }  // physic for the rest of staffers instead
-            }
-        }
-        else {
-            for x in 1..4 {
-                if x == 3 && rng.get_value(3) > 1 {  continue; }
-                if let Some(staff_) = WEAPONDATA.get().unwrap().get_staff(total_level, x, staff_level){
-                    unit.item_list.add_item_no_duplicate(staff_);
-                }
+        for x in 1..4 {
+            if x == 3 && rng.get_value(3) > 1 {  continue; }
+            if let Some(staff_) = WEAPONDATA.get().unwrap().get_staff(total_level, x, staff_level, !is_player ){
+                unit.item_list.add_item_no_duplicate(staff_);
             }
         }
     };
@@ -354,12 +275,8 @@ pub fn adjust_missing_weapons(unit: &Unit) {
     }
     let total_level = unit.level as i32 + unit.internal_level as i32;
     if get_number_of_usable_weapons(unit) < 2 && total_level > 15 {
-        println!("{} has only one weapons!", Mess::get_name(unit.person.pid));
         if let Some(uitem) = unit.item_list.unit_items.iter().flatten().find(|x| x.is_weapon() ) {
-            println!("Found Weapon: {}", Mess::get_name(uitem.item.iid));
-            if let Some(item) = WEAPONDATA.get().unwrap().get_additional_weapon(uitem.item) {
-                unit.item_list.add_item_no_duplicate(item);
-            }
+            if let Some(item) = WEAPONDATA.get().unwrap().get_additional_weapon(uitem.item) { unit.item_list.add_item_no_duplicate(item); }
         }
     }
 }
@@ -388,7 +305,7 @@ pub fn add_generic_weapons(unit: &Unit) {
     //if unit.person.get_asset_force() != 0 { // Making sure enemies have weapon
     let job = unit.get_job();
     let job_mask = job.get_weapon_mask().value;
-    println!("Adding Weapons for {} ({}), with Selected Mask {} / {}", Mess::get(unit.person.get_name().unwrap()).to_string(), Mess::get(unit.get_job().name), unit.selected_weapon_mask.value, job_mask);
+    // println!("Adding Weapons for {} ({}), with Selected Mask {} / {}", Mess::get(unit.person.get_name().unwrap()).to_string(), Mess::get(unit.get_job().name), unit.selected_weapon_mask.value, job_mask);
     let jid = job.jid.to_string();
     if jid == "JID_ボウナイト" { unit.item_list.add_item_no_duplicate(ItemData::get("IID_銀の弓").unwrap());  }
     if jid == "JID_エンチャント" {

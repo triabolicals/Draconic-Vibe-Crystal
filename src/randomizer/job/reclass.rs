@@ -5,13 +5,13 @@ pub fn add_job_list_unit(this: &mut ChangeJobData, unit: &Unit, method_info: Opt
     let result = call_original!(this, unit, method_info);
     if !DVCVariables::random_enabled() { return result; }
     if CONFIG.lock().unwrap().debug {
-        this.is_gender = true;
+        //this.is_gender = true;
         this.is_default_job = true;
         return true;
     }
     // Dancer-lock
-    if this.job.jid.to_string().contains("ダンサー") { 
-        if unit.get_job().jid.to_string().contains("ダンサー") || unit.person.get_job().unwrap().jid.to_string().contains("ダンサー") {
+    if this.job.mask_skills.find_sid("SID_踊り").is_some() { 
+        if unit.get_job().mask_skills.find_sid("SID_踊り").is_some() || unit.person.get_job().unwrap().mask_skills.find_sid("SID_踊り").is_some() {
             if this.job.get_flag().value & 16 != 0 {
                 let gender; 
                 if unit.edit.is_enabled() { gender = unit.edit.gender; }  // Alear
@@ -30,14 +30,12 @@ pub fn add_job_list_unit(this: &mut ChangeJobData, unit: &Unit, method_info: Opt
         }
     }
     if this.job.get_flag().value & 16 != 0 {
-        let gender = if unit.edit.is_enabled() { unit.edit.gender }  // Alear
-                     else { unit.person.get_gender() }; // Everyone Else 
+        let gender = if unit.edit.is_enabled() { unit.edit.gender } else { unit.person.get_gender() };
         if gender == 2 {  
             this.is_gender = false;
             return false; 
         }
         else {
-            //Male in male only (with female animations)
             if unit.person.get_flag().value & 32 != 0 { 
                 this.is_gender = false;
                 return false; 
@@ -57,8 +55,7 @@ pub fn add_job_list_unit(this: &mut ChangeJobData, unit: &Unit, method_info: Opt
         else { 
             this.is_gender = false; 
             return false; 
-        } // Male Crossdressing in female class: true
-          // Female Crossdressing in female class: false
+        }
     }
     return result;
 }

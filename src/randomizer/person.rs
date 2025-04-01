@@ -101,7 +101,7 @@ impl ConfigBasicMenuItemSwitchMethods for CustomPersonRecruitDisable {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         if PLAYABLE.get().unwrap().len() > 94 {
-            this.help_text = "Added recruitment slots are disabled. (Cannot Change)".into();
+            this.help_text = "Added recruitment slots are disabled. (Exceeds unit limit)".into();
             this.command_text = "Disable".into();
             this.update_text();
             return BasicMenuResult::new();
@@ -147,29 +147,20 @@ pub fn get_playable_list() {
         });
         // Add all others that have non zero SP
         let person_list = PersonData::get_list().unwrap(); 
-        let mut count = 0;
-    
-        for x in 0..person_list.len() { 
-            let person = &person_list[x as usize];
-            if person.get_sp() == 0 { continue; }
-            count += 1;
-        }
+        let count = person_list.iter().filter(|p| p.get_sp() > 0 ).count();
         if count < 200 { 
-            for x in 1..person_list.len() { 
-                let person = &person_list[x as usize];
-                if person.pid.to_string().contains("_竜化") { continue; }  //No Dragons
-                if person.get_common_sids().is_none() { continue; }
-                let index = person.parent.index; 
-                if str_contains(person.pid, "PLAYABLE") || str_contains(person.pid, "layable") { person.set_asset_force(0); } 
-                if person.get_sp() > 0 && person.get_asset_force() == 0 {
-                    if person.get_sp() < 300 { person.set_sp(300); }
-                    if hashes.iter().find(|r| **r == person.parent.hash).is_none() { 
-                        list.push(index);
-                        hashes.push(person.parent.hash);
-                        println!("Person #{}: {} was added", index, Mess::get_name(person.pid).to_string());
-                    }
+            person_list.iter().filter(|p| 
+                !p.pid.to_string().contains("_竜化") &&
+                p.parent.index > 1 && 
+                p.get_sp() > 0 && 
+                p.get_asset_force() == 0
+            )
+            .for_each(|person|{
+                if !hashes.iter().any(|&hash| hash == person.parent.hash ) {
+                    list.push(person.parent.index);
+                    hashes.push(person.parent.hash);
                 }
-            }
+            });
         }
         if count < 95 { println!("Total of {} Playable Units", list.len()); }
         else { println!("Total of {} Possible Playable Units", list.len()); }
@@ -274,8 +265,7 @@ pub fn randomize_person() {
         let rng = get_rng();
         match GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) {
             1 => {
-                let playable_size = if CONFIG.lock().unwrap().custom_units && PLAYABLE.get().unwrap().len() > 41 { PLAYABLE.get().unwrap().len() }
-                    else { 41 };
+                let playable_size = if CONFIG.lock().unwrap().custom_units && PLAYABLE.get().unwrap().len() > 41 { PLAYABLE.get().unwrap().len() } else { 41 };
         
                 let list = PLAYABLE.get().unwrap();
                 let mut playable_list: Vec<usize> = (0..playable_size).collect();
@@ -374,8 +364,7 @@ pub fn change_map_dispos() {
             let aid = t_list[x][y].get_pid();
             if aid.is_none() { continue; }
             let pid = aid.unwrap().to_string();
-            if pid == PIDS[0] { 
-                t_list[x][y].set_pid(DVCVariables::get_dvc_person(0, true));   }
+            if pid == PIDS[0] { t_list[x][y].set_pid(DVCVariables::get_dvc_person(0, false));   }
             else if ( t_list[x][y].get_force() == 0 || t_list[x][y].get_force() == 2 ) && GameVariableManager::get_bool("DDFanClub") && GameVariableManager::exist(&format!("G_R_{}", pid)) {
                 t_list[x][y].set_pid(GameVariableManager::get_string(&format!("G_R_{}", pid)));
             }
@@ -389,7 +378,7 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
     if !DVCVariables::random_enabled() || super::RANDOMIZER_STATUS.read().unwrap().alear_person_set { return; }
     if !GameVariableManager::exist("G_R_PID_リュール") ||GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) == 0 { return; }
     println!("Alear check");
-    if DVCVariables::get_dvc_person(0, true).to_string() == PIDS[0] {
+    if DVCVariables::get_dvc_person(0, false).to_string() == PIDS[0] {
         let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.alear_person_set = true);
         return;
      }

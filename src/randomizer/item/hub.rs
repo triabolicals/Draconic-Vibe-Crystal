@@ -48,7 +48,7 @@ pub extern "C" fn vibe_hub_items() -> &'static mut ConfigBasicMenuItem {
 pub fn hub_item_randomized() {
     if !DVCVariables::random_enabled() || GameVariableManager::get_number(DVCVariables::ITEM_KEY) & 2 == 0  { return; }
     if let Some(hub_sequence) = get_singleton_proc_instance::<HubSequence>() {
-        println!("Randomizing Hub Items");
+        // println!("Randomizing Hub Items");
         let rng = Random::get_system();
         hub_sequence.get_locator_group().as_mut().unwrap().access_list.iter_mut()
             .flat_map(| access | access.access_data.as_mut() )

@@ -161,15 +161,14 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
     do_dlc();
     postchapter::create_bond_rings();
     WellSequence::set_use_flag(2);
+    postchapter::update_bonds();
     let item_list = generate_item_list(proc);
     WellSequence::set_use_flag(0);
     let common_rewards_sequence = CommonRewardSequence::instantiate().unwrap();
     let methods = common_rewards_sequence.get_class().get_methods();
     let ctor_parameters = methods[3].get_parameters();
     let para = unity::prelude::Il2CppClass::from_il2cpptype( ctor_parameters[0].parameter_type ).unwrap();
-    let exp_list = il2cpp::instantiate_class::<Dictionary<&Unit, i32>>(para);
-    if exp_list.is_ok() {
-        let e_list = exp_list.unwrap();
+    if let Ok(e_list) = il2cpp::instantiate_class::<Dictionary<&Unit, i32>>(para) {
         let dictionary_methods = e_list.get_class().get_methods();
         unsafe { dictionary_ctor(e_list, Some(dictionary_methods[0])); }
         let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
@@ -309,8 +308,7 @@ pub fn update_next_chapter() {
 }
 // DLC Check for continous mode
 fn continuous_mode_dlc_allowed() -> bool {
-    if dlc_check() { return GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 1 || GameVariableManager::get_number(DVCVariables::CONTINIOUS)  == 3; }
-    return false;
+    dlc_check() && (GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 1 || GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3)
 }
 
 fn set_next_chapter(){
@@ -389,12 +387,9 @@ fn do_dlc() {
     let random = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
     let completed = get_story_chapters_completed();
     if (!random && current_cid == "CID_M006" ) || ( random && completed >= 4 ) {
-        let god;
-        if GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) == 0 { god = GodData::get("GID_エーデルガルト").unwrap(); }
-        else {
-            let gid = GameVariableManager::get_string("G_R_GID_エーデルガルト").to_string(); 
-            god = GodData::get(&gid).unwrap();
-        }
+        let god =
+        if GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) == 0 { GodData::get("GID_エーデルガルト") }
+        else { GodData::get( GameVariableManager::get_string("G_R_GID_エーデルガルト")) }.unwrap();
         GodPool::create(god);
     }
     if (!random && current_cid == "CID_M017" ) || ( random && completed == 16 ) {
@@ -402,33 +397,23 @@ fn do_dlc() {
         GameVariableManager::set_bool("G_CC_マージカノン", true);
         GameVariableManager::set_number("G_所持_IID_マージカノン専用プルフ", GameVariableManager::get_number("G_所持_IID_マージカノン専用プルフ") + 1); // add dlc deals
         GameVariableManager::set_number("G_所持_IID_エンチャント専用プルフ", GameVariableManager::get_number("G_所持_IID_エンチャント専用プルフ") + 1);
+        GameVariableManager::make_entry("MapRecruit", 1);
+        GameVariableManager::set_bool("MapRecruit", true);
         for x in 36..41 {
-            if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
-                let person_data = PersonData::get(DVCVariables::get_dvc_person(x as i32, false)).unwrap();
-                GameVariableManager::make_entry("MapRecruit", 1);
-                GameVariableManager::set_bool("MapRecruit", true);
-                UnitUtil::join_unit_person(person_data);
-                GameVariableManager::set_bool("MapRecruit", false);
-            }
-            else {
-                let person_data = PersonData::get(PIDS[x]).unwrap();
-                UnitUtil::join_unit_person(person_data);
-            }
+            let person_data = 
+            if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 { PersonData::get(DVCVariables::get_dvc_person(x as i32, false)) }
+            else { PersonData::get(PIDS[x]) }.unwrap();
+            UnitUtil::join_unit_person(person_data);
         }
+        GameVariableManager::set_bool("MapRecruit", false);
     }
 }
 
 pub fn get_continious_total_map_complete_count() -> i32 {
-    let mut number = 0;
-    ChapterData::get_list().unwrap().iter()
-        .for_each(|chapter| if GameUserData::is_chapter_completed(chapter) { number += 1; });
-    number
+    ChapterData::get_list().unwrap().iter().filter(|chapter| GameUserData::is_chapter_completed(chapter)).count() as i32
 }
 pub fn get_story_chapters_completed() -> i32 {
-    let mut number = 0;
-    GameVariableManager::find_starts_with("G_Cleared_M0").iter()
-        .for_each(|cleared| if GameVariableManager::get_bool(cleared.to_string()) { number += 1 });
-    number
+    GameVariableManager::find_starts_with("G_Cleared_M0").iter().filter(|cleared| GameVariableManager::get_bool(cleared.to_string())).count() as i32
 }
 
 fn get_recommended_level_main() -> u8 {
@@ -449,20 +434,14 @@ fn enable_map_rewind(method_info: OptionalMethod);
 fn dictionary_ctor(this: &Dictionary<&Unit, i32>, method_info: OptionalMethod);
 
 pub fn continuous_mode_next_chapter_notice(){
-    let c_mode = GameVariableManager::get_number(DVCVariables::CONTINIOUS);
-    if c_mode != 0 && c_mode < 4 && ( GameUserData::get_sequence() == 4 || GameUserData::get_sequence() == 5) {
-        if GameUserData::get_chapter().get_next_chapter().is_some() {
-            NoticeManager::add_by_mid( "MID_Hub_Next_Go1");
-        }
+    if DVCVariables::is_random_map() && ( GameUserData::get_sequence() & 4 != 0) && GameUserData::get_chapter().get_next_chapter().is_some() {
+        NoticeManager::add_by_mid( "MID_Hub_Next_Go1");
     }
 }
 
 pub fn hub_menu_next_help_text(_this: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString {
-    let c_mode = GameVariableManager::get_number(DVCVariables::CONTINIOUS);
-    if c_mode != 0 && c_mode < 4 {
-        if GameUserData::get_chapter().get_next_chapter().is_some() { return Mess::get("MID_Hub_Next_Go1");  }
-    }
-    return Mess::get("MID_MENU_KIZUNA_DEPART_HELP");
+    if DVCVariables::is_random_map() && GameUserData::get_chapter().get_next_chapter().is_some() {  Mess::get("MID_Hub_Next_Go1")  }
+    else { Mess::get("MID_MENU_KIZUNA_DEPART_HELP") }
 }
 
 pub extern "C" fn nothing_proc(_proc: &mut ProcInst, _method_info: OptionalMethod) {}

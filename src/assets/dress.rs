@@ -13,6 +13,7 @@ pub fn commit_for_unit_dress(result: &mut AssetTableResult, mode: i32, unit: &mu
     remove_condition("AID_NoEngage");
     remove_condition("AID_NoEngage2");
     remove_condition("AID_NoEngage3");
+    // accessory_clear_all(result.accessory_list);
     let sf = AssetTableStaticFields::get();
     let mut flags = ConditionFlags::get_from_conditions(conditions);
     if m022_god_dress(result, mode, conditions) || random_emblem_name_asset_switch(result, unit, mode, equipped, conditions) {
@@ -26,8 +27,9 @@ pub fn commit_for_unit_dress(result: &mut AssetTableResult, mode: i32, unit: &mu
     // Vision 
     // Main Character Gender Swap for Characters that switch gender clothes (Rosado)
     conditions::set_gender_conditions(condition_unit, &mut flags);
+    if unit.person.parent.index > 1 && unit.person.get_flag().value & 128 == 0 { conditions::remove_condition("MPID_Lueur"); }
+
     if flags.contains(ConditionFlags::Transform) && mode == 1 {
-        println!("{} is transforming.", Mess::get_name(condition_unit.person.pid));
         if has_enemy_tiki(unit) {
             if flags.contains(ConditionFlags::EngageAttack) {
                 result.body_model = "oBody_Tik0AF_c567".into();
@@ -39,7 +41,6 @@ pub fn commit_for_unit_dress(result: &mut AssetTableResult, mode: i32, unit: &mu
             else {result.setup_for_person(1, PersonData::get("PID_E001_Boss"), conditions); }
             return flags;
         }
-
         let jid = condition_unit.job.jid.to_string();
         if let Some(pos) = MONSTERS.iter().position(|&x| x == jid){ result.setup_for_person_job_item(1, PersonData::get(MONSTER_PERSONS[pos]), Some(condition_unit.job), None, conditions); }
         else if let Some(pos) = EMBLEM_ASSET.iter().position(|&x| jid.contains(x)) {
@@ -86,7 +87,6 @@ pub fn commit_for_unit_dress(result: &mut AssetTableResult, mode: i32, unit: &mu
             result.commit( mode, Some(condition_unit.person), Some(condition_unit.job), equipped);
             illusion_double_dress(result, condition_unit, mode, equipped, conditions, flags);
         }
-
         return flags;
     }
     // Check if Unit will Transform and adjust conditions
@@ -96,14 +96,12 @@ pub fn commit_for_unit_dress(result: &mut AssetTableResult, mode: i32, unit: &mu
         result.commit(mode, Some(condition_unit.person), condition_unit.person.get_job(), equipped);
         flags = ConditionFlags::get_from_conditions(conditions);
         flags.set(ConditionFlags::Transforming, true);
-        // println!("{} is Monster tranforming ", Mess::get_name(condition_unit.person.pid));
     }
 
     else if ( equipped.is_some_and(|item| item.iid.to_string().contains("チキ")) && !flags.contains(ConditionFlags::Engaged) ) || transform::has_enemy_tiki( condition_unit ) {
         result.commit(mode, Some(condition_unit.person), Some(condition_unit.job), equipped);
         flags = ConditionFlags::get_from_conditions(conditions);
         flags.set(ConditionFlags::Transforming, true);
-        // println!("{} is Tiki tranforming ", Mess::get_name(condition_unit.person.pid));
     }
     else { 
         result.commit( mode, Some(condition_unit.person), Some(condition_unit.job), equipped);
@@ -115,19 +113,17 @@ pub fn commit_for_unit_dress(result: &mut AssetTableResult, mode: i32, unit: &mu
 
     // Unit Dress / Head Adjustment 
     dress::adjust_dress( result, mode, unit, flags);
-
     SEARCH_LIST.get().unwrap().adjust_head(result, condition_unit);
+
     // Generic Appearance Randomization
     if flags.contains(ConditionFlags::Generic) && !flags.contains(ConditionFlags::TikiEngage){  // Generic Appearance
         let generic_mode =  GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY);
-        // let can_accessorize = crate::randomizer::RANDOMIZER_STATUS.read().unwrap().accessory;
-        if generic_mode & 1 == 1 && mode == 2 {  SEARCH_LIST.get().unwrap().random_head(result, condition_unit, flags, true); }
-            //data::HEAD_DATA.get().unwrap().replace_by_rng(unit, result);  }
-        if generic_mode & 2 == 2 { change_hair_change(unit, result); }
+        if generic_mode & 1 != 0 && mode == 2 {  SEARCH_LIST.get().unwrap().random_head(result, condition_unit, flags, true); }
+        if generic_mode & 2 != 0 { change_hair_change(unit, result); }
     }
     // Info Animation Randomization
     if GameVariableManager::get_number("G_RandAsset") > 1 && unit.person.gender != 0 && unit.person.get_bmap_size() == 1 {  
-         SEARCH_LIST.get().unwrap().random_aoc(condition_unit, result, flags); 
+        SEARCH_LIST.get().unwrap().random_aoc(condition_unit, result, flags); 
     }
     flags
 }
@@ -168,14 +164,6 @@ pub fn add_personal_outfit_accessory(result: &mut AssetTableResult, unit: &Unit,
 pub fn adjust_dress(result: &mut AssetTableResult, mode: i32, unit: &Unit, conditions: ConditionFlags) {
     let dress_gender = unit_dress_gender(unit);
     if conditions.contains(ConditionFlags::Engaged) {
-        /* 
-        if let Some(link) = unit.god_link {
-            println!("{} is Link Engaged with {}.", Mess::get_name(unit.person.pid), Mess::get(link.data.mid));
-        }
-        if let Some(gunit) = unit.god_unit {
-            println!("{} is Engaged with {}.", Mess::get_name(unit.person.pid), Mess::get(gunit.data.mid));
-        }
-        */
         if unit.person.parent.hash == 258677212 {   //Lumera Chapter 2
             if GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) != 0 {
                 let god = DVCVariables::get_god_from_index(1, true).unwrap();
@@ -195,9 +183,7 @@ pub fn adjust_dress(result: &mut AssetTableResult, mode: i32, unit: &Unit, condi
                 if result.head_model.to_string().contains("null") {
                     let _ = search_data.job.iter().find(|w| w.job_hash == unit.job.parent.hash && w.mode == 2 )
                         .map(|w|{
-                            if let Some(acc) = w.get_acc(gen, mode, "c_spine2_jnt") {
-                                result.accessory_list.try_add(acc);
-                            }
+                            if let Some(acc) = w.get_acc(gen, mode, "c_spine2_jnt") { result.accessory_list.try_add(acc); }
                         }
                     );
                 }
@@ -228,10 +214,9 @@ pub fn illusion_double_dress(result: &mut AssetTableResult, owner: &Unit, mode: 
         if flags.contains(ConditionFlags::TikiEngage) {
             SEARCH_LIST.get().unwrap().replace_with_god(result, mode, 13, false);  // Replace Assets with Tiki
         }
-        else if owner.person.get_flag().value & 2048 != 0 {
+        else if flags.contains(ConditionFlags::Generic) {
             let generic_mode =  GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY);
-            // if generic_mode & 1 == 1 && mode == 2{  HEAD_DATA.get().unwrap().replace_by_rng(owner, result); } 
-            if generic_mode & 2 == 2 { change_result_colors_by_unit(owner, result); }
+            if generic_mode & 2 != 0 { change_result_colors_by_unit(owner, result); }
         }
         add_personal_outfit_accessory(result, owner, flags);
         animation::vision_swd_animations(result, gen, mode);

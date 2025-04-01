@@ -1,8 +1,18 @@
 use super::*;
 use std::sync::OnceLock;
-pub static JOB_RESTRICT_SKILLS_LIST: OnceLock<Vec<SkillWeaponRestrictions>> = OnceLock::new();
+pub static JOB_RESTRICT_SKILLS_LIST: OnceLock<SkillRestriction> = OnceLock::new();
 use engage::force::*;
 use crate::randomizer::job::reclass::ChangeJobData;
+
+pub struct SkillRestriction {
+    pub list: Vec<SkillWeaponRestrictions>,
+}
+impl SkillRestriction {
+    pub fn is_valid_for_weapon_mask(&self, skill: &SkillData, job_mask: i32) -> bool {
+        !self.list.iter().any(|restriction| restriction.hash == skill.parent.hash && restriction.mask & job_mask == 0)
+    }
+}
+
 
 pub struct SkillWeaponRestrictions {
     pub hash: i32,
@@ -184,7 +194,7 @@ pub fn initialize_job_skill_restrictions() {
             }
         });
         println!("{} skills in the restrict skills list.", list.len());
-        list
+        SkillRestriction{ list: list }
     });
 }
 
@@ -211,13 +221,8 @@ pub fn random_job_learn_skill(unit: &Unit, job: &JobData) -> Option<&'static Ski
     // Skill cannot be personal or current job skill
         if new_skill_index == personal  { continue; }
         let skill = SkillData::try_index_get(new_skill_index).unwrap();
-        if count == 50 { break; }
-        let hash = skill.parent.hash;
-        if let Some(restrict) = restriction_list.iter().find(|x| x.hash == hash) {
-            if restrict.mask & weapon_mask != 0 { break; }
-            else { count += 1;  }
-        }
-        else { break; }
+        if restriction_list.is_valid_for_weapon_mask(skill, weapon_mask) || count >= 50 { break;  }
+        count += 1;
     }
     SkillData::try_index_get(new_skill_index)
 }

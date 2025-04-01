@@ -1,7 +1,6 @@
 use super::*;
 use crate::randomizer::emblem;
 use engage::gamedata::ai::*;
-use unit::has_sid;
 static mut AISET: bool = false;
 
 pub fn adjust_person_unit_ai(unit: &mut Unit) {
@@ -24,13 +23,6 @@ pub fn adjust_enemy_emblem_unit_ai_flags(unit: &Unit){
     ai.set_flag(0x400);
     ai.set_flag(0x800);
     ai.set_flag( 0x20000000 );
-}
-
-pub fn adjust_ai_by_skill(unit: &mut Unit) {
-    if has_sid(unit, "SID_特別な踊り") && unit.person.gender != 0 {
-        unit.private_skill.add_sid("SID_踊り", 10, 0);
-        unit.ai.set_sequence(1, "AI_MI_Irregular");
-    }
 }
 
 pub fn create_custom_ai() {
@@ -120,7 +112,7 @@ pub fn adjust_unitai(unit: &mut Unit) {
 
     let old_ai_names: [String; 4] = [unit.ai.sequence[0].to_string(), unit.ai.sequence[1].to_string(),  unit.ai.sequence[2].to_string(), unit.ai.sequence[3].to_string() ];
     let old_ac_values: [i32; 4] = [unit.ai.value[0].get_value(), unit.ai.value[1].get_value(), unit.ai.value[2].get_value(), unit.ai.value[3].get_value()];
-    
+
     if unit.person.get_asset_force() == 2 {
         unit.ai.set_sequence(2, "AI_AT_Attack");
         unit.ai.set_sequence(3, "AI_MV_NearestEnemy");

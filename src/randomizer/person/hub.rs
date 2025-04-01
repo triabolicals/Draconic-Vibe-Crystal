@@ -9,7 +9,7 @@ pub fn change_somniel_hub_dispos() {
         }
     }
     if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) > 0 {
-        let pid = DVCVariables::get_dvc_person(0, true);
+        let pid = DVCVariables::get_dvc_person(0, false);
         HubRandomSet::get_list_mut().unwrap().iter_mut()
             .flat_map(|x| x.iter_mut()).filter(|x| x.iid == pid)
             .for_each(|x| x.iid = PIDS[0].into() );

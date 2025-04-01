@@ -36,7 +36,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         return;
     }
     if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
-        if DVCVariables::get_dvc_person(0, true) == this.person.pid && DVCVariables::is_main_menu() {    //IsLueur
+        if DVCVariables::get_dvc_person(0, false) == this.person.pid && DVCVariables::is_main_menu() {    //IsLueur
             println!("Alear: {}", Mess::get_name(this.person.pid));
             change_unit_autolevel(this, true);
             this.item_list.put_off_all_item();
@@ -94,7 +94,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     else if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 || GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 {  adjust_unit_items(this);  }
     unit_items::remove_duplicates(this.item_list);
 
-    println!("Finish with Create2Impl for {}", this.person.get_name().unwrap().to_string());
+    // println!("Finish with Create2Impl for {}", this.person.get_name().unwrap().to_string());
     set_unit_edit_name(this);
     this.auto_equip();
     grow::adaptive_growths(this);
@@ -126,7 +126,6 @@ pub fn adjust_unit_items(unit: &mut Unit) {
         unit_items::add_monster_weapons(unit);
         return;
     }
-    unit_items::simple_replacement(unit);
     if unit_items::get_number_of_usable_weapons(unit) < 1 { unit_items::adjust_missing_weapons(unit); }
     else {
         let ran_map = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
@@ -283,69 +282,6 @@ pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
     fixed_unit_weapon_mask(unit);   // fixed weapon mask due to class changes  // Random map order level adjustment
 }
 
-/* 
-pub fn random_map_unit_level(unit: &mut Unit) {
-    if !DVCVariables::is_main_chapter_complete(4) || GameUserData::is_evil_map() { return; }
-    if !DVCVariables::is_random_map() {
-        if GameVariableManager::get_bool(DVCVariables::DVC_AUTOLEVEL_KEY) { auto_level_unit(unit); }
-        return; 
-    }
-    let mut total_level = crate::continuous::random::random_map_mode_level() - 1;
-    let avg_level = get_instance::<MapSituation>().average_level;
-    if avg_level > total_level { total_level = ( total_level + avg_level + 1 ) / 2; }
-
-
-    let job = unit.get_job();
-    let job_max_level = job.max_level as i32;
-    if job.is_low() {
-        if total_level <= 20 {
-            unit.set_level(total_level);
-            unit.set_internal_level(0);
-        }
-        else if job.max_level == 40 {
-            if total_level <= 40 {
-                unit.set_level(total_level);
-                unit.set_internal_level(0);
-            }
-            else {
-                unit.set_level(40);
-                unit.set_internal_level(total_level - 40);
-            }
-        }
-        else {
-            let high_jobs = job.get_high_jobs();
-            if high_jobs.len() > 0 {
-                unit.class_change(high_jobs[0]);
-                unit.set_level(total_level-job_max_level);
-
-                unit.set_internal_level(job_max_level);
-            }
-            else {
-                unit.set_level(20);
-                unit.set_internal_level(total_level-20);
-            }
-        }
-    }
-    else {
-        if total_level <= 20 {
-            unit.set_internal_level(0);
-            unit.set_level(total_level);
-        }
-        else if total_level <= 40 {
-            unit.set_internal_level(20);
-            unit.set_level(total_level - 20);
-        }
-        else {
-            unit.set_internal_level(total_level - 20);
-            unit.set_level(20);
-        }
-    }
-    unit.set_hp(unit.get_capability(0, true));
-
-}
-*/
-
-
 fn calculate_new_offset(original: &PersonData, new: &PersonData) -> [i8; 11] {
     let original_job = original.get_job().expect("Original Person does not have a valid default class in Person.xml");
     let new_job = new.get_job().expect("Replacement Person does not have a valid default class in Person.xml");
@@ -428,9 +364,12 @@ fn replace_recruitment_god_unit(unit: &mut Unit) {
 fn enemy_unit_randomization(unit: &mut Unit) {
     let x = unit.dispos_y as i8;
     let z = unit.dispos_z as i8;
+    let diff = 1 << GameUserData::get_difficulty(false);
     if let Some(data) = DisposData::get_list().unwrap().iter()
         .flat_map(|array| array.iter())
-        .find(|data| data.get_person().is_some_and(|dispos_person| dispos_person.parent.hash == unit.person.parent.hash) && data.dispos_x == x && data.dispos_y == z )
+        .find(|data| 
+            data.flag.value & diff != 0 &&
+            data.get_person().is_some_and(|dispos_person| dispos_person.parent.hash == unit.person.parent.hash) && data.dispos_x == x && data.dispos_y == z )
     {
         let rng = Random::get_game();
         let is_boss = data.get_flag().value & 16 != 0 ;

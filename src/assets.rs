@@ -9,7 +9,7 @@ use crate::{assets::conditions::ConditionFlags};
 use std::sync::OnceLock;
 use engage::{
     dialog::yesno::*, force::*, gamedata::{accessory::*, assettable::*, item::ItemData, skill::*, unit::*, *}, 
-    gamevariable::GameVariableManager, menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemGaugeMethods, ConfigBasicMenuItemSwitchMethods}, *}, mess::Mess, random::Random 
+    gamevariable::GameVariableManager, menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemGaugeMethods, ConfigBasicMenuItemSwitchMethods}, *}, random::Random 
 };
 use crate::{
     config::DVCVariables, enums::*, utils::str_contains, CONFIG,
@@ -133,10 +133,15 @@ pub fn asset_table_result_setup_hook(this: &mut AssetTableResult, mode: i32, uni
 
     if conditions_flags.contains(ConditionFlags::Talk) { return result; }
     if conditions_flags.contains(ConditionFlags::EngageAttack) && mode == 2 {
+        // println!("{} is engage attacking. Transform: {}", Mess::get_name(unit.person.pid), conditions_flags.contains(ConditionFlags::Transforming));
         emblem::adjust_engage_attack_animation(result, unit, equipped, conditions_flags);  
+        if unit.god_unit.is_some_and(|gunit| gunit.data.mid.to_string().contains("Tiki") && !gunit.data.gid.contains("チキ")) {
+            if unit_dress_gender(unit) == 1 { result.body_anims.add( Il2CppString::new_static("Sds0AM-No2_c049_N")); }
+            else {  result.body_anims.add( Il2CppString::new_static("Sds0AF-No2_c099_N")); }
+        }
         return result;
     }
-    if conditions_flags.contains(ConditionFlags::EngageAttackComboMain) || conditions_flags.contains(ConditionFlags::EngageAttackComboSub) && mode == 2 {
+    if ( conditions_flags.contains(ConditionFlags::EngageAttackComboMain) || conditions_flags.contains(ConditionFlags::EngageAttackComboSub) ) && mode == 2 {
         animation::lueur_engage_atk(result, unit, conditions_flags);
         return result;
     }
@@ -245,9 +250,7 @@ pub fn edit_asset_weapon(result: &mut AssetTableResult, equipped: bool, item: Op
 
 
 pub fn unit_dress_gender(unit: &Unit) -> i32 {
-    if unit.person.pid.to_string() == PIDS[0] { 
-        if unit.edit.is_enabled() { return unit.edit.gender; }
-    }
+    if unit.person.pid.to_string() == PIDS[0] {  if unit.edit.is_enabled() { return unit.edit.gender; }  }
     unsafe { get_dress_gender(unit.person, None) }
 }
 

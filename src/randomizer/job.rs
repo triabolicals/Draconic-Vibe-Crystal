@@ -66,9 +66,7 @@ fn rerandomize_jobs() {
 }
 
 fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, player: bool, emblem: bool) -> bool {
-    if !GameVariableManager::get_bool(DVCVariables::CUSTOM_JOB_KEY) {
-        if !JOB_HASH.iter().any(|&hash| hash == job.parent.hash ) { return false;}
-    }
+    if !GameVariableManager::get_bool(DVCVariables::CUSTOM_JOB_KEY) { if !JOB_HASH.iter().any(|&hash| hash == job.parent.hash ) { return false;} }
     let job_flags = job.flag.value;
     if job_flags & 32 != 0 { return false; }
     let jid = job.jid.to_string();
@@ -128,7 +126,7 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
 
     let unit_level = old_data.1;
     let internal_level = if old_data.0 == 1 && old_data.2 == 0 { 20 } else { old_data.2 };
-    println!("Unit Level {} / Internal {} (Current Job: {})", unit_level, internal_level, Mess::get(current_job.name));
+    // println!("Unit Level {} / Internal {} (Current Job: {})", unit_level, internal_level, Mess::get(current_job.name));
 
     let class_list: Vec<_> = job_list.iter().filter(|&job| unit_random_can_reclass(job, is_female, is_high, true, false) ).collect();
     if class_list.len() == 0 { return; }
@@ -218,7 +216,7 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
     unit.original_aptitude.value = new_opt;
     unit.aptitude.value |= new_opt;
     crate::randomizer::skill::learn::unit_update_learn_skill(unit);
-    println!("{} changed to {} (Lv {}/{})", Mess::get_name(unit.person.pid), Mess::get(new_job.name), unit.level, unit.internal_level);
+    // println!("{} changed to {} (Lv {}/{})", Mess::get_name(unit.person.pid), Mess::get(new_job.name), unit.level, unit.internal_level);
     
 }
 
@@ -249,7 +247,6 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
 
     let new_job = class_list[ rng.get_value( class_list.len() as i32) as usize ];
     unit.class_change(new_job);
-
     // Keep original level and internal level
     if unit_level > 20 {
         if new_job.is_high() {
@@ -295,7 +292,7 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
         }
         else { unit.private_skill.add_sid("SID_移動－２", 10, 0); }
     }
-    println!("{} changed to {} (Lv {}/{}) from {}", Mess::get_name(unit.person.pid), Mess::get(new_job.name), unit.level, unit.internal_level, Mess::get(current_job_name));
+    // println!("{} changed to {} (Lv {}/{}) from {}", Mess::get_name(unit.person.pid), Mess::get(new_job.name), unit.level, unit.internal_level, Mess::get(current_job_name));
     unit.set_hp(unit.get_capability(0, true));
     fixed_unit_weapon_mask(unit);
     randomize_selected_weapon_mask(unit);

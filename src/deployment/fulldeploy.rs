@@ -185,7 +185,6 @@ pub fn load_extra_deployment_slots() {
 pub fn load_extras() -> Option<Vec<(i32, i32, i32)>> {
     let my_str = include_str!("DVC.fdp");
     let cid = GameUserData::get_chapter().cid.to_string();
-    println!("Current Chapter: {}", cid);
     let mut read_slots = false;
     let mut out: Vec<(i32, i32, i32)> = Vec::new();
     let lines = my_str.lines();

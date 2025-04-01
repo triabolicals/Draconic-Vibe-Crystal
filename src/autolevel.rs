@@ -21,11 +21,8 @@ pub fn calculate_player_cap() -> i32 {
         .chain( Force::get(ForceType::Absent).unwrap().iter() )
         .chain( Force::get(ForceType::Dead).unwrap().iter() )
         .map(|unit| unit_cap_total(unit, true, false)).collect();
-    if caps.len() == 0 { 
-        
-        return 0;
-    
-    }
+    if caps.len() == 0 {  return 0;  }
+
     caps.sort_by(|a, b| b.cmp(a));
     let mut total: i32 = 0;
 
@@ -86,9 +83,7 @@ pub fn auto_level_unit(unit: &mut Unit, leader: bool){
     if !GameVariableManager::exist("AvgLvl") || GameUserData::get_sequence() == 3  {
         GameVariableManager::make_entry("AvgLvl", calculate_average_level(10 - diff ));
     }
-    if !GameVariableManager::exist("ChpCnt") {
-        GameVariableManager::make_entry("ChpCnt", get_chapters_completed());
-    }
+    if !GameVariableManager::exist("ChpCnt") { GameVariableManager::make_entry("ChpCnt", get_chapters_completed());  }
     let avg_level = if leader { 3 } else { 0 } + GameVariableManager::get_number("AvgLvl");
     let chapter_count = GameVariableManager::get_number("ChpCnt");
 
@@ -157,7 +152,7 @@ pub fn auto_level_unit_for_random_map(unit: &mut Unit, leader: bool){
     let diff = GameUserData::get_difficulty(false);
     let mut level =  
         crate::continuous::random::random_map_mode_level() +
-        if leader { 3 } else { 0 } + 
+        if leader { 3 } else { 0 } +  
         if !is_player { rng.get_value(2+diff) - 1 } else { -1 };
 
     let map_sit_level = get_instance::<MapSituation>().average_level;
@@ -183,7 +178,7 @@ pub fn auto_level_unit_for_random_map(unit: &mut Unit, leader: bool){
         randomizer::job::randomize_selected_weapon_mask(unit);
         randomizer::person::unit::adjust_unit_items(unit);
     }
-    println!("Autolevel for Random Map: {} for {}", level, Mess::get_name(unit.person.pid));
+    // println!("Autolevel for Random Map: {} for {}", level, Mess::get_name(unit.person.pid));
     fix_unit_level(unit, level);
 
     if is_player {
@@ -202,7 +197,7 @@ pub fn auto_level_unit_for_random_map(unit: &mut Unit, leader: bool){
 }
 
 pub fn calculate_average_level(sortie_count: i32) -> i32 {
-    let vander_replace = DVCVariables::get_dvc_person(1, true);
+    let vander_replace = DVCVariables::get_dvc_person(1, false);
 
     let count = if sortie_count == 0 { 10 } else { sortie_count };
     let mut collection: Vec<i32> = Force::get(ForceType::Player).unwrap().iter().chain(Force::get(ForceType::Absent).unwrap().iter())

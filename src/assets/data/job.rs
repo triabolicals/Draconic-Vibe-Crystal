@@ -119,7 +119,6 @@ impl JobAssetSets {
             }
             return;
         }
-        let gen = if gender == Gender::Male { "M-"} else { "F-" };
         let engage = AssetTableStaticFields::get_condition_index("エンゲージ技");
         let dragonstone = AssetTableStaticFields::get_condition_index("竜石");
         let engage2 = AssetTableStaticFields::get_condition_index("エンゲージ中");
@@ -128,9 +127,11 @@ impl JobAssetSets {
         let mut custom_made = false;
         self.entries.iter().flat_map(|&i| AssetTable::try_index_get(i))
             .filter(|entry| weapon_condition_met(entry, kind) && 
-                !has_condition(entry, engage) && !has_condition(entry, dragonstone) && !has_condition(entry, engage2) &&
+                !has_condition(entry, engage) && 
+                !has_condition(entry, dragonstone) && 
+                !has_condition(entry, engage2) &&
                 !has_condition(entry, bullet) &&
-                entry.body_anim.is_some_and(|x| x.to_string().contains(gen))
+                entry.body_anim.is_some_and(|x| x.to_string().contains(search.as_str()))
             )
             .for_each(|entry|{
                 // println!("Entry Added: {} (Line: {}) Kind: {}", entry.parent.index, 90 + entry.parent.index, kind);
@@ -257,9 +258,9 @@ pub fn create_anim_type(mount: Mount, gender: Gender) -> String {
         (Mount::Wolf, Gender::Female) => { "CF" }
         (Mount::Wyvern, Gender::Male) =>  { "DM" }
         (Mount::Wyvern, Gender::Female) => { "DF" }
-        (Mount::Pegasus, Gender::Female) =>  { "EF" }
+        (Mount::Pegasus, _) =>  { "EF" }
         (Mount::Griffin, Gender::Male) => { "FM"}
-        (Mount::Griffin, Gender::Female) =>{ "FM"}
+        (Mount::Griffin, Gender::Female) =>{ "FF" }
         (_, Gender::Other) => {"AT" }
         (_, _) => {"" }
     }.to_string()

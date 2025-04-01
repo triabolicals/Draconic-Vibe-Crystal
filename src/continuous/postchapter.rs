@@ -64,7 +64,7 @@ pub fn update_bonds() {
         );
         return; 
     }
-    let units: Vec<_> = Force::get(ForceType::Absent).unwrap().iter().collect();
+    let units: Vec<_> = Force::get(ForceType::Player).unwrap().iter().chain(Force::get(ForceType::Absent).unwrap().iter()).collect();
     EMBLEM_LIST.get().unwrap().iter()
         .flat_map(|&index| GodData::try_get_hash(index))
         .flat_map(|god| GodPool::try_get(god, false))
@@ -84,12 +84,11 @@ pub fn update_bonds() {
                     });
                     units.iter().for_each(|unit|{
                         if let Some(g_bond) = god_unit.get_bond(unit) {
-                            if g_bond.level < max_level {
-                                let n_levels = max_level - g_bond.level;
-                                for _x in 0..n_levels { g_bond.level_up(); }
+                            while g_bond.level < max_level { 
+                                g_bond.level_up(); 
                                 g_bond.exp = bond_exp;
-                            }  
-                            unit.inherit_apt(god_unit);
+                                unit.inherit_apt(god_unit);
+                            }
                         }
                     });
                 }

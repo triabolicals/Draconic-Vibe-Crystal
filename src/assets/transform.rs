@@ -95,14 +95,14 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
         let distance = crate::utils::clamp_value(this.map_distance, 1, 2);
         let status = this.game_status[side as usize].unit.unwrap().get_god_state();
         if let Some(gunit) = this.game_status[side as usize].unit.unwrap().god_link.or(this.game_status[side as usize].unit.unwrap().god_unit) {
-            if gunit.data.gid.to_string().contains("敵チキ") || ( gunit.data.mid.to_string().contains("Tiki") && !gunit.data.gid.contains("チキ") ) {  // Enemy Tiki Emblem
+            if gunit.data.gid.to_string().contains("敵チキ") || ( gunit.data.mid.to_string().contains("Tiki") && !gunit.data.gid.to_string().contains("チキ") ) {  // Enemy Tiki Emblem
                 if status >= 2 {   // Is Engage Attacking 
                     let asset_index = super::emblem::get_emblem_attack_index(this.game_status[side as usize].unit.unwrap());
                     this.combat_style |= 1 << 22; 
                     let conditions = Array::<&Il2CppString>::new_specific( PersonData::get(PIDS[0]).unwrap().get_common_sids().unwrap().get_class(), 3).unwrap();
                     conditions[0] = "エンゲージ技".into();
                     let result;
-                    println!("Transformation Engage Attack: {}", asset_index);
+                    // println!("Transformation Engage Attack: {}", asset_index);
                     if asset_index == 13 || asset_index > 20 {
                         conditions[1] = "敵チキ".into();
                         conditions[2] = "AID_チキ竜化".into();
@@ -135,9 +135,9 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
                     else {
                         conditions[0] = "敵チキ".into();
                         result = AssetTableResult::get_from_pid(2, "PID_E001_Boss_竜化",  conditions);
+                        result.sound.voice = None;
                     }
                     result.body_anims.add(Il2CppString::new_static("Ent0AT-Ft1_c000_N"));
-                    result.sound.voice = None;
                     unsafe { combat_character_game_status_import(this.dragonize[side as usize], side, param_3.calc, calc_side, distance, None) };
                     this.game_status[side as usize].appearance = unsafe { create_from_result(result, distance, None) };
                 }
@@ -147,7 +147,7 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
         let jid = this.game_status[side as usize].unit.unwrap().job.jid.to_string();
         let conditions = Array::<&Il2CppString>::new_specific( PersonData::get(PIDS[0]).unwrap().get_common_sids().unwrap().get_class(), 1).unwrap();
         conditions[0] = "".into();
-        let mut pid: String = "none".to_string();
+        let mut pid = String::new();
         if is_emblem_class(this.game_status[side as usize].unit.unwrap()) {
             if let Some(emblem) = EMBLEM_ASSET.iter().find(|&x1| jid.contains(x1)) {
                 pid = format!("PID_闘技場_{}", emblem);
@@ -156,7 +156,8 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
             }
         }
         else if let Some(weapon) = this.game_status[side as usize].weapon.as_ref() {
-            if weapon.item.iid.to_string().contains("チキ") && status == 0 {
+            if weapon.item.iid.to_string().contains("チキ") && !is_tiki_engage( this.game_status[side as usize].unit.unwrap() ) {
+                if status == 1 { return;  }
                 conditions[0] = "AID_Person_チキ_竜化".into();
                 pid = "PID_闘技場_チキ".to_string();
             }
@@ -176,12 +177,20 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
                     }
                 }
             }
-        }
-        if pid != "none" {
-            println!("Transforming!");
-            if this.combat_style & (1 << 28 ) == 0 {
-                this.combat_style |= 1 << 22;
+            if weapon.item.flag.value & 0x4000000 != 0 && pid.is_empty() {   // Failsafe
+                if this.game_status[side as usize].unit.unwrap().person.gender == 1 {
+                    conditions[0] = "AID_ラファール竜化".into();
+                    pid = "PID_ラファール_竜化".to_string();
+                }
+                else {
+                    conditions[0] = "AID_エル竜化".into();
+                    pid = "PID_エル_竜化".to_string();
+                }
             }
+        }
+        if !pid.is_empty() {
+            println!("Transforming!");
+            if this.combat_style & (1 << 28 ) == 0 { this.combat_style |= 1 << 22; }
             let result = AssetTableResult::get_from_pid(2, pid, conditions);
             unsafe { combat_character_game_status_import(this.dragonize[side as usize], side, param_3.calc, calc_side, distance, None) };
             this.game_status[side as usize].appearance = unsafe { create_from_result(result, distance, None) };
@@ -191,14 +200,14 @@ pub fn change_dragon2(this: &mut CombatRecord, calc_side: i32, param_3: &CombatR
 #[skyline::hook(offset=0x02928bc0)]
 pub fn tranformation_chain_atk(this: &mut CombatRecord, calc_side: i32, param_3: &CombatRecordDisplayClass87, method_info: OptionalMethod) {
     let chain_atk_index = this.chain_attack_count;
-    call_original!(this, calc_side, param_3, None);
+    call_original!(this, calc_side, param_3, method_info);
     if chain_atk_index < this.chain_attack_count && chain_atk_index < this.chain_atk.len() as i32  {
         let game_status = &this.chain_atk[chain_atk_index  as usize];
         if let Some(unit) = game_status.unit.as_ref() {
             let jid = unit.job.jid.to_string();
             let conditions = Array::<&Il2CppString>::new_specific( PersonData::get(PIDS[0]).unwrap().get_common_sids().unwrap().get_class(), 1).unwrap();
             conditions[0] = "".into();
-            let mut pid: String = "none".to_string();
+            let mut pid = String::new();
             if is_emblem_class(unit) {
                 if let Some(emblem) = EMBLEM_ASSET.iter().find(|&x1| jid.contains(x1)) {
                     pid = format!("PID_闘技場_{}", emblem);
@@ -207,7 +216,7 @@ pub fn tranformation_chain_atk(this: &mut CombatRecord, calc_side: i32, param_3:
                 }
             }
             else if let Some(weapon) = &game_status.weapon {
-                if weapon.item.iid.to_string().contains("チキ") {
+                if weapon.item.iid.to_string().contains("チキ") && !is_tiki_engage(unit) {
                     conditions[0] = "AID_Person_チキ_竜化".into();
                     pid = "PID_闘技場_チキ".to_string();
                 }
@@ -227,9 +236,18 @@ pub fn tranformation_chain_atk(this: &mut CombatRecord, calc_side: i32, param_3:
                         }
                     }
                 }
+                if weapon.item.flag.value & 0x4000000 != 0 && pid.is_empty() {   //Failsafe
+                    if unit.person.gender == 1 {
+                        conditions[0] = "AID_ラファール竜化".into();
+                        pid = "PID_ラファール_竜化".to_string();
+                    }
+                    else {
+                        conditions[0] = "AID_エル竜化".into();
+                        pid = "PID_エル_竜化".to_string();
+                    }
+                }
             }
-            if pid != "none" {
-                println!("Transforming!");
+            if !pid.is_empty() {
                 let result = AssetTableResult::get_from_pid(2, pid, conditions);
                 this.chain_atk[chain_atk_index as usize].appearance = unsafe { create_from_result(result, 1, None) };
             }

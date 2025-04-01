@@ -62,7 +62,7 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                 }
                 2 => {  // Alear Name Swap
                     if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
-                        return replace_string(result, Mess::get_name(DVCVariables::get_dvc_person(0, true)), GameVariableManager::get_string(DVCVariables::LUEUR_NAME));
+                        return replace_string(result, Mess::get_name(DVCVariables::get_dvc_person(0, false)), GameVariableManager::get_string(DVCVariables::LUEUR_NAME));
                     }
                 }
                 3 => {  //Enemy Person Name Swap

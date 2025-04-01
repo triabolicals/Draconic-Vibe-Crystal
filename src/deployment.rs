@@ -239,7 +239,6 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
         unit_selection_menu_disable(true);
         while player_count < max_player {
             let mut pid: &Il2CppString = "PID_unit".into();
-            let mut mpid: &Il2CppString = "MPID_unit".into();
             let mut capability_score = 99999;
             let mut force_iter = Force::iter(absent_force);
             while let Some(unit) = force_iter.next() {
@@ -247,10 +246,8 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
                 if cap < capability_score {
                     capability_score = cap;
                     pid = unit.person.pid;
-                    mpid = unit.person.get_name().unwrap();
                 }
             }
-            println!("{} is deployed with rating of {}", mpid.to_string(), capability_score);
             if let Some(unit) = engage::unitpool::UnitPool::get_from_person_mut(pid, false) {
                 unit.transfer(0, true);
                 unit.try_create_actor();
@@ -260,7 +257,6 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
     }
         // Random Deployment
     else if unit_deployment_mode == 2  {
-        println!("Random Deployment");
         unit_selection_menu_disable(true);
         while player_count < max_player {
             let rng_range = absent_force.get_count();

@@ -74,7 +74,7 @@ pub extern "C" fn vibe_generic() -> &'static mut ConfigBasicMenuItem {
 
 pub fn generic_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
     if DVCVariables::is_main_menu() { return BasicMenuResult::new(); }
-    let mode = GameVariableManager::get_number("G_GenericMode");
+    let mode = GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY);
     let msg; 
     match mode {
         1 => { msg = "Reseed generic enemy appearance?" }
@@ -96,19 +96,18 @@ impl TwoChoiceDialogMethods for ReseedEnemyConfirm {
 }
 
 fn change_enemy_seed() {
-    let force_type = [ForceType::Enemy, ForceType::Ally];
     let rng = Random::get_game();
     let mode = GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY);
-    for ff in force_type {
-        let force_iter = Force::iter(Force::get(ff).unwrap());
-        for unit in force_iter {
-            if unit.person.get_asset_force() == 0 { continue; }
-            unsafe { 
-                if mode & 2 == 2 { set_grow_seed(unit, rng.value(), None); }
-                if mode & 1 == 1 { set_drop_seed(unit, rng.value(), None); }
+    Force::get(ForceType::Enemy).unwrap().iter()
+        .for_each(|unit|{
+            if unit.person.get_asset_force() > 0 {
+                unsafe { 
+                    if mode & 2 != 0 { set_grow_seed(unit, rng.value(), None); }
+                    if mode & 1 != 0 { set_drop_seed(unit, rng.value(), None); }
+                }
             }
         }
-    }
+    );
 }
 
 #[unity::from_offset("App", "Unit", "set_GrowSeed")]

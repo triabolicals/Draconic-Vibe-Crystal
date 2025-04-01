@@ -21,7 +21,7 @@ pub mod misc;
 pub mod assets;
 
 pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| DeploymentConfig::new().into() );
-pub const VERSION: &str = "2.11.0";
+pub const VERSION: &str = "2.11.1";
 
 extern "C" fn event_install(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {

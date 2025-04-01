@@ -1,11 +1,11 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::OnceLock;
 use accessory::BustData;
 use concat_string::concat_string;
 use god::{EngageAtkAsset, GodAssets};
 use item::WeaponAssets;
 use engage::{gamedata::{*, skill::*, unit::*, assettable::*}, random::Random, gamedata::item::ItemData, gamevariable::GameVariableManager};
-use crate::{DVCVariables, randomizer::emblem::EMBLEM_LIST};
+use crate::{randomizer::emblem::EMBLEM_LIST, utils::str_contains, DVCVariables};
 use job::{Mount, *};
 use search::*;
 // use animation::*;
@@ -32,6 +32,7 @@ pub struct AssetData {
     pub job: Vec<JobAssetSets>,
     pub god: Vec<GodAssets>,
     pub engage: Vec<SearchData>,
+    pub unique_0: HashMap<i32, i32>,
     pub engage_atks: Vec<EngageAtkAsset>,
     pub male_index: i32,
     pub female_index: i32,
@@ -52,6 +53,7 @@ impl AssetData {
             m_body: HashSet::new(),
             f0: HashSet::new(),
             f_body: HashSet::new(),
+            unique_0: HashMap::new(),
             job: Vec::new(), engage: Vec::new(), god: Vec::new(), engage_atks: Vec::new(),
             male_index: AssetTableStaticFields::get_condition_index("男装"),
             female_index: AssetTableStaticFields::get_condition_index("女装"),
@@ -92,8 +94,12 @@ impl AssetData {
             if let Some(bid) = person.belong {
                 let _ = search_by_key(0, bid, None).map(|entry| self.bid.insert(entry.parent.index) );
             }
-            if let Some(entry) = search_by_key_with_dress(0, name) { 
-                if is_male { self.m0.insert(entry.parent.index); } else { self.f0.insert(entry.parent.index); }    }
+            if let Some(entry) = search_by_key(0, name, None) { 
+                if is_male { self.m0.insert(entry.parent.index); } else { self.f0.insert(entry.parent.index); }    
+                if let Some(icon) = person.unit_icon_id {
+                    if let Ok(id) = icon.to_string().split_at(3).0.parse::<i32>(){ self.unique_0.insert(id, entry.parent.index); }
+                }
+            }
             if let Some(entry) = search_by_key_with_dress(0, person.pid) { if is_male { self.m0.insert(entry.parent.index); } else { self.f0.insert(entry.parent.index); } }
 
 
@@ -280,7 +286,7 @@ impl AssetData {
     }
     pub fn random_head(&self, result: &mut AssetTableResult, unit: &Unit, conditions: ConditionFlags, with_dress: bool) {
         let rng = Random::instantiate().unwrap();
-        rng.initialize(unit.grow_seed as u32);
+        rng.initialize(unit.drop_seed as u32);
         if conditions.contains(ConditionFlags::Male) || conditions.contains(ConditionFlags::Female) {
             self.bid.iter().nth( rng.get_value( self.bid.len() as i32) as usize)
                 .map(|&i| AssetTable::try_index_get(i).map(|entry| result.commit_asset_table(entry))
@@ -291,24 +297,36 @@ impl AssetData {
 
             if let Some(entry) = set.iter().nth(rng.get_value(size as i32) as usize).and_then(|&index|AssetTable::try_index_get(index)) {
                 result_commit_scaling(result, entry);
-                if with_dress {
-                    if !GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) { entry.dress_model.map(|dress| result.dress_model = dress);   }
-                }
+                if with_dress && !GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) { entry.dress_model.map(|dress| result.dress_model = dress);   }
                 if entry.head_model.is_some_and(|head| !head.to_string().contains("null")) {  result.head_model = entry.head_model.unwrap(); }
-                if entry.accessory_list.list.iter()
-                    .any(|acc| acc.model.is_some_and(|model| model.to_string().contains("_Hair"))) { result.hair_model = "uHair_null".into(); }
+                let hair_accessory = entry.accessory_list.list.iter().any(|acc| acc.model.is_some_and(|model| model.to_string().contains("_Hair"))); 
 
+                let shld = result.accessory_list.list.iter().find(|x|
+                        x.locator.is_some_and(|loc| str_contains(loc, "shld"))
+                ).map_or_else(|| String::new(), |acc| acc.model.map_or_else(|| String::new(), |model| model.to_string()));
+
+                if hair_accessory { result.hair_model = "uHair_null".into(); }
                 else if entry.hair_model.is_some_and(|hair| !hair.to_string().contains("null")) {  result.hair_model = entry.hair_model.unwrap(); }
 
-                crate::assets::accessory::accessory_clear_all(result.accessory_list);
-
-                entry.accessory_list.list.iter()
-                    .filter(|acc| 
-                        acc.model.is_some_and(|model| !model.to_string().contains("shld")) && acc.locator.is_some())
-                    .for_each(|acc| result.accessory_list.try_add(acc) );
-
-                clear_accessory_at_locator(result.accessory_list, "c_trans");
-                clear_accessory_at_locator(result.accessory_list, "c_hip_jnt");
+                if with_dress || hair_accessory {
+                    result.accessory_list.clear();
+                    entry.accessory_list.list.iter().for_each(|acc|{ result.accessory_list.try_add(acc); });
+                    clear_accessory_at_locator(result.accessory_list, "c_trans");
+                    clear_accessory_at_locator(result.accessory_list, "c_hip_jnt");
+                    if !shld.is_empty() { change_accessory(result.accessory_list, shld.as_str(), "l_shld_loc"); }
+                    else { change_accessory(result.accessory_list, "null", "l_shld_loc"); }
+                }
+                // Fixing Skin for Heads
+                if !result.head_model.is_null() {
+                    let head = result.head_model.to_string();
+                    if head.len() >= 10 {
+                        if let Ok(id) = head.split_at(7).1[..3].parse::<i32>() {
+                            if let Some(entry0) = self.unique_0.get(&id).and_then(|&index| AssetTable::try_index_get(index)) {
+                                result.commit_asset_table(entry0);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -329,14 +347,16 @@ impl AssetData {
     }
 
     pub fn get_gender_condition(&self, gender: i32) -> i32 {
-        if gender == 1 { self.male_index } else if gender == 2 { self.female_index } else { 0 }
+        if gender == 1 { self.male_index } 
+        else if gender == 2 { self.female_index } 
+        else { 0 }
     }
     pub fn random_aoc(&self, unit: &Unit, result: &mut AssetTableResult, conditions: ConditionFlags) {
         if conditions.contains(ConditionFlags::TikiEngage) { return; }
         if conditions.contains(ConditionFlags::Male) || conditions.contains(ConditionFlags::Female) {
             let hash = if unit.person.get_asset_force() == 0 { unit.person.parent.hash } else { unit.grow_seed };
             let rng = crate::utils::create_rng(hash, 1);
-            if unit.status.value & 8388608 != 0 { rng.get_value(100); }
+            if unit.status.value & 8388608 != 0 { rng.get_value(1); }
             let aoc = if conditions.contains(ConditionFlags::Male) { &self.aoc_m[ rng.get_value( self.aoc_m.len() as i32 ) as usize] }
                 else { &self.aoc_f[ rng.get_value( self.aoc_f.len() as i32 ) as usize] };
             result.info_anims = Some(concat_string!("AOC_Info_c", aoc).into());

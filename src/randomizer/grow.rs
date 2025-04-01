@@ -205,7 +205,7 @@ pub fn randomize_person_grow(){
     let limits: (i32, i32) = 
         match mode {
             0|3 => { (150, 400) },  // Balanced
-            1|2 => { (100, 2000) },   // Unrestricted
+            1|2 => { (10, 2000) },   // Unrestricted
             _ => { (150, 400) },
         };
 
