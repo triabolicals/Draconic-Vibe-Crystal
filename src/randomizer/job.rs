@@ -4,6 +4,8 @@ use engage::force::*;
 use engage::unitpool::*;
 use engage::util::get_instance;
 use engage::menu::{BasicMenuResult, config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItemGaugeMethods, ConfigBasicMenuItem}};
+use crate::assets::data::SEARCH_LIST;
+use crate::randomizer::grow::adaptive_growths;
 use crate::randomizer::job::reclass::ChangeJobData;
 
 pub const JOB_HASH: [i32; 111] = [ 
@@ -25,6 +27,7 @@ pub const JOB_HASH: [i32; 111] = [
 
 pub mod reclass;
 pub mod menu;
+pub mod single;
 
 pub struct UnitPoolStaticFieldsMut {
     pub s_unit: &'static mut Array<&'static mut Unit>,
@@ -37,13 +40,13 @@ fn rerandomize_jobs() {
         .iter_mut().filter(|unit| unit.force.is_some_and(|f| (1 << f.force_type) & 6 != 0 )).for_each(|unit|{
             if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 {
                 if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit); }
-                else { 
-                    super::person::ai::reset_enemy_ai_and_items(unit);
+                else {
+                    person::ai::reset_enemy_ai_and_items(unit);
                     enemy_unit_change_to_random_class(unit); 
                 }
                 crate::autolevel::auto_level_unit_for_random_map(unit, false);
-                super::person::unit::adjust_unit_items(unit);
-                if unit.force.unwrap().force_type != 0 { crate::randomizer::person::ai::adjust_unitai(unit);  }
+                person::unit::adjust_unit_items(unit);
+                if unit.force.unwrap().force_type != 0 { person::ai::adjust_unitai(unit);  }
                 unit.auto_equip();
                 unit.reload_actor();
             }
@@ -56,7 +59,7 @@ fn rerandomize_jobs() {
                 if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit); }
                 else {  enemy_unit_change_to_random_class(unit); }
                 crate::autolevel::auto_level_unit_for_random_map(unit, false);
-                super::person::unit::adjust_unit_items(unit);
+                person::unit::adjust_unit_items(unit);
                 unit.auto_equip();
                 unit.reload_actor();
             }
@@ -73,10 +76,10 @@ fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, pla
     if let Some(pos) = crate::assets::animation::MONSTERS.iter().position(|&j| j == jid) { 
         if !DVCVariables::is_main_chapter_complete(17) || emblem { return false; }
         if player { 
-            if !crate::utils::dlc_check() { return pos == 5 || pos == 6 ; } // Wyrms Only
+            if !dlc_check() { return pos == 5 || pos == 6 ; } // Wyrms Only
             else { return pos != 4 && pos != 7; }  // No Fell Dragons
         }  
-        return  pos == 2 || pos == 3 || pos == 5 || pos == 6 ;  // Wolfs and Wyrms
+        return  pos == 2 || pos == 3 || pos == 5 || pos == 6 ;  // Wolves and Wyrms
     }
     if jid.contains("_紋章士_") { return false; }     // Prevent Emblem Classes
 
@@ -86,7 +89,7 @@ fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, pla
     if jid == "JID_村人" { return false; }  // No Villager
     if jid == "JID_マージカノン" { return GameVariableManager::get_bool("G_CC_マージカノン"); } // FX Checks for Mage Cannoner / Enchanter
     if jid == "JID_エンチャント" { return GameVariableManager::get_bool("G_CC_エンチャント"); } 
-    return true;
+   true
 }
 
 fn get_old_person_data(unit: &Unit) -> (i32, i32, i32) {
@@ -104,74 +107,68 @@ fn get_old_person_data(unit: &Unit) -> (i32, i32, i32) {
     let job = unit.person.get_job().unwrap();
     let level = unit.person.get_level() as i32;
     let internal = unit.person.get_internal_level() as i32;
-    if job.is_high() { return (1, level, internal); }
-    else if job.max_level == 40 { return (2, level, internal); }
-    else { return (0, level, internal); }
+    if job.is_high() { (1, level, internal) }
+    else if job.max_level == 40 { (2, level, internal) }
+    else { (0, level, internal) }
 }
 
-pub fn unit_change_to_random_class(unit: &mut Unit){
-    let rng = Random::get_game();
-    let mut is_female = 
-    if ( unit.person.pid.to_string() == PIDS[0] || unit.person.get_flag().value & 128 != 0 ) && 
-        GameVariableManager::exist(DVCVariables::LUEUR_GENDER) { GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) == 2 }
-        else if unit.edit.is_enabled() { unit.edit.gender == 2 }
-        else { unit.person.get_gender() == 2 };
-    if unit.person.get_flag().value & 32 != 0 { is_female = !is_female };   // Reverse gender
-
-    let job_list = JobData::get_list().unwrap();
-    let current_job = unit.get_job();
-    
+pub fn unit_change_to_random_class(unit: &mut Unit) {
     let old_data = get_old_person_data(unit);
-    let is_high = old_data.0 == 1 || (old_data.0 == 2 && old_data.1 > 15 );
-
+    let is_high = old_data.0 == 1 || (old_data.0 == 2 && old_data.1 > 15);
+    let rng = Random::get_game();
     let unit_level = old_data.1;
     let internal_level = if old_data.0 == 1 && old_data.2 == 0 { 20 } else { old_data.2 };
-    // println!("Unit Level {} / Internal {} (Current Job: {})", unit_level, internal_level, Mess::get(current_job.name));
+    if let Some(class) = DVCVariables::get_single_class(!is_high){
+        if class.parent.hash != unit.job.parent.hash { unit.class_change(class); }
+        else { return; }
+    }
+    else {
+        let mut is_female =
+            if (unit.person.pid.to_string() == PIDS[0] || unit.person.get_flag().value & 128 != 0) &&
+                GameVariableManager::exist(DVCVariables::LUEUR_GENDER) { GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) == 2 } else if unit.edit.is_enabled() { unit.edit.gender == 2 } else { unit.person.get_gender() == 2 };
+        if unit.person.get_flag().value & 32 != 0 { is_female = !is_female };   // Reverse gender
 
-    let class_list: Vec<_> = job_list.iter().filter(|&job| unit_random_can_reclass(job, is_female, is_high, true, false) ).collect();
-    if class_list.len() == 0 { return; }
+        let job_list = JobData::get_list().unwrap();
 
-    let new_job = class_list[ rng.get_value( class_list.len() as i32) as usize ];
-    unit.class_change(new_job);
+        let class_list: Vec<_> = job_list.iter()
+            .filter(|&job| unit_random_can_reclass(job, is_female, is_high, true, false)).collect();
+        if class_list.len() == 0 { return; }
 
+        let new_job = class_list[rng.get_value(class_list.len() as i32) as usize];
+        unit.class_change(new_job);
+    }
     match old_data.0 {
-        2 =>  { //Special
-            if new_job.is_high() {
-                if unit_level > 35 { 
+        2 => { //Special
+            if unit.job.is_high() {
+                if unit_level > 35 {
                     unit.set_level(unit_level - 20);
                     unit.set_internal_level(20);
-                }
-                else if unit_level > 15 {
+                } else if unit_level > 15 {
                     unit.set_level(unit_level - 15);
                     unit.set_internal_level(15);
-                }
-                else {
+                } else {
                     unit.set_level(1);
                     unit.set_internal_level(unit_level);
                 }
-            }
-            else if new_job.max_level == 40 {
+            } else if unit.job.max_level == 40 {
                 let new_level = if unit_level > 40 { 40 } else { unit_level };
-                unit.set_level(new_level); 
+                unit.set_level(new_level);
                 unit.set_internal_level(0);
-            }
-            else {
-                unit.set_level(unit_level); 
+            } else {
+                unit.set_level(unit_level);
                 unit.set_internal_level(0);
             }
         }
         1 => {  //Promoted
-            if new_job.is_high() {
-                unit.set_level(unit_level); 
+            if unit.job.is_high() {
+                unit.set_level(unit_level);
                 unit.set_internal_level(internal_level);
-            }
-            else if new_job.max_level == 40 {
+            } else if unit.job.max_level == 40 {
                 let total = unit_level + internal_level;
                 let new_level = if total > 40 { 40 } else { total };
-                unit.set_level(new_level); 
+                unit.set_level(new_level);
                 unit.set_internal_level(0);
-            }
-            else {
+            } else {
                 let total = unit_level + internal_level;
                 let new_level = if total > 20 { 20 } else { total };
                 unit.set_level(new_level);
@@ -179,24 +176,20 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
             }
         }
         _ => {  //Base
-            if new_job.is_high()   {
+            if unit.job.is_high() {
                 if unit_level > 20 {
-                    unit.set_level(unit_level - 20); 
+                    unit.set_level(unit_level - 20);
                     unit.set_internal_level(20);
-                }
-                else {
-                    unit.set_level(1); 
+                } else {
+                    unit.set_level(1);
                     unit.set_internal_level(unit_level - 1);
                 }
-            }
-            else {
+            } else {
                 unit.set_level(unit_level);
                 unit.set_internal_level(internal_level);
             }
         }
     }
-
-
     unit.set_hp(unit.get_capability(0, true));  // fix HP
     unit.set_weapon_mask_from_person(); 
 
@@ -204,7 +197,7 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
     randomize_selected_weapon_mask(unit);
     let mut new_opt = 
         if unit.job.get_weapon_mask().value & (1 << 9) != 0 { 1 << ( rng.get_value(8) + 1 ) }
-        else if unit.selected_weapon_mask.value == 0 { unit.job.get_weapon_mask().value }
+        else if unit.selected_weapon_mask.value == 0 { unit.weapon_mask.value }
         else { unit.selected_weapon_mask.value };
 
     if rng.get_value(20) < 5 {
@@ -215,12 +208,12 @@ pub fn unit_change_to_random_class(unit: &mut Unit){
     }
     unit.original_aptitude.value = new_opt;
     unit.aptitude.value |= new_opt;
-    crate::randomizer::skill::learn::unit_update_learn_skill(unit);
-    // println!("{} changed to {} (Lv {}/{})", Mess::get_name(unit.person.pid), Mess::get(new_job.name), unit.level, unit.internal_level);
-    
+    skill::learn::unit_update_learn_skill(unit);
+    adaptive_growths(unit, true);
 }
 
 pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
+
     let current_job = unit.get_job();
     let current_job_name = current_job.name.to_string();
     if current_job_name == "MJID_Emblem" { return false; }
@@ -242,7 +235,10 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
     let internal_level = unit.internal_level as i32;
     let has_emblem = unit.get_god_unit().is_some() || ( GameUserData::get_chapter().cid.to_string() != "CID_M011" );
 
-    let class_list: Vec<_> = JobData::get_list().unwrap().iter().filter(|&job| unit_random_can_reclass(job, is_female, is_high, false, has_emblem) ).collect();
+    let class_list: Vec<_> = JobData::get_list().unwrap().iter()
+        .filter(|&job| unit_random_can_reclass(job, is_female, is_high, false, has_emblem) )
+        .collect();
+
     if class_list.len() == 0 { return false; }
 
     let new_job = class_list[ rng.get_value( class_list.len() as i32) as usize ];
@@ -292,16 +288,12 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
         }
         else { unit.private_skill.add_sid("SID_移動－２", 10, 0); }
     }
-    // println!("{} changed to {} (Lv {}/{}) from {}", Mess::get_name(unit.person.pid), Mess::get(new_job.name), unit.level, unit.internal_level, Mess::get(current_job_name));
     unit.set_hp(unit.get_capability(0, true));
     fixed_unit_weapon_mask(unit);
     randomize_selected_weapon_mask(unit);
-    crate::randomizer::skill::learn::unit_update_learn_skill(unit);
-    return true;
+    skill::learn::unit_update_learn_skill(unit);
+    true
 }
-
-// Alow Class Change for Exclusive Classes based on Asset Gender
-
 
 pub fn is_magic_class(job: &JobData) -> bool {
     let mut weapon_type = 0;
@@ -326,14 +318,19 @@ pub fn get_weapon_for_asset_table(job: &JobData) -> Option<&'static ItemData> {
             weapon_level = job.get_max_weapon_level(x);
         }
     }
-    return crate::randomizer::item::data::WEAPONDATA.get().unwrap().get_random_weapon(weapon_type - 1, true);
+    item::data::WEAPONDATA.get().unwrap().get_random_weapon(weapon_type, -1, true)
 }
 
 pub fn correct_job_base_stats() {
     let job_list = JobData::get_list_mut().unwrap();
     job_list.iter_mut()
-        .filter(|job| job.is_low() )
-        .for_each(|job|{
+        .filter(|job| job.is_low())
+        .for_each(|job| {
+            if job.unit_icon_id_m.is_none() && job.unit_icon_id_f.is_some() {
+                job.unit_icon_id_m = job.unit_icon_id_f.clone();
+            } else if job.unit_icon_id_f.is_none() && job.unit_icon_id_m.is_some() {
+                job.unit_icon_id_f = job.unit_icon_id_m.clone();
+            }
             let bases = job.get_base();
             let cap = job.get_limit();
             let high_jobs = job.get_high_jobs();
@@ -343,34 +340,47 @@ pub fn correct_job_base_stats() {
                     let h_job = JobData::get_mut(hjob.jid).unwrap();
                     let h_bases = h_job.get_base();
                     let h_cap = h_job.get_limit();
-                    for x in 0..10 { 
+                    for x in 0..10 {
                         if h_cap[x] < cap[x] { h_cap[x] = cap[x] + 2; }
-                        if h_bases[x] < bases[x] { h_bases[x] = bases[x] + 1; } 
+                        if h_bases[x] < bases[x] { h_bases[x] = bases[x] + 1; }
                     }
                     if h_bases[10] < bases[10] { h_bases[10] = bases[10]; }
                     if h_cap[10] < cap[10] { h_cap[10] = cap[10]; }
                 }
-            );
-        }
+                );
+        });
+    ["JID_邪竜", "JID_不明", "JID_邪竜ノ王", "JID_M000_邪竜ノ王"].iter().for_each(|jid|
+        if let Some(job) = JobData::get_mut(jid) { job.get_flag().value = 0; }
     );
-    ["JID_邪竜", "JID_不明", "JID_邪竜ノ王", "JID_M000_邪竜ノ王"].iter().for_each(|jid| 
-        if let Some(job) = JobData::get_mut(jid) {job.get_flag().value = 0;}
-    );
-    ["JID_フロラージュ下級", "JID_フロラージュ", "JID_フロラージュ_E", "JID_リンドブルム下級", "JID_リンドブルム", "JID_リンドブルム_E", "JID_スレイプニル下級", "JID_スレイプニル", "JID_スレイプニル_E", "JID_ピッチフォーク下級", "JID_ピッチフォーク", "JID_ピッチフォーク_E",
-    "JID_メリュジーヌ_味方", "JID_メリュジーヌ", "JID_裏邪竜ノ娘"].iter()
-    .for_each(|jid| 
-        if let Some(job) = JobData::get_mut(jid) {job.get_flag().value |= 7;}
-    );
+    ["JID_フロラージュ下級", "JID_フロラージュ", "JID_フロラージュ_E", "JID_リンドブルム下級", "JID_リンドブルム", "JID_リンドブルム_E",
+        "JID_スレイプニル下級", "JID_スレイプニル", "JID_スレイプニル_E", "JID_ピッチフォーク下級", "JID_ピッチフォーク", "JID_ピッチフォーク_E",
+        "JID_メリュジーヌ_味方", "JID_メリュジーヌ", "JID_裏邪竜ノ娘"].iter()
+        .for_each(|jid|
+            if let Some(job) = JobData::get_mut(jid) { job.get_flag().value |= 7; }
+        );
 
-    [ "JID_アヴニール下級", "JID_アヴニール", "JID_アヴニール_E", "JID_スュクセサール下級", "JID_スュクセサール", "JID_スュクセサール_E", "JID_ティラユール下級", "JID_ティラユール", "JID_ティラユール_E", "JID_クピードー下級", "JID_クピードー", "JID_クピードー_E",
-    "JID_裏邪竜ノ子", "JID_ダンサー"].iter()
-    .for_each(|jid|
-        if let Some(job) = JobData::get_mut(jid) {
-            job.get_flag().value |= 16;
-            job.get_flag().value &= !4; 
-            job.get_flag().value |= 3;
+    ["JID_アヴニール下級", "JID_アヴニール", "JID_アヴニール_E", "JID_スュクセサール下級", "JID_スュクセサール",
+        "JID_スュクセサール_E", "JID_ティラユール下級", "JID_ティラユール", "JID_ティラユール_E", "JID_クピードー下級",
+        "JID_クピードー", "JID_クピードー_E", "JID_裏邪竜ノ子", "JID_ダンサー"
+    ].iter()
+        .for_each(|jid|
+            if let Some(job) = JobData::get_mut(jid) {
+                job.get_flag().value |= 16;
+                job.get_flag().value &= !4;
+                job.get_flag().value |= 3;
+            }
+        );
+    JobData::get_list_mut().unwrap().iter_mut()
+        .filter(|job| job.jid.str_contains("JID_紋章士_") && job.parent.index > 0)
+        .for_each(|emblem_job| { emblem_job.get_flag().value = 0; });
+    let search_list = SEARCH_LIST.get().unwrap();
+    JobData::get_list_mut().unwrap().iter_mut().for_each(|job| {
+        let has_mode_1 = search_list.job.iter().any(|j| j.job_hash == job.parent.hash && j.mode == 1);
+        let has_mode_2 = search_list.job.iter().any(|j| j.job_hash == job.parent.hash && j.mode == 2);
+        if !has_mode_1 || !has_mode_2 {
+            job.get_flag().value = 0;
         }
-    );
+    });
 }
 
 pub fn randomize_selected_weapon_mask(unit: &mut Unit) {
@@ -379,7 +389,6 @@ pub fn randomize_selected_weapon_mask(unit: &mut Unit) {
     let selectable_job_weapons = job.get_selectable_weapon_mask(&mut weapon_select_count);
     if weapon_select_count == 0 { return; }
     let rng = Random::get_system();
-    // adjusting equippable weapons
 
     let mut select_kinds: Vec<i32> = Vec::new();
     for x in 1..10 {
@@ -407,13 +416,16 @@ fn cc_check(this: &ChangeJobData, unit: &Unit, method_info: OptionalMethod) -> b
 
 fn add_to_list(this: &ChangeJobData, unit: &Unit, cc_type: i32) -> bool {
     let job = unit.get_job();
-    if this.proof_type == 0 && cc_type == 0 {
-        return true;
+    if !can_reclass(this.job) { return false; }
+    if this.proof_type == 0 && cc_type == 0 { true }
+    else if this.proof_type > 0 && cc_type > 0 {
+        if this.job.is_low() && job.is_high() { this.job.max_level == 40  }
+        else { true }
     }
-    if this.proof_type > 0 && cc_type > 0 {
-        if this.job.is_low() && job.is_high() { return this.job.max_level == 40;  }
-        return true;
-    }
-    return false;
+    else { false }
 }
 
+pub fn can_reclass(job: &JobData) -> bool {
+    let vanilla_class = JOB_HASH.iter().any(|x| *x == job.parent.hash);
+    (vanilla_class && job.get_flag().value & 32 == 0) || (!vanilla_class && GameVariableManager::get_bool(DVCVariables::CUSTOM_JOB_KEY) )
+}

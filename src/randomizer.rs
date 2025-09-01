@@ -4,22 +4,23 @@ pub use unity::prelude::*;
 use skyline::patching::Patch;
 pub use engage::{
     dialog::yesno::*,
-    menu::{*, BasicMenuResult, config::{ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItem, ConfigBasicMenuItemSwitchMethods}},
-    proc::ProcInst,
-    gamevariable::*,
+    gamedata::{dispos::*, god::*, item::RewardData, item::*, ring::RingData, skill::*, unit::*, *},
     gameuserdata::*,
+    gamevariable::*,
     hub::access::*,
+    menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItemSwitchMethods}, BasicMenuResult, *},
     mess::*,
     pad::Pad,
-    random::*,
-    proc::*, script::DynValue,
-    gamedata::{*, unit::*, ring::RingData, item::RewardData, skill::*, item::*, god::*, dispos::*},
+    proc::ProcInst,
+    proc::*, random::*,
+    script::DynValue,
 };
 pub use super::enums::*;
 pub use super::config::*;
-pub use std::sync::{RwLock, OnceLock};
+pub use std::sync::{OnceLock, RwLock};
 
 use std::{fs::{self, File}, io::Write};
+use engage::godpool::GodPool;
 use crate::utils::{self, can_rand, dlc_check, fnv_hash_string};
 
 pub mod status;
@@ -37,7 +38,7 @@ pub mod map;
 pub mod terrain;
 
 use engage::proc::desc::ProcDesc;
-
+use crate::assets::emblem::{get_random_engage_voice, has_engage_decide};
 pub use super::{CONFIG, VERSION};
 pub static mut LINKED: [i32; 20] = [-1; 20];
 
@@ -83,19 +84,17 @@ pub fn get_new_seed() -> i32 {
     if let Some(input) = unsafe { get_result(None) } {
         let string = input.to_string();
         if string.len() == 0 { return Random::get_system().value() }
-        println!("String: {}", string);
         let parsed = string.parse::<i32>();
         if parsed.is_ok(){
             let value = parsed.unwrap();
-            println!("String Value: {}", value);
-            if value == 0 { return Random::get_system().value() as i32; }
+            if value == 0 { return Random::get_system().value(); }
             return value;
         }
         let hash = unsafe { fnv_hash_string(input, None) };
         if hash < 0 { return -1*hash; }
         else { return hash; }
     }
-    Random::get_system().value() as i32
+    Random::get_system().value()
 }
 pub struct SeedRandomizer;
 impl ConfigBasicMenuItemCommandMethods for SeedRandomizer {
@@ -103,8 +102,16 @@ impl ConfigBasicMenuItemCommandMethods for SeedRandomizer {
         let pad_instance =  engage::util::get_instance::<Pad>();
         if pad_instance.npad_state.buttons.plus() {
             let keyboard = SoftwareKeyboard::instantiate().unwrap();
-            let current_seed = format!("{}", crate::utils::get_random_number_for_seed() as i32);
-            unsafe { keyboard_ctor(keyboard, 10, current_seed.into(), "Enter value for new save file seed.".into(), format!("Range: 0 to {}. 0 for random seed.", i32::MAX).into(), 0, 0, None) };    
+            let current_seed = format!("{}", utils::get_random_number_for_seed() as i32);
+            unsafe {
+                keyboard_ctor(
+                    keyboard,
+                    10,
+                    current_seed.into(),
+                    "Enter value for new save file seed.".into(),
+                    format!("Range: 0 to {}. 0 for random seed.", i32::MAX).into(),
+                    0, 0, None)
+            };
             let desc = unsafe { keyboard_desc(keyboard, None) };
             unsafe { procinst_createbind(keyboard, this.menu, desc, "Keyboard".into(), None) };
             BasicMenuResult::se_cursor()
@@ -125,7 +132,7 @@ impl ConfigBasicMenuItemCommandMethods for SeedRandomizer {
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { 
         let set_seed = CONFIG.lock().unwrap().seed as i32;
         this.help_text = if set_seed != 0 { format!("Press + to change the set seed. Currently set to: {}", set_seed) }
-            else { format!("Press + to manually set seed.") }.into();
+            else { "Press + to manually set seed.".to_string() }.into();
 
     }
 }
@@ -163,14 +170,9 @@ pub struct SeedConfirm;
 impl TwoChoiceDialogMethods for SeedConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
         let new_seed = get_new_seed();
-        unsafe {
-            CONFIG.lock().unwrap().seed = new_seed as u32;
-            CONFIG.lock().unwrap().save();
-            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap());
-            let index = menu.select_index;
-            SeedRandomizer::set_help_text(menu.menu_item_list[index as usize], None);
-            menu.menu_item_list[index as usize].update_text();
-        }
+        CONFIG.lock().unwrap().seed = new_seed as u32;
+        CONFIG.lock().unwrap().save();
+        crate::menus::utils::dialog_restore_text_command::<SeedRandomizer>(this);
         BasicMenuResult::se_cursor().with_close_this(true)
     }
     extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
@@ -180,10 +182,7 @@ pub struct ReseedConfirm;
 impl TwoChoiceDialogMethods for ReseedConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
         reseed();
-        let menu = unsafe {  std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap()) };
-        let index = menu.select_index;
-        ReseedRandomizer::set_help_text(menu.menu_item_list[index as usize], None);
-        menu.menu_item_list[index as usize].update_text();
+        crate::menus::utils::dialog_restore_text_command::<ReseedRandomizer>(this);
         BasicMenuResult::se_cursor().with_close_this(true)
     }
     extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
@@ -206,18 +205,20 @@ pub fn tutorial_check(){
             if string == "G_解説_TUTID_クラスチェンジ" { return; }
         }
     }
-    GameVariableManager::find_starts_with("G_進化_").iter().for_each(|key| GameVariableManager::set_bool(key.to_string(), true));
+    GameVariableManager::find_starts_with("G_進化_").iter()
+        .for_each(|key| GameVariableManager::set_bool(key.to_string(), true));
+    if CONFIG.lock().unwrap().debug {
+        GameVariableManager::find_starts_with("G_Gmap").iter()
+            .for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
+    }
     if dlc_check() && can_rand() {
         GameVariableManager::set_bool("G_CC_エンチャント", true);
         GameVariableManager::set_bool("G_CC_マージカノン", true);
     }
-    /* 
     if CONFIG.lock().unwrap().debug {
         GameVariableManager::find_starts_with("G_GmapSpot_").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
-        EMBLEM_LIST.get().unwrap().iter().flat_map(|&i| GodData::try_get_hash(i))
-            .for_each(|god| { GodPool::create(god); });
+        EMBLEM_LIST.get().unwrap().iter().flat_map(|&hash| GodData::try_get_hash(hash)).for_each(|g| { GodPool::create(g); });
     }
-    */
 }
 #[skyline::from_offset(0x01fde850)]
 pub fn keyboard_create_bind<P: Bindable>(this: &P, length: i32, text: &Il2CppString, header: &Il2CppString, sub: &Il2CppString, preset: i32, call_back: u64, method_info: OptionalMethod);
@@ -232,7 +233,7 @@ pub fn write_seed_output_file() {
          else { file}.unwrap();
     writeln!(&mut f, "------------- Triabolical Draconic Vibe Crystal Randomization Settings - Version {} -------------", VERSION).unwrap();
     if GameVariableManager::get_bool("G_Ironman") { writeln!(&mut f, "* Ironman Mode").unwrap(); }
-    match GameVariableManager::get_number(DVCVariables::CONTINIOUS){
+    match GameVariableManager::get_number(DVCVariables::CONTINUOUS){
         1|2 => { writeln!(&mut f, "* Continuious Mode").unwrap();} 
         3 => { writeln!(&mut f, "* Random Map Mode").unwrap();}
         4 => { writeln!(&mut f, "* Open Map Mode").unwrap();} 
@@ -258,7 +259,12 @@ pub fn write_seed_output_file() {
     else if god_mode == 2 { writeln!(&mut f, "* Emblem Data: Engage Attack / Engage Link").unwrap(); }
     else if god_mode == 3 { writeln!(&mut f, "* Emblem Data: Inheritable / Attack / Link").unwrap(); }
     writeln!(&mut f, "* Random Classes: {}", GameVariableManager::get_bool(DVCVariables::JOB_KEY)).unwrap();
-    writeln!(&mut f, "* Random Skills: {}", GameVariableManager::get_bool(DVCVariables::SKILL_KEY)).unwrap();
+    match GameVariableManager::get_number(DVCVariables::SKILL_KEY) {
+        1|4 => writeln!(&mut f, "* Random Skills: Personal").unwrap(),
+        2 => writeln!(&mut f, "* Random Skills: Class").unwrap(),
+        3 => writeln!(&mut f, "* Random Skills: Personal + Class").unwrap(),
+        _ => writeln!(&mut f, "* Random Skills: None").unwrap(),
+    };
     writeln!(&mut f, "* Random Items: {}", GameVariableManager::get_bool(DVCVariables::ITEM_KEY)).unwrap();
     let growth_mode = GameVariableManager::get_number(DVCVariables::GROWTH_KEY);
     match growth_mode {
@@ -279,7 +285,7 @@ pub fn write_seed_output_file() {
         2 => { writeln!(&mut f, "* Random SP Cost + Chaos Skill Inheritance Mode").unwrap(); },
         _ => {}
     }
-
+    let emblem_list = emblem::get_playable_emblem_hashes();
     if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
         writeln!(&mut f, "\n--------------- Person Recruitment Order ---------------").unwrap();
         PLAYABLE.get().unwrap().iter().flat_map(|&i| PersonData::try_index_get(i)).enumerate()
@@ -295,7 +301,7 @@ pub fn write_seed_output_file() {
     }
     if emblem_mode != 0 {
         writeln!(&mut f, "\n-------------- Emblems Recruitment Order Randomization ---------------").unwrap();
-        EMBLEM_LIST.get().unwrap().iter().flat_map(|&h| GodData::try_get_hash(h)).enumerate()
+        emblem_list.iter().flat_map(|&h| GodData::try_get_hash(h)).enumerate()
             .for_each(|(index, god)|{
                 let key = format!("G_R_{}", god.gid.to_string());
                 if GameVariableManager::exist(key.as_str()) {
@@ -328,9 +334,9 @@ pub fn write_seed_output_file() {
             }
         );
     }
-    if GameVariableManager::get_bool(DVCVariables::SKILL_KEY) {
+    if GameVariableManager::get_number(DVCVariables::SKILL_KEY) != 0 {
         writeln!(&mut f, "\n--------------- Personal Skills Randomization ---------------").unwrap();
-        person::PLAYABLE.get().unwrap().iter()
+        PLAYABLE.get().unwrap().iter()
             .flat_map(|&index| PersonData::try_index_get(index))
             .for_each(|person|{
                 let skill_name = 
@@ -393,14 +399,14 @@ pub fn write_seed_output_file() {
     }
     if GameVariableManager::get_number("G_Random_God_Mode") >= 2 {
         writeln!(&mut f, "\n--------------- Emblem Engage / Linked Engage Attack Randomization ---------------").unwrap();
-        EMBLEM_LIST.get().unwrap().iter().flat_map(|&h| GodData::try_get_hash(h))
+        emblem_list.iter().flat_map(|&h| GodData::try_get_hash(h))
             .for_each(|god|{ 
                 writeln!(&mut f, "{}", crate::message::god_engage_random_str(god)).unwrap();
             } 
         );
     }
     writeln!(&mut f, "\n--------------- Emblem Engrave Data ---------------").unwrap();
-    EMBLEM_LIST.get().unwrap().iter().flat_map(|&h| GodData::try_get_hash(h))
+    emblem_list.iter().flat_map(|&h| GodData::try_get_hash(h))
         .for_each(|god|{
             let line = format!("* {} - \t{}: {}, {}: {}, {}: {}, {}: {}, {}: {}, {}: {}", 
                 Mess::get(god.mid), 
@@ -423,7 +429,7 @@ pub fn write_seed_output_file() {
         3 => { writeln!(&mut f, "* Emblem Sync Data: Stats / Sync Skills / Engage Skills").unwrap(); },
         _ => { writeln!(&mut f, "* Emblem Sync Data: No Randomization").unwrap(); },
     }
-    EMBLEM_LIST.get().unwrap().iter().flat_map(|&h| GodData::try_get_hash(h)).enumerate()
+    emblem_list.iter().flat_map(|&h| GodData::try_get_hash(h)).enumerate()
         .for_each(|(index, god)|{
             let level_data = god.get_level_data().unwrap();
             let grow_data = GodGrowthData::try_get_from_god_data(god).unwrap();
@@ -442,9 +448,9 @@ pub fn write_seed_output_file() {
             }
             writeln!(&mut f, "").unwrap();
             for y in 1..level_data.len() {
-                writeln!(&mut f, "\t* {} Lv. {} Stats: {}", god_name, y, utils::stats_from_skill_array(level_data[y as usize].synchro_skills)).unwrap();
-                writeln!(&mut f, "\t\tSyncho Skills:  {}", utils::skill_array_string(level_data[y as usize].synchro_skills)).unwrap();
-                writeln!(&mut f, "\t\tEngaged Skills: {}", utils::skill_array_string(level_data[y as usize].engaged_skills)).unwrap();
+                writeln!(&mut f, "\t* {} Lv. {} Stats: {}", god_name, y, utils::stats_from_skill_array(level_data[y].synchro_skills)).unwrap();
+                writeln!(&mut f, "\t\tSyncho Skills:  {}", utils::skill_array_string(level_data[y].synchro_skills)).unwrap();
+                writeln!(&mut f, "\t\tEngaged Skills: {}", utils::skill_array_string(level_data[y].engaged_skills)).unwrap();
                 if y-1 < grow_data.len() {
                     let level = grow_data[y-1].get_inheritance_skills();
                     if level.is_none() { writeln!(&mut f, "").unwrap(); continue;}
@@ -458,19 +464,6 @@ pub fn write_seed_output_file() {
     println!("Randomization Print to file");
 }
 
-/// Switching PersonData indexes in scripts for event function calls
-#[skyline::hook(offset=0x01cb5eb0)]
-pub fn try_get_index(dyn_value: &DynValue, index: i32, method_info: OptionalMethod) -> i32 {
-    let result = call_original!(dyn_value, index, method_info);
-    if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) == 0 { return result; }
-    if let Some(person) = PersonData::try_index_get(result) {
-        if utils::is_player_unit(person){
-            let new_person = person::switch_person(person);
-            return PersonData::get_index( new_person.pid );
-        }
-    }
-    return result;
-}
 /// SaveLoad Event Randomizing for Cobalt 1.21+
 pub fn save_file_load() {
     tutorial_check();
@@ -503,15 +496,26 @@ pub fn save_file_load() {
 fn randomize_gamedata(is_new_game: bool) {
     let sequence = GameUserData::get_sequence();
     println!("Current Chapter: {}, Sequence: {}", GameUserData::get_chapter().cid, sequence);
-
+    if !is_new_game {
+        if GameVariableManager::get_number(DVCVariables::SKILL_KEY) == 1 {
+            GameVariableManager::set_number(DVCVariables::SKILL_KEY, 3);
+        }
+    }
+    if CONFIG.lock().unwrap().player_appearance && is_new_game {
+        for x in PIDS {
+            GameVariableManager::make_entry(format!("G_O{}", x).as_str(), 33);
+            GameVariableManager::set_number(format!("G_O{}", x).as_str(), 33);
+        }
+    }
     emblem::randomize_emblems();
-    crate::utils::get_lueur_name_gender();
+    utils::get_lueur_name_gender();
     person::randomize_person();
     person::change_lueur_for_recruitment(is_new_game);
     skill::randomize_skills();
     item::shop::randomize_shop_data();
     emblem::emblem_skill::randomized_god_data();
     item::randomize_well_rewards();
+    names::randomize_emblem_npc_names();
     if !utils::in_map_chapter()  {   // Some issues when attempting to this when the scene loads
         let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.accessory = true ); 
         skill::replace_enemy_version();
@@ -527,7 +531,7 @@ fn randomize_gamedata(is_new_game: bool) {
     interact::change_interaction_data( GameVariableManager::get_number(DVCVariables::INTERACT_KEY), true);
     grow::random_grow();
     styles::randomize_job_styles();
-    if GameVariableManager::get_bool(DVCVariables::EMBLEM_NAME_KEY) { names::randomize_emblem_names();  }
+
 
     if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() {
         lock.seed = DVCVariables::get_seed();
@@ -547,7 +551,7 @@ pub fn in_map_randomize() {
 }
 /// Routine after NG is started to randomize gamedata
 pub fn start_new_game(){
-    *CONFIG.lock().unwrap() = DeploymentConfig::new();
+    // *CONFIG.lock().unwrap() = DeploymentConfig::new();
     CONFIG.lock().unwrap().correct_rates();
     let seed = CONFIG.lock().unwrap().seed;
     // Settings that does not get added
@@ -555,11 +559,14 @@ pub fn start_new_game(){
         GameVariableManager::make_entry(DVCVariables::IRONMAN, 1);
         crate::ironman::ironman_code_edits();
     }
-    GameVariableManager::make_entry(DVCVariables::CONTINIOUS, CONFIG.lock().unwrap().continuous);
+    GameVariableManager::make_entry(DVCVariables::CONTINUOUS, CONFIG.lock().unwrap().continuous);
     if CONFIG.lock().unwrap().randomized {
         if seed == 0 {  GameVariableManager::make_entry(DVCVariables::SEED, utils::get_random_number_for_seed() as i32); }
         else { GameVariableManager::make_entry(DVCVariables::SEED, CONFIG.lock().unwrap().seed as i32); }
         CONFIG.lock().unwrap().create_game_variables(true);
+        if GameVariableManager::get_number(DVCVariables::SKILL_KEY) == 1 {
+            GameVariableManager::set_number(DVCVariables::SKILL_KEY, 4);
+        }
         randomize_gamedata(true);
     }
     else { 
@@ -572,6 +579,10 @@ pub fn start_new_game(){
 /// Resets all gamedata to normal when returning to the title screen
 pub fn reset_gamedata() {
     println!("Resetting GameData");
+    if let Some(god_data) = GodData::get("GID_リュール") {
+        god_data.set_link("PID_リュール".into());
+        god_data.get_flag().value |= -2147483648
+    }
     skill::reset_skills();
     ItemData::unload();
     ItemData::load_data();
@@ -668,14 +679,13 @@ pub fn reset_gamedata() {
         lock.reset();
         println!("Randomizer Status is reset");
     }
-
 }
 
 pub fn randomize_stuff() {
-
+    job::single::single_class_exists();
+    println!("[DVC Randomization] {}", can_rand());
     if !utils::can_rand() {  return;  }
     if RANDOMIZER_STATUS.read().unwrap().seed == 0 {
-        *CONFIG.lock().unwrap() = DeploymentConfig::new();
         CONFIG.lock().unwrap().correct_rates();
         CONFIG.lock().unwrap().create_game_variables_after_new_game();
         tutorial_check();
@@ -708,30 +718,27 @@ pub fn intitalize_game_data() {
     bgm::initalize_bgm_pool();
     person::ai::create_custom_ai();
     person::get_playable_list();
+    person::get_all_enemy_persons();
     crate::talk::fill_name_array();
     emblem::initialize_emblem_list();
-    // assets::auto_adjust_asset_table( IS_GHAST);
     interact::get_style_interact_default_values();
     skill::create_skill_pool();
     emblem::engrave::get_engrave_stats();
     item::create_item_pool();
     engage_count();
     emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().intialize_list();
-    job::correct_job_base_stats();
+
     grow::get_growth_min_max();
     emblem::emblem_skill::get_pid_emblems();
     person::check_playable_classes();
-    person::get_all_enemy_persons();
+
     emblem::enemy::initalize_dark_emblems();
     skill::fixed_skill_inherits();
     skill::learn::initialize_job_skill_restrictions();
     crate::assets::data::initialize_search_list();
     crate::assets::animation::fix_common_male_swords();
+    job::correct_job_base_stats();
     CONFIG.lock().unwrap().seed = 0;
-}
-/// Data that does not depend on game data
-pub fn intialize_added_data() { 
-    // crate::assets::data::HEAD_DATA.get_or_init(||crate::assets::data::person::get_head_data());
 }
 
 pub fn engage_count() {
@@ -740,11 +747,10 @@ pub fn engage_count() {
         .filter(|god| god.engage_count > 0)
         .for_each(|god| god.engage_count = 7);
 
-    emblem::ENEMY_EMBLEM_LIST.get().unwrap().iter().flat_map(|&x|GodData::try_index_get_mut(x))
-        .for_each(|x|{
-            x.force_type = 1;
-        }
-    );
+    emblem::ENEMY_EMBLEM_LIST.get().unwrap()
+        .iter()
+        .flat_map(|&x|GodData::try_index_get_mut(x))
+        .for_each(|x| { x.force_type = 1; });
 }
 
 pub fn reseed() {
@@ -760,10 +766,53 @@ pub fn reseed() {
     GameVariableManager::set_number("NewSeed", 0);
     let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.seed = GameVariableManager::get_number(DVCVariables::SEED));
     // Set Personal and Job Learn Skill to 0 
-    GameVariableManager::find_starts_with("G_P_PID").iter().for_each(|person_key| GameVariableManager::set_number(person_key.to_string().as_str(), 0));
-    GameVariableManager::find_starts_with("G_L_JID").iter().for_each(|job_key| GameVariableManager::set_number(job_key.to_string().as_str(), 0));
+    GameVariableManager::find_starts_with("G_P_PID").iter()
+        .for_each(|person_key| GameVariableManager::set_number(person_key.to_string().as_str(), 0));
+    GameVariableManager::find_starts_with("G_L_JID").iter()
+        .for_each(|job_key| GameVariableManager::set_number(job_key.to_string().as_str(), 0));
     // Adaptive Growths
-    GameVariableManager::find_starts_with("G_JG_").iter().for_each(|growth_key| GameVariableManager::set_number(growth_key.to_string().as_str(), 0));
-    //randomize_gamedata(false);
+    GameVariableManager::find_starts_with("G_JG_").iter()
+        .for_each(|growth_key| GameVariableManager::set_number(growth_key.to_string().as_str(), 0));
 }
 
+#[skyline::hook(offset=0x02291fd0)]
+pub fn person_sound(
+    person_switch_name: &Il2CppString,
+    engage_switch_name: Option<&Il2CppString>,
+    event_name: &Il2CppString,
+    character: u64,
+    method_info: OptionalMethod)
+{
+    println!("Person Sound Switch: {}", person_switch_name);
+    println!("Person Sound Evebt: {}", event_name);
+    if event_name.to_string() == "V_Engage_Respond" {
+        let person_switch = person_switch_name.to_string();
+        if person_switch == "Lueur1" {
+            call_original!("PlayerM".into(), engage_switch_name, event_name, character, method_info);
+            return;
+        }
+        else if person_switch == "Lueur2" {
+            call_original!("PlayerF".into(), engage_switch_name, event_name, character, method_info);
+            return;
+        }
+    }
+    else if event_name.to_string() == "V_Engage_Decide" {
+        let person_switch = person_switch_name.to_string();
+        let new_voice =
+            match person_switch.as_str() {
+                "PlayerM_Boss" => { "PlayerM" },
+                "PlayerF_Boss" => { "PlayerF" },
+                "Veyre_Boss" => { "Veyre" },
+                "Sepia" => { "DLC_44" },
+                "Gris" => { "DLC_45"},
+                "Marron" => { "DLC_46" },
+                _ => {
+                    if !has_engage_decide(person_switch.as_str()) { get_random_engage_voice() }
+                    else { person_switch.as_str() }
+                }
+            };
+        call_original!(new_voice.into(), engage_switch_name, event_name, character, method_info);
+        return;
+    }
+    call_original!(person_switch_name, engage_switch_name, event_name, character, method_info);
+}

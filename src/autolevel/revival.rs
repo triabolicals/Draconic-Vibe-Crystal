@@ -17,10 +17,11 @@ impl ConfigBasicMenuItemGaugeMethods  for EnemyRevivalStones {
             if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().revival_stone_rate = result; }
             else { GameVariableManager::set_number(DVCVariables::REVIVAL_STONE_GAUGE_KEY, result); }
             this.gauge_ratio = 0.01 * result as f32;
+            Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
+            BasicMenuResult::se_cursor()
         }
-        return BasicMenuResult::new(); 
+        else { BasicMenuResult::new() }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){ 
         let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().revival_stone_rate }
@@ -34,6 +35,7 @@ impl ConfigBasicMenuItemGaugeMethods  for EnemyRevivalStones {
 
 pub extern "C" fn vibe_enemy_stones() -> &'static mut ConfigBasicMenuItem { 
     let enemy_stones = ConfigBasicMenuItem::new_gauge::<EnemyRevivalStones>("Enemy Revival Stone Rate"); 
-    enemy_stones.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
+    enemy_stones.get_class_mut().get_virtual_method_mut("BuildAttribute")
+        .map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
     enemy_stones
 }

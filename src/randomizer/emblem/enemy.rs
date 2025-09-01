@@ -27,6 +27,11 @@ pub fn initalize_dark_emblems() {
 
 pub fn randomize_enemy_emblems() {
     let different_order = GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) != 0;
+    if !different_order &&
+        GameVariableManager::get_number(DVCVariables::EMBLEM_SYNC_KEY) == 0 &&
+        GameVariableManager::get_number(DVCVariables::EMBLEM_ITEM_KEY) == 0 &&
+        GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_KEY) == 0
+    { return; }
     if !crate::randomizer::RANDOMIZER_STATUS.read().unwrap().emblem_data_randomized { return; }
     if !crate::randomizer::RANDOMIZER_STATUS.read().unwrap().enemy_emblem_randomized {
         println!("Randomizing Enemy Emblems");
@@ -61,7 +66,7 @@ pub fn adjust_enemy_edelgard_chapter() {
     if !crate::randomizer::RANDOMIZER_STATUS.read().unwrap().enemy_emblem_randomized || crate::randomizer::RANDOMIZER_STATUS.read().unwrap().enemy_edelgard  { return; }
     let cid = GameUserData::get_chapter().get_prefixless_cid().to_string();
     if let Some(enemy_edelgard) = ENEMY_EMBLEMS.get().unwrap().iter().find(|w| 
-        GodData::try_index_get(w.0).is_some_and(|g| g.gid.to_string().contains(cid.as_str())) && 
+        GodData::try_index_get(w.0).is_some_and(|g| g.gid.str_contains(cid.as_str())) &&
         DVCVariables::get_god_from_index(w.1, true).is_some_and(|god| god.parent.index == 64)) {
         let enemy_god = GodData::try_index_get_mut(enemy_edelgard.0).unwrap();
         let gid = if cid == "M002" { "GID_相手エーデルガルト" } else { "GID_E006_敵エーデルガルト" };
@@ -99,7 +104,7 @@ fn change_enemy_emblem_data(enemy_god: &mut GodData, index: i32, different_order
             else if source_god.get_engage_attack().to_string() == "SID_リンエンゲージ技" { enemy_god.set_engage_attack("SID_リンエンゲージ技_威力減".into()); }
             else { enemy_god.set_engage_attack( source_god.get_engage_attack() );  }
         }
-    //if different_order {
+    if different_order {
         enemy_god.link_gid = source_god.link_gid;
         enemy_god.engage_attack_link = source_god.engage_attack_link;
         enemy_god.ascii_name = source_god.ascii_name;
@@ -118,7 +123,7 @@ fn change_enemy_emblem_data(enemy_god: &mut GodData, index: i32, different_order
         enemy_god.face_icon_name_darkness = source_god.face_icon_name_darkness;
         enemy_god.ascii_name = source_god.ascii_name;
         enemy_god.unit_icon_id = source_god.unit_icon_id;
-        //}
+    }
 
         let source_ggd = source_god.get_grow_table().unwrap();
         let src_data = GodGrowthData::get_level_data(&source_ggd.to_string()).unwrap();
@@ -162,7 +167,7 @@ fn change_enemy_emblem_data(enemy_god: &mut GodData, index: i32, different_order
                         );
                         if index != 13 {
                             for z in 0..9 {
-                                let src_items = src_data[ index_c as usize ].style_items.get_items(z); 
+                                let src_items = src_data[ index_c  ].style_items.get_items(z);
                                 src_items.iter().for_each(|item|{ level.style_items.add_item(z, item); });
                             }
                         }
@@ -175,15 +180,15 @@ fn change_enemy_emblem_data(enemy_god: &mut GodData, index: i32, different_order
 
 // Nerfing some skills for pre-chapter 12
 fn get_enemy_version_of_skills(skill: &'static SkillData) -> Option<&'static SkillData> {
+    let sid = skill.sid.to_string();
     if !DVCVariables::is_main_chapter_complete(20) {
-        let sid = skill.sid.to_string();
-        if sid.contains("SID_迅走") {  return SkillData::get("SID_迅走_闇")  }
-        else if sid.contains("SID_増幅") {  return SkillData::get("SID_増幅_闇")  } 
-        else if sid.contains("SID_超越") {  return SkillData::get("SID_超越_闇") }  // Rise Above -> Sink Below
-        else if sid.contains("SID_踏ん張り") { return SkillData::get("SID_踏ん張り")  } // Hold Out -> Lowest Tier Hold Out
-        else if sid.contains("SID_アイクエンゲージスキル") { return None; }   // Laguz Friend -> None
+        if sid.contains("SID_迅走") && DVCVariables::is_main_chapter_complete(3) { return SkillData::get("SID_迅走_闇") }
+        else if sid.contains("SID_増幅") { return SkillData::get("SID_増幅_闇") }
+        else if sid.contains("SID_超越") { return SkillData::get("SID_超越_闇") }  // Rise Above -> Sink Below
+        else if sid.contains("SID_踏ん張り") { return SkillData::get("SID_踏ん張り") } // Hold Out -> Lowest Tier Hold Out
     }
-    return Some(skill);
+    if sid.contains("SID_アイクエンゲージスキル") { None }   // Laguz Friend -> None
+    else { Some(skill) }
 }
 #[unity::from_offset("App", "GodData", "CalcChangeData")]
 fn calc_change_data(this: &GodData, method_info: OptionalMethod) -> Option<&Array<&GodData>>;

@@ -5,10 +5,13 @@ use engage::{
         BasicMenuResult, 
         config::{ConfigBasicMenuItemSwitchMethods, ConfigBasicMenuItem}
     },
+    sequence::{combatsequence::CombatSequence, mapsequence::battle::*},
     gamevariable::GameVariableManager,
 };
 use engage::gamedata::dispos::ChapterData;
 use std::sync::OnceLock;
+use engage::battle::BattleCalculator;
+
 static BGM_POOL: OnceLock<Vec<String>> = OnceLock::new();
 
 pub fn initalize_bgm_pool() {
@@ -24,7 +27,6 @@ pub fn initalize_bgm_pool() {
             else if x >= 68 && x <= 74 { list.push(event_name); }
         }
         list
-
     });
  }
 
@@ -83,12 +85,6 @@ pub fn randomize_bgm_map() {
     set_random_bgm_phase();
     get_random_special(true);
 }
-#[skyline::hook(offset=0x0228deb0)]
-pub fn special_bgm_hook(calculator: u64, method_info: OptionalMethod) -> Option<&'static Il2CppString> {
-    let result = call_original!(calculator, method_info);
-    if result.is_some() && GameVariableManager::get_bool(DVCVariables::BGM_KEY) { return Some(get_random_special(false)); }
-    else { return result; }
-}
 
 fn get_random_special(set: bool) -> &'static Il2CppString {
     let rng = Random::get_game();
@@ -135,7 +131,9 @@ pub fn change_bgm() {
 
 pub struct RandomBGMMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomBGMMod {
-    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    fn init_content(_this: &mut ConfigBasicMenuItem){
+        GameVariableManager::make_entry(DVCVariables::BGM_KEY, 0);
+    }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_map_bgm } 
             else { GameVariableManager::get_bool(DVCVariables::BGM_KEY) };
@@ -147,9 +145,9 @@ impl ConfigBasicMenuItemSwitchMethods for RandomBGMMod {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
+            BasicMenuResult::se_cursor()
         }
-        return BasicMenuResult::new();
+        else { BasicMenuResult::new() }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         if GameUserData::get_sequence() != 3 {
@@ -163,7 +161,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomBGMMod {
     }
 
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_map_bgm } 
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_map_bgm }
             else {  GameVariableManager::get_bool(DVCVariables::BGM_KEY) };
         this.command_text = if value { "Random" } else { "Default" }.into();
     }
@@ -190,15 +188,74 @@ pub extern "C" fn vibe_bgm() -> &'static mut ConfigBasicMenuItem {
     switch
 }
 
+pub fn random_special_bgm(calculator: &BattleCalculator) -> bool {
+    unsafe {
+        if is_special_battle_bgm(calculator, None) {
+            println!("Special Battle");
+            start_special_bgm(None);
+            let s = get_random_special(false);
+                println!("Playing {}", s);
+                if !is_event_playing(s, None) {
+                    if set_phase_bgm(s, s, s, None) {
+                        field_bgm_play(0, None);
+                        set_state_battle_special("PreSpecialCombat".into(), None);
+                        return true;
+                    }
+                }
+                else { return true; }
+            }
+        }
+    false
+}
+
+pub extern "C" fn map_sequence_battle_pre_bgm(this: &mut MapSequenceBattle, method_info: OptionalMethod) {
+    if GameVariableManager::get_bool(DVCVariables::BGM_KEY) {
+        if random_special_bgm(this.calculator) { return; }
+    }
+    unsafe { map_sequence_battle_to_pre_bgm(this, method_info); }
+}
+pub extern "C" fn map_sequence_battle_action_pre_bgm(this: &mut MapSequenceBattleAction, method_info: OptionalMethod) {
+    if GameVariableManager::get_bool(DVCVariables::BGM_KEY)  {
+        if random_special_bgm(this.calculator) {return; }
+    }
+    unsafe { map_sequence_battle_action_to_pre_bgm(this, method_info); }
+}
+
+pub extern "C" fn combat_sequence_pre_bgm(this: &mut CombatSequence, method_info: OptionalMethod) {
+    if GameVariableManager::get_bool(DVCVariables::BGM_KEY) && this.calculator.mode == 0 {
+        if random_special_bgm(this.calculator) { return; }
+    }
+    unsafe { combat_sequence_to_pre_bgm(this, method_info); }
+}
+#[unity::from_offset("App", "MapSequenceBattle", "ToPreBgm")]
+fn map_sequence_battle_to_pre_bgm(this: &MapSequenceBattle, method_info: OptionalMethod);
+
+#[unity::from_offset("App", "MapSequenceBattleAction", "ToPreBgm")]
+fn map_sequence_battle_action_to_pre_bgm(this: &MapSequenceBattleAction, method_info: OptionalMethod);
+
+#[unity::from_offset("Combat", "CombatSequence", "ToPreBgm")]
+fn combat_sequence_to_pre_bgm(this: &CombatSequence, method_info: OptionalMethod);
+
+#[skyline::from_offset(0x228d930)]
+fn is_special_battle_bgm(calculator: &BattleCalculator, optional_method: OptionalMethod) -> bool;
+
+#[skyline::from_offset(0x0228ced0)]
+fn start_special_bgm(optional_method: OptionalMethod);
+
+#[skyline::from_offset(0x02289120)]
+fn is_event_playing(event_name: &Il2CppString, optional_method: OptionalMethod) -> bool;
 
 #[skyline::from_offset(0x0228c330)]
-pub fn set_phase_bgm(player: &Il2CppString, enemy: &Il2CppString,ally: &Il2CppString, method_info: OptionalMethod);
+pub fn set_phase_bgm(player: &Il2CppString, enemy: &Il2CppString,ally: &Il2CppString, method_info: OptionalMethod) -> bool;
 
 #[skyline::from_offset(0x0228c0f0)]
 fn set_phase_by_chapter(chapter: &ChapterData, is_encounter: bool, method_info: OptionalMethod);
 
 #[skyline::from_offset(0x0228c470)]
 fn field_bgm_play(force: i32, method_info: OptionalMethod);
+
+#[skyline::from_offset(0x0228e420)]
+fn set_state_battle_special(name: &Il2CppString, method_info: OptionalMethod);
 
 #[skyline::from_offset(0x0228d100)]
 pub fn set_first_played_flag(method_info: OptionalMethod);

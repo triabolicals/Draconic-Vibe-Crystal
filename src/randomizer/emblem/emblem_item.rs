@@ -102,8 +102,8 @@ impl EngageItemList {
         list.iter()
             .enumerate()
             .for_each(|(god, data)|{
-                let astra_storm_slot = if data.engage_attack.is_some_and(|atk| atk.to_string().contains("リンエンゲージ技")) { 0 }
-                else if data.engage_attack_link.is_some_and(|atk| atk.to_string().contains("リンエンゲージ技")) && god != 13 { 1 }
+                let astra_storm_slot = if data.engage_attack.is_some_and(|atk| atk.str_contains("リンエンゲージ技")) { 0 }
+                else if data.engage_attack_link.is_some_and(|atk| atk.str_contains("リンエンゲージ技")) && god != 13 { 1 }
                 else { 3 };
                 if astra_storm_slot < 3 {
                     let bow_index = crate::utils::get_random_and_remove(&mut engage_bows, rng).map_or(0, |f| f);
@@ -248,8 +248,8 @@ pub fn randomized_emblem_apts() {
     let mode = GameVariableManager::get_number(DVCVariables::WEAPON_PROF_KEY);
     if mode == 0  { return; }
     let rng = crate::utils::get_rng();
-    EMBLEM_LIST.get().unwrap().iter()
-        .flat_map(|&h| GodData::try_get_hash_mut(h))
+    EMBLEM_LIST.get().unwrap().iter().enumerate().filter(|x| x.0 < 20 && x.0 >= 24)
+        .flat_map(|(_, &h)| GodData::try_get_hash_mut(h))
         .for_each(|god|{ 
             randomize_god_apts(god, mode, rng); 
         }

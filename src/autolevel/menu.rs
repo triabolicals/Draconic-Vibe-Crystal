@@ -13,16 +13,16 @@ impl ConfigBasicMenuItemSwitchMethods for BenchAutoLevelOption {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else { return BasicMenuResult::new();  }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = 
-            if !GameVariableManager::get_bool(DVCVariables::AUTOLEVEL_BENCH_KEY) {"Undeployed will not be autoleveled at the end of the chapter." }
-            else { "Undeployed units will autolevel to difficulty-adjusted average." }.into();
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.command_text = if !GameVariableManager::get_bool(DVCVariables::AUTOLEVEL_BENCH_KEY) { "Disabled" } else { "Enabled" }.into();
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text =
+            if !GameVariableManager::get_bool(DVCVariables::AUTOLEVEL_BENCH_KEY) {"Un-deployed will not be auto-leveled at the end of the chapter." }
+            else { "Un-deployed units will auto-level to difficulty-adjusted average." }.into();
     }
 }
 pub extern "C" fn autobench() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_switch::<BenchAutoLevelOption>("Post Chapter Autoleveling")   }
@@ -40,20 +40,21 @@ impl ConfigBasicMenuItemSwitchMethods for AutolevelMod {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
+            BasicMenuResult::se_cursor()
         }
-        return BasicMenuResult::new(); 
+        else { BasicMenuResult::new() }
+
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let value = if DVCVariables::is_main_menu() {  CONFIG.lock().unwrap().autolevel }
+            else { GameVariableManager::get_bool(DVCVariables::DVC_AUTOLEVEL_KEY) };
+        this.command_text = if value { "Autoscale" } else { "No Scaling" }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let value = if DVCVariables::is_main_menu() {  CONFIG.lock().unwrap().autolevel }
             else { GameVariableManager::get_bool(DVCVariables::DVC_AUTOLEVEL_KEY) };
         this.help_text = if value { "Units/enemies will be scaled to army's power." }
             else { "No changes to recruited/enemy unit's stats and levels." }.into();
-    }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() {  CONFIG.lock().unwrap().autolevel }
-            else { GameVariableManager::get_bool(DVCVariables::DVC_AUTOLEVEL_KEY) };
-        this.command_text = if value { "Autoscale" } else { "No Scaling" }.into();
     }
 }
 

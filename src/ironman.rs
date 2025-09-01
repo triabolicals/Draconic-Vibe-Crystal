@@ -19,15 +19,15 @@ impl ConfigBasicMenuItemSwitchMethods for IronmanMod {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.command_text = if CONFIG.lock().unwrap().iron_man {  "On" } else { "Off"}.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.help_text = if CONFIG.lock().unwrap().iron_man {  "Disables Draconic Time Crystal and bookmarks." }
             else {"Disables Ironman mode." }.into();
-    }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = if CONFIG.lock().unwrap().iron_man {  "On" } else { "Off"}.into();
     }
 }
 
@@ -80,9 +80,7 @@ fn map_system_temp_save_build_attr(_temp_save_menu_item: &BasicMenuItem, _method
 
 fn restart_menu_item_build_attr(restart_item: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
     if GameVariableManager::get_bool("G_Ironman") { BasicMenuItemAttribute::Hide }
-    else {
-        unsafe { original_restart_item_build_attr(restart_item, None) }
-    }
+    else { unsafe { original_restart_item_build_attr(restart_item, None) } }
 }
 
 fn reset_menu_item_build_attr(_reset_item: &BasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute {

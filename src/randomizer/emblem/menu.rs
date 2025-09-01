@@ -19,15 +19,6 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEmblemMod {
             return BasicMenuResult::se_cursor();
         } else {return BasicMenuResult::new(); }
     }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match CONFIG.lock().unwrap().emblem_mode {
-            1 => { "Emblem recruitment will be randomized." },
-            2 => { "Emblem recruitment will be in reversed order" },
-            3 => { "Emblem recruitment will determined by list. (Press A)"},
-            4 => { "Random recruitment with custom emblems."},
-            _ => { "Default recruitment order for emblems." },
-        }.into();
-    }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.command_text = match CONFIG.lock().unwrap().emblem_mode  {
             1 => { "Random" },
@@ -35,6 +26,15 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEmblemMod {
             3 => { "Custom Order (A)" },
             4 => { "Custom Emblems"},
             _ => { "Standard"},
+        }.into();
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = match CONFIG.lock().unwrap().emblem_mode {
+            1 => { "Emblem recruitment will be randomized." },
+            2 => { "Emblem recruitment will be in reversed order" },
+            3 => { "Emblem recruitment will determined by list. (Press A)"},
+            4 => { "Random recruitment with custom emblems."},
+            _ => { "Default recruitment order for emblems." },
         }.into();
     }
 }
@@ -58,18 +58,18 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEmblemLinkMod {
             return BasicMenuResult::se_cursor();
         } else {return BasicMenuResult::new(); }
     }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().engage_link }
+            else { GameVariableManager::get_bool("EngagePlus") };
+
+        this.command_text = if value { "Random Links" } else { "No Links" }.into();
+    }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().engage_link }
             else { GameVariableManager::get_bool("EngagePlus") };
 
         this.help_text = if value { "Units are linked to emblems for Engage+." }
             else { "Units will not be linked to emblems." }.into();
-    }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().engage_link }
-            else { GameVariableManager::get_bool("EngagePlus") };
-
-        this.command_text = if value { "Random Links" } else { "No Links" }.into();
     }
 }
 
@@ -83,16 +83,9 @@ impl ConfigBasicMenuItemSwitchMethods for RandomGodMod {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match CONFIG.lock().unwrap().random_god_mode {
-            1 => { "Inheritiable skills will be randomized."},
-            2 => { "Engage Attacks and Linked Engage Attacks will be randomized." },
-            3 => { "Inheritiable skills and Engage Attacks will be randomized." },
-            _ => { "No Randomization to emblem data."},
-        }.into();
+            BasicMenuResult::se_cursor()
+        }
+        else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.command_text = match CONFIG.lock().unwrap().random_god_mode {
@@ -100,6 +93,14 @@ impl ConfigBasicMenuItemSwitchMethods for RandomGodMod {
             2 => { "Engage Atks" },
             3 => { "Inherits/Engage Atks"},
             _ => { "None" },
+        }.into();
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = match CONFIG.lock().unwrap().random_god_mode {
+            1 => { "Inheritiable skills will be randomized."},
+            2 => { "Engage Attacks and Linked Engage Attacks will be randomized." },
+            3 => { "Inheritiable skills and Engage Attacks will be randomized." },
+            _ => { "No Randomization to emblem data."},
         }.into();
     }
 }
@@ -113,16 +114,9 @@ impl ConfigBasicMenuItemSwitchMethods for RandomSynchoMod {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match CONFIG.lock().unwrap().random_god_sync_mode {
-            1 => { "Emblem stat bonuses are randomized." },
-            2 => { "Emblem sync and engage skills are randomized." },
-            3 => { "Emblem stats, sync, and engage skills are randomized." },
-            _ => { "No changes to sync/engage emblem data."},
-        }.into();
+            BasicMenuResult::se_cursor()
+        }
+        else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.command_text = match CONFIG.lock().unwrap().random_god_sync_mode {
@@ -130,6 +124,14 @@ impl ConfigBasicMenuItemSwitchMethods for RandomSynchoMod {
             2 => { "Sync/Engage Skills" },
             3 => { "All Sync"},
             _ => { "None"},
+        }.into();
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = match CONFIG.lock().unwrap().random_god_sync_mode {
+            1 => { "Emblem stat bonuses are randomized." },
+            2 => { "Emblem sync and engage skills are randomized." },
+            3 => { "Emblem stats, sync, and engage skills are randomized." },
+            _ => { "No changes to sync/engage emblem data."},
         }.into();
     }
 }
@@ -143,16 +145,16 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEngageWepMod {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = if CONFIG.lock().unwrap().random_engage_weapon {  "Engage Items/Weapons are randomized"  }
-            else { "No changes to Engage items/weapons." }.into();
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.command_text = if CONFIG.lock().unwrap().random_engage_weapon {  "Randomize Weapons" }
             else { "Default Item/Weapons" }.into();
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = if CONFIG.lock().unwrap().random_engage_weapon {  "Engage Items/Weapons are randomized"  }
+            else { "No changes to Engage items/weapons." }.into();
     }
 }
 
@@ -174,7 +176,7 @@ pub fn engage_link_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalM
     if DVCVariables::is_main_menu() {return BasicMenuResult::new(); }
     if GameVariableManager::get_number(DVCVariables::ENGAGE_P_KEY) == GameVariableManager::get_number("EngagePlus") { return BasicMenuResult::new();}
     YesNoDialog::bind::<EngageLinkConfirm>(this.menu, "Change Engage Link Settings?", "Do it!", "Nah..");
-    return BasicMenuResult::new();
+    BasicMenuResult::new()
 }
 
 pub extern "C" fn vibe_engage_links() -> &'static mut ConfigBasicMenuItem {  

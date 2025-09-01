@@ -4,8 +4,9 @@ use engage::{
 };
 use unity::prelude::OptionalMethod;
 use crate::config::DVCVariables;
+use crate::utils::can_rand;
 
-pub fn job_gauge_build_attr(_this: &BasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
+pub fn job_gauge_build_attr(_this: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
     if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2  { BasicMenuItemAttribute::Hide }
     else if DVCVariables::is_main_menu()  { BasicMenuItemAttribute::Enable }
     else if !DVCVariables::random_enabled() { BasicMenuItemAttribute::Hide }
@@ -15,7 +16,7 @@ pub fn job_gauge_build_attr(_this: &BasicMenuItem,  _method_info: OptionalMethod
 
 pub fn skill_gauge_build_attr(_this: &BasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
     if DVCVariables::is_main_menu() { BasicMenuItemAttribute::Enable }
-    else if GameVariableManager::get_bool(DVCVariables::SKILL_KEY) && GameUserData::get_sequence() > 3 { BasicMenuItemAttribute::Enable }
+    else if can_rand() && GameUserData::get_sequence() > 3 { BasicMenuItemAttribute::Enable }
     else { BasicMenuItemAttribute::Hide }
 }
 
@@ -47,3 +48,4 @@ pub fn build_attribute_not_in_map2(_this: &BasicMenuItem,  _method_info: Optiona
 pub fn dlc_build_attr(_this: &BasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
     if crate::utils::dlc_check() { BasicMenuItemAttribute::Enable } else { BasicMenuItemAttribute::Hide }
 }
+

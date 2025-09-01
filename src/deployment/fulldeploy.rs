@@ -92,7 +92,7 @@ pub fn encounter_map_dispos() {
     }
     let mut valid_tiles = Vec::new();
     let threshold2 = if is_encounter { 36 } else { 16 };
-    // Add tiles in which player/ally position are within 7/8 tiles 
+    // Add tiles in which player / ally position are within 7/8 tiles
     for x in &unit_pos {
         if x.2 != 1 {
             for dx in 0..4 {

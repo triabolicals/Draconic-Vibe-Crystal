@@ -3,11 +3,11 @@ use engage::{
     dialog::yesno::*, gamevariable::*, 
     menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemCommandMethods, ConfigBasicMenuItemSwitchMethods}, BasicMenuResult, *},
     pad::Pad, proc::{desc::ProcDesc, Bindable, ProcInst, ProcVoidMethod},
-    sequence::configsequence::ConfigSequence, 
-    sortie::SortieTopMenuManager, 
+    sequence::configsequence::ConfigSequence,
     titlebar::TitleBar, 
     util::get_instance
 };
+use engage::godpool::GodPool;
 use crate::{autolevel, deployment, continuous, ironman, randomizer};
 use super::{DVCVariables, CONFIG};
 
@@ -15,9 +15,16 @@ pub mod ingame;
 pub mod global;
 pub mod submenu;
 pub mod buildattr;
+pub mod utils;
 
-extern "C" fn open_anime_all_ondispose(this: &mut ProcInst, _method_info: OptionalMethod) {
+pub extern "C" fn open_anime_all_ondispose(this: &mut ProcInst, _method_info: OptionalMethod) {
     this.parent.as_ref().unwrap().get_class().get_virtual_method("OpenAnimeAll").map(|method| {
+        let open_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&ProcInst, &MethodInfo)>(method.method_info.method_ptr) };
+        open_anime_all(this.parent.as_ref().unwrap(), method.method_info);
+    });
+}
+pub extern "C" fn open_anime_parent(this: &mut ProcInst, _method_info: OptionalMethod) {
+    this.parent.as_ref().unwrap().get_class().get_virtual_method("OpenAnime").map(|method| {
         let open_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&ProcInst, &MethodInfo)>(method.method_info.method_ptr) };
         open_anime_all(this.parent.as_ref().unwrap(), method.method_info);
     });
@@ -31,13 +38,13 @@ fn add_dvc_menu_options(config_menu: &mut ConfigMenu<ConfigBasicMenuItem>){
     config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::ClassSubMenu>("Class / Skills Randomization"));
     config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::ItemSubMenu>("Item Randomization"));
     config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::EnemySubMenu>("Enemy Settings"));
+    config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::AssetSubMenu>("Asset Settings"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::grow::RandomGrowMod>("Random Growth Mode"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::grow::PersonalGrowMode>("Personal Growth Mode"));
     config_menu.add_item(randomizer::terrain::menu::vibe_energy());
     config_menu.add_item(randomizer::terrain::menu::vibe_fow());
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<autolevel::menu::AutolevelMod>("Level Scale Units")); 
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::bgm::RandomBGMMod>("Map BGM Setting")); 
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::assets::accessory::RandomAssets>("Random Assets"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::bgm::RandomBGMMod>("Map BGM Setting"));
     config_menu.add_item(randomizer::map::vibe_tile());
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::learn::EquipLearnSkill>("Equip Class Learn Skills"));
 }
@@ -48,15 +55,13 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalMenu {
         let pad_instance = get_instance::<Pad>();
         if pad_instance.npad_state.buttons.a() {
             if pad_instance.npad_state.buttons.a() {
-            // Close the original Settings menu temporarily so it doesn't get drawn in the background
-                this.menu.get_class().get_virtual_method("CloseAnimeAll").map(|method| {
-                let close_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&BasicMenu<ConfigBasicMenuItem>, &MethodInfo)>(method.method_info.method_ptr) };
-                    close_anime_all(this.menu, method.method_info);
-                });
+                this.menu.close_anime_all();
                 ConfigMenu::create_bind(this.menu);
                 let config_menu = this.menu.proc.child.as_mut().unwrap().cast_mut::<ConfigMenu<ConfigBasicMenuItem>>();
 
-                config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose as _).unwrap();
+                config_menu.get_class_mut()
+                    .get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_parent as _).unwrap();
+
                 config_menu.full_menu_item_list.clear();
                 add_dvc_menu_options(config_menu);
                 BasicMenuResult::se_cursor()
@@ -99,16 +104,16 @@ pub fn save_config_settings(_this: &BasicMenu<BasicMenuItem>, _method_info: Opti
 }
 
 pub fn menu_calls_install() {
-    ingame::dvc_minus_calls();
-    let cooking_menu = Il2CppClass::from_name("App", "HubPlayTalkAfter").unwrap().get_nested_types().iter().find(|x| x.get_name() == "CookingMenu").unwrap();
+    let cooking_menu = Il2CppClass::from_name("App", "HubPlayTalkAfter")
+        .unwrap().get_nested_types().iter().find(|x| x.get_name() == "CookingMenu").unwrap();
+
     let cooking_menu_mut = Il2CppClass::from_il2cpptype(cooking_menu.get_type()).unwrap();
     cooking_menu_mut.get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::message::cooking_menu_build_attribute as _);
-    println!("Replaced Virtual Method of CookingMenu");
 
-    if let Some(cc) = Il2CppClass::from_name("App", "ClassChangeJobMenu").unwrap().get_nested_types().iter().find(|x| x.get_name() == "ClassChangeJobMenuItem"){
-        let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
-        menu_mut.get_virtual_method_mut("ACall").map(|method| method.method_ptr = crate::randomizer::job::reclass::class_change_a_call_random_cc as _);
-        println!("Replaced ACall of ClassChangeJobMenuItem");
+    if let Some(menu) = Il2CppClass::from_name("App", "ClassChangeJobMenu").unwrap().get_nested_types()
+        .iter().find(|x| x.get_name() == "ClassChangeJobMenuItem").and_then(|x| Il2CppClass::from_il2cpptype(x.get_type()).ok()) {
+        menu.get_virtual_method_mut("ACall")
+            .map(|method| method.method_ptr = crate::randomizer::job::reclass::class_change_a_call_random_cc as _);
     }
     if let Some(cc) = Il2CppClass::from_name("App", "HubMenu").unwrap().get_nested_types().iter().find(|x| x.get_name() == "NextItem"){
         let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
@@ -117,7 +122,9 @@ pub fn menu_calls_install() {
 
     crate::deployment::sortie::sortie_deployment_menu_install();
     crate::continuous::sortie::sortie_continious_menu_install();
-
+    let god_pool = GodPool::class_mut();
+    let _ = god_pool.get_virtual_method_mut("OnDeserialize")
+        .map(|method| method.method_ptr = randomizer::emblem::on_deserialize as _);
 }
 
 extern "C" fn create_dvc_config_menu_test(this: &mut ConfigSequence, _method_info: OptionalMethod) {
@@ -125,7 +132,8 @@ extern "C" fn create_dvc_config_menu_test(this: &mut ConfigSequence, _method_inf
     ConfigMenu::create_bind(this);
     let config_menu = this.proc.child.as_mut().unwrap().cast_mut::<ConfigMenu<ConfigBasicMenuItem>>();
 
-    config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose as _).unwrap();
+    config_menu.get_class_mut().get_virtual_method_mut("OnDispose")
+        .map(|method| method.method_ptr = open_anime_all_ondispose as _).unwrap();
     config_menu.full_menu_item_list.clear();
     config_menu.add_item(global::vibe_enable());
     config_menu.add_item(global::vibe_dlc());
@@ -136,9 +144,7 @@ extern "C" fn create_dvc_config_menu_test(this: &mut ConfigSequence, _method_inf
 }
 
 pub fn dvc_ng_menu_create_bind(this: &ProcInst) {
-
     ConfigSequence::create_bind(this);
-
     let create_global_config_menu = ProcVoidMethod::new(None, create_dvc_config_menu_test);
 
     // Replace CreateConfigMenu by our own implementation
@@ -147,3 +153,5 @@ pub fn dvc_ng_menu_create_bind(this: &ProcInst) {
         .unwrap();
 
 }
+
+

@@ -1,31 +1,46 @@
 use super::{*, ai};
-use engage::godpool::GodPool;
 use crate::{
-    assets::animation::MONSTERS, config::DVCVariables, randomizer::{emblem::{EMBLEM_LIST, ENEMY_EMBLEM_LIST}, grow, item::unit_items, job, skill}
+    assets::animation::MONSTERS, config::DVCVariables, randomizer::{emblem::ENEMY_EMBLEM_LIST, grow, item::unit_items, job, skill}
 };
+use crate::randomizer::item::random_item;
+
 #[unity::hook("App", "Unit", "CreateImpl2")]
 pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     let can_lueur_change = RANDOMIZER_STATUS.read().unwrap().enabled;
     call_original!(this, method_info);
-   //  println!("Creating Unit: {} {}", this.person.parent.index, Mess::get_name(this.person.pid));
+
     if !can_lueur_change {
-        if this.person.pid.to_string() == PIDS[0] {  
+        if this.person.pid.str_contains(PIDS[ALEAR]) {
             let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.enabled = true);
         }
         return;
     }
-    if !can_rand() || this.person.parent.hash == 1879825845 || this.status.value & 134217728 != 0  { return; }  // Doubles
-    replace_recruitment_god_unit(this);
+    if this.person.parent.hash == 1879825845 || this.status.value & 134217728 != 0 { return; }  // Doubles
+    let single_class = DVCVariables::get_single_class(false).is_some();
+    println!("Creating Person: # {} {}", this.person.parent.index, Mess::get_name(this.person.pid));
+    if !can_rand() && single_class && (is_player_unit(this.person) || is_playable_person(this.person)){
+        job::unit_change_to_random_class(this);
+        adjust_unit_items(this);
+        this.auto_equip();
+        return;
+    }
+    if !can_rand()  { return; }
+    let changed_recruit_order = GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0;
+    let random_class = GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0;
+    let random_inventory = GameVariableManager::get_number(DVCVariables::PLAYER_INVENTORY) & 1 != 0;
+    let adjust_items = changed_recruit_order || random_class || single_class;
+
     ai::adjust_person_unit_ai(this);
     if !is_player_unit(this.person) {
         if is_playable_person(this.person) {
-            if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 { job::unit_change_to_random_class(this);  }
-            if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 ||  ( GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 ) {  adjust_unit_items(this);  }
-            if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) { unit_items::adjust_missing_weapons(this); }
-            grow::adaptive_growths(this);
+            if random_class || single_class { job::unit_change_to_random_class(this);  }
+            if adjust_items {  adjust_unit_items(this);  }
+            if random_inventory { unit_items::adjust_missing_weapons(this); }
+            grow::adaptive_growths(this, true);
             auto_level_unit_for_random_map(this, false); 
         }
         else {  // Enemy Randomization
+            println!("Enemy Randomization of {}", Mess::get_name(this.person.pid));
             crate::assets::accessory::accesorize_enemy_unit(this); 
             enemy_unit_randomization(this);
             let rng = Random::get_game();
@@ -33,78 +48,91 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         }
         this.auto_equip();
         this.set_hp(this.get_capability(0, true));
+        println!("Finish creating {}", Mess::get_name(this.person.pid));
         return;
     }
-    if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
+    if changed_recruit_order {
+        let old_person = switch_person_reverse(this.person).pid.to_string();
         if DVCVariables::get_dvc_person(0, false) == this.person.pid && DVCVariables::is_main_menu() {    //IsLueur
-            println!("Alear: {}", Mess::get_name(this.person.pid));
             change_unit_autolevel(this, true);
             this.item_list.put_off_all_item();
             this.item_list.add_iid_no_duplicate("IID_鉄の剣");
             this.item_list.add_iid_no_duplicate("IID_傷薬");
         }
         else if GameVariableManager::get_bool("DDFanClub") {
-            let old_person = switch_person_reverse(this.person).pid.to_string();
             change_unit_autolevel(this, true);
-        // If Chapter 1 and Vander -> Switch
-            if GameUserData::get_chapter().cid.to_string().contains("M001") && ( old_person == PIDS[2] || old_person == PIDS[3] ) {
-                this.item_list.put_off_all_item();
-            }
-            else {
-                this.item_list.put_off_all_item();
-                this.item_list.add_item_no_duplicate(ItemData::get("IID_鉄の剣").unwrap()); 
-                this.item_list.add_item_no_duplicate(ItemData::get("IID_傷薬").unwrap());
+            if old_person == PIDS[2] || old_person == PIDS[3] {
+                if GameUserData::get_chapter().cid.str_contains("M001") {
+                    if single_class { job::unit_change_to_random_class(this); }
+                    this.item_list.put_off_all_item();
+                    if random_inventory { adjust_unit_items(this); }
+                    grow::adaptive_growths(this, true);
+                    this.set_hp(this.get_capability(0, true));
+                    return;
+                }
+                else {
+                    this.item_list.put_off_all_item();
+                    this.item_list.add_item_no_duplicate(ItemData::get("IID_鉄の剣").unwrap());
+                    this.item_list.add_item_no_duplicate(ItemData::get("IID_傷薬").unwrap());
+                }
             }
         }
          // Hub & Kizuna: person is already the correct person or MapSequence and Alear is not on the Map (Chapter 11)
         else if ( GameUserData::get_sequence() == 5  ||  GameUserData::get_sequence() == 4 ) || 
-            (GameUserData::get_sequence() == 3 && ( GameVariableManager::get_bool("MapRecruit") || ( GameVariableManager::get_number(DVCVariables::DEPLOYMENT_KEY) != 3 && !crate::utils::lueur_on_map() ) ) )  { 
+            (GameUserData::get_sequence() == 3 && ( GameVariableManager::get_bool("MapRecruit") || ( GameVariableManager::get_number(DVCVariables::DEPLOYMENT_KEY) != 3 && !lueur_on_map() ) ) )
+        {
             println!("Hub/Kizuna Recruitment");
             change_unit_autolevel(this, true);
-            if this.person.pid.to_string().contains(PIDS[32]) {
+            if this.person.pid.str_contains(PIDS[VEYLE]) {
                 this.item_list.put_off_all_item();
                 this.item_list.add_iid_no_duplicate("IID_オヴスキュリテ");
                 this.item_list.add_iid_no_duplicate("IID_ミセリコルデ");
             }
         }
-        // if randomized to the same person
         else if switch_person(this.person).pid ==  this.person.pid {
-            if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0  {
+            if random_class || single_class  {
                 job::unit_change_to_random_class(this);
                 fixed_unit_weapon_mask(this);
                 adjust_unit_items(this);
-                if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) { unit_items::adjust_missing_weapons(this); }
+                if GameVariableManager::get_number(DVCVariables::PLAYER_INVENTORY) & 1 != 0 { unit_items::adjust_missing_weapons(this); }
             }
-            grow::adaptive_growths(this);
+            grow::adaptive_growths(this, true);
             auto_level_unit_for_random_map(this, false);
+            ai::adjust_unitai(this);
             this.set_hp(this.get_capability(0, true));
             return;
         }
         else { change_unit_autolevel(this, false);  }
-        if this.person.pid.to_string() == PIDS[0] && GameUserData::get_sequence() != 0{
+        if this.person.pid.str_contains(PIDS[ALEAR]) && GameUserData::get_sequence() != 0 {
             this.edit.set_gender( GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) );
-            if GameVariableManager::exist(DVCVariables::LUEUR_NAME) { this.edit.set_name( GameVariableManager::get_string(DVCVariables::LUEUR_NAME) ); }
+
+            if GameVariableManager::exist(DVCVariables::LUEUR_NAME) {
+                this.edit.set_name( GameVariableManager::get_string(DVCVariables::LUEUR_NAME) );
+            }
         }
     }
-    if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0   {  job::unit_change_to_random_class(this);  }
-    if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) {
+    if random_class || single_class {  job::unit_change_to_random_class(this);  }
+    if adjust_items {
         adjust_unit_items(this);
-        unit_items::adjust_missing_weapons(this);
+        if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 {
+            ai::adjust_unitai(this);
+        }
     }
-    else if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 || GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 {  adjust_unit_items(this);  }
-    unit_items::remove_duplicates(this.item_list);
 
-    // println!("Finish with Create2Impl for {}", this.person.get_name().unwrap().to_string());
+    unit_items::remove_duplicates(this.item_list);
     set_unit_edit_name(this);
     this.auto_equip();
-    grow::adaptive_growths(this);
+    grow::adaptive_growths(this, true);
     auto_level_unit_for_random_map(this, false);
     this.set_hp(this.get_capability(0, true));
+    println!("Finish creating {}", Mess::get_name(this.person.pid));
 }
 
 fn unit_set_drop_seals(this: &mut Unit) {
     for x in 0..8 {
-        if let Some(item) = this.item_list.get_item(x) { if item.item.iid.to_string().contains("プルフ"){ item.set_flags(2); } }
+        if let Some(item) = this.item_list.get_item(x) {
+            if item.item.iid.str_contains("プルフ") { item.set_flags(2); }
+        }
     }
 }
 pub fn fixed_unit_weapon_mask(this: &mut Unit){
@@ -126,50 +154,95 @@ pub fn adjust_unit_items(unit: &mut Unit) {
         unit_items::add_monster_weapons(unit);
         return;
     }
-    if unit_items::get_number_of_usable_weapons(unit) < 1 { unit_items::adjust_missing_weapons(unit); }
+    if CONFIG.lock().unwrap().debug {
+        println!("Adjusting Items for {} Job: #{} {}", Mess::get_name(unit.person.pid), job.parent.index, Mess::get_name(job.jid));
+        unit.item_list.unit_items.iter().flat_map(|x| x)
+            .for_each(|item| { println!("Adjusting item for #{}, {}", item.item.parent.index, Mess::get_name(item.item.iid)); });
+    }
+    unit.update_weapon_mask();
+    let mut has_drops = unit_items::has_drops(unit);
+    let custom_inventory = GameVariableManager::get_number(DVCVariables::PLAYER_INVENTORY);
+    let ran_map = GameVariableManager::get_number(DVCVariables::CONTINUOUS) == 3;
+    if custom_inventory & 1 != 0 && !is_enemy {
+        println!("Custom Inventory");
+        unit.item_list.put_off_all_item();
+        unit_items::add_generic_weapons(unit);
+        unit_items::assign_tomes(unit);
+    }
+    else if custom_inventory & 2 != 0 && is_enemy && ((DVCVariables::is_main_chapter_complete(11) && ran_map) ||
+        DVCVariables::is_main_chapter_complete(9))
+    {
+        unit.item_list.put_off_all_item();
+        unit_items::add_generic_weapons(unit);
+        unit_items::assign_tomes(unit);
+    }
     else {
-        let ran_map = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
-        if !is_enemy {
-            if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) { 
-                unit.item_list.put_off_all_item();
-                unit_items::add_generic_weapons(unit);
-            }
-            else { unit_items::simple_replacement(unit);  }
-        }
-        else if GameVariableManager::get_number(DVCVariables::ITEM_KEY) == 0 || ( DVCVariables::is_main_chapter_complete(11) && ran_map ) || DVCVariables::is_main_chapter_complete(9) {
-            unit_items::simple_replacement(unit);
-        }
-        else {
-            unit.item_list.put_off_all_item();
-            unit_items::add_generic_weapons(unit);
-        }
+        println!("Simple Replacement");
+        has_drops = 0;
+        unit_items::simple_replacement(unit);
     }
-    unit_items::assign_staffs(unit);
-    unit_items::assign_tomes(unit);
     unit_items::assign_unique_items(unit);
+    unit_items::assign_staffs(unit);
     unit_items::add_equip_condition(unit);
-    if !is_enemy { // Vul or Elixir
-        if unit.get_capability(0, false) >= 45 { unit.item_list.add_iid_no_duplicate("IID_特効薬");   }
-        else { unit.item_list.add_item_no_duplicate(ItemData::get("IID_傷薬").unwrap());  }
-    }
     unit_items::adjust_melee_weapons(unit);
     unit_items::adjust_missing_weapons(unit);
+    unit_items::remove_duplicates(unit.item_list);
     unit.auto_equip();
-   // println!("Finished adjusting items");
+    if has_drops != 0 {
+        let iid = random_item(5, has_drops == 2 ).to_string();
+        unit.item_list.add_iid_no_duplicate(&iid);
+        if let Some(x) = unit.item_list.unit_items.
+            iter_mut().flatten().find(|x| x.item.iid.to_string() == iid)
+        {
+            x.flags |= 2;
+        }
+    }
+
+    if unit.person.get_asset_force() == 0 {
+        if unit.get_capability(0, true) >= 45 {
+            unit.item_list.add_iid_no_duplicate("IID_特効薬")
+        }
+        else {
+            unit.item_list.add_iid_no_duplicate("IID_傷薬")
+        }
+    }
+    unit.item_list.unit_items.iter().flat_map(|x| x)
+        .for_each(|item| {
+            println!("Final Items #{}, {}", item.item.parent.index, Mess::get_name(item.item.iid));
+        });
 }
 
 pub fn set_unit_edit_name(unit: &Unit) {
-    if unit.person.pid.to_string() == PIDS[0] || unit.person.get_flag().value & 1024 != 0 {
-        if GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) != 0 { unit.edit.set_gender( GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) ); }
+    if unit.person.pid.str_contains(PIDS[0]) || unit.person.get_flag().value & 1024 != 0 {
+        if GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) != 0 {
+            unit.edit.set_gender( GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) );
+        }
         else {unit.edit.set_gender( 1 );  }
         if GameVariableManager::exist(DVCVariables::LUEUR_NAME) { unit.edit.set_name( GameVariableManager::get_string(DVCVariables::LUEUR_NAME) ); }
         unit.person.set_gender( unit.edit.gender );
     }
-    if unit.person.get_flag().value & 128 != 0 {
-        unit.edit.set_name( GameVariableManager::get_string(DVCVariables::LUEUR_NAME) );
-        if GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) != 0 { unit.edit.set_gender( GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) ); }
-        else {unit.edit.set_gender( 1 );  }
-    } 
+    if unit.person.get_flag().value & 128 != 0 && unit.person.get_job().is_some_and(|j| j.jid.to_string().contains("JID_邪竜ノ子")){
+        if let Some(pid) = GameVariableManager::try_get_string("G_R_PID_ヴェイル").
+            and_then(|pid| PersonData::get(pid))
+            .filter(|p| p.parent.index > 1)
+        {
+            unit.edit.set_name(pid.name.unwrap());
+            if pid.gender == 1 {
+                if pid.get_flag().value & 32 != 0 { unit.edit.set_gender( 2 ); }
+                else { unit.edit.set_gender( 1 ); }
+            }
+            else {
+                if pid.get_flag().value & 32 != 0 { unit.edit.set_gender( 1 ); }
+                else { unit.edit.set_gender( 2 ); }
+            }
+        }
+        else {
+            unit.edit.set_name(GameVariableManager::get_string(DVCVariables::LUEUR_NAME));
+            if GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) != 0 {
+                unit.edit.set_gender(GameVariableManager::get_number(DVCVariables::LUEUR_GENDER));
+            } else { unit.edit.set_gender(1); }
+        }
+    }
 }
 
 pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
@@ -226,10 +299,10 @@ pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
             unit.auto_grow_capability( current_level, current_level);
             unit.set_level( current_level );
             unit.set_internal_level( 0 );
-            println!("{} -> {} Base -> Base Level {}",  person.get_name().unwrap().to_string(), new_person.get_name().unwrap().to_string(), current_level);
+          //  println!("{} -> {} Base -> Base Level {}",  person.get_name().unwrap().to_string(), new_person.get_name().unwrap().to_string(), current_level);
         }
         else {
-            let new_job_list = new_person.get_job().unwrap().get_low_jobs();
+            let new_job_list = get_base_classes(new_person.get_job().unwrap());
             unit.auto_grow_capability(current_level, current_level);
             if new_job_list.len() == 3 {
                 let index = super::get_low_class_index(new_person);
@@ -270,11 +343,9 @@ pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
             unit.set_internal_level( current_internal_level );
         }
     }
+    for x in 0..11 { original_gr[x as usize] = original_growth_rates[x as usize]; }
     let bases = calculate_new_offset(person, new_person);
      // Change back to original growth rate
-    for x in 0..11 { 
-        original_gr[x as usize] = original_growth_rates[x as usize]; 
-    }
     for x in 0..11 {  unit.set_base_capability(x as i32, bases[x] as i32);  }
 
     unit.set_sp( person.get_sp() );
@@ -289,33 +360,48 @@ fn calculate_new_offset(original: &PersonData, new: &PersonData) -> [i8; 11] {
     let old_level = if original_job.is_high() { 20  + original.get_level() as i32 }  else { original.get_level() as i32 };
     let new_level = if new_job.is_high() { 20 + new.get_level() as i32 } else { new.get_level() as i32 };
 
-    let factor = (new_level as i32 - old_level as i32) as i32;
+    let factor = new_level - old_level;
     let new_offset = new.get_offset_n();
     let old_offset = original.get_offset_n();
     let new_grow = new.get_grow();
-    // Use Vander's offset if vander
-    if original.pid.to_string() == PIDS[1] {
+    let diff_grow = new_job.get_diff_grow();
+    let old_grow = original.get_grow();
+    let class_base = original_job.get_base();
+    let n_autolevels =
+        if DVCVariables::is_random_map() && DVCVariables::is_main_chapter_complete(4) {
+            max(crate::continuous::random::random_map_mode_level(), engage::util::get_instance::<engage::map::situation::MapSituation>().average_level) +
+                crate::continuous::get_continious_total_map_complete_count() / 3
+        }
+        else { ( if original_job.is_high() { 20 } else { 0 } + original.get_level() ) as i32 };
+
+    if original.pid.contains(PIDS[1]) {
+        let new_class_bases = new_job.get_base();
         for x in 0..11 {
-            let value: i32 = 100 * old_offset[x as usize ] as i32 + old_level * new_grow[ x ] as i32 + 50;
-            out[x as usize] = (value / 100 ) as i8;
+            let offset = 100*old_offset[x] as i32 + n_autolevels * ( old_grow[x] as i32) + 100*class_base[x] as i32 + 50;
+            let round = if diff_grow[x] as i32 + new_grow[x] as i32 > 0 { 50 } else { 0 };
+            let value: i32 = 100 * new_offset[x] as i32 - factor * diff_grow[x] as i32 + round +  ( n_autolevels  * new_grow[x] as i32) + 100*new_class_bases[x] as i32;
+            if value >= (offset + 100) {
+                out[x] = ((offset- 100*(new_class_bases[x] as i32) + 100) / 100) as i8;
+            }
+            else if value < (offset - 300) {
+                out[x] = ((offset - 100*(new_class_bases[x] as i32) - 300) / 100) as i8;
+            }
+            else {
+                out[x] = ((value - 100*new_class_bases[x] as i32) / 100) as i8;
+            }
         }
     }
     else {
     // Everyone calculate offset by subtracting class growths to adjust to original unit's level
-        let diff_grow = new_job.get_diff_grow();
-        let n_autolevels = 
-            if DVCVariables::is_random_map() && DVCVariables::is_main_chapter_complete(4) {
-                crate::continuous::random::random_map_mode_level() + crate::continuous::get_continious_total_map_complete_count() / 3
-            }  
-            else { ( if original_job.is_high() { 20 } else { 0 } + original.get_level() ) as i32 };
-
         for x in 0..10 {
-            let value: i32 = 100 * new_offset[x ] as i32 - factor as i32 * diff_grow[x] as i32 + 50;
-            let base: i32 = 
-            if value > ( 100* (old_offset[x] + 5 ) as i32 ) as i32 && old_offset[x] != 0 { 100*( old_offset[x] as i32 + 5 ) }
-            else if value < 0 && old_offset[x] != 0 { 100 * ( old_offset[x] as i32 ) }
-            else if value < 100* ( old_offset[x] ) as i32  {  60*( old_offset[x] as i32 ) + value /2  }
-            else { value }  + ( n_autolevels  * new_grow[x] as i32) as i32 + 50;
+            let original_stat = old_offset[x] as i32;
+            let round = if diff_grow[x] as i32 + new_grow[x] as i32 > 0 { 50 } else { 0 };
+            let value: i32 = 100 * new_offset[x] as i32 - factor * diff_grow[x] as i32;
+            let base: i32 =
+            // Clamp difference between -4 to +4 of the original unit
+            if value > ( 100* (original_stat + 4 )) { 100*( 4 + old_offset[x] as i32 ) }
+            else if value < 100 * ( original_stat - 5 ) { ( 50*value + 5000 * original_stat ) / 100  }
+            else { value } + ( n_autolevels  * new_grow[x] as i32) + round;
             out[x] = (base / 100 ) as i8;
         }
     }
@@ -326,41 +412,26 @@ pub fn has_skill(this: &Unit, skill: &SkillData) -> bool {
     if let Some(learn) = this.learned_job_skill {
         if skill.parent.hash == learn.parent.hash { return true; }
     }
-    return this.mask_skill.unwrap().find_sid(skill.sid).is_some() | this.private_skill.find_sid(skill.sid).is_some()| this.equip_skill.find_sid(skill.sid).is_some();
+    this.mask_skill.unwrap().find_sid(skill.sid).is_some() |
+        this.private_skill.find_sid(skill.sid).is_some()|
+        this.equip_skill.find_sid(skill.sid).is_some()
 }
 pub fn has_sid(this: &Unit, sid: &str) -> bool {
     if let Some(learn) = this.learned_job_skill {
         if sid == learn.sid.to_string() { return true; }
     }
-    return this.mask_skill.unwrap().find_sid(sid).is_some() | this.private_skill.find_sid(sid).is_some() | this.equip_skill.find_sid(sid).is_some();
+   this.mask_skill.unwrap().find_sid(sid).is_some() |
+       this.private_skill.find_sid(sid).is_some() |
+       this.equip_skill.find_sid(sid).is_some()
 }
 
 pub fn reload_all_actors() {
-    engage::unitpool::UnitPool::class().get_static_fields_mut::<crate::randomizer::job::UnitPoolStaticFieldsMut>().s_unit
+    UnitPool::class().get_static_fields_mut::<job::UnitPoolStaticFieldsMut>().s_unit
         .iter_mut().filter(|unit| unit.force.is_some_and(|f| f.force_type < 3  )).for_each(|unit|{
             unit.reload_actor();
             unit.auto_equip();
     });
 }
-
-
-fn replace_recruitment_god_unit(unit: &mut Unit) {
-    if GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) == 0 || unit.get_god_unit().is_none() { return; }
-    if let Some(god_unit) = unit.get_god_unit() {
-        if let Some(pos) = EMBLEM_LIST.get().unwrap().iter().position(|&hash| hash == god_unit.data.parent.hash) {
-            if let Some(god) = DVCVariables::get_god_from_index(pos as i32, true) {
-                if god.parent.hash != god_unit.data.parent.hash {
-                    if let Some(new_g_unit) = GodPool::create(god) {
-                        unit.clear_parent();
-                        GodPool::delete(god_unit);
-                        unit.try_connect_god(new_g_unit);
-                    }
-                }
-            }
-        }
-    }
-}
-
 fn enemy_unit_randomization(unit: &mut Unit) {
     let x = unit.dispos_y as i8;
     let z = unit.dispos_z as i8;
@@ -375,43 +446,50 @@ fn enemy_unit_randomization(unit: &mut Unit) {
         let is_boss = data.get_flag().value & 16 != 0 ;
         let mut changed_class = false;
         let random_map = DVCVariables::is_random_map();
-        let diffculty = GameUserData::get_difficulty(false);
+        let difficulty = GameUserData::get_difficulty(false);
         let m004_complete = DVCVariables::is_main_chapter_complete(4);
         if let Some(person) = data.get_person() {
-            if person.get_engage_sid().is_none()  {
-                if ( GameVariableManager::get_bool(DVCVariables::SKILL_KEY) &&
-                 ( (is_boss && GameVariableManager::get_number(DVCVariables::ENEMY_SKILL_GUAGE_KEY) == 10 ) || GameVariableManager::get_number(DVCVariables::ENEMY_SKILL_GUAGE_KEY) > 10 )) && 
-                 ( DVCVariables::random_enabled() && person.get_asset_force() != 0 ) {
+            if person.get_engage_sid().is_none() {
+                 if ( DVCVariables::random_enabled() && person.get_asset_force() != 0 ) &&
+                     (
+                         (is_boss && GameVariableManager::get_number(DVCVariables::ENEMY_SKILL_GAUGE_KEY) == 10 ) ||
+                         (GameVariableManager::get_number(DVCVariables::ENEMY_SKILL_GAUGE_KEY) > 10)
+                     )
+                  {
                     if let Some(dispos_skill) = data.sid {
-                        unit.private_skill.replace_sid(dispos_skill, skill::get_random_skill_dispos(diffculty, rng));
+                        unit.private_skill
+                            .replace_sid(dispos_skill, skill::get_random_skill_dispos(difficulty, rng));
                     }
-                    else if rng.get_value(20) < 2*diffculty && m004_complete {
-                        unit.private_skill.add_skill(skill::get_random_skill_dispos(diffculty, rng), 10, 0);
+                    else if rng.get_value(20) < 2* difficulty && m004_complete {
+                        unit.private_skill
+                            .add_skill(skill::get_random_skill_dispos(difficulty, rng), 10, 0);
                     }
                 }
             }
         }
         if unit.person.parent.hash == 1879825845 || unit.status.value & 134217728 != 0 { return; }
         let job = unit.get_job();
-        if crate::assets::animation::MONSTERS.iter().any(|str| job.jid.contains(str)) { 
+        if MONSTERS.iter().any(|str| job.jid.contains(str)) {
             if random_map && m004_complete { auto_level_unit_for_random_map(unit, is_boss);  }
             else { emblem_paralogue_level_adjustment(unit); }
             return;  
         }
         let mut has_master = unit.item_list.has_item_iid("IID_マスタープルフ");
         set_unit_edit_name(unit);
-        if unit.person.get_flag().value & 512 == 512 {  // Person was change 
+        if unit.person.get_flag().value & 512 == 512 && GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {  // Person was change 
             fixed_unit_weapon_mask(unit);
+            // println!("Adjust Weapon 1");
             adjust_unit_items(unit); 
             ai::adjust_unitai(unit);
         }
-        if unit.person.get_asset_force() == 0 && ( GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 ){  ai::adjust_unitai(unit);  }
+        if (unit.person.get_asset_force() | 2 == 2) && ( GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 ){  ai::adjust_unitai(unit);  }
         if unit.person.get_asset_force() != 0 {
             if random_map && m004_complete && !GameUserData::get_chapter().cid.contains("E00") { // Continuous Mode Random Map
                 fixed_unit_weapon_mask(unit);
                 let maps_completed = crate::continuous::get_continious_total_map_complete_count();
                 if maps_completed < 16 {
                     unit.item_list.put_off_all_item();
+                    //println!("Adjust Weapon RNG");
                     adjust_unit_items(unit); 
                     unit.auto_equip();
                 }
@@ -428,6 +506,7 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                 }
                 changed_class = true;
                 unit_items::adjust_missing_weapons(unit);
+                // println!("Mauvier Passed?");
             }
             if ( GameVariableManager::get_number(DVCVariables::JOB_KEY) & 2 != 0 )  && m004_complete {
                 let gauge = GameVariableManager::get_number(DVCVariables::ENEMY_JOB_GAUGE_KEY);
@@ -435,6 +514,7 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                     if job::enemy_unit_change_to_random_class(unit){ 
                         changed_class = true;
                         fixed_unit_weapon_mask(unit);
+                       //  println!("Adjust Weapon 2");
                         adjust_unit_items(unit); 
                         if unit.person.get_asset_force() == 2 { unit_items::add_generic_weapons(unit);  }
                         ai::adjust_unitai(unit);
@@ -445,43 +525,62 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                             if unit.get_job().get_max_level() == 40 { unit.internal_level = 0; }
                         }
                     }
+                    else {
+                        // println!("Random Class: None");
+                    }
+                }
+                else {
+                   // println!("Random Class: None");
                 }
             }
-            if GameUserData::get_chapter().cid.to_string().contains("CID_S0") && GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) != 0 { emblem_paralogue_level_adjustment(unit); } 
+            if GameUserData::get_chapter().cid.str_contains("CID_S0") && GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) != 0 {
+                emblem_paralogue_level_adjustment(unit);
+            }
             if GameVariableManager::get_number(DVCVariables::ITEM_KEY) & 2 != 0 { unit_items::random_items_drops(unit); }
-            if !m004_complete {  unit.auto_equip(); return;  }
-            let gauge = GameVariableManager::get_number(DVCVariables::ENEMY_SKILL_GUAGE_KEY);
-            if GameVariableManager::get_bool(DVCVariables::SKILL_KEY) && ( ( rng.get_value(100) < gauge && gauge > 11 ) || ( gauge > 0 && gauge <= 11 && is_boss ) )  && unit.person.get_engage_sid().is_none() {
+            if !m004_complete {
+                unit.auto_equip();
+                return;
+            }
+            let gauge = GameVariableManager::get_number(DVCVariables::ENEMY_SKILL_GAUGE_KEY);
+            if ( ( rng.get_value(100) < gauge && gauge > 11 ) || ( gauge > 0 && gauge <= 11 && is_boss ) )  && unit.person.get_engage_sid().is_none() {
                 if let Some(skill) = skill::get_random_skill_job(GameUserData::get_difficulty(false), rng, unit){
                     unit.private_skill.add_skill(skill, 10, 0); 
                 }
             }
+            println!("Revival Stone/ Emblem Check");
             if ( rng.get_value(100) < GameVariableManager::get_number(DVCVariables::REVIVAL_STONE_GAUGE_KEY) ) && DVCVariables::is_main_chapter_complete(5) {
                unit.hp_stock_count += 1;
                unit.hp_stock_count_max += 1;
             }
-            else if unit.person.get_asset_force() == 1 && rng.get_value(100) < GameVariableManager::get_number(DVCVariables::ENEMY_EMBLEM_KEY) && (  unit.person.get_engage_sid().is_none() && unit.get_god_unit().is_none()){
+            else if unit.person.get_asset_force() == 1 && rng.get_value(100) < GameVariableManager::get_number(DVCVariables::ENEMY_EMBLEM_KEY) &&
+                (  unit.person.get_engage_sid().is_none() && unit.get_god_unit().is_none())
+            {
                 let current_chapter = GameUserData::get_chapter().cid.to_string();
                 if current_chapter != "CID_M022" && current_chapter != "CID_M011"  {
                     let emblem = rng.get_value( ENEMY_EMBLEM_LIST.get().unwrap().len() as i32) as usize;
-                    if crate::autolevel::enemy::try_equip_emblem(unit, emblem) {  ai::adjust_enemy_emblem_unit_ai_flags(unit);   }
+                    println!("Emblem: {}", emblem);
+                    if enemy::try_equip_emblem(unit, emblem) {
+                        ai::adjust_enemy_emblem_unit_ai_flags(unit);
+                    }
                 }
             } 
-            else if unit.person.get_engage_sid().is_some() || unit.get_engage_attack().is_some()  {
-                ai::adjust_ai_for_engage_attack(unit);
-            }
-            crate::autolevel::auto_level_unit(unit, is_boss);
+            else if unit.person.get_engage_sid().is_some() || unit.get_engage_attack().is_some()  { ai::adjust_ai_for_engage_attack(unit);  }
+            auto_level_unit(unit, is_boss);
         }
         unit_items::adjust_enemy_meteor(unit);
         if has_master {  unit.item_list.add_iid_no_duplicate("IID_マスタープルフ"); }    // Add Seal if lost seal
         unit_set_drop_seals(unit);    // Drop Seals
     
        // Prevent Green Emblems from dying in Chapter 22 if AI is changed
-        if unit.person.pid.to_string().contains("PID_M022_紋章士") {
+        if unit.person.pid.str_contains("PID_M022_紋章士") {
             unit.private_skill.add_sid("SID_死亡回避", 10, 0);  
             unit.put_off_all_item();
         } 
-        else if changed_class { unit_items::adjust_missing_weapons(unit); }
+        else if changed_class {
+            unit_items::adjust_missing_weapons(unit);
+            ai::adjust_unitai(unit);
+        }
+        if GameUserData::is_evil_map() { auto_level_unit(unit, is_boss); }
         unit.auto_equip();
         unit.set_hp(unit.get_capability(0, true));
     }

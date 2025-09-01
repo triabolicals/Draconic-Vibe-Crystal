@@ -16,6 +16,8 @@ pub fn code_patches() {
         Patch::in_text(0x0228151c).bytes(&[0x0A, 0x04, 0x80, 0x52]).unwrap();
         Patch::in_text(0x02281fb8).bytes(&[0x08, 0x04, 0x80, 0x52]).unwrap();
     }
+    // Call Doubles
+    Patch::in_text(0x01c76558).bytes(&[0x02, 0x00, 0x00, 0x14]).unwrap();
 }
 
 pub fn dual_guard_code_patch() {
@@ -75,13 +77,9 @@ pub fn set_personal_caps(){
                 cap[10] = 99;
             });
             PersonData::get_list_mut().unwrap().iter_mut().for_each(|person|{ let limits = person.get_limit(); for y in 0..11 { limits[y] = 0; }});
-
-            println!("Stat Caps Maxed out");
         }
         let _ = crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock|lock.stat_caps = true);
     }
 }
 
-pub fn full_bullet_patch() {
-
-}
+pub fn full_bullet_patch() {}

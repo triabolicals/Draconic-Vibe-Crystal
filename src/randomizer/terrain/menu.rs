@@ -17,8 +17,8 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEmblemEnergy {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().terrain } else { GameVariableManager::get_number(DVCVariables::TERRAIN) };

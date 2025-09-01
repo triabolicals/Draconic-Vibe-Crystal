@@ -2,13 +2,13 @@ use super::*;
 use engage::menu::{BasicMenuItem, BasicMenuItemAttribute};
 
 pub fn sortie_top_menu_back_get_map_attr(this: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
-    let c_mode = GameVariableManager::get_number(DVCVariables::CONTINIOUS);
+    let c_mode = GameVariableManager::get_number(DVCVariables::CONTINUOUS);
     if c_mode > 0 && c_mode < 4 { BasicMenuItemAttribute::Hide }
     else { unsafe { sortie_top_menu_back_get_map_attr_original(this, None) } }
 }
 
 pub fn sortie_top_menu_base_b_call(this: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    let c_mode = GameVariableManager::get_number(DVCVariables::CONTINIOUS);
+    let c_mode = GameVariableManager::get_number(DVCVariables::CONTINUOUS);
     if c_mode > 0 && c_mode < 4 { BasicMenuResult::new() }
     else { unsafe { sortie_top_menu_base_b_call_original(this, None) } }
 }

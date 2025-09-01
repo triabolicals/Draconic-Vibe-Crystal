@@ -1,11 +1,52 @@
+use crate::utils::get_base_classes;
 use super::*;
 
 #[skyline::hook(offset=0x019c6700)]
 pub fn add_job_list_unit(this: &mut ChangeJobData, unit: &Unit, method_info: OptionalMethod) -> bool {
     let result = call_original!(this, unit, method_info);
     if !DVCVariables::random_enabled() { return result; }
+    if this.job.get_flag().value & 63 == 32 && this.job.parent.hash != unit.job.parent.hash {
+        this.is_default_job = false;
+        this.is_gender = false;
+        return false;
+    }
+    // No-Re_classing
+    let job_wm = this.job_weapon_mask.value;
+    if GameVariableManager::get_number(DVCVariables::RECLASS_KEY) == 2 || DVCVariables::get_single_class(false).is_some() {
+        let gender = unit.get_dress_gender();
+        if (gender == Gender::Male && this.job.flag.value & 4 != 0) || (gender == Gender::Female && this.job.flag.value & 16 != 0) {
+            this.is_gender = false;
+            return false;
+        }
+        let hash = this.job.parent.hash;
+        let jid = this.job.jid.to_string().trim_end_matches("_E").to_string();
+
+        let unit_jid =  unit.job.jid.to_string().trim_end_matches("_E").to_string().trim_end_matches("下級").to_string();
+        if jid.contains(&unit_jid) || ( jid.contains(&unit_jid) && jid.contains("下級") ) || (jid.contains("メリュジーヌ") && unit_jid.contains("メリュジーヌ")) {
+            this.is_default_job = true;
+            return this.is_enough_level && this.enough_item;
+        }
+        let condition_met = unit.aptitude.value & job_wm == job_wm && (this.is_enough_level && this.enough_item );
+        if this.job.parent.hash == unit.job.parent.hash {
+            return condition_met;
+        }
+        if unit.job.is_high() {
+            let lows = get_base_classes(unit.job);
+            if lows.iter().any(|x| x.parent.hash == hash) || lows.iter().any(|x| x.get_high_jobs().iter().any(|h| h.parent.hash == hash)) {
+                return condition_met;
+            }
+        }
+        if unit.job.is_low() && unit.job.has_high() {
+            if unit.job.get_high_jobs().iter().any(|x| x.parent.hash == hash) ||
+                unit.job.get_high_jobs().iter().any(|x|  get_base_classes(x).iter().any(|h| h.parent.hash == hash))
+            {
+                return condition_met;
+            }
+        }
+        this.is_gender = false;
+        return false;
+    }
     if CONFIG.lock().unwrap().debug {
-        //this.is_gender = true;
         this.is_default_job = true;
         return true;
     }
@@ -46,7 +87,6 @@ pub fn add_job_list_unit(this: &mut ChangeJobData, unit: &Unit, method_info: Opt
     if unit.person.get_flag().value & 32 != 0 && this.job.get_flag().value & 4 != 0 {
         if unit.person.get_gender() == 1 { 
             this.is_gender = true;
-            let job_wm = this.job_weapon_mask.value;
             if unit.aptitude.value & job_wm == job_wm && (this.is_enough_level && this.enough_item ) {
                 return true;
             }
@@ -57,7 +97,7 @@ pub fn add_job_list_unit(this: &mut ChangeJobData, unit: &Unit, method_info: Opt
             return false; 
         }
     }
-    return result;
+    result
 }
 
 #[unity::class("App", "ClassChange.ChangeJobData")]
@@ -114,7 +154,7 @@ pub fn class_change_a_call_random_cc(item: &ClassChangeJobMenuItem, _method_info
         }
         else { unsafe { class_change_confirm_bind(item.menu, item.job_data, None); } }
     }
-    return 0x80;
+    0x80
 }
 pub fn black_list_jobs() {
     JOB_BLACK_LIST.lock().unwrap().iter()

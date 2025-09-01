@@ -43,8 +43,20 @@ impl ConfigBasicMenuItemSwitchMethods for EmblemSkillChaos {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().emblem_skill_chaos }
+            else { GameVariableManager::get_number("ESkC")};
+        let changed = DVCVariables::changed_setting_text("ESkC", DVCVariables::EMBLEM_SKILL_CHAOS_KEY);
+
+        this.command_text = format!("{}{}",changed, match value {
+            1 => { "Sync" },
+            2 => { "Engage" },
+            3 => { "Sync / Engage "},
+            _ => { "Default"},
+        }).into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let main = DVCVariables::is_main_menu();
@@ -59,18 +71,6 @@ impl ConfigBasicMenuItemSwitchMethods for EmblemSkillChaos {
             3 => { "Expands pool for engage and sync skills." },
             _ => { "Default pool for sync and engage skills."},
         }, changed).into();
-    }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().emblem_skill_chaos }
-            else { GameVariableManager::get_number("ESkC")};
-        let changed = DVCVariables::changed_setting_text("ESkC", DVCVariables::EMBLEM_SKILL_CHAOS_KEY);
-
-        this.command_text = format!("{}{}",changed, match value {
-            1 => { "Sync" },
-            2 => { "Engage" },
-            3 => { "Sync / Engage "},
-            _ => { "Default"},
-        }).into();
     }
 }
 
@@ -117,8 +117,8 @@ pub fn create_emblem_skill_pool() {
         }
         values
     });
-    let emblem_list =  EMBLEM_LIST.get().unwrap();
-    let n_emblems = emblem_list.len();
+    let emblem_list = get_playable_emblem_hashes();
+    let n_emblems = get_playable_emblem_hashes().len();
     let mut engage_skills: Vec<i32> = Vec::with_capacity(n_emblems);
     // Get all syncho skills to the random list  //Add Gambit    
     emblem_list.iter().flat_map(|&h| GodData::try_get_hash(h))
@@ -143,7 +143,7 @@ pub fn create_emblem_skill_pool() {
     SYNCHO_RANDOM_LIST.lock().unwrap().get_sync_list_size(); // Calc size
 
     ENGAGE_ATTACKS.get_or_init(||{
-        let mut engage_atks: Vec<(i32, i32)> = Vec::with_capacity(emblem_list.len() * 2 );
+        let mut engage_atks: Vec<(i32, i32)> = Vec::with_capacity(n_emblems * 2 );
         emblem_list.iter().flat_map(|&h| GodData::try_get_hash(h)).enumerate()
             .for_each(|(index, god)|{
                 if let Some(e_atk) = god.engage_attack.and_then(|sid| SkillData::get(sid)){
@@ -193,7 +193,8 @@ pub fn randomized_god_data(){
     rng.ctor(3*seed as u32 );
     let rng2 = Random::instantiate().unwrap();
     rng2.ctor( 2*seed as u32);
-    let emblem_list = &EMBLEM_LIST.get().unwrap();
+    let emblem_list: Vec<_> = EMBLEM_LIST.get().unwrap().iter().enumerate().filter(|x|  x.0 < 20 || x.0 >= 24).map(|(_, x)| *x).collect();
+    println!("Emblem List: {}", emblem_list.len());
     let god_list: Vec<_> = emblem_list.iter().flat_map(|&x| GodData::try_get_hash_mut(x)).collect();
     let mut level_data: Vec<_> = emblem_list.iter().flat_map(|&x| GodData::try_get_hash_mut(x)).flat_map(|god| god.get_level_data()).collect();
     let mut grow_data: Vec<_> = emblem_list.iter().flat_map(|&x| GodData::try_get_hash_mut(x)).flat_map(|god| GodGrowthData::try_get_from_god_data(god)).collect();
@@ -338,9 +339,9 @@ fn randomize_engage_skills(rng: &Random, grow_data: &mut Vec<&mut List<GodGrowth
         }
     );
     GodData::get_list().unwrap().iter()
-        .filter(|god| god.gid.to_string().contains("GID_M0") || god.gid.contains("GID_E0"))
+        .filter(|god| god.gid.str_contains("GID_M0") || god.gid.contains("GID_E0"))
         .for_each(|god|{
-            if let Some(emblem_position) = EMBLEM_ASSET.iter().position(|&a| god.gid.to_string().contains(a)) {
+            if let Some(emblem_position) = EMBLEM_ASSET.iter().position(|&a| god.gid.str_contains(a)) {
                 if emblem_position < 20 {
                     if let Some(engage_skill) = SkillData::try_index_get(engage_sid[emblem_position]){
                         if let Some(ggd) = god.get_level_data() {
@@ -420,7 +421,7 @@ fn randomized_common_sids(emblem_index: i32) {
                 engaged_skills.iter()
                     .for_each(|engaged|{
                         if let Some(skill) = engaged.get_skill() {
-                            if skill.get_flag() & 1 == 0 && !skill.sid.to_string().contains("アイクエンゲージスキル") && counter < 4 {  // no laguz friend
+                            if skill.get_flag() & 1 == 0 && !skill.sid.str_contains("アイクエンゲージスキル") && counter < 4 {  // no laguz friend
                                 common.add_skill(skill, 1, 0);
                                 hard.add_skill(skill, 1, 0);
                                 normal.add_skill(skill, 1, 0);
@@ -525,7 +526,7 @@ fn randomized_emblem_syncho_skills(rng: &Random, grow_data: &mut Vec<&mut List<G
         .for_each(|sid|{
             if let Some(skill) = SkillData::get(*sid) {
                 let replacement_skill = list.get_replacement(skill, false);
-                if replacement_skill.sid.to_string().contains("SID_計略") { *sid = "".into(); }
+                if replacement_skill.sid.str_contains("SID_計略") { *sid = "".into(); }
                 else { *sid = replacement_skill.sid; }
             }
         }
@@ -577,7 +578,6 @@ pub fn change_skill_weapon_restrict_index(skill_index: i32, value: i32 ) {
 }
 pub fn change_weapon_restrict<'a>(sid: impl Into<&'a Il2CppString>, value: i32) {
     if let Some(engage_atk) = SkillData::get_mut(sid) {
-        println!("{} has Mask: {}", Mess::get(engage_atk.name.unwrap()), value);
         let w1 = engage_atk.get_weapon_prohibit();
         let weapon_mask_value = 1023 - value;
         if w1.value <= 2 { return; }
@@ -590,7 +590,7 @@ pub fn get_pid_emblems() {
     EMBLEM_PERSON.get_or_init(||{
         let mut list: Vec<(i32, i32)> = Vec::new();
         PersonData::get_list().unwrap().iter().filter(|&p|
-            if let Some(jid) = p.get_jid() { jid.to_string().contains("JID_紋章士") }
+            if let Some(jid) = p.get_jid() { jid.str_contains("JID_紋章士") }
             else { false }
         ).for_each(|emblem|{
             let jid = emblem.get_jid().unwrap().to_string();

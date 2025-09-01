@@ -1,4 +1,3 @@
-use emblem::EMBLEM_LIST;
 use engage::reliance::*;
 use super::*;
 
@@ -54,19 +53,17 @@ pub fn add_support_points() {
 }
 
 pub fn update_bonds() {
-    if GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 0 {
-        EMBLEM_GIDS.iter()
-            .for_each(|gid|{
-                if let Some(g_unit) = GodPool::try_get_gid(gid, true) {
-                    if g_unit.bonds == 0 { reset_bonds(g_unit); }
-                }
+    if GameVariableManager::get_number(DVCVariables::CONTINUOUS) == 0 {
+        for x in 0..19 {
+            if let Some(g_unit) = GodPool::try_get_gid(EMBLEM_GIDS[x], true) {
+                if g_unit.bonds == 0 { reset_bonds(g_unit); }
             }
-        );
+        }
         return; 
     }
     let units: Vec<_> = Force::get(ForceType::Player).unwrap().iter().chain(Force::get(ForceType::Absent).unwrap().iter()).collect();
-    EMBLEM_LIST.get().unwrap().iter()
-        .flat_map(|&index| GodData::try_get_hash(index))
+    emblem::get_playable_emblem_hashes().into_iter()
+        .flat_map(|index| GodData::try_get_hash(index))
         .flat_map(|god| GodPool::try_get(god, false))
         .for_each(|god_unit|{
             if god_unit.data.force_type == 0 {

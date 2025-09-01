@@ -7,13 +7,16 @@ use unity::{
 };
 use crate::{assets::conditions::ConditionFlags};
 use std::sync::OnceLock;
+// use bitflags::Flags;
 use engage::{
     dialog::yesno::*, force::*, gamedata::{accessory::*, assettable::*, item::ItemData, skill::*, unit::*, *}, 
     gamevariable::GameVariableManager, menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemGaugeMethods, ConfigBasicMenuItemSwitchMethods}, *}, random::Random 
 };
+use engage::gameuserdata::GameUserData;
+use engage::mess::Mess;
+use engage::unitpool::UnitPool;
 use crate::{
-    config::DVCVariables, enums::*, utils::str_contains, CONFIG,
-    randomizer::{names::EMBLEM_NAMES, person::PLAYABLE},
+    config::DVCVariables, enums::*, CONFIG,
 };
 
 pub mod accessory;
@@ -27,8 +30,12 @@ pub mod dress;
 pub mod conditions;
 
 use animation::*;
+use crate::assets::conditions::remove_condition;
+use crate::assets::data::search::search_by_iid;
+use crate::utils::{get_random_and_remove, get_rng};
 
 pub static ACCESSORY_COUNT: OnceLock<i32> = OnceLock::new();
+
 pub static ASSET_STATUS: RwLock<AssetStatus> = RwLock::new(AssetStatus{
     engage_atk_eirika: 11, 
     engage_atk_3h: 12, 
@@ -95,104 +102,155 @@ pub struct AnimSetDB{
     pub atkt: Option<&'static Il2CppString>, 
 }
 impl Gamedata for AnimSetDB {}
-
-
-
+impl AnimSetDB {
+    pub fn get_engage1(&self) -> Option<&'static Il2CppString> {
+        unsafe { anim_get_engage_1(self, None) }
+    }
+}
+#[skyline::from_offset(0x1c8f340)]
+fn anim_get_engage_1(this: &AnimSetDB, optional_method: OptionalMethod) -> Option<&'static Il2CppString>;
 pub fn get_unit_outfit_mode(unit: &Unit) -> i32 {
-    if unit.person.get_asset_force() != 0 { return 0; }
-    if !PLAYABLE.get().unwrap().iter().any(|&x| x == unit.person.parent.index) { return 0;}
-
     let key = format!("G_O{}", unit.person.pid);
-    if !GameVariableManager::exist(key.as_str()) { GameVariableManager::make_entry(key.as_str(), 1); return 0; }
-    return GameVariableManager::get_number(key.as_str());
+    if !GameVariableManager::exist(key.as_str()) {
+        if unit.force.is_some_and(|f| f.force_type == 1 || f.force_type == 2) { return 0; }
+        if unit.person.get_asset_force() != 0 && GameUserData::get_sequence() == 3 { return 0; }
+        GameVariableManager::make_entry(key.as_str(), 1);
+    }
+    GameVariableManager::get_number(key.as_str())
+}
+pub fn set_unit_outfit_mode(unit: &Unit, value: i32){
+    let key = format!("G_O{}", unit.person.pid);
+    if !GameVariableManager::exist(key.as_str()) {
+        if unit.force.is_some_and(|f| f.force_type == 1 || f.force_type == 2) { return; }
+        if GameUserData::get_sequence() == 3 && unit.person.get_asset_force() != 0 { return; }
+        GameVariableManager::make_entry(key.as_str(), 1);
+    }
+    GameVariableManager::set_number(key.as_str(), value);
 }
 
-//Unlock royal classes if asset table entry is found
 pub fn unlock_royal_classes(){
     SEARCH_LIST.get().unwrap().job.iter().filter(|x| x.unique)
         .for_each(|x|{
             if let Some(job) = JobData::try_get_hash_mut(x.job_hash) {
                 let job_flags = job.get_flag();
-                job_flags.value |= 3; 
-                if x.gender_flag != 3 {
-                    if x.gender_flag & 2 != 0 { job_flags.value |= 4; }
-                    if x.gender_flag & 1 != 0 { job_flags.value |= 16; }
+                let jid = job.jid.to_string();
+                if x.gender_flag != 0 && job.style > 0 && !jid.contains("紋章士_") && !jid.contains("M0") { 
+                    job_flags.value |= 3; 
+                    if x.gender_flag != 3 {
+                        if x.gender_flag & 2 != 0 { job_flags.value |= 4; }
+                        if x.gender_flag & 1 != 0 { job_flags.value |= 16; }
+                    }
                 }
             }
         }
     );
 }
-
+pub fn assigned_color(result: &mut AssetTableResult, unit: &Unit) {
+    let outfit_flags = get_unit_outfit_mode(unit);
+    if outfit_flags & 16 != 0 {
+        result.unity_colors[0].r = ( (outfit_flags >> 8) & 255 ) as f32 / 255.0;
+        result.unity_colors[0].g = ( (outfit_flags >> 16) & 255 ) as f32 / 255.0;
+        result.unity_colors[0].b = ( (outfit_flags >> 24) & 255 ) as f32 / 255.0;
+    }
+}
 #[skyline::hook(offset=0x01bb2430)]
-pub fn asset_table_result_setup_hook(this: &mut AssetTableResult, mode: i32, unit: &mut Unit, equipped: Option<&ItemData>, conditions: &mut Array<&'static Il2CppString>, method_info: OptionalMethod) -> &'static mut AssetTableResult {
-    let result = call_original!(this, mode, unit, equipped, conditions, method_info);   // Pre-set Conditions
+pub fn asset_table_result_setup_hook(
+    this: &mut AssetTableResult,
+    mode: i32,
+    unit: &mut Unit,
+    equipped: Option<&ItemData>,
+    conditions: &mut Array<&'static Il2CppString>,
+    method_info: OptionalMethod) -> &'static mut AssetTableResult
+{
+    if mode == 3 && conditions.len() >= 2 && DVCVariables::is_changed_recruitment_order(false) {
+        if let Some(unit) = PersonData::get(DVCVariables::get_dvc_person(0, false))
+            .filter(|x| x.parent.index > 1).and_then(|x| UnitPool::get_from_person_mut(x.pid, false))
+        {
+            let result = call_original!(this, 1, unit, equipped, conditions, method_info);
+            let flags = dress::commit_for_unit_dress(result, 1, unit, equipped, conditions);
+            set_class_animations(result, unit.job, equipped, unit, 1, flags);
+            assigned_color(result, unit);
+            result.scale_stuff[16] = 4.0;
+            return result;
+        }
+    }
+    let result = call_original!(this, mode, unit, equipped, conditions, method_info);
+    // Pre-set Conditions
     let conditions_flags = dress::commit_for_unit_dress(result, mode, unit, equipped, conditions);
-    if conditions_flags.contains(ConditionFlags::Transform) && mode == 1 { return result; }
+
+    if conditions_flags.contains(ConditionFlags::RandomTransform) || (conditions_flags.contains(ConditionFlags::Transform) && mode == 1) { return result; }
+    
     emblem::bust_modifier_randomization(result, unit.grow_seed);
+    assigned_color(result, unit);
     let pid = unit.person.pid.to_string();
 
     if conditions_flags.contains(ConditionFlags::Talk) { return result; }
     if conditions_flags.contains(ConditionFlags::EngageAttack) && mode == 2 {
-        // println!("{} is engage attacking. Transform: {}", Mess::get_name(unit.person.pid), conditions_flags.contains(ConditionFlags::Transforming));
         emblem::adjust_engage_attack_animation(result, unit, equipped, conditions_flags);  
-        if unit.god_unit.is_some_and(|gunit| gunit.data.mid.to_string().contains("Tiki") && !gunit.data.gid.contains("チキ")) {
+        if unit.god_unit.is_some_and(|gunit| gunit.data.mid.str_contains("Tiki") && !gunit.data.gid.contains("チキ")) {
             if unit_dress_gender(unit) == 1 { result.body_anims.add( Il2CppString::new_static("Sds0AM-No2_c049_N")); }
             else {  result.body_anims.add( Il2CppString::new_static("Sds0AF-No2_c099_N")); }
         }
-        return result;
     }
-    if ( conditions_flags.contains(ConditionFlags::EngageAttackComboMain) || conditions_flags.contains(ConditionFlags::EngageAttackComboSub) ) && mode == 2 {
-        animation::lueur_engage_atk(result, unit, conditions_flags);
-        return result;
+    else if ( conditions_flags.contains(ConditionFlags::EngageAttackComboMain) || conditions_flags.contains(ConditionFlags::EngageAttackComboSub) ) && mode == 2 {
+        lueur_engage_atk(result, unit, conditions_flags);
     }
-    if ( engage::gameuserdata::GameUserData::get_chapter().cid.to_string().contains("G00") && unit.person.get_asset_force() != 0 ) || pid.contains("_チキ")   { 
-        if mode == 2 { edit_asset_weapon(result, false, equipped); }
-        return result;
+    else if conditions_flags.contains(ConditionFlags::Engaging) { adjust_engaging_animations(result, unit); }
+    else if ( mode == 2 && GameUserData::get_chapter().cid.str_contains("G00") && unit.force.is_some_and(|f| f.force_type != 0) ) || pid.contains("_チキ") {
+        edit_asset_weapon(result, false, 2, equipped);
     }
-    if conditions_flags.contains(ConditionFlags::ClassChange) || conditions_flags.contains(ConditionFlags::Ballista) || conditions_flags.contains(ConditionFlags::Vision) || conditions_flags.contains(ConditionFlags::AllyDarkEmblem) { return result; }   
-    if conditions_flags.contains(ConditionFlags::Engaging) { 
-        animation::adjust_engaging_animations(result, unit);
-        return result;
-    }
+    else if conditions_flags.contains(ConditionFlags::Transforming) { edit_result_for_monster_trans(result, unit, equipped, mode); }
+    else if !conditions_flags.contains(ConditionFlags::ClassChange) &&
+        !conditions_flags.contains(ConditionFlags::Ballista) &&
+        !conditions_flags.contains(ConditionFlags::Vision) &&
+        !conditions_flags.contains(ConditionFlags::AllyDarkEmblem) &&
+        !conditions_flags.contains(ConditionFlags::Talk)
+    {
+        if CONFIG.lock().unwrap().debug {
+            if mode == 2 {
+                println!("{} Body / Dress: {} / {}",  Mess::get_name(unit.person.pid), result.body_model ,result.dress_model);
+            }
+            println!("{}: Job: {} Mode: {}", Mess::get_name(unit.person.pid), Mess::get_name(unit.job.jid), mode);
+            if mode == 2 {
+                if !result.ride_model.is_null() { println!("Ride Model: {}", result.ride_model); }
+                if !result.ride_dress_model.is_null() { println!("Ride Dress Model: {}", result.ride_dress_model); }
 
-    if conditions_flags.contains(ConditionFlags::Transforming) { 
-        animation::edit_result_for_monster_trans(result, unit, equipped, mode); 
-        return result;
-    }
-    // Class Animations
-    /* 
-    if CONFIG.lock().unwrap().debug {
-        println!("{}: Job: {} Mode: {}", Mess::get_name(unit.person.pid), Mess::get_name(unit.job.jid), mode);
-        if mode == 2 {
-           // println!("Body / Dress: {} / {}", result.body_model ,result.dress_model);
-            // if !result.ride_model.is_null() { println!("Ride Model: {}", result.ride_model); }
-            // if !result.ride_dress_model.is_null() { println!("Ride Dress Model: {}", result.ride_dress_model); }
-            result.body_anims.iter().for_each(|m| println!("Before Body Act: {}", m));
-            set_class_animations(result, unit.job, equipped, unit, mode, conditions_flags);
-            result.body_anims.iter().for_each(|m| println!("After Body Act: {}", m));
-           // println!("Body / Dress: {} / {}", result.body_model ,result.dress_model);
-            if !result.ride_model.is_null() { println!("Ride Model: {}", result.ride_model); }
-            if !result.ride_dress_model.is_null() { println!("Ride Dress Model: {}", result.ride_dress_model); }
+                // println!("Body / Dress: {} / {}", result.body_model ,result.dress_model);
+                // if !result.ride_model.is_null() { println!("Ride Model: {}", result.ride_model); }
+                // if !result.ride_dress_model.is_null() { println!("Ride Dress Model: {}", result.ride_dress_model); }
+                result.body_anims.iter().for_each(|m| println!("Before Body Act: {}", m));
+                set_class_animations(result, unit.job, equipped, unit, mode, conditions_flags);
+                result.body_anims.iter().for_each(|m| println!("After Body Act: {}", m));
+                // println!("Body / Dress: {} / {}", result.body_model ,result.dress_model);
+
+            }
+            else {
+                // println!("Body {}", result.body_model);
+                if !result.body_model.is_null() { println!("Body Model: {}", result.body_model); }
+                if !result.ride_model.is_null() { println!("Ride Model: {}", result.ride_model); }
+                result.body_anims.iter().for_each(|m| println!("Before Body Act: {}", m));
+                set_class_animations(result, unit.job, equipped, unit, mode, conditions_flags);
+                result.body_anims.iter().for_each(|m| println!("After Body Act: {}", m));
+            }
         }
-        else {
-            // println!("Body {}", result.body_model);
-          //  if !result.ride_model.is_null() { println!("Ride Model: {}", result.ride_model); }
-            result.body_anims.iter().for_each(|m| println!("Before Body Act: {}", m));
-            set_class_animations(result, unit.job, equipped, unit, mode, conditions_flags);
-            result.body_anims.iter().for_each(|m| println!("After Body Act: {}", m));
-        }
+        else { set_class_animations(result, unit.job, equipped, unit, mode, conditions_flags); }
+        if mode == 2 { edit_asset_weapon(result, false, mode, equipped); }
     }
-    else {
-        */
-        set_class_animations(result, unit.job, equipped, unit, mode, conditions_flags); // }
-    // Weapon 
-    if mode == 2 { edit_asset_weapon(result, false, equipped); }
     result
 }
 
-pub fn edit_asset_weapon(result: &mut AssetTableResult, equipped: bool, item: Option<&ItemData>) {
-    if !result.right_hand.is_null() { if result.right_hand.to_string().contains("00") { return; } }
-    if !result.left_hand.is_null() { if result.left_hand.to_string().contains("00") { return; } }
+pub fn edit_asset_weapon(result: &mut AssetTableResult, equipped: bool, mode: i32, item: Option<&ItemData>) {
+    if equipped {
+        if let Some(asset_table) = item.and_then(|item| search_by_iid(item.iid, mode)) {
+            result.commit_asset_table(asset_table);
+        }
+    }
+    if !result.right_hand.is_null() {
+        if result.right_hand.str_contains("00") { return; }
+    }
+    if !result.left_hand.is_null() {
+        if result.left_hand.str_contains("00") { return; }
+    }
     if let Some(w_item) = item {
         if w_item.kind == 9 { return; }
         let weapons = &SEARCH_LIST.get().unwrap().items;
@@ -240,30 +298,30 @@ pub fn edit_asset_weapon(result: &mut AssetTableResult, equipped: bool, item: Op
                 _ => {}
             }
         }
-        else if equipped {
-            if let Some(entry) = weapons.get_index(w_item.parent.index).and_then(|item_asset| AssetTable::try_index_get(item_asset.asset_entry)) {
-                result.commit_asset_table(entry);
-            }
-        }
     }
 }
 
-
 pub fn unit_dress_gender(unit: &Unit) -> i32 {
-    if unit.person.pid.to_string() == PIDS[0] {  if unit.edit.is_enabled() { return unit.edit.gender; }  }
+    if unit.person.pid.to_string() == PIDS[0] || unit.person.get_flag().value & 128 != 0 {  if unit.edit.is_enabled() { return unit.edit.gender; }  }
     unsafe { get_dress_gender(unit.person, None) }
 }
 
 pub fn is_sword_fighter_outfit(this: &mut AssetTableResult) -> bool {
-    if !this.dress_model.is_null() { if this.dress_model.to_string().contains("Swd0A") { return true } }
-    if !this.body_model.is_null() { if this.body_model.to_string().contains("Swd0A") { return true } }
-    return false;
+    if !this.dress_model.is_null() { 
+        let dress_model = this.dress_model.to_string();
+        dress_model.contains("Swd0A") && !dress_model.contains("c251")
+    }
+    else if !this.body_model.is_null() {
+        let body_model = this.body_model.to_string();
+        body_model.contains("c151") ||  body_model.contains("c451") || ( body_model.contains("Swd0A")  && !body_model.contains("c251"))
+    }
+    else { false }
 }
 
 pub fn is_tiki_engage(this: &mut AssetTableResult) -> bool {
-    if !this.dress_model.is_null() { if this.dress_model.to_string().contains("Tik1AT") { return true } }
-    if !this.body_model.is_null() { if this.body_model.to_string().contains("Tik1AT") { return true } }
-    return false;
+    if !this.dress_model.is_null() { this.dress_model.to_string().contains("Tik1AT") }
+    else if !this.body_model.is_null() { this.body_model.to_string().contains("Tik1AT") }
+    else { false }
 }
 
 pub fn result_commit_scaling(result: &mut AssetTableResult, data: &AssetTable) {
@@ -285,11 +343,39 @@ fn unit_get_accessory_list(this: &Unit, method_info: OptionalMethod) -> &'static
 #[skyline::from_offset(0x01f266a0)]
 fn get_dress_gender(person: &PersonData, method_info: OptionalMethod) -> i32; 
 
-pub fn install_dvc_outfit() {
-    if let Some(cc) = Il2CppClass::from_name("App", "SortieUnitSelect").unwrap().get_nested_types().iter().find(|x| x.get_name() == "UnitMenuItem") {
-        let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
-        menu_mut.get_virtual_method_mut("YCall").map(|method| method.method_ptr = accmenu::unit_menu_item_y_call as _);
-        println!("Replaced Added YCall to UnitMenuItem");
+pub fn assign_rand_appearance() {
+    if GameVariableManager::exist("G_AMPID_LueurM") { return; }
+    if let Some(search_lists) = SEARCH_LIST.get() {
+        let data = &search_lists.personal_data;
+        let mut male_list = data.iter().enumerate().filter(|x| !x.1.is_female)
+            .map(|x| x.0 ).collect::<Vec<_>>();
+
+        let mut female_list = data.iter().enumerate().filter(|x| x.1.is_female)
+            .map(|x| x.0 ).collect::<Vec<_>>();
+
+        let rng = get_rng();
+        MPIDS.iter().enumerate().for_each(|(i, mpid)| {
+            if i == 0 {
+                if let Some(s) = get_random_and_remove(&mut male_list, rng) {
+                    GameVariableManager::make_entry(format!("G_A{}M", mpid).as_str(), s as i32);
+                }
+                if let Some(s) = get_random_and_remove(&mut female_list, rng) {
+                    GameVariableManager::make_entry(format!("G_A{}F", mpid).as_str(), s as i32);
+                }
+            }
+            else {
+                let female = PersonData::get(PIDS[i]).map(|p| p.gender == 2).unwrap_or(false);
+                if female {
+                    if let Some(s) = get_random_and_remove(&mut female_list, rng) {
+                        GameVariableManager::make_entry(format!("G_A{}", mpid).as_str(), s as i32);
+                    }
+                }
+                else {
+                    if let Some(s) = get_random_and_remove(&mut male_list, rng) {
+                        GameVariableManager::make_entry(format!("G_A{}", mpid).as_str(), s as i32);
+                    }
+                }
+            }
+        });
     }
 }
-

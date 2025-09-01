@@ -32,11 +32,23 @@ impl ConfigBasicMenuItemSwitchMethods for DeploymentMod {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else { return BasicMenuResult::new(); }
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let deploy_type =
+            if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().deployment_type }
+            else { GameVariableManager::get_number(DVCVariables::DEPLOYMENT_KEY) };
+        this.command_text = match deploy_type {
+            1 => { "Lowest Rating" },
+            2 => { "Random" },
+            3 => { "Free"},
+            4 => { "Full / Expand"},
+            _ => { "Default" },
+        }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let deploy_type =   
+        let deploy_type =
             if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().deployment_type }
             else { GameVariableManager::get_number(DVCVariables::DEPLOYMENT_KEY) };
         this.help_text = match deploy_type {
@@ -47,23 +59,13 @@ impl ConfigBasicMenuItemSwitchMethods for DeploymentMod {
             _ => { "Normal Deployment"},
         }.into();
     }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let deploy_type =   
-            if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().deployment_type }
-            else { GameVariableManager::get_number(DVCVariables::DEPLOYMENT_KEY) };
-        this.command_text = match deploy_type { 
-            1 => { "Lowest Rating" },
-            2 => { "Random" },
-            3 => { "Free"},
-            4 => { "Full / Expand"},
-            _ => { "Default" },
-        }.into();
-    }
 }
 
 pub extern "C" fn vibe_deployment() -> &'static mut ConfigBasicMenuItem { 
     let switch = ConfigBasicMenuItem::new_switch::<DeploymentMod>("Deployment Mode");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
+    switch.get_class_mut()
+        .get_virtual_method_mut("BuildAttribute")
+        .map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
     switch
 } 
 
@@ -81,35 +83,36 @@ impl ConfigBasicMenuItemSwitchMethods for EmblemMod {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
+            BasicMenuResult::se_cursor()
         }
-        return BasicMenuResult::new();
+        else { BasicMenuResult::new() }
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let emblem_deployment =
+            if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().emblem_deployment }
+            else { GameVariableManager::get_number(DVCVariables::EMBLEM_DEPLOYMENT_KEY) };
+        this.command_text = match emblem_deployment {
+            1 => { "Random Emblems" },
+            2 => { "No Emblems" },
+            _ => { "Default"},
+        }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let emblem_deployment = 
+        let emblem_deployment =
             if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().emblem_deployment }
             else { GameVariableManager::get_number(DVCVariables::EMBLEM_DEPLOYMENT_KEY) };
         this.help_text = match emblem_deployment {
             1 => { "Emblems will be randomized onto deployed units." },
             2 => { "Emblems will not be equipped onto units." },
-            _ => { "Emblems are freely selectable in battle preperations."},
-        }.into();
-    }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let emblem_deployment = 
-            if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().emblem_deployment }
-            else { GameVariableManager::get_number(DVCVariables::EMBLEM_DEPLOYMENT_KEY) };
-        this.command_text = match emblem_deployment { 
-            1 => { "Random Emblems" },
-            2 => { "No Emblems" },
-            _ => { "Default"},
+            _ => { "Emblems are freely selectable in battle preparations."},
         }.into();
     }
 }
 
 pub extern "C" fn vibe_emblem_deployment() -> &'static mut ConfigBasicMenuItem { 
     let switch = ConfigBasicMenuItem::new_switch::<EmblemMod>("Emblem Deployment Mode");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
+    switch.get_class_mut().get_virtual_method_mut("BuildAttribute")
+        .map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
     switch
 } 
 
@@ -125,7 +128,9 @@ pub fn lueur_status_check() {
         let lueur_god = GodData::get_mut(EMBLEM_GIDS[19]).unwrap();
         if UnitPool::get_from_person_force_mask(PersonData::get(PIDS[0]).unwrap(), 9).is_none() {
             if lueur_god.get_flag().value & -2147483648 != 0 {
-                lueur_god.get_flag().value -= -2147483648;  //Alear is now an equippable ring due to death or not recruited
+                lueur_god.link = None;
+                lueur_god.get_flag().value -= -2147483648;
+                //Alear is now an equippable ring due to death or not recruited
             }
         }
         else { lueur_god.get_flag().value |= -2147483648; }
@@ -146,8 +151,7 @@ pub fn get_emblem_list() -> Vec<String> {
     );
     result
 }
-pub fn unit_selection_menu_disable(enabled: bool) { GameVariableManager::set_bool("UnitDeploy", enabled); 
-}
+pub fn unit_selection_menu_disable(enabled: bool) { GameVariableManager::set_bool("UnitDeploy", enabled); }
 //Hook to function that creates the sortie deploy positions to do deployment stuff
 
 pub fn get_emblem_paralogue_level() {
@@ -159,14 +163,14 @@ pub fn get_emblem_paralogue_level() {
 
     if e_index.is_none() {  return;  }
     let emblem_index = e_index.unwrap();
-    let found = crate::randomizer::person::pid_to_index(&EMBLEM_GIDS[emblem_index as usize].to_string(), true);
+    let found = crate::randomizer::person::pid_to_index(&EMBLEM_GIDS[emblem_index].to_string(), true);
     let new_emblem_index;
     if found != -1 { new_emblem_index = found;  }
     else { return; }
     let level_difference;
     if new_emblem_index >= 12 {
         let party_average = crate::autolevel::get_difficulty_adjusted_average_level();
-        level_difference = party_average - 2 - PARA_LEVEL[emblem_index as usize];
+        level_difference = party_average - 2 - PARA_LEVEL[emblem_index];
         if level_difference >= 0 { GameVariableManager::set_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL, 0); }
         else { GameVariableManager::set_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL, level_difference); }
     }

@@ -1,9 +1,17 @@
 use unity::prelude::*;
 use engage::{
-    gameuserdata::GameUserData, proc::ProcInst, sequence::{mainmenusequence::MainMenuSequenceLabel, mainsequence::MainSequenceLabel, mapsequence::{human::MapSequenceHumanLabel, MapSequenceLabel}}
+    gameuserdata::GameUserData, proc::ProcInst,
+    sequence::{
+        mainmenusequence::MainMenuSequenceLabel,
+        mainsequence::MainSequenceLabel,
+        mapsequence::{human::MapSequenceHumanLabel, MapSequenceLabel}
+    }
 };
+use num_traits::cast::FromPrimitive;
+use engage::gamevariable::GameVariableManager;
+// use engage::resourcemanager::{ResourceManager, ResourceManagerStaticFields};
 use crate::{config::DVCVariables, CONFIG};
-
+// use std::{fs::{self, File}, io::Write};
 pub const TITLE_SEQUENCE: i32 = -988690862;
 pub const MAIN_SEQUENCE: i32 = -339912801;
 pub const MAINMENU_SEQUENCE: i32 = -1912552174;
@@ -14,7 +22,8 @@ pub const PROC_SCENE: i32 = -1118443598;
 pub const PROC_CHECK: [i32; 7] = [TITLE_SEQUENCE, MAINMENU_SEQUENCE, MAIN_SEQUENCE, MAP_SEQUENCE, MAP_HUMAN_SEQUENCE, PROC_SCENE, SORTIE_SEQUENCE];
 
 pub fn map_sequence_events(proc: &ProcInst, label: i32) {
-    let sequence_label: MapSequenceLabel = label.into();
+    GameVariableManager::make_entry("DVC", 1);
+    let sequence_label: MapSequenceLabel = MapSequenceLabel::from_i32(label).unwrap_or(MapSequenceLabel::End);
     match sequence_label {
         MapSequenceLabel::ResumeSortie | MapSequenceLabel::ResumeMap => { 
             crate::randomizer::terrain::fow::resume_fow();
@@ -45,13 +54,16 @@ pub fn map_sequence_events(proc: &ProcInst, label: i32) {
             crate::randomizer::emblem::enemy::adjust_enemy_edelgard_post_chapter();
             crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.map_complete() ).unwrap();
         },
-        MapSequenceLabel::RestartLoad => { crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.inspectors_set = false).unwrap(); }
+        MapSequenceLabel::RestartLoad => {
+            crate::randomizer::RANDOMIZER_STATUS.try_write()
+                .map(|mut lock| lock.inspectors_set = false).unwrap();
+        }
         _ => {}
     }
 }
 
 pub fn main_menu_sequence_events(proc: &ProcInst, label: i32) {
-    let sequence_label: MainMenuSequenceLabel = label.into();
+    let sequence_label: MainMenuSequenceLabel = MainMenuSequenceLabel::from_i32(label).unwrap_or(MainMenuSequenceLabel::None);
     match sequence_label {
         MainMenuSequenceLabel::PlayerGenderSelect => {
             crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock|lock.reset() ).unwrap();
@@ -70,7 +82,7 @@ pub fn main_menu_sequence_events(proc: &ProcInst, label: i32) {
 }
 
 pub fn main_sequence_events(_proc: &ProcInst, label: i32) {
-    let sequence_label: MainSequenceLabel = label.into();
+    let sequence_label: MainSequenceLabel = MainSequenceLabel::from_i32(label).unwrap();
     match sequence_label {
         MainSequenceLabel::TitleLoop | MainSequenceLabel::GameOver => { crate::randomizer::reset_gamedata(); },
 
@@ -84,7 +96,9 @@ pub fn main_sequence_events(_proc: &ProcInst, label: i32) {
         },
 
         MainSequenceLabel::Map => {
-            if GameUserData::get_sequence() > 3 && !GameUserData::is_evil_map() { GameUserData::get_status().value &= !8192; }
+            if GameUserData::get_sequence() > 3 && !GameUserData::is_evil_map() {
+                GameUserData::get_status().value &= !8192;
+            }
             crate::continuous::update_next_chapter();  // For Chapter 11/22 Continue Flag 
             crate::ironman::ironman_code_edits();
             crate::autolevel::calculate_player_cap(); 
@@ -110,7 +124,9 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
             crate::enums::generate_black_list();
             crate::randomizer::intitalize_game_data();
             crate::message::initialize_mess_hashs();
-            if let Some(asset_data) = crate::assets::data::SEARCH_LIST.get() { asset_data.bust.apply_bust_changes(); }
+            if let Some(asset_data) = crate::assets::data::SEARCH_LIST.get() {
+                asset_data.bust.apply_bust_changes();
+            }
             crate::menus::menu_calls_install();
             crate::ironman::map_save_menu_edits();
         }
@@ -120,23 +136,37 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
 
 pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
     if label == 0 {
-        crate::assets::install_dvc_outfit();
+        println!("[DVC] DVC Outfits Menu Install");
+        println!("[DVC] Blacklist Classes");
         crate::randomizer::job::reclass::black_list_jobs();
         crate::misc::set_personal_caps();
         crate::randomizer::randomize_stuff();
         crate::randomizer::tutorial_check();
         crate::randomizer::skill::learn::update_learn_skills(false);
+        println!("[DVC] Continuious Mode");
         crate::continuous::do_continious_mode();
+        println!("[DVC] Update Next Chapter");
         crate::continuous::update_next_chapter();
+        println!("[DVC] Ironman Edits");
         crate::ironman::ironman_code_edits();
+        println!("[DVC] Emblem Gmap Spot Adjust");
         crate::randomizer::emblem::emblem_gmap_spot_adjust();
         crate::randomizer::terrain::adjust_miasma_tiles();
+        println!("[DVC] Lueur Status Check");
         crate::deployment::lueur_status_check();
+
+        crate::randomizer::person::change_map_dispos();
+        crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.map_complete() ).unwrap();
         if engage::gamevariable::GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 { 
-            crate::randomizer::person::change_map_dispos(); 
             crate::script::replace_lueur_chapter22();
         }
-        if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 { crate::script::adjust_person_map_inspectors();  }
+
+        if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 {
+            println!("[DVC] Map Inspector Adjustments");
+            crate::script::adjust_person_map_inspectors();
+        }
+        crate::assets::assign_rand_appearance();
+        println!("[DVC] Checks End");
     }
 }
 
@@ -150,8 +180,7 @@ pub fn sortie_sequence_events(_proc: &ProcInst, label: i32) {
 
 pub fn map_sequence_human_events(proc: &ProcInst, label: i32) {
     crate::ironman::map_save_proc_edit(proc);
-    let sequence_label: MapSequenceHumanLabel = label.into();
-    if sequence_label == MapSequenceHumanLabel::PickCursorResume { crate::randomizer::emblem::player_emblem_check(); }
+    if label == MapSequenceHumanLabel::PickCursorResume as i32 { crate::randomizer::emblem::player_emblem_check(); }
 }
 
 #[skyline::from_offset(0x02285890)]

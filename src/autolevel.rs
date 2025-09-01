@@ -11,6 +11,7 @@ use engage::{
 };
 use super::CONFIG;
 use crate::{randomizer::{self, emblem::ENEMY_EMBLEM_LIST}, utils::*, DVCVariables};
+use crate::randomizer::item::unit_items::adjust_missing_weapons;
 
 pub mod enemy;
 pub mod revival;
@@ -30,14 +31,13 @@ pub fn calculate_player_cap() -> i32 {
     let mut count = min(caps.len() as i32, 14 - 2 * diff);
     if count == 0 { count = 1; }
     for i in 0..count{ total += caps[i as usize];  }
-    let average = total / ( count as i32 );
+    let average = total / ( count  );
     println!("{} unit Average is {}", count, average);
     if average > GameVariableManager::get_number(DVCVariables::PLAYER_AVERAGE_CAP) {
          GameVariableManager::set_number(DVCVariables::PLAYER_AVERAGE_CAP, average);
     }
     average
 }
-
 pub fn unit_cap_total(this: &Unit, with_hp: bool, enhanced: bool) -> i32 {
     let mut total = 0;
     if with_hp {
@@ -63,13 +63,24 @@ pub fn emblem_paralogue_level_adjustment(unit: &Unit){
     unit.auto_grow_capability(new_level, new_level);
     fix_unit_level(unit, new_level);
     unit.set_hp(unit.get_capability(0, true));
-    crate::randomizer::skill::learn::unit_update_learn_skill(unit);
+    randomizer::skill::learn::unit_update_learn_skill(unit);
 }
 
 pub fn auto_level_unit(unit: &mut Unit, leader: bool){
-    if GameUserData::is_evil_map() { return; }
+    if GameUserData::is_evil_map() && unit.person.get_flag().value & 512 != 0 {
+        let level = unit.person.get_level() as i32;
+        if level < 15  {
+            if unit.job.is_high() { unit.auto_grow_capability(level, level + 20); }
+            else if unit.job.is_low() && unit.job.max_level > 20 {
+                unit.auto_grow_capability(20 + level, level + 20);
+            }
+            else {
+                unit.auto_grow_capability(level, level + 20);
+            }
+        }
+    }
 
-    if ( DVCVariables::is_random_map() || GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 5 ) && DVCVariables::is_main_chapter_complete(4) {
+    if (DVCVariables::is_random_map() || GameVariableManager::get_number(DVCVariables::CONTINUOUS) == 5 ) && DVCVariables::is_main_chapter_complete(4) {
         auto_level_unit_for_random_map(unit, leader);
         return;
     }
@@ -89,8 +100,9 @@ pub fn auto_level_unit(unit: &mut Unit, leader: bool){
 
     let current_job = &unit.job;
     if avg_level <= current_job.max_level as i32 {
-        if current_job.is_high() && current_job.get_low_jobs().len() > 0 {
-            unit.class_change(current_job.get_low_jobs()[0]);
+        let lows = get_base_classes(current_job);
+        if current_job.is_high() && lows.len() > 0 {
+            unit.class_change(lows[0]);
         }
     }
     else if current_job.is_low() && current_job.has_high() { unit.class_change(current_job.get_high_jobs()[0]);  }
@@ -111,7 +123,8 @@ pub fn auto_level_unit(unit: &mut Unit, leader: bool){
         counter += 1;
     }
     unit.set_hp(unit.get_capability(0, true));
-    crate::randomizer::skill::learn::unit_update_learn_skill(unit);
+    adjust_missing_weapons(unit);
+    randomizer::skill::learn::unit_update_learn_skill(unit);
 }
 
 
@@ -146,54 +159,61 @@ pub fn fix_unit_level(unit: &Unit, total_level: i32) {
 }
 // Autolevel based on Map Completed
 pub fn auto_level_unit_for_random_map(unit: &mut Unit, leader: bool){
-    if !DVCVariables::is_main_chapter_complete(4) || GameUserData::is_evil_map() || !DVCVariables::is_random_map() { return; } 
+    if !DVCVariables::is_main_chapter_complete(4) || GameUserData::is_evil_map() { return; }
+    if GameVariableManager::get_number(DVCVariables::CONTINUOUS) != 5 && GameVariableManager::get_number(DVCVariables::CONTINUOUS) != 3 { return; }
     let rng = Random::get_game();
     let is_player = unit.person.get_asset_force() == 0;
     let diff = GameUserData::get_difficulty(false);
-    let mut level =  
-        crate::continuous::random::random_map_mode_level() +
-        if leader { 3 } else { 0 } +  
-        if !is_player { rng.get_value(2+diff) - 1 } else { -1 };
-
-    let map_sit_level = get_instance::<MapSituation>().average_level;
-    if map_sit_level > level { level = (map_sit_level + level + 1) / 2; }
+    let level =
+    if GameUserData::get_chapter().cid.to_string().contains("S0") { crate::continuous::random::random_map_mode_level() + if leader { 3 } else { 0 }  }
+    else {
+        let map_level = crate::continuous::random::random_map_mode_level();
+        let map_sit_level =
+            if GameUserData::get_sequence() == 2 || GameUserData::get_sequence() == 3 {
+                get_instance::<MapSituation>().average_level
+            }
+            else { get_difficulty_adjusted_average_level() };
+        let l = if map_sit_level > map_level {  (map_sit_level + map_level + 1) / 2  }
+        else { map_level } +  if is_player{ -1 } else { 0 };
+        l
+    };
     let current_job = &unit.job;
-    // let is_special = current_job.max_level > 20 && current_job.is_low();
 
     if level <= current_job.max_level as i32 {
-        let job_len = current_job.get_low_jobs().len();
-        if current_job.is_high() && current_job.get_low_jobs().len() > 0 && !is_player {
-            if job_len == 1 { unit.class_change(current_job.get_low_jobs()[0]);  }
-            else {
-                let index = rng.get_value(job_len as i32) as usize;
-                unit.class_change(current_job.get_low_jobs()[index]);
+        if current_job.is_high() && !is_player {
+            let lows = get_base_classes(current_job);
+            let job_count = lows.len();
+            if job_count > 0 {
+                if job_count == 1 {
+                    unit.class_change(lows[0]);
+                }
+                else if job_count > 1 {
+                    let index = rng.get_value( job_count as i32) as usize;
+                    unit.class_change(lows[index]);
+                }
+                randomizer::job::randomize_selected_weapon_mask(unit);
+                randomizer::person::unit::adjust_unit_items(unit);
             }
-            randomizer::job::randomize_selected_weapon_mask(unit);
-            randomizer::person::unit::adjust_unit_items(unit);
         }
-
     }
-    else if current_job.is_low() && current_job.has_high() { 
+    else if current_job.is_low() && current_job.has_high() {
         unit.class_change(current_job.get_high_jobs()[0]); 
         randomizer::job::randomize_selected_weapon_mask(unit);
         randomizer::person::unit::adjust_unit_items(unit);
     }
-    // println!("Autolevel for Random Map: {} for {}", level, Mess::get_name(unit.person.pid));
     fix_unit_level(unit, level);
-
     if is_player {
-        unit.set_sp( level * 100 + 300 );
+        unit.set_sp( level * 100 + 500 );
         unit.set_weapon_mask_from_person();
     }
     else {
         let offset = unit.person.get_offset_by_difficulty();
-        let completed_maps = crate::continuous::get_continious_total_map_complete_count();
-        unit.auto_grow_capability(unit.level as i32, level + diff + completed_maps / 4 );
+        // let completed_maps = crate::continuous::get_continious_total_map_complete_count();
+        unit.auto_grow_capability(unit.level as i32, level + diff );
         for x in 0..10 { unit.base_capability.capability[x] -= offset[x]; }
     }
-
     unit.set_hp(unit.get_capability(0, true));
-    crate::randomizer::skill::learn::unit_update_learn_skill(unit);
+    randomizer::skill::learn::unit_update_learn_skill(unit);
 }
 
 pub fn calculate_average_level(sortie_count: i32) -> i32 {
@@ -225,8 +245,8 @@ pub fn get_sortie_unit_count(method_info: OptionalMethod) -> i32;
 
 pub fn get_difficulty_adjusted_average_level() -> i32 {
     unsafe {
-        if get_sortie_unit_count(None) == 0 { return get_average_level(0, 10, None); }
-        else { return get_average_level(0, get_sortie_unit_count(None), None); }
+        if get_sortie_unit_count(None) == 0 { get_average_level(0, 10, None) }
+        else { get_average_level(0, get_sortie_unit_count(None), None) }
     }
 }
 
@@ -237,17 +257,17 @@ pub fn autolevel_party(){
     Force::get(ForceType::Absent).unwrap().iter()
         .for_each(|unit|{
             let total_level: i32 = unit.level as i32 + unit.internal_level as i32;
-            let number_of_levelups = player_average - total_level;
-            if number_of_levelups < 1 { 
+            let number_of_level_ups = player_average - total_level;
+            if number_of_level_ups < 1 {
                 let job_max_level = unit.get_job().get_max_level();
-                for _x in 0..number_of_levelups { 
+                for _x in 0..number_of_level_ups {
                     if job_max_level <= unit.level { unit.set_level( (job_max_level - 1) as i32 ); }
                     unit.level_up(3);
                     unit.add_sp(100);
                 }
             }
             unit.set_hp(unit.get_capability(0, true));
-            println!("{} gained {} levels", Mess::get_name(unit.person.pid), number_of_levelups);
+            println!("{} gained {} levels", Mess::get_name(unit.person.pid), number_of_level_ups);
         }
     );
 }

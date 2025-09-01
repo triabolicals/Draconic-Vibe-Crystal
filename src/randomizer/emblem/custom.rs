@@ -102,15 +102,12 @@ impl ConfigBasicMenuItemSwitchMethods for CustomEmblemRecruitmentMenuItem {
 
 pub fn cemblem_recruitment_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
     if CONFIG.lock().unwrap().emblem_mode != 3 { return BasicMenuResult::new(); }
-    this.menu.get_class().get_virtual_method("CloseAnimeAll").map(|method| {
-        let close_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&BasicMenu<ConfigBasicMenuItem>, &MethodInfo)>(method.method_info.method_ptr) };
-            close_anime_all(this.menu, method.method_info);
-        }
-    );
+    this.menu.close_anime_all();
 
     ConfigMenu::create_bind(this.menu);
     let config_menu = this.menu.proc.child.as_mut().unwrap().cast_mut::<ConfigMenu<ConfigBasicMenuItem>>();
-    config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = crate::menus::submenu::open_anime_all_ondispose_to_dvc_main2 as _).unwrap();
+    config_menu.get_class_mut().get_virtual_method_mut("OnDispose")
+        .map(|method| method.method_ptr = crate::menus::submenu::open_anime_all_ondispose_to_dvc_main as _).unwrap();
     config_menu.full_menu_item_list.clear();
     let limit = if dlc_check() && CONFIG.lock().unwrap().dlc & 1 == 0 { 19 } else { 12 };
     for x in 0..limit {

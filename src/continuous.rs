@@ -23,26 +23,8 @@ impl ConfigBasicMenuItemSwitchMethods for ContiniousMode {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let mode = CONFIG.lock().unwrap().continuous;
-        this.help_text = if dlc_check() {
-            if mode == 1 {  "Game will progress map to map."}
-            else if mode == 2 {  "Game will progress map to map without DLC." }
-            else if mode == 3 { "Game will progress map to map in random order."}
-            else if mode == 4 { "Chapters are unlocked with some restrictions."}
-            else if mode == 5 { "Chapters are scaled and unlocked with some restrictions."}
-            else {"Game will progress with access to the Somniel and World Map" }
-        }
-        else {
-            if mode == 1 { "Game will progress map to map." }
-            else if mode == 2 { "Game will progress map to map in random order."}
-            else if mode == 3 { "Chapters are unlocked with some restrictions."}
-            else if mode == 4 { "Chapters are scaled and unlocked with some restrictions."}
-            else { "Game will progress with access to the Somniel and World Map" }
-        }.into();
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let mode = CONFIG.lock().unwrap().continuous;
@@ -66,23 +48,41 @@ impl ConfigBasicMenuItemSwitchMethods for ContiniousMode {
             }
         }.into();
     }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let mode = CONFIG.lock().unwrap().continuous;
+        this.help_text = if dlc_check() {
+            if mode == 1 {  "Game will progress map to map."}
+            else if mode == 2 {  "Game will progress map to map without DLC." }
+            else if mode == 3 { "Game will progress map to map in random order."}
+            else if mode == 4 { "Chapters are unlocked with some restrictions."}
+            else if mode == 5 { "Chapters are scaled and unlocked with some restrictions."}
+            else {"Game will progress with access to the Somniel and World Map" }
+        }
+        else {
+            if mode == 1 { "Game will progress map to map." }
+            else if mode == 2 { "Game will progress map to map in random order."}
+            else if mode == 3 { "Chapters are unlocked with some restrictions."}
+            else if mode == 4 { "Chapters are scaled and unlocked with some restrictions."}
+            else { "Game will progress with access to the Somniel and World Map" }
+        }.into();
+    }
 }
 pub fn setting_adjustment() {
     GameVariableManager::make_entry("G_ConSet", 0);
-    let c_mode = GameVariableManager::get_number(DVCVariables::CONTINIOUS);
+    let c_mode = GameVariableManager::get_number(DVCVariables::CONTINUOUS);
     if c_mode >= 3  && !dlc_check() && !GameVariableManager::get_bool("G_ConSet") {
         GameVariableManager::set_bool("G_ConSet", true);
-        GameVariableManager::set_number(DVCVariables::CONTINIOUS, c_mode + 1);
+        GameVariableManager::set_number(DVCVariables::CONTINUOUS, c_mode + 1);
     }
     else if c_mode == 2 && !dlc_check() {
         GameVariableManager::set_bool("G_ConSet", true);
-        GameVariableManager::set_number(DVCVariables::CONTINIOUS, 3);
+        GameVariableManager::set_number(DVCVariables::CONTINUOUS, 3);
     }
 }
 // Continious Mode Stuff
 pub fn do_continious_mode() {
     setting_adjustment();
-    let c_mode = GameVariableManager::get_number(DVCVariables::CONTINIOUS);
+    let c_mode = GameVariableManager::get_number(DVCVariables::CONTINUOUS);
     if GameVariableManager::get_number(DVCVariables::DEPLOYMENT_KEY) == 3 && !GameUserData::is_evil_map() { GameUserData::get_status().value &= !12352; }
     if c_mode > 0 {
         Patch::in_text(0x01f7e9c8).bytes(&[0xE0, 0x03, 0x15, 0x2A ]).unwrap(); // Forces SP = EXP for all cases
@@ -126,7 +126,7 @@ pub fn do_continious_mode() {
             if c_mode == 3 { 
                 crate::randomizer::terrain::adjust_miasma_tiles();
                 if !GameUserData::is_evil_map() { GameUserData::get_status().value &= !12352; }
-                crate::utils::return_true(0x028a80d0);
+                return_true(0x028a80d0);
             }
         }
     }
@@ -152,7 +152,7 @@ pub fn do_continious_mode() {
 }
 
 pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
-    if GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 0 { return; }
+    if GameVariableManager::get_number(DVCVariables::CONTINUOUS) == 0 { return; }
     if GameUserData::get_chapter().cid.to_string() == "CID_M026" || DVCVariables::is_main_chapter_complete(26) { return; }
 
     GameVariableManager::set_bool(GameUserData::get_chapter().get_cleared_flag_name(), true);
@@ -174,12 +174,12 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
         let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
         let mut base_exp_gain = 10*(3 + 2*(2 - (GameUserData::get_difficulty(false) as i32 )) );
         let mut level_cap = get_recommended_level_main() as i32;
-        let random_map = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
+        let random_map = GameVariableManager::get_number(DVCVariables::CONTINUOUS) == 3;
         if random_map { 
-            let map_completed = crate::continuous::get_story_chapters_completed();
+            let map_completed = get_story_chapters_completed();
             base_exp_gain = 50 - (GameUserData::get_difficulty(false) as i32)*10; 
             level_cap = if map_completed < 7  {1 + map_completed    }
-            else { crate::utils::max( (crate::continuous::get_story_chapters_completed()-6)*2, crate::continuous::get_story_chapters_completed()+4) }
+            else { max( (get_story_chapters_completed()-6)*2, get_story_chapters_completed()+4) }
         }
         for ff in force_type {
             let force_iter = Force::iter(Force::get(ff).unwrap());
@@ -243,7 +243,7 @@ fn generate_item_list(_proc: &ProcInst) -> &'static mut List<ItemData> {
     let seed = Random::get_system().value() as u32;
     let random = Random::instantiate().unwrap();
     random.ctor(seed);
-    let rand_map = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
+    let rand_map = GameVariableManager::get_number(DVCVariables::CONTINUOUS) == 3;
     let completed = get_continious_total_map_complete_count();
     if (!rand_map && !DVCVariables::is_main_chapter_complete(6)) || (rand_map && completed <= 7 ) {
         if current_cid == "CID_M004" {
@@ -291,16 +291,16 @@ fn generate_item_list(_proc: &ProcInst) -> &'static mut List<ItemData> {
             well_items.add(ItemData::get_mut("IID_マスタープルフ").unwrap());
             well_items.add(ItemData::get_mut("IID_チェンジプルフ").unwrap());
         }
-        return well_items;
+       well_items
     }
-    else if (!rand_map && !DVCVariables::is_main_chapter_complete(17)) || ( rand_map && completed < 16 ) { return WellSequence::calc_item_exchange(3, random); }
-    else if (!rand_map && !DVCVariables::is_main_chapter_complete(22)) || ( rand_map && completed < 21 ) { return WellSequence::calc_item_exchange(4, random) }
-    else { return WellSequence::calc_item_exchange(5, random); }
+    else if (!rand_map && !DVCVariables::is_main_chapter_complete(17)) || ( rand_map && completed < 16 ) { WellSequence::calc_item_exchange(3, random) }
+    else if (!rand_map && !DVCVariables::is_main_chapter_complete(22)) || ( rand_map && completed < 21 ) { WellSequence::calc_item_exchange(4, random) }
+    else { WellSequence::calc_item_exchange(5, random) }
 }
 
 // When loading save at exploration
 pub fn update_next_chapter() {
-    if GameVariableManager::get_number(DVCVariables::CONTINIOUS) != 0 { 
+    if GameVariableManager::get_number(DVCVariables::CONTINUOUS) != 0 {
         set_next_chapter(); 
         random::continous_rand_emblem_adjustment();
         continuous_mode_next_chapter_notice();
@@ -308,11 +308,11 @@ pub fn update_next_chapter() {
 }
 // DLC Check for continous mode
 fn continuous_mode_dlc_allowed() -> bool {
-    dlc_check() && (GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 1 || GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3)
+    dlc_check() && (GameVariableManager::get_number(DVCVariables::CONTINUOUS) == 1 || GameVariableManager::get_number(DVCVariables::CONTINUOUS) == 3)
 }
 
 fn set_next_chapter(){
-    let mode = GameVariableManager::get_number(DVCVariables::CONTINIOUS);
+    let mode = GameVariableManager::get_number(DVCVariables::CONTINUOUS);
     if mode == 0 || !DVCVariables::is_main_chapter_complete(4) { return; }
     let current_chapter = GameUserData::get_chapter();
     let current_cid = current_chapter.cid.to_string();
@@ -384,7 +384,7 @@ fn set_next_chapter(){
 fn do_dlc() {
     if !continuous_mode_dlc_allowed() { return; }
     let current_cid = GameUserData::get_chapter().cid.to_string();
-    let random = GameVariableManager::get_number(DVCVariables::CONTINIOUS) == 3;
+    let random = GameVariableManager::get_number(DVCVariables::CONTINUOUS) == 3;
     let completed = get_story_chapters_completed();
     if (!random && current_cid == "CID_M006" ) || ( random && completed >= 4 ) {
         let god =

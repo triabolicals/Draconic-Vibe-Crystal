@@ -13,6 +13,11 @@ use crate::randomizer::emblem::emblem_skill::STAT_BONUS;
 use crate::config::DVCVariables;
 use crate::enums::*;
 
+pub fn get_base_classes(job: &JobData) -> Vec<&'static &'static mut JobData>{
+   JobData::get_list().unwrap().iter()
+        .filter(|x| x.rank == 0 && x.has_high() && x.get_high_jobs().iter().any(|j| j.parent.hash == job.parent.hash)).collect::<Vec<_>>()
+}
+
 pub fn set_patch_flag(flag: &str) {
     GameVariableManager::make_entry(flag, 1);
     GameVariableManager::set_bool(flag, true);
@@ -22,11 +27,11 @@ pub fn get_random_element<'a, T>(vec: &'a mut Vec<T>, rng: &Random) -> Option<&'
     vec.get(rng.get_value(vec.len() as i32 ) as usize)
 }
 
-pub fn get_random_and_remove<'a, T: Clone>(vec: &'a mut Vec<T>, rng: &Random) -> Option<T> {
+pub fn get_random_and_remove<T: Clone>(vec: &mut Vec<T>, rng: &Random) -> Option<T> {
     let index = rng.get_value(vec.len() as i32 ) as usize;
     let v = vec.get(index).cloned();
     if v.is_some() { vec.remove(index); }
-    return v;
+    v
 }
 
 pub fn get_rng() -> &'static Random {
@@ -41,7 +46,7 @@ pub fn is_tile_good(tid: &Il2CppString) -> bool{
     else { false }
  }
 
-pub fn can_rand() -> bool { return GameVariableManager::get_number(DVCVariables::SEED) != 0; }
+pub fn can_rand() -> bool { GameVariableManager::get_number(DVCVariables::SEED) != 0 }
 
 pub fn create_rng(seed: i32, rng_mode: i32) -> &'static Random {
     let rng = Random::instantiate().unwrap();
@@ -68,7 +73,7 @@ pub fn class_count(jid: &str) -> i32 {
 pub fn lueur_on_map() -> bool {
     let lueur_unit = unsafe { unit_pool_get_hero(true, None) };
     if lueur_unit.is_none() { return false;  }
-    return lueur_unit.unwrap().force.unwrap().force_type < 3 ;
+    lueur_unit.unwrap().force.unwrap().force_type < 3
 }
 
 pub fn is_player_unit(person: &PersonData) -> bool {
@@ -76,7 +81,7 @@ pub fn is_player_unit(person: &PersonData) -> bool {
     if GameVariableManager::exist(&key) { return true; }
     let pid = person.pid.to_string();
     for x in PIDS { if *x == pid { return true; } }
-    return false;
+    false
 }
 
 // Getting Player's name for file name
@@ -338,7 +343,7 @@ pub fn is_valid_skill_index(index: i32 ) -> bool {
         if skill.name.is_none() { return false; }
         else if Mess::get( skill.help.unwrap() ).to_string().len() == 0 { return false; }
         if skill.is_style_skill() { return false; }
-        return  skill.get_flag() & 511 == 0;
+        return skill.get_flag() & 511 == 0;
     }
     return false;
 }

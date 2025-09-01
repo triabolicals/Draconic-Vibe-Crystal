@@ -9,7 +9,6 @@ pub mod menu;
 
 const TERRAIN: [&str; 9] = ["TID_瘴気の領域", "TID_瘴気", "TID_氷の領域", "TID_霧", "TID_流砂", "TID_煙", "TID_アロマ", "TID_水溜まり", "TID_土柱", ];
 
-
 pub fn adjust_miasma_tiles() {
     ["TID_瘴気_永続", "TID_瘴気の領域", "TID_瘴気"]
         .iter()
@@ -50,7 +49,7 @@ pub fn randomized_emblem_power_spots() {
         let rng = Random::get_system();
         for z in start_z..end_z {
             for x in start_x..end_x {
-                if !crate::utils::is_tile_good(terrain.terrains[ ( x + 32 * z ) as usize ]) { continue; }
+                if !utils::is_tile_good(terrain.terrains[ ( x + 32 * z ) as usize ]) { continue; }
                 if MapOverlap::can_create(None, x, z, energy) {
                     pos_list.push( (x, z));
                 }
@@ -58,7 +57,7 @@ pub fn randomized_emblem_power_spots() {
         }
         let mut n_add = 0;
         if let Some(terrain) = DisposData::try_get_mut("Terrain") {
-            terrain.iter_mut().filter(|data| data.pid.to_string().contains("紋章氣"))
+            terrain.iter_mut().filter(|data| data.pid.str_contains("紋章氣"))
                 .for_each(|data|{
                     if rng.get_value(2) < 1 { n_add += 1; }
                     if let Some(tile)  = get_random_and_remove(&mut pos_list, rng) {
@@ -84,11 +83,15 @@ pub fn terrain_spots() {
     if value == 0 { return; }
     let rng = Random::get_system();
     let v = rng.get_value(100);
-    let pool = &Il2CppClass::from_name("App", "UnitPool").unwrap().get_static_fields_mut::<crate::randomizer::job::UnitPoolStaticFieldsMut>().s_unit;
-    let mut pos_list: Vec<(i32, i32)> = pool.iter().filter(|unit| unit.force.is_some_and(|force| force.force_type < 3)).map(|unit| ( unit.get_x(), unit.get_z())).collect();
+    let pool = &Il2CppClass::from_name("App", "UnitPool").unwrap()
+        .get_static_fields_mut::<job::UnitPoolStaticFieldsMut>().s_unit;
+
+    let mut pos_list: Vec<(i32, i32)> = pool.iter().
+        filter(|unit| unit.force.is_some_and(|force| force.force_type < 3))
+        .map(|unit| ( unit.get_x(), unit.get_z())).collect();
+
     let count = pos_list.len();
     if count < 5 { return; }
-    let selection_count_max = rng.get_value(( count / 3 ) as i32 ) ;
     if v < 15 && value > 0 {
         if let Some(tile) = get_random_and_remove(&mut pos_list, rng) { MapOverlap::set(tile.0, tile.1, "TID_紋章氣".into(), -1, 7); }
     }
@@ -123,7 +126,9 @@ pub fn terrain_spots() {
                     if total_z < start_z || total_z >= end_z { continue; }
                     if rng.get_value(100) < chance {
                         if MapOverlap::can_create(None, total_x, total_z, terrain) {
-                            if MapOverlap::set(total_x, total_z, terrain.tid, -1, 7) { chance *= 2 / 3; }
+                            if MapOverlap::set(total_x, total_z, terrain.tid, -1, 7) {
+                                chance *= 2 / 3;
+                            }
                         }
                     }
                 }

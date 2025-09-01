@@ -31,10 +31,13 @@ pub fn init_emblem_list() -> Vec<i32> {
     let mut custom_count = 0;
     let mut ggids: Vec<String> = Vec::new();
     GodData::get_list().unwrap().iter()
-        .filter(|god|
-        {
+        .filter(|god|{
             let gid = god.gid.to_string();
-            !EMBLEM_ASSET.iter().any(|asset| gid.contains(asset)) && !gid.contains("M0") && !gid.contains("E00") && !gid.contains("GID_相手") && god.force_type == 0
+            !EMBLEM_ASSET.iter().any(|asset| gid.contains(asset)) &&
+            !gid.contains("M0") &&
+            !gid.contains("E00") &&
+            !gid.contains("GID_相手") &&
+            god.force_type == 0
         }
     ).for_each(|god|{
         if let Some(grow) = god.get_level_data() {
@@ -48,6 +51,10 @@ pub fn init_emblem_list() -> Vec<i32> {
         }
     });
     list
+}
+
+pub fn get_playable_emblem_hashes() -> Vec<i32> {
+    EMBLEM_LIST.get().unwrap().iter().enumerate().filter(|x| x.0 < 20 || x.0 >= 24).map(|x| *x.1).collect()
 }
 
 pub fn initialize_emblem_list() {
@@ -66,12 +73,10 @@ pub fn initialize_emblem_list() {
             GodData::get(format!("GID_相手{}", EMBLEM_ASSET[x])).map(|god| list.push(god.parent.index));
         }
         GodData::get_list().unwrap().iter()
-        .filter(|god|
-        {
-            let gid = god.gid.to_string();
-            !EMBLEM_ASSET.iter().any(|asset| gid.contains(asset)) && gid.contains("GID_相手")
-        }
-        ).for_each(|god| list.push(god.parent.index));
+            .filter(|god| {
+                let gid = god.gid.to_string();
+                !EMBLEM_ASSET.iter().any(|asset| gid.contains(asset)) && gid.contains("GID_相手")
+            }).for_each(|god| list.push(god.parent.index));
         list
     });
     println!("Number of Enemy Emblems: {}", ENEMY_EMBLEM_LIST.get().unwrap().len());
@@ -96,7 +101,7 @@ pub fn emblem_gmap_spot_adjust(){
         if unlock_cid == "" {  // open tiki's divine paralogue if edelgard ring is obtained and unlock the emblem paralogue that replaces edelgard
             let gmap_spot_flag = format!("G_GmapSpot_{}", cid);
             if edelgard_obtain {
-                if GameVariableManager::get_number("G_GmapSpot_G001") == 1 || GameVariableManager::get_number("G_GmapSpot_G001") == 2  {  GameVariableManager::set_number("G_GmapSpot_G001", 3);  }
+                if GameVariableManager::get_number("G_GmapSpot_G001") & 3 != 0 { GameVariableManager::set_number("G_GmapSpot_G001", 3); }
                 if GameVariableManager::get_number(&gmap_spot_flag) == 1 {  GameVariableManager::set_number(&gmap_spot_flag, 3); }
             }
             else { 
@@ -129,7 +134,6 @@ pub fn emblem_gmap_spot_adjust(){
             if cid_index < 12 { chapter.set_recommended_level( rec_level[x as usize]); }
             else if let Some(chapter2) = ChapterData::get_mut(&format!("CID_{}", EMBELM_PARA[x as usize])){
                 let average = crate::autolevel::get_difficulty_adjusted_average_level() as u8;
-
                 if average >= rec_level[x as usize] { 
                     chapter2.set_recommended_level(rec_level[x as usize]); 
                 }
@@ -220,7 +224,7 @@ pub fn randomize_emblems() {
                 });
             },
             4 => {
-                let mut list = EMBLEM_LIST.get().unwrap().clone();
+                let mut list = get_playable_emblem_hashes();
                 list.remove(19);    // Emblem Alear Removed
                 let mut available = list.clone();
                 if !dlc_check() {
@@ -284,26 +288,27 @@ pub fn set_m022_emblem_assets() {
     }
 }
 pub fn get_engage_attack_type(skill: Option<&SkillData>) -> i32 {
-    if let Some(engage_attack) = skill {
-        let engage_str = engage_attack.sid.to_string();
-        if let Some(engage_type) = EMBLEM_ASSET.iter().position(|sid|  engage_str.contains(sid)) {
-            match engage_type {
-                0|2|4|5|6|11|12|16|18|19|20|21 => { return 0; }, //AI_AT_EngageAttack
-                1 => { return 1; }, //AI_AT_EngagePierce
-                3 => { return 9; }, //AI_AT_Versus
-                7 => { return 2; }, // AI_AT_EngageVision
-                8 => { return 10; }, // AI_AT_EngageWait
-                9 => { return 3; }, // AI_AT_EngageDance
-                10 => { return 4; }, // AI_AT_EngageOverlap
-                13 => { return 5; }, // AI_AT_EngageBless
-                14 => { return 6; }, // AI_AT_EngageWaitGaze
-                15 => { return 7; }, // AI_AT_EngageSummon
-                17 => { return 8; }, // AI_AT_EngageCamilla
-                _ => { return -1; },    // None
-            }
+    if let Some(engage_type) = skill
+        .map(|s| s.sid.to_string())
+        .and_then(|engage_str|
+            EMBLEM_ASSET.iter().position(|sid|  engage_str.contains(sid))
+        ){
+        match engage_type {
+            0|2|4|5|6|11|12|16|18|19|20|21 => { 0 }, //AI_AT_EngageAttack
+            1 => { 1 }, //AI_AT_EngagePierce
+            3 => { 9 }, //AI_AT_Versus
+            7 => { 2 }, // AI_AT_EngageVision
+            8 => { 10 }, // AI_AT_EngageWait
+            9 => { 3 }, // AI_AT_EngageDance
+            10 => { 4 }, // AI_AT_EngageOverlap
+            13 => { 5 }, // AI_AT_EngageBless
+            14 => { 6 }, // AI_AT_EngageWaitGaze
+            15 => { 7 }, // AI_AT_EngageSummon
+            17 => { 8 }, // AI_AT_EngageCamilla
+            _ => { -1 },    // None
         }
     }
-    -1
+    else { -1 }
 }
 
 pub fn randomize_engage_links(reset: bool) {
@@ -448,18 +453,13 @@ pub fn post_map_emblem_adjustment() {
 pub fn player_emblem_check() {
     if let Some(force) = Force::get(ForceType::Player){
         for unit in Force::iter(force) {
-            // if unit.status.value & 0x800000 != 0 { println!("Person {} is engaged", Mess::get_name(unit.person.pid)); }
             if let Some(god_unit) = unit.god_unit {
-               // println!("{} equipped with Emblem {}", Mess::get_name(unit.person.pid), emblem);
-              //  if let Some(parent) = god_unit.parent_unit { println!("{}'s Parent Unit: {}", emblem, Mess::get_name(parent.person.pid)); }
                 if god_unit.child.is_none() && god_unit.parent_unit.is_none() {
                     god_unit.set_parent(Some(unit), 0);
-                    // println!("Set {}'s Parent to {}", emblem, Mess::get_name(unit.person.pid));
                 }
             }
             if let Some(god_link) = unit.god_link {
                 if god_link.child.is_none() {
-                    // println!("{} Linked with Emblem {} but no child", Mess::get_name(unit.person.pid), emblem);
                     if let Some(unit2) = engage::unitpool::UnitPool::get_from_person_mut(unit.person.pid, false) {
                         unit2.god_link = None;
                         unit2.status.value &= !0x800000;
@@ -500,14 +500,12 @@ fn build_god_unit(this: &GodUnit, data: &GodData, method_info: OptionalMethod) -
 
 #[unity::hook("App", "GodPool", "OnDeserialize")]
 pub fn on_deserialize(this: &GodPool, stream: u64, version: i32, method_info: OptionalMethod) {
-    println!("GodPool::OnDeserialize");
     call_original!(this, stream, version, method_info);
+    println!("GodPool::OnDeserialize");
     GodData::get_list().unwrap().iter().filter(|god| god.force_type == 0)
         .for_each(|god|{
             if let Some(g_unit) = GodPool::try_get(god, true) {
-                if let Some(god_bonds) = unsafe { god_unit_get_bonds(g_unit, None) } {
-
-                }
+                if let Some(_god_bonds) = unsafe { god_unit_get_bonds(g_unit, None) } {}
                 else {
                     println!("GodUnit: {} has broken bonds!", Mess::get(god.mid));
                     let escape = g_unit.get_escape();
@@ -538,17 +536,31 @@ pub fn on_deserialize(this: &GodPool, stream: u64, version: i32, method_info: Op
                     );
                 }
             }
-        }
-        );
+        });
 }
 
-#[unity::class("App", "GodBondHolder")]
-pub struct GodBondHolder {
-    parent: u128,
-    pub data: &'static GodData, 
-    reliance_s: u64,
-    pub bonds: Option<&'static Dictionary<&'static Il2CppString, GodBond>>,
+/*
+#[unity::hook("App", "GodBondHolder", "Get")]
+pub fn on_deserialize(this: &GodBondHolder, unit: Option<&Unit>, method_info: OptionalMethod) -> Option<&'static GodBond> {
+    if let Some(bonds) = this.bonds {
+        let used = bonds.get_count() as usize;
+        let limit = bonds.entries.len();
+        let pool_len = this.pool.list.len();
+        println!("{} / {} / List Size: {} / Stack Size: {}", used, limit, pool_len, this.pool.stack.len());
+        if this.data.force_type == 0 {
+            if let Some(unit) = unit {
+                if bonds.contains_key(unit.person.pid) || used < limit -2  {
+                    return call_original!(this, Some(unit), method_info);
+                }
+                if let Some(hero) = UnitPool::get_from_person_mut(DVCVariables::get_dvc_person(0, false), false) {
+                    return call_original!(this, Some(hero), method_info);
+                }
+            }
+        }
+    }
+    call_original!(this, unit, method_info)
 }
+*/
 
 #[unity::from_offset("App", "GodUnit", "get_GodBonds")]
 fn god_unit_get_bonds(this: &GodUnit, method_info: OptionalMethod) -> Option<&'static GodBondHolder>;

@@ -31,21 +31,23 @@ impl EngageAtkAsset {
     }
 
     pub fn apply(&self, result: &mut AssetTableResult, unit: &Unit, gender_condition: i32){
-        let mpid_condition = AssetTableStaticFields::get_condition_index(unit.person.get_name().unwrap());
-        result.body_anims.clear();
+        if let Some(name) = unit.person.get_name() {
+            let mpid_condition = AssetTableStaticFields::get_condition_index(name);
+            result.body_anims.clear();
 
 
-        if let Some(entry) = self.entries.iter()
-            .flat_map(|&index| AssetTable::try_index_get(index))
-            .find(|entry| has_condition(entry, gender_condition) && has_condition(entry, mpid_condition))
-        {
-            result.commit_asset_table(entry);
-            return;
+            if let Some(entry) = self.entries.iter()
+                .flat_map(|&index| AssetTable::try_index_get(index))
+                .find(|entry| has_condition(entry, gender_condition) && has_condition(entry, mpid_condition))
+            {
+                result.commit_asset_table(entry);
+                return;
+            }
+            let _ = self.entries.iter()
+                .flat_map(|&index| AssetTable::try_index_get(index))
+                .find(|entry| has_condition(entry, gender_condition))
+                .map(|entry| result.commit_asset_table(entry));
         }
-        let _ = self.entries.iter()
-            .flat_map(|&index| AssetTable::try_index_get(index))
-            .find(|entry| has_condition(entry, gender_condition))
-            .map(|entry| result.commit_asset_table(entry));
     }
 }
 
@@ -56,11 +58,11 @@ impl GodAssets {
         let gid_index =  AssetTableStaticFields::get_condition_index(god_data.gid);
         let darkness = AssetTableStaticFields::get_condition_index("闇化");
         let darkness_dlc = AssetTableStaticFields::get_condition_index(god_data.gid.to_string().replace("GID_", "GID_E006_敵"));
-        let god_entry = sf.search_lists[mode as usize].iter().find(|entry| has_condition(entry, gid_index)).map_or_else(||-1, |f| f.parent.index);
+        let god_entry = sf.search_lists[mode as usize].iter().find(|entry| entry.parent.hash == 0 && has_condition(entry, gid_index)).map_or_else(||-1, |f| f.parent.index);
         let dark_entry =
-            sf.search_lists[mode as usize].iter().find(|entry| has_condition(entry, gid_index) && has_condition(entry, darkness))
+            sf.search_lists[mode as usize].iter().find(|entry|  entry.parent.hash == 0 && has_condition(entry, gid_index) && has_condition(entry, darkness))
             .map_or_else(
-                ||sf.search_lists[mode as usize].iter().find(|entry| has_condition(entry, darkness_dlc) ).map_or_else(||-1, |f| f.parent.index),
+                ||sf.search_lists[mode as usize].iter().find(|entry|  entry.parent.hash == 0 && has_condition(entry, darkness_dlc) ).map_or_else(||-1, |f| f.parent.index),
                 |f| f.parent.index
             );
         Self {

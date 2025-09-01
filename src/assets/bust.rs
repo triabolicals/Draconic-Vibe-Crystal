@@ -17,8 +17,8 @@ impl ConfigBasicMenuItemGaugeMethods  for BustGauge {
             Self::set_help_text(this, None);
             this.update_text();
             CONFIG.lock().unwrap().save();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let confirm = if GameVariableManager::get_bool("BustSettingChange") { "(Press A to Confirm)" } else { "" };
@@ -26,7 +26,6 @@ impl ConfigBasicMenuItemGaugeMethods  for BustGauge {
             if this.gauge_ratio <= 0.09 {  format!("Current Volume Value: Default. {}", confirm) }
             else if this.gauge_ratio >= 0.95 { format!("Current Volume Value: Randomized. {}", confirm) }
             else { format!("Current Volume Value: {:2}. {}", this.gauge_ratio*5.0, confirm)  }.into();
-
     }
 }
 
@@ -35,7 +34,8 @@ impl TwoChoiceDialogMethods for BustConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
         GameVariableManager::set_bool("BustSettingChange", false);
         SEARCH_LIST.get().unwrap().bust.apply_bust_changes();
-        let menu = unsafe {  std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap()) };
+        let menu =
+            unsafe {  std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap()) };
         let index = menu.select_index;
         BustGauge::set_help_text(menu.menu_item_list[index as usize], None);
         menu.menu_item_list[index as usize].update_text();
@@ -47,7 +47,7 @@ impl TwoChoiceDialogMethods for BustConfirm {
 pub fn bust_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
     if !GameVariableManager::get_bool("BustSettingChange") { return BasicMenuResult::new();}
     YesNoDialog::bind::<BustConfirm>(this.menu, "Change value?", "Do it!", "Nah..");
-    return BasicMenuResult::new();
+    BasicMenuResult::new()
 }
 
 pub extern "C" fn vibe_bust() -> &'static mut ConfigBasicMenuItem {

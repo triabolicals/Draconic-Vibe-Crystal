@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 use unity::{
     prelude::*,
     il2cpp::object::Array,
@@ -16,9 +16,14 @@ pub use engage::{
 use crate::enums::*;
 use crate::utils::*;
 use crate::DVCVariables;
+use crate::randomizer::person::ENEMY_PERSONS;
 
-pub static NAMES: Mutex<Names> = Mutex::new(Names{ 
-    is_custom: false, 
+const VEYRE: [&str; 7] = [
+    "PID_ヴェイル_フード", "PID_ヴェイル_包帯", "PID_ヴェイル_フード_顔出し", "PID_ヴェイル_白_悪",
+    "PID_ヴェイル_黒_悪", "PID_ヴェイル_黒_善", "PID_ヴェイル_黒_善_角折れ"
+];
+
+pub static NAMES: RwLock<Names> =  RwLock::new(Names{
     original_names: Vec::new(), 
     original_emblem_names: Vec::new(), 
     original_emblem_rings: Vec::new(), 
@@ -31,26 +36,15 @@ pub struct Names {
     pub original_emblem_names: Vec<String>,
     pub original_emblem_rings: Vec<String>,
     pub original_emblem_nickname: Vec<String>,
-    pub other_names: Vec<(i32, String)>,
-    pub is_custom: bool,
+    pub other_names: Vec<String>,
 }
 
 pub fn fill_name_array() {
-    let mut names = NAMES.lock().unwrap();
+    let mut names = NAMES.write().unwrap();
     names.original_names.clear();
     MPIDS.iter().for_each(|mpid|{
         names.original_names.push(Mess::get(mpid).to_string());
     });
-    for x in 0..41 {
-        if MPIDS[x] != PersonData::get(PIDS[x]).unwrap().get_name().unwrap().to_string() {
-            names.is_custom = true;
-            break;
-        }
-        if x > 0 && ( Mess::get(MPIDS[x]) !=  Mess::get(PersonData::get(PIDS[x]).unwrap().get_name().unwrap() ) ) {
-            names.is_custom = true;
-            break;
-        }
-    }
     names.original_emblem_names.clear();
     names.original_emblem_rings.clear();
     names.original_emblem_nickname.clear();
@@ -65,20 +59,22 @@ pub fn fill_name_array() {
         let nickname = Mess::get(format!("MGEID_{}", mid)).to_string();
         names.original_emblem_nickname.push(nickname);
     });
-    // 
-    let other_pids = ["PID_ルミエル", "PID_ソンブル", "PID_イヴ", "PID_モリオン", "PID_ハイアシンス", "PID_スフォリア", "PID_セピア", "PID_グリ", "PID_マロン"];
-    let mpids = ["MPID_Lumiere", "MPID_Sombre", "MPID_Eve", "MPID_Morion", "MPID_Hyacinth", "MPID_Sfoglia", "MPID_Sepia", "MPID_Gris", "MPID_Marron"];
-    for x in 0..9 {
-        let index = PersonData::get(other_pids[x]).unwrap().parent.index;
-        let name = Mess::get(mpids[x]).to_string();
-        names.other_names.push( (index, name) );
-     }
+    if let Some(v) = ENEMY_PERSONS.get() {
+        for x in 150..167 {
+            if let Some(name) = v.iter().find(|p| p.0 == x)
+                .and_then(|p| PersonData::try_index_get(p.1)
+                    .and_then(|person| person.get_name()))
+            {
+                names.other_names.push(name.to_string());
+            }
+        }
+    }
 }
 
 static TEXT_REPLACE: Mutex<TextReplacer> = Mutex::new(
     TextReplacer{ mid: String::new(), replace: Vec::new(), current_position: 0, is_enabled: false, is_start: false, first_char: 0, diff: 0});
 
-const VEYRE: [&str; 7] = ["PID_ヴェイル_フード", "PID_ヴェイル_包帯", "PID_ヴェイル_フード_顔出し", "PID_ヴェイル_白_悪", "PID_ヴェイル_黒_悪", "PID_ヴェイル_黒_善", "PID_ヴェイル_黒_善_角折れ" ];
+
 
 
 #[unity::class("App", "EventDemoSequence")]
@@ -104,24 +100,22 @@ fn get_current_mid(method_info: OptionalMethod) -> &'static Il2CppString;
 
 fn is_character_specific() -> bool {
     let mid = unsafe { get_current_mid(None) }.to_string();
-    if mid.contains( "MID_KR_") { return true; }
-    if mid.contains( "MID_GR_") { return true; }
-    if mid.contains( "MID_DIE") { return true; }
-    if mid.contains( "MID_RELIANCE") { return true; }
-    if mid.contains( "MID_LVUP") { return true; }
-    if mid.contains( "MID_HUB") { 
-        if mid.contains( "MID_HUB_DLC") { return false; }
-        if mid.contains( "MID_HUB_Mascot") { return false; }    
-        return true; 
-    }
-    return false; 
+    mid.contains( "MID_KR_") ||
+    mid.contains( "MID_GR_") ||
+    mid.contains( "MID_DIE") ||
+    mid.contains( "MID_RELIANCE") ||
+    mid.contains( "MID_LVUP") ||
+    (mid.contains( "MID_HUB") && ( !mid.contains( "MID_HUB_DLC") && !mid.contains( "MID_HUB_Mascot")))
 }
 fn is_emblem_paralogue() -> bool {
     let chapter = GameUserData::get_chapter().cid.to_string();
-    if chapter.contains("CID_S015") || chapter.contains("CID_S001") || chapter.contains("CID_S002") {
-        return false
-    }
-    return chapter.contains("CID_S0") || chapter.contains("CID_G00");
+    (
+        chapter.contains("CID_S0") &&
+            !chapter.contains("CID_S015") &&
+            !chapter.contains("CID_S001") &&
+            !chapter.contains("CID_S002")
+    )
+    || chapter.contains("CID_G00")
 }
 
 
@@ -188,13 +182,17 @@ pub fn get_cmd_info_from_cmd_lines_hook(this: &EventDemoSequence, mut cmd: &mut 
     return call_original!(this, cmd, method_info);
 }
 
-#[skyline::hook(offset=0x020c5370)]
+#[skyline::hook(offset=0x20c5440)]
 pub fn get_active_character_hook(this: &mut TalkPtr, method_info: OptionalMethod) -> &'static Il2CppString {
     let result = call_original!(this, method_info);
     if is_character_specific() { return result; }
     let sequence = GameUserData::get_sequence();
     if get_singleton_proc_instance::<EventDemoSequence>().is_none() && (sequence  == 4 || sequence == 5)  { return result; }
     let str1 = result.to_string();
+    if GameVariableManager::exist(&format!("G_R_PID_{}", str1)) {
+        let pid = GameVariableManager::get_string(&format!("G_R_PID_{}", str1));
+        return il2_str_substring(pid, 4);
+    }
     if result.contains("ジェーデ_兜あり") {
         if GameVariableManager::exist("G_R_PID_ジェーデ") {
             let pid = GameVariableManager::get_string("G_R_PID_ジェーデ");
@@ -207,12 +205,10 @@ pub fn get_active_character_hook(this: &mut TalkPtr, method_info: OptionalMethod
             return il2_str_substring(pid, 4);
         }
     }
-    if GameVariableManager::exist(&format!("G_R_PID_{}", str1)) {
-        //PID_
-        let pid = GameVariableManager::get_string(&format!("G_R_PID_{}", str1));
-        return il2_str_substring(pid, 4);
+    if result.contains("神竜王リュール") && GameVariableManager::exist("G_R_PID_リュール") {
+        let pid = GameVariableManager::get_string("G_R_PID_リュール");
+        if pid.to_string() != PIDS[0] { return il2_str_substring(pid, 4); }
     }
-
     if GameVariableManager::exist(&format!("G_R_GID_{}", str1)) && !is_emblem_paralogue()  {
         let gid = GameVariableManager::get_string(&format!("G_R_GID_{}", str1));
         if let Some(god) = GodPool::try_get_gid(gid.to_string().as_str(), false) {
@@ -230,7 +226,7 @@ pub fn get_active_character_hook(this: &mut TalkPtr, method_info: OptionalMethod
             return il2_str_substring(gid, 4);
         }
     }
-    return result; 
+    result
 }
 
 #[unity::class("App", "Talk3D.TalkTagAddLetter")]
@@ -343,29 +339,27 @@ pub fn do_replacement(mid: &Il2CppString) {
 
     replacer.first_char = mess.to_u16().to_vec()[0];
     let mut new_str = Il2CppString::new_static(original_str.clone());
-    let names = NAMES.lock().unwrap();
+    let names = NAMES.read().unwrap();
     // Persons
     let mut persons = Vec::new();
     let mut others: Vec<usize> = Vec::new();
 // Replacement old text -> Replacement Label
     if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 && !is_character_specific() {
         for x in 0..41 { if new_str.contains(names.original_names[x].as_str()) { persons.push(x); } }
+        if new_str.contains( Mess::get("MPID_Il").to_string().as_str()) { persons.push(37); }
         persons.iter().for_each(|&x|{
             if GameVariableManager::get_string(format!("G_R2_{}", PIDS[x]).as_str()).to_string() != PIDS[0] {
                 new_str = unsafe { replace_str(new_str, names.original_names[x].clone().into(), format!("PERSON{}",x).into(), None) };
+                if x == 37 { new_str = unsafe { replace_str(new_str, Mess::get("MPID_Il"), "PERSON37".into(), None) }; }
             }
         });
     }
-    else if names.is_custom {
-        let mut persons = Vec::new();
-        for x in 1..41 { if new_str.contains(names.original_names[x].as_str()){ persons.push(x); } }
-        persons.iter().for_each(|&x|{
-            new_str = unsafe { replace_str(new_str,  names.original_names[x].clone().into(), format!("PERSON{}",x).into(), None) };
+    if GameVariableManager::get_bool(DVCVariables::RANDOM_BOSS_KEY) {
+        names.other_names.iter().enumerate().for_each(|(i, x)| {
+            if new_str.contains(Mess::get(&x).to_string().as_str()) { others.push(i); }
         });
-    // NPCs
-        for x in 0..9 { if new_str.contains(names.other_names[x].1.as_str()){ others.push(x); } }
-        others.iter().for_each(|&x|{
-            new_str = unsafe { replace_str(new_str, names.other_names[x].1.clone().into(), format!("OTHERS{}",x).into(), None) };
+        others.iter().for_each(|&i|{
+            new_str = unsafe { replace_str(new_str, Mess::get(&names.other_names[i]), format!("OTHER{}",i).into(), None) };
         });
     }
     let mut emblems = Vec::new();
@@ -403,43 +397,25 @@ pub fn do_replacement(mid: &Il2CppString) {
             new_str = unsafe { replace_str(new_str, names.original_emblem_nickname[x].clone().into(), format!("NICK{}",x).into(), None) };
         });
     }
-    else if names.is_custom {
-        let mut emblems = Vec::new();
-        for x in 0..23 { if new_str.contains(names.original_emblem_names[x].as_str()){ emblems.push(x); } }
-        emblems.iter().for_each(|&x|{
-                new_str = unsafe { replace_str(new_str, names.original_emblem_names[x].clone().into(), format!("EMBLEM{}", x).into(), None) };
-        });
-    }
 // Replacement Label -> New Text
-    if names.is_custom {
-        persons.iter().for_each(|&x|{
-            new_str = unsafe { replace_str(new_str, format!("PERSON{}",x).into(), Mess::get_name(PIDS[x]), None) };
-        });
-        others.iter().for_each(|&x|{
-            let person = PersonData::try_index_get(names.other_names[x].0).unwrap();
-            let new_name = Mess::get_name(person.pid);
-            new_str = unsafe { replace_str(new_str,  format!("OTHERS{}",x).into(), new_name, None) };
-        });
-    }
-    else {
-        persons.iter().for_each(|&x|{
-            let new_name = Mess::get_name(GameVariableManager::get_string(format!("G_R_{}", PIDS[x]).as_str()));
-            new_str = unsafe { replace_str(new_str, format!("PERSON{}",x).into(), new_name, None) };
-        });
-    }
-
+    persons.iter().for_each(|&x|{
+        let new_name = Mess::get_name(GameVariableManager::get_string(format!("G_R_{}", PIDS[x]).as_str()));
+        new_str = unsafe { replace_str(new_str, format!("PERSON{}",x).into(), new_name, None) };
+    });
+    others.iter().for_each(|&x|{
+        let new_name = crate::randomizer::names::get_new_npc_person_name(x).unwrap();
+        new_str = unsafe { replace_str(new_str, format!("OTHER{}",x).into(), Mess::get(new_name), None) };
+    });
     if random_emblem_order {
-        emblems.iter().for_each(|&x|{
+        for x in 0..19{
             let gid = GameVariableManager::get_string(format!("G_R_{}", EMBLEM_GIDS[x]).as_str());
             let god = GodData::get(gid).unwrap();
             let new = if let Some(god_unit) = GodPool::try_get(god, false) {
                 Mess::get(god_unit.data.mid)
             }
-            else {
-                Mess::get(god.mid)
-            };
+            else { Mess::get(god.mid) };
             new_str = unsafe { replace_str(new_str, format!("EMBLEM{}",x).into(), new, None) };
-        });
+        }
         rings.iter().for_each(|&x|{
             let gid = GameVariableManager::get_string(format!("G_R_{}", EMBLEM_GIDS[x]).as_str());
             let god = GodData::get(gid).unwrap();
@@ -455,21 +431,6 @@ pub fn do_replacement(mid: &Il2CppString) {
             }
         });
     }
-    else if names.is_custom {
-        emblems.iter().for_each(|&x|{
-            let gid = match x {
-                19 => { "GID_ディミトリ"}
-                20 => { "GID_クロード" }
-                21 => { "GID_ルフレ" }
-                22 => { "GID_エフラム" }
-                _ => { EMBLEM_GIDS[x] }
-            };
-            let old = format!("EMBLEM{}", x);
-            let new = Mess::get(GodData::get(gid).unwrap().mid);
-            new_str = unsafe { replace_str(new_str, old.into(), new, None) };
-        });
-    }
-
 
     let new_string = new_str.to_string();
     if new_string != original_str {

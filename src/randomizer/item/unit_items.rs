@@ -1,52 +1,8 @@
-use engage::menu::BasicMenuItemAttribute;
 use engage::unitpool::UnitPool;
 use utils::clamp_value;
 
 use super::*;
-use super::data::*;
-use crate::{assets::animation::MONSTERS, continuous::{get_story_chapters_completed, get_continious_total_map_complete_count}, randomizer::person::unit::has_sid};
-
-pub struct PlayerRandomWeapons;
-impl ConfigBasicMenuItemSwitchMethods for PlayerRandomWeapons {
-    fn init_content(_this: &mut ConfigBasicMenuItem){}
-    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let is_main = DVCVariables::is_main_menu();
-        if is_main && CONFIG.lock().unwrap().random_item == 0 {
-            this.help_text = "Enable item randomization to enable this setting.".into();
-            this.update_text();
-            return BasicMenuResult::new();
-        }
-        let state = if is_main { CONFIG.lock().unwrap().player_inventory } else {  GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) };
-        let result = ConfigBasicMenuItem::change_key_value_b(state);
-        if state != result {
-            if is_main { CONFIG.lock().unwrap().player_inventory = result; }
-            else { GameVariableManager::set_bool(DVCVariables::PLAYER_INVENTORY, result); }
-            Self::set_command_text(this, None);
-            Self::set_help_text(this, None);
-            this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let state = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().player_inventory } else {  GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) };
-        this.help_text = if state { "Player units can be recruited with non-standard weapons."}
-            else { "Player units are recruited with standard weapons." }.into();
-    }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let state = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().player_inventory } else {  GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) };
-        this.command_text = if state { "Random"} else {"Standard"}.into();
-    }
-}
-fn prw_build_attrs(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
-    if GameVariableManager::get_number(DVCVariables::ITEM_KEY) != 0 { BasicMenuItemAttribute::Enable }
-    else { BasicMenuItemAttribute::Hide }
-}
-
-pub extern "C" fn vibe_prw() ->  &'static mut ConfigBasicMenuItem {
-    let switch = ConfigBasicMenuItem::new_switch::<PlayerRandomWeapons>("Player Starting Inventory");
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = prw_build_attrs as _);
-    switch
-}
+use crate::{assets::animation::MONSTERS, continuous::get_continious_total_map_complete_count, randomizer::person::unit::has_sid};
 
 //Has Healing staff
 pub fn replace_staves(item_list: &UnitItemList){
@@ -65,6 +21,11 @@ pub fn replace_staves(item_list: &UnitItemList){
         }
     }
 }
+pub fn has_drops(unit: &Unit) -> i32 {
+    unit.item_list.unit_items.iter().flatten().find(|w| w.is_drop())
+        .map(|f| (f.item.flag.value & 1 != 0) as i32 + 1  ).unwrap_or(0)
+}
+
 pub fn dispose_item_type(item_list: &UnitItemList, item_kind: i32){
     for x in 0..8 {
         if let Some(item) = item_list.get_item(x){
@@ -78,7 +39,7 @@ pub fn dispose_all_but_drops(item_list: &UnitItemList){
     for x in 0..8 {
         if !item_list.unit_items[x].as_ref().unwrap().is_drop() {
             if let Some(item) = item_list.get_item(x as i32 ) {
-                if  !item.is_drop() { item.dispose(); }
+                if !item.is_drop() { item.dispose(); }
             }
         }
     }
@@ -86,9 +47,11 @@ pub fn dispose_all_but_drops(item_list: &UnitItemList){
 pub fn dispose_unusables(unit: &Unit) {
     for x in 0..8 {
         if unit.item_list.unit_items[x].as_ref().unwrap().item.parent.index < 3 { continue; }
-        if let Some(item) = unit.item_list.get_item(x as i32 ) {
-            if item.item.flag.value & 128 == 0 && item.flags & 2 == 0 && item.item.kind > 0 { // Not Engage Weapon or Not Drop
-                if !unit.can_equip(x as i32, true, true){ item.dispose(); }
+        if let Some(item) = unit.item_list.get_item(x as i32 ).filter(|x| !x.is_drop() && x.item.flag.value & 128 == 0 ) {
+            if item.item.kind < 10 && item.item.kind > 0 { // Not Engage Weapon or Not Drop
+                if !unit.can_equip(x as i32, true, true) && item.item.kind < 10 {
+                    item.dispose(); 
+                }
             }
         }
     }
@@ -108,10 +71,10 @@ pub fn dispose_unusables(unit: &Unit) {
 
 pub fn remove_duplicates(item_list: &UnitItemList) {
     for x in 0..8 {
-        if let Some(item) = item_list.get_item(x as i32) { 
+        if let Some(item) = item_list.get_item(x) {
             let iid1 = item.item.iid.to_string();
             for y in x+1..8 {
-                if let Some(item2) = item_list.get_item(y as i32 ) {
+                if let Some(item2) = item_list.get_item(y) {
                     let iid2 = item2.item.iid.to_string();
                     if item2.item.parent.index == item.item.parent.index { 
                         if item2.is_drop() { item.flags |= 2; }
@@ -151,8 +114,13 @@ pub fn adjust_melee_weapons(unit: &Unit) {
             let kind = weapon.item.kind;
             if !can_change_weapon(weapon, true) { continue; }
             let weapon_level = job.get_max_weapon_level(kind as i32) as i32;
-            if weapon.item.get_weapon_level() <= weapon_level && ( ( unit.selected_weapon_mask.value & ( 1 << kind ) != 0 || unit.selected_weapon_mask.value == 0 ) ) {
-               weapon.ctor_str(mag_weapons[kind as usize -1 ]);
+
+            if weapon.is_weapon() && weapon.item.get_weapon_level() <= weapon_level && (
+                ( unit.selected_weapon_mask.value & ( 1 << kind ) != 0 || unit.selected_weapon_mask.value == 0 ) )
+            {
+                let is_drop = weapon.is_drop();
+                weapon.ctor_str(mag_weapons[kind as usize -1 ]);
+                if is_drop { weapon.flags |= 2; }
             }
         }
         return;
@@ -160,10 +128,19 @@ pub fn adjust_melee_weapons(unit: &Unit) {
 }
 pub fn get_number_of_usable_weapons(unit: &Unit) -> i32 {
     let mut count = 0;
+    let weapon_mask = unit.selected_weapon_mask.value;
+    let job = &unit.job;
     for x in 0..8 {
-        if let Some(item) = unit.item_list.get_item(x) {
-            if item.item.flag.value & 128 == 0 {
-                if unit.can_equip(x, false, true)  { count += 1;}
+        if let Some(item) = unit.item_list.get_item(x)
+            .filter(|x| x.item.flag.value & 128 == 0 && x.item.is_weapon())
+        {
+            if unit.can_equip(x, false, true)  {
+                let weapon_type = item.item.kind;
+                if job.weapons[weapon_type as usize] == 1 { count += 1; }
+                else if (weapon_mask & (1 << weapon_type) != 0)  && job.weapons[weapon_type as usize ] > 1
+                {
+                    count += 1
+                }
             }
         }
     }
@@ -175,8 +152,8 @@ pub fn can_change_weapon(weapon: &UnitItem, melee: bool) -> bool {
     let flag = weapon.item.get_flag().value; 
     if flag & 128 != 0 || flag & 2 != 0 { return false; }
     let kind = weapon.item.kind;
-    if melee { return kind > 0 && kind < 5;  }
-    else { return kind > 0 && kind < 9; }
+    if melee { kind > 0 && kind < 5  }
+    else { kind > 0 && kind < 9 }
 }
 
 pub fn assign_tomes(unit: &Unit) {
@@ -189,7 +166,9 @@ pub fn assign_tomes(unit: &Unit) {
     if weapon_mask.value & 64 != 0  && job_rank > 0 {
         dispose_item_type(unit.item_list, 6);
         let total_level = if is_vander { 1 } else { unit.level as i32 + unit.internal_level as i32};
-        if let Some(item) = WEAPONDATA.get().unwrap().get_tome(job_rank, total_level, !is_player) { unit.item_list.add_item_no_duplicate(item); }
+        if let Some(item) = WEAPONDATA.get().unwrap().get_tome(job_rank, total_level, !is_player) {
+            unit.item_list.add_item_no_duplicate(item);
+        }
     }
 }
 
@@ -235,7 +214,6 @@ pub fn assign_unique_items(unit: &Unit) {
 pub fn assign_staffs(unit: &Unit) {
     let job = unit.get_job();
     let weapon_mask = job.get_weapon_mask();
-    let rng = Random::get_system();
     let is_player = unit.person.get_asset_force() == 0;
 
     let staff_level = if  has_sid(unit, "SID_杖使い＋＋") { 4 } 
@@ -243,12 +221,21 @@ pub fn assign_staffs(unit: &Unit) {
         else if has_sid(unit, "SID_杖使い") { 2 } 
         else { job.get_max_weapon_level(7) };
     let total_level = unit.level as i32 + unit.internal_level as i32;
+    let inventory_flag = GameVariableManager::get_number(DVCVariables::PLAYER_INVENTORY) & 2 != 0;
     if weapon_mask.value & ( 1 << 7 ) == 0 { replace_staves(unit.item_list); }
     else if weapon_mask.value & ( 1 << 7 ) != 0 && staff_level > 0 {
         dispose_item_type(unit.item_list, 7);
-        for x in 1..4 {
-            if x == 3 && rng.get_value(3) > 1 {  continue; }
-            if let Some(staff_) = WEAPONDATA.get().unwrap().get_staff(total_level, x, staff_level, !is_player ){
+        if DVCVariables::is_main_chapter_complete(5) {
+            for x in 1..3 {
+                if let Some(staff_) = WEAPONDATA.get().unwrap()
+                    .get_staff(total_level, x, staff_level, !is_player && inventory_flag )
+                {
+                    unit.item_list.add_item_no_duplicate(staff_);
+                }
+            }
+        }
+        else {
+            if let Some(staff_) = WEAPONDATA.get().unwrap().get_staff(5, 1, 3, true){
                 unit.item_list.add_item_no_duplicate(staff_);
             }
         }
@@ -256,41 +243,56 @@ pub fn assign_staffs(unit: &Unit) {
 }
 
 pub fn adjust_missing_weapons(unit: &Unit) {
-    if get_number_of_usable_weapons(unit) < 1 {
-        println!("{} has no usable weapons!", Mess::get_name(unit.person.pid));
-        dispose_unusables(unit);
-        if unit.job.mask_skills.find_sid("SID_弾丸装備").is_some() {  //Mage Canon
-            let len = WEAPONDATA.get().unwrap().bullet_list.len();
-            let rng = Random::get_game();
-            if len > 1 {
-                let index1 = WEAPONDATA.get().unwrap().bullet_list[ rng.get_value(len as i32) as usize].item_index;
-                unit.item_list.add_item_no_duplicate(ItemData::try_index_get(index1).unwrap());
+    unit.update_weapon_mask();
+    let count = get_number_of_usable_weapons(unit);
+    println!("{} has {} usable weapon", Mess::get_name(unit.person.pid), count);
+    if unit.job.mask_skills.find_sid("SID_弾丸装備").is_some() && count < 2 && unit.job.get_max_weapon_level(9) > 1 {  //Mage Canon
+        dispose_all_but_drops(unit.item_list);
+        let len = WEAPONDATA.get().unwrap().bullet_list.len();
+        let rng = Random::get_game();
+        if len > 1 {
+            let index1 = WEAPONDATA.get().unwrap().bullet_list[ rng.get_value(len as i32) as usize].item_index;
+            unit.item_list.add_item_no_duplicate(ItemData::try_index_get(index1).unwrap());
+            if count < 2 {
                 let index2 = WEAPONDATA.get().unwrap().bullet_list[ rng.get_value(len as i32) as usize].item_index;
                 unit.item_list.add_item_no_duplicate(ItemData::try_index_get(index2).unwrap());
             }
-            return;
         }
+        return;
+    }
+    if count < 1 {
+        println!("{} has no usable weapons!", Mess::get_name(unit.person.pid));
+        assign_staffs(unit);
+        assign_tomes(unit);
         add_generic_weapons(unit);
         unit.auto_equip();
     }
     let total_level = unit.level as i32 + unit.internal_level as i32;
-    if get_number_of_usable_weapons(unit) < 2 && total_level > 15 {
-        if let Some(uitem) = unit.item_list.unit_items.iter().flatten().find(|x| x.is_weapon() ) {
-            if let Some(item) = WEAPONDATA.get().unwrap().get_additional_weapon(uitem.item) { unit.item_list.add_item_no_duplicate(item); }
+    if get_number_of_usable_weapons(unit) < 2 && total_level > 20 && unit.selected_weapon_mask.value != 0 {
+        if let Some(uitem) = unit.item_list.unit_items.iter().flatten()
+            .find(|x| x.is_weapon() && ((1 << x.item.kind) & (unit.weapon_mask.value | unit.selected_weapon_mask.value) != 0))
+        {
+            if let Some(item) = WEAPONDATA.get().unwrap().get_additional_weapon(uitem.item) {
+                // println!("Adding {}", Mess::get_name(item.iid));
+                unit.item_list.add_item_no_duplicate(item);
+            }
         }
     }
+    unit_items::add_equip_condition(unit);
 }
 
 pub fn simple_replacement(unit: &Unit) {
     let job = unit.get_job();
-    let mut combine_mask = unit.selected_weapon_mask.value | job.get_weapon_mask().value;
+    let mut combine_mask = unit.selected_weapon_mask.value | unit.weapon_mask.value;
+    let mut n_weapons = 0;
+    for x in 1..9 { if (combine_mask & (1 << x) != 0 ) && x != 7 { n_weapons += 1; }}
     unit.item_list.unit_items.iter().flatten()
-        .filter(|uitem| uitem.item.is_weapon() && uitem.item.flag.value & 128 == 0)
-        .for_each(|uitem|{
-            if let Some(new_item) = WEAPONDATA.get().unwrap().get_simple_replacement(uitem.item, combine_mask, job.weapon_levels) {
-                // println!("Unit {} ({}): Simple Replacing {} -> {} ({} -> {})", Mess::get_name(unit.person.pid), Mess::get_name(unit.job.jid), Mess::get_name(uitem.item.iid), Mess::get_name(new_item.iid), uitem.item.power, new_item.power);
+        .filter(|uitem| uitem.item.is_weapon() && uitem.item.flag.value & 128 == 0 && !uitem.is_drop() )
+        .for_each(|uitem| {
+            if let Some(new_item) = WEAPONDATA.get().unwrap().get_simple_replacement(uitem.item, combine_mask, job.weapon_levels)
+            {
                 uitem.ctor(new_item);
-                combine_mask &= !(1 << new_item.kind); // remove kind mask
+                if n_weapons > 1 { combine_mask &= !(1 << new_item.kind); }
             }
         }
     );
@@ -299,41 +301,40 @@ pub fn simple_replacement(unit: &Unit) {
     if combine_mask & 62 != 0 && get_number_of_usable_weapons(unit) < 2 { add_generic_weapons(unit); }
 }
 
-
-
 pub fn add_generic_weapons(unit: &Unit) {
-    //if unit.person.get_asset_force() != 0 { // Making sure enemies have weapon
     let job = unit.get_job();
-    let job_mask = job.get_weapon_mask().value;
-    // println!("Adding Weapons for {} ({}), with Selected Mask {} / {}", Mess::get(unit.person.get_name().unwrap()).to_string(), Mess::get(unit.get_job().name), unit.selected_weapon_mask.value, job_mask);
     let jid = job.jid.to_string();
     if jid == "JID_ボウナイト" { unit.item_list.add_item_no_duplicate(ItemData::get("IID_銀の弓").unwrap());  }
     if jid == "JID_エンチャント" {
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_HPの薬").unwrap());  
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_力の薬").unwrap());  
     }
-    let combine_mask = unit.selected_weapon_mask.value | job_mask;
+    let combine_mask = unit.selected_weapon_mask.value | unit.weapon_mask.value;
     let unit_level = unit.level as i32 + unit.internal_level as i32;
     let player = unit.person.get_asset_force() == 0;
-    let mut weapon_rank = if unit_level < 10 { 1 }
-        else if unit_level < 21 { 2 }
-        else { 3 };
+    let mut weapon_rank = if unit_level < 10 || !GameVariableManager::get_bool("G_Cleared_M002") { 1 }
+        else if unit_level < 15 { 2 }
+        else if unit_level < 25 { 3 }
+        else if unit_level < 30 { 4 }
+        else {
+            4 + (Random::get_system().get_value(10) < 40 - (40 - unit_level)) as i32
+        };
 
     let mut has_weapon: [bool; 10] = [false; 10];
     has_weapon[7] = true;
     unit.item_list.unit_items.iter()
         .flatten()
-        .filter(|uitem| uitem.item.is_weapon() && uitem.item.flag.value & 128 == 0)
-        .for_each(|uitem|{
-            let kind = uitem.item.kind;
-            let item_level = uitem.item.get_weapon_level();
-            let weapon_level = job.get_max_weapon_level(kind as i32) as i32;
+        .filter(|u_item| u_item.item.is_weapon() && u_item.item.flag.value & 128 == 0)
+        .for_each(|u_item|{
+            let kind = u_item.item.kind;
+            let item_level = u_item.item.get_weapon_level();
+            let weapon_level = job.get_max_weapon_level(kind as i32);
             if item_level <= weapon_level && combine_mask & ( 1 << kind ) != 0 { 
                 if weapon_rank < item_level { weapon_rank = item_level; }
                 has_weapon[kind as usize] = true; 
             
             }
-            else if uitem.flags & 2 != 0 { uitem.dispose();  }
+            else if !u_item.is_drop() && u_item.is_weapon() { u_item.dispose();  }
         }
     );
     for i in 1..9 {
@@ -341,70 +342,60 @@ pub fn add_generic_weapons(unit: &Unit) {
         let rank = clamp_value(weapon_rank, 0, job.get_max_weapon_level(i));
         let mut added_weapon = false;
         if combine_mask & (1 << i ) != 0 && rank > 0 {
-            if player {
-                if GameVariableManager::get_bool(DVCVariables::PLAYER_INVENTORY) {
-                    if let Some(item) = WEAPONDATA.get().unwrap().get_random_weapon(i-1, false) {
-                        if item.get_weapon_level() <= rank { 
-                            unit.item_list.add_item_no_duplicate(item);  
-                            added_weapon = true;
-                        }
+            if player && GameVariableManager::get_number(DVCVariables::PLAYER_INVENTORY) & 1 != 0 {
+                if let Some(item) = WEAPONDATA.get().unwrap().get_random_weapon(i, rank, false) {
+                    if item.get_weapon_level() <= rank {
+                        unit.item_list.add_item_no_duplicate(item);
+                        added_weapon = true;
                     }
                 }
             }
-            else {
-                if GameVariableManager::get_number(DVCVariables::ITEM_KEY) != 0 && get_continious_total_map_complete_count() > 10 {
-                    if let Some(item) = WEAPONDATA.get().unwrap().get_random_weapon(i-1, true) {
-                        if item.get_weapon_level() <= rank {
-                            unit.item_list.add_item_no_duplicate(item); 
-                            added_weapon = true;
-                        }
+            else if GameVariableManager::get_number(DVCVariables::PLAYER_INVENTORY) & 2 != 0 && !player && get_continious_total_map_complete_count() > 9 {
+                if let Some(item) = WEAPONDATA.get().unwrap().get_random_weapon(i, rank, true) {
+                    if item.get_weapon_level() <= rank {
+                        unit.item_list.add_item_no_duplicate(item);
+                        added_weapon = true;
                     }
                 }
             }
             if !added_weapon {
                 let mut search_rank = rank;
                 while search_rank > 0 {
-                    if let Some(item) = WEAPONDATA.get().unwrap().get_generic_weapon(i-1, search_rank) { 
-                        unit.item_list.add_item_no_duplicate(item); 
-                        break;
+                    if let Some(item) = WEAPONDATA.get().unwrap().get_generic_weapon(i, search_rank) {
+                        if (item.get_equip_skills().find_sid("SID_２回行動").is_none() && i < 6) ||
+                            (item.get_equip_skills().find_sid("SID_２回行動").is_some() && i > 6)
+                        {
+                            unit.item_list.add_item_no_duplicate(item);
+                            break;
+                        }
                     }
                     search_rank -= 1;
                 }
             }
         }
     }
-    if job.get_max_weapon_level(4) >= 2 && DVCVariables::is_main_chapter_complete(22) { unit.item_list.add_item_no_duplicate(ItemData::get("IID_長弓").unwrap());  } 
-
+    if job.get_max_weapon_level(4) >= 2 && DVCVariables::is_main_chapter_complete(22) && Random::get_system().get_value(10) < 2 {
+        unit.item_list.add_item_no_duplicate(ItemData::get("IID_長弓").unwrap());
+    }
+    dispose_unusables(unit);
 }
 
 pub fn random_items_drops(unit: &Unit){
     let rng = Random::get_system();
     let mut none_count = 0;
-    let mut rate = if GameUserData::get_difficulty(false) == 2 {1 / 2} else { 1 } * GameVariableManager::get_number(DVCVariables::ITEM_DROP_GAUGE_KEY);
-        
+    let mut rate =
+        if GameUserData::get_difficulty(false) == 2 {1 / 2} else { 1 } * GameVariableManager::get_number(DVCVariables::ITEM_DROP_GAUGE_KEY);
+
     for x in 0..8 {
         if let Some(u_item) = unit.item_list.get_item(x) {
-            if u_item.item.flag.value & 131 != 0 {  u_item.flags = 0; }
+            if u_item.item.flag.value & 130 != 0 {  u_item.flags = 0; }
         }
     }
     for x in 0..8 {
         let item = unit.item_list.get_item(x);
         if item.is_none() { continue; }
         let u_item = &mut item.unwrap();
-        if u_item.is_drop(){
-            if u_item.item.flag.value & 131 != 0  { //Unequip 
-                u_item.flags = 0;  
-                continue;
-            }
-            else if !u_item.is_equip() { 
-                let new_item = get_random_item(u_item.item.iid, false);
-                u_item.ctor_str(&new_item.to_string());
-                u_item.flags = 2;
-                none_count += 1;
-            }
-        } 
-        let iid1 =  u_item.item.iid.to_string();
-        if iid1 == "IID_無し" && none_count == 0 { 
+        if u_item.item.parent.index < 2 && none_count == 0 {
             if rng.get_value(100) < rate {
                 u_item.ctor_str(&random_item(4, false).to_string());
                 u_item.flags = 2;
@@ -413,7 +404,6 @@ pub fn random_items_drops(unit: &Unit){
             else { none_count += 1; }
         } 
     }
-
 }
 
 fn magic_dagger_weapon_change(veyle_job: &JobData){
@@ -516,13 +506,13 @@ pub fn add_equip_condition(unit: &Unit) {
     for x in 0..8 {
         if unit.item_list.unit_items[x].as_ref().unwrap().item.equip_condition.is_some() {
             let sid = unit.item_list.unit_items[x].as_ref().unwrap().item.equip_condition.unwrap().to_string();
+            println!("Adding Equip Skill Condition");
             unit.private_skill.add_sid(&sid, 10, 0);
         }
     }
 }
 
 pub fn add_monster_weapons(unit: &Unit){
-    // ["JID_幻影飛竜", "JID_異形飛竜", "JID_幻影狼", "JID_異形狼",  "JID_E006ラスボス", "JID_幻影竜", "JID_異形竜", "JID_邪竜"];
     let jid = unit.get_job().jid.to_string();
     unit.item_list.put_off_all_item();
     if let Some(pos) = MONSTERS.iter().position(|&x| jid == x) {

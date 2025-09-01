@@ -1,8 +1,11 @@
 use super::*;
-
 pub struct RandomJobMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomJobMod {
-    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    fn init_content(_this: &mut ConfigBasicMenuItem){
+        if !DVCVariables::is_main_menu() {
+            GameVariableManager::make_entry_norewind(DVCVariables::RECLASS_KEY, 0);
+        }
+    }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().random_job, 0, 3, 1);
         if CONFIG.lock().unwrap().random_job != result {
@@ -10,16 +13,8 @@ impl ConfigBasicMenuItemSwitchMethods for RandomJobMod {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match CONFIG.lock().unwrap().random_job {
-            1 => { "Playable units will be in random classes." },
-            2 => { "Enemy/NPC units will be in random classes."},
-            3 => { "All units will be in random classes."},
-            _ => { "Units will be in their assigned class"},
-        }.into();
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.command_text = match  CONFIG.lock().unwrap().random_job {
@@ -29,27 +24,40 @@ impl ConfigBasicMenuItemSwitchMethods for RandomJobMod {
             _ => { "None"},
         }.into();
     }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = match CONFIG.lock().unwrap().random_job {
+            1 => { "Playable units will be in random classes." },
+            2 => { "Enemy/NPC units will be in random classes."},
+            3 => { "All units will be in random classes."},
+            _ => { "Units will be in their assigned class"},
+        }.into();
+    }
 }
 pub struct CustomJobs;
 impl ConfigBasicMenuItemSwitchMethods for CustomJobs {
-    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    fn init_content(_this: &mut ConfigBasicMenuItem){
+        if !DVCVariables::is_main_menu() {
+            GameVariableManager::make_entry_norewind(DVCVariables::CUSTOM_JOB_KEY, 0);
+        }
+    }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value = CONFIG.lock().unwrap().get_custom_jobs();
+        let value = DVCVariables::get_custom_jobs();
         let result = ConfigBasicMenuItem::change_key_value_b(value);
         if value != result {
-            CONFIG.lock().unwrap().set_custom_jobs(result);
+            DVCVariables::set_custom_jobs(result);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = if CONFIG.lock().unwrap().get_custom_jobs() { "Allows customs classes in the randomization pool." }
-        else { "Only vanilla classes in the randomization pool" }.into();
+            BasicMenuResult::se_cursor()
+        }
+        else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = if CONFIG.lock().unwrap().get_custom_jobs() { "Include"} else { "Exclude"}.into();
+        this.command_text = if DVCVariables::get_custom_jobs() { "Include"} else { "Exclude"}.into();
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = if DVCVariables::get_custom_jobs() { "Allows customs classes in the randomization pool." }
+        else { "Only vanilla classes in the randomization pool" }.into();
     }
 }
 
@@ -89,8 +97,8 @@ impl ConfigBasicMenuItemGaugeMethods for EnemyJobGauge {
             this.gauge_ratio = result as f32 * 0.01;
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let gauge = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_enemy_job_rate } else { GameVariableManager::get_number(DVCVariables::ENEMY_JOB_GAUGE_KEY) };
@@ -110,22 +118,32 @@ pub struct RandomCC;
 impl ConfigBasicMenuItemSwitchMethods for RandomCC {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let previous = CONFIG.lock().unwrap().get_random_cc();
-        let result = ConfigBasicMenuItem::change_key_value_b(previous);
+        let previous = DVCVariables::get_random_reclass();
+        let result = ConfigBasicMenuItem::change_key_value_i(previous, 0, 2, 1);
         if previous != result {
-            CONFIG.lock().unwrap().set_random_cc(result);
+            DVCVariables::set_random_reclass(result);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
-    }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = if CONFIG.lock().unwrap().get_random_cc() { "When reclassing, the new class will be determined randomly." }
-            else { "Default reclassing behavior."}.into();
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = if CONFIG.lock().unwrap().get_random_cc() { "Random" } else { "Default" }.into();
+        let s = DVCVariables::get_random_reclass();
+        this.command_text =
+        match s {
+            1 => "Random",
+            2 => "None",
+            _ => "Default"
+        }.into();
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let s = DVCVariables::get_random_reclass();
+        this.help_text = match s {
+            1 => "When reclassing, the new class will be determined randomly.",
+            2 => "Units can only change class within their current class lines.",
+            _ =>  "Default reclassing behavior.",
+        }.into();
     }
 }
 
@@ -156,7 +174,7 @@ impl TwoChoiceDialogMethods for RerandomizeJobsConfirm {
 }
 
 pub fn re_randomize_build_attr(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
-    if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 == 0 { return  BasicMenuItemAttribute::Hide; }
+    if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 == 0 || DVCVariables::get_single_class(false).is_none() { return  BasicMenuItemAttribute::Hide; }
     if DVCVariables::is_main_chapter_complete(3) && GameUserData::get_sequence() == 2 { BasicMenuItemAttribute::Enable }
     else if GameUserData::get_sequence() == 3 && GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 { BasicMenuItemAttribute::Enable }
     else {  BasicMenuItemAttribute::Hide  }

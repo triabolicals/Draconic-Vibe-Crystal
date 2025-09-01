@@ -68,9 +68,7 @@ impl RandomizerStatus {
     pub fn set_enable(&mut self) { self.enabled = true; }
     pub fn map_complete(&mut self) {
         self.enemy_edelgard = false;
-        self.enemy_edelgard = false;
         self.inspectors_set = false;
         self.map_tile = false;
     }
-
 }

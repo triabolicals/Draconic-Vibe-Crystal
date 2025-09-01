@@ -14,7 +14,7 @@ pub fn search_for_body_anim(mode: i32, act_prefix: &str, unique_id: &str) -> Opt
     let asset_table_sf = AssetTableStaticFields::get();
     asset_table_sf.search_lists[mode as usize].iter().find(|entry| entry.mode == mode && entry.body_anim.is_some_and(|b| b.to_string().contains(act_prefix) && b.to_string().contains(unique_id) ) )
 }
-pub fn search_by_jid(mode: i32, jid: &Il2CppString) -> Option<&'static &'static mut AssetTable> {
+pub fn search_by_jid(mode: i32, jid: &'static Il2CppString) -> Option<&'static &'static mut AssetTable> {
     let asset_table_sf = AssetTableStaticFields::get();
     let jid_index  = AssetTableStaticFields::get_condition_index(jid);
     if jid_index < 1 { return None; }
@@ -25,7 +25,7 @@ pub fn search_by_jid(mode: i32, jid: &Il2CppString) -> Option<&'static &'static 
     )
 }
 
-pub fn search_by_key<'a>(mode: i32, key: impl Into<&'a Il2CppString>, start: Option<i32>) -> Option<&'static &'static mut AssetTable> {
+pub fn search_by_key<'a>(mode: i32, key: impl Into<&'static Il2CppString>, start: Option<i32>) -> Option<&'static &'static mut AssetTable> {
     let asset_table_sf = AssetTableStaticFields::get();
     let key_index  = AssetTableStaticFields::get_condition_index(key);
     if key_index < 1 { return None; }
@@ -33,7 +33,7 @@ pub fn search_by_key<'a>(mode: i32, key: impl Into<&'a Il2CppString>, start: Opt
     asset_table_sf.search_lists[mode as usize].iter().find(|entry| entry.mode == mode && entry.parent.index > start_index && has_condition(entry, key_index))
 }
 
-pub fn search_by_key_with_dress<'a>(mode: i32, key: impl Into<&'a Il2CppString>) -> Option<&'static &'static mut AssetTable> {
+pub fn search_by_key_with_dress<'a>(mode: i32, key: impl Into<&'static Il2CppString>) -> Option<&'static &'static mut AssetTable> {
     let asset_table_sf = AssetTableStaticFields::get();
     let key_index  = AssetTableStaticFields::get_condition_index(key);
     if key_index < 1 { return None; }
@@ -44,7 +44,7 @@ pub fn search_by_key_with_dress<'a>(mode: i32, key: impl Into<&'a Il2CppString>)
     )
 }
 
-pub fn search_by_2_keys<'a>(mode: i32, key1: impl Into<&'a Il2CppString>,  key2: impl Into<&'a Il2CppString>) -> Option<&'static &'static mut AssetTable> {
+pub fn search_by_2_keys<'a>(mode: i32, key1: impl Into<&'static Il2CppString>,  key2: impl Into<&'static Il2CppString>) -> Option<&'static &'static mut AssetTable> {
     let asset_table_sf = AssetTableStaticFields::get();
     let key1_index  = AssetTableStaticFields::get_condition_index(key1);
     let key2_index  = AssetTableStaticFields::get_condition_index(key2);
@@ -56,7 +56,7 @@ pub fn search_by_2_keys<'a>(mode: i32, key1: impl Into<&'a Il2CppString>,  key2:
     )
 }
 
-pub fn search_by_3_keys<'a>(mode: i32, key1: impl Into<&'a Il2CppString>,  key2: impl Into<&'a Il2CppString>, key3: impl Into<&'a Il2CppString>) -> Option<&'static &'static mut AssetTable> {
+pub fn search_by_3_keys<'a>(mode: i32, key1: impl Into<&'static Il2CppString>,  key2: impl Into<&'static Il2CppString>, key3: impl Into<&'static Il2CppString>) -> Option<&'static &'static mut AssetTable> {
     let asset_table_sf = AssetTableStaticFields::get();
     let key1_index  = AssetTableStaticFields::get_condition_index(key1);
     let key2_index  = AssetTableStaticFields::get_condition_index(key2);
@@ -71,11 +71,11 @@ pub fn search_by_3_keys<'a>(mode: i32, key1: impl Into<&'a Il2CppString>,  key2:
 }
 
 
-pub fn search_by_iid(iid: &Il2CppString) -> Option<&'static &'static mut AssetTable> {
+pub fn search_by_iid(iid: &'static Il2CppString, mode: i32) -> Option<&'static &'static mut AssetTable> {
     let asset_table_sf = AssetTableStaticFields::get();
     let iid_index  = AssetTableStaticFields::get_condition_index(iid);
     if iid_index < 1 { return None }
-    asset_table_sf.search_lists[2].iter().find(|entry| has_condition(entry, iid_index) && ( entry.left_hand.is_some() || entry.right_hand.is_some()) )
+    asset_table_sf.search_lists[mode as usize].iter().find(|entry| has_condition(entry, iid_index) && ( entry.left_hand.is_some() || entry.right_hand.is_some()) )
 }
 
 pub fn has_condition(entry: &AssetTable, condition_index: i32) -> bool { 

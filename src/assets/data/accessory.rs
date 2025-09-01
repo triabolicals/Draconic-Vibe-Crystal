@@ -37,5 +37,4 @@ impl BustData {
         let rng = Random::get_game();
         self.entries.iter().for_each(|bentry|{ AssetTable::try_index_get_mut(bentry.0).map(|entry| entry.scale_stuff[11] = 1.0 + rng.get_value(50) as f32 * 0.02).unwrap(); });
     }
-
 }

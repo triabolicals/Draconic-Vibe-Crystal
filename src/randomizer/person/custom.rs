@@ -2,8 +2,7 @@ use super::*;
 use std::sync::Mutex;
 use engage::{
     menu::{config::{ConfigBasicMenuItem, ConfigBasicMenuItemSwitchMethods}, BasicMenuResult, *}, 
-    pad::Pad, 
-    proc::ProcInst,
+    pad::Pad,
     titlebar::TitleBar, 
     util::get_instance
 };
@@ -101,19 +100,12 @@ impl ConfigBasicMenuItemSwitchMethods for CustomRecruitmentMenuItem {
 
 pub fn crecruitment_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
     if CONFIG.lock().unwrap().random_recruitment != 3 { return BasicMenuResult::new(); }
-    this.menu.get_class().get_virtual_method("CloseAnimeAll").map(|method| {
-        let close_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&BasicMenu<ConfigBasicMenuItem>, &MethodInfo)>(method.method_info.method_ptr) };
-            close_anime_all(this.menu, method.method_info);
-        }
-    );
-    this.menu.proc.parent.as_ref().unwrap().get_class().get_virtual_method("CloseAnimeAll").map(|method| {
-        let close_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&ProcInst, &MethodInfo)>(method.method_info.method_ptr) };
-            close_anime_all(this.menu.proc.parent.as_ref().unwrap(), method.method_info);
-        }
-    );
+    this.menu.close_anime_all();
     ConfigMenu::create_bind(this.menu);
     let config_menu = this.menu.proc.child.as_mut().unwrap().cast_mut::<ConfigMenu<ConfigBasicMenuItem>>();
-    config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = crate::menus::submenu::open_anime_all_ondispose_to_dvc_main2 as _).unwrap();
+    config_menu.get_class_mut().get_virtual_method_mut("OnDispose")
+        .map(|method| method.method_ptr = crate::menus::submenu::open_anime_all_ondispose_to_dvc_main as _).unwrap();
+
     config_menu.full_menu_item_list.clear();
     let limit = if dlc_check() && CONFIG.lock().unwrap().dlc & 2 == 0 { 41 } else { 36 };
     if CONFIG.lock().unwrap().dlc & 2 != 0 {

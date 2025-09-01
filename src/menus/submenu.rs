@@ -1,14 +1,7 @@
 use super::*;
 
 pub extern "C" fn open_anime_all_ondispose_to_dvc_main(this: &mut ProcInst, _method_info: OptionalMethod) {
-    this.parent.as_ref().unwrap().get_class().get_virtual_method("OpenAnimeAll").map(|method| {
-        let open_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&ProcInst, &MethodInfo)>(method.method_info.method_ptr) };
-        open_anime_all(this.parent.as_ref().unwrap(), method.method_info);
-    });
-    TitleBar::open_header("Draconic Vibe Crystal", super::super::VERSION, "");
-}
-pub extern "C" fn open_anime_all_ondispose_to_dvc_main2(this: &mut ProcInst, _method_info: OptionalMethod) {
-    this.parent.as_ref().unwrap().get_class().get_virtual_method("OpenAnimeAll").map(|method| {
+    this.parent.as_ref().unwrap().get_class().get_virtual_method("OpenAnime").map(|method| {
         let open_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&ProcInst, &MethodInfo)>(method.method_info.method_ptr) };
         open_anime_all(this.parent.as_ref().unwrap(), method.method_info);
     });
@@ -27,14 +20,11 @@ impl ConfigBasicMenuItemCommandMethods for RecruitmentSubMenu {
     }
 }
 pub fn recruitment_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    this.menu.get_class().get_virtual_method("CloseAnimeAll").map(|method| {
-        let close_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&BasicMenu<ConfigBasicMenuItem>, &MethodInfo)>(method.method_info.method_ptr) };
-            close_anime_all(this.menu, method.method_info);
-        }
-    );
+    this.menu.close_anime_all();
     ConfigMenu::create_bind(this.menu);
     let config_menu = this.menu.proc.child.as_mut().unwrap().cast_mut::<ConfigMenu<ConfigBasicMenuItem>>();
-    config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose_to_dvc_main as _).unwrap();
+    config_menu.get_class_mut().get_virtual_method_mut("OnDispose")
+        .map(|method| method.method_ptr = open_anime_all_ondispose_to_dvc_main as _).unwrap();
     config_menu.full_menu_item_list.clear();
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<deployment::DeploymentMod>("Deployment Mode"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<deployment::EmblemMod>("Emblem Deployment Mode"));
@@ -59,11 +49,7 @@ impl ConfigBasicMenuItemCommandMethods for EmbelmSubMenu {
     }
 }
 pub fn emblem_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    this.menu.get_class().get_virtual_method("CloseAnimeAll").map(|method| {
-        let close_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&BasicMenu<ConfigBasicMenuItem>, &MethodInfo)>(method.method_info.method_ptr) };
-            close_anime_all(this.menu, method.method_info);
-        }
-    );
+    this.menu.close_anime_all();
     ConfigMenu::create_bind(this.menu);
     let config_menu = this.menu.proc.child.as_mut().unwrap().cast_mut::<ConfigMenu<ConfigBasicMenuItem>>();
     config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose_to_dvc_main as _).unwrap();
@@ -92,21 +78,18 @@ impl ConfigBasicMenuItemCommandMethods for ClassSubMenu {
     }
 }
 pub fn class_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    this.menu.get_class().get_virtual_method("CloseAnimeAll").map(|method| {
-        let close_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&BasicMenu<ConfigBasicMenuItem>, &MethodInfo)>(method.method_info.method_ptr) };
-            close_anime_all(this.menu, method.method_info);
-        }
-    );
+    this.menu.close_anime_all();
     ConfigMenu::create_bind(this.menu);
     let config_menu = this.menu.proc.child.as_mut().unwrap().cast_mut::<ConfigMenu<ConfigBasicMenuItem>>();
     config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose_to_dvc_main as _).unwrap();
     config_menu.full_menu_item_list.clear();
     config_menu.add_item(randomizer::job::menu::vibe_custom_job());
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::styles::RandomBattleStyles>("Class Types Setting"));
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::menu::RandomCC>("Reclassing Setting"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::menu::RandomCC>("Re-Classing Setting"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::menu::RandomJobMod>("Random Classes"));    
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::menu::RandomSkillMod>("Randomize Skills"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::skill::menu::RandomSkillCost>("Skill Inheritance / SP Cost"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::single::SingleJob>("Single Class"));
     config_menu.add_item(randomizer::skill::learn::vibe_learn_skill());
     TitleBar::open_header("Draconic Vibe Crystal", "Class / Skill Settings", "");
     BasicMenuResult::se_cursor()
@@ -124,20 +107,16 @@ impl ConfigBasicMenuItemCommandMethods for ItemSubMenu {
     }
 }
 pub fn item_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    this.menu.get_class().get_virtual_method("CloseAnimeAll").map(|method| {
-        let close_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&BasicMenu<ConfigBasicMenuItem>, &MethodInfo)>(method.method_info.method_ptr) };
-            close_anime_all(this.menu, method.method_info);
-        }
-    );
+    this.menu.close_anime_all();
     ConfigMenu::create_bind(this.menu);
     let config_menu = this.menu.proc.child.as_mut().unwrap().cast_mut::<ConfigMenu<ConfigBasicMenuItem>>();
     config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose_to_dvc_main as _).unwrap();
     config_menu.full_menu_item_list.clear();
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::interact::InteractionSettings>("Weapon Triangle Settings"));
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::RandomItemMod>("Item Randomization"));
-    config_menu.add_item(ConfigBasicMenuItem::new_gauge::<randomizer::item::ItemPriceGauge>("Item Replacement Value"));
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::unit_items::PlayerRandomWeapons>("Player Starting Inventory"));
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::RandomGiftMod>("Reward/Gift Item Settings"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::menu::RandomItemMod>("Item Randomization"));
+    config_menu.add_item(ConfigBasicMenuItem::new_gauge::<randomizer::item::menu::ItemPriceGauge>("Item Replacement Value"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::menu::PlayerRandomWeapons>("Player Starting Inventory"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::menu::RandomGiftMod>("Reward/Gift Item Settings"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::shop::RandomShopMod>("Shop Setting"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::item::hub::RandomHubItemMod>("Exploration Items"));
     TitleBar::open_header("Draconic Vibe Crystal", "Items Settings", "");
@@ -147,32 +126,64 @@ pub fn item_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMe
 pub struct EnemySubMenu;
 impl ConfigBasicMenuItemCommandMethods for EnemySubMenu {
     fn init_content(this: &mut ConfigBasicMenuItem) {
-        this.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = enemy_menu_a_call as _).unwrap();
+        this.get_class_mut().get_virtual_method_mut("ACall")
+            .map(|method| method.method_ptr = enemy_menu_a_call as _).unwrap();
     }
     extern "C" fn custom_call(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new() }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { this.command_text = "View Settings".into(); }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { 
-        this.help_text = "View Draconic Vibe Crystal growth settings.".into();
+        this.help_text = "View Draconic Vibe Crystal enemy settings.".into();
     }
 }
 pub fn enemy_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    this.menu.get_class().get_virtual_method("CloseAnimeAll").map(|method| {
-        let close_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&BasicMenu<ConfigBasicMenuItem>, &MethodInfo)>(method.method_info.method_ptr) };
-            close_anime_all(this.menu, method.method_info);
-        }
-    );
+    this.menu.close_anime_all();
     ConfigMenu::create_bind(this.menu);
     let config_menu = this.menu.proc.child.as_mut().unwrap().cast_mut::<ConfigMenu<ConfigBasicMenuItem>>();
     config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose_to_dvc_main as _).unwrap();
     config_menu.full_menu_item_list.clear();
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::person::RandomBosses>("Random Bosses"));
     config_menu.add_item(randomizer::names::vibe_generic());
     config_menu.add_item(ConfigBasicMenuItem::new_gauge::<randomizer::skill::menu::EnemySkillGauge>("Random Enemy Skill Rate"));
-    config_menu.add_item(randomizer::item::vibe_drops());
+    config_menu.add_item(randomizer::item::menu::vibe_drops());
     config_menu.add_item(randomizer::job::menu::vibe_job_gauge());
     config_menu.add_item(ConfigBasicMenuItem::new_gauge::<autolevel::enemy::EnemyEmblemGauge>("Enemy Emblem Rate"));
     config_menu.add_item(ConfigBasicMenuItem::new_gauge::<autolevel::revival::EnemyRevivalStones>("Enemy Revival Stone Rate"));
+
     TitleBar::open_header("Draconic Vibe Crystal", "Enemy Settings", "");
     BasicMenuResult::se_cursor()
 }
 
-
+pub struct AssetSubMenu;
+impl ConfigBasicMenuItemCommandMethods for AssetSubMenu  {
+    fn init_content(this: &mut ConfigBasicMenuItem) {
+        this.get_class_mut().get_virtual_method_mut("ACall")
+            .map(|method| method.method_ptr = asset_menu_a_call as _).unwrap();
+    }
+    extern "C" fn custom_call(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new() }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { this.command_text = "View Settings".into(); }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) {
+        this.help_text = "View Draconic Vibe Crystal Asset Settings.".into();
+    }
+}
+pub fn asset_menu_a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+    this.menu.close_anime_all();
+    ConfigMenu::create_bind(this.menu);
+    let config_menu = this.menu.proc.child.as_mut().unwrap().cast_mut::<ConfigMenu<ConfigBasicMenuItem>>();
+    config_menu.get_class_mut().get_virtual_method_mut("OnDispose").map(|method| method.method_ptr = open_anime_all_ondispose_to_dvc_main as _).unwrap();
+    config_menu.full_menu_item_list.clear();
+    if DVCVariables::is_main_menu() {
+        config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::assets::accessory::RandomPlayerAppearance>("Random Player Appearance"));
+    }
+    else {
+        config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::names::RandomNameMods>("Random Emblem Names"));
+    }
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::assets::accessory::EmblemAppearance>("Emblem Appearance Settings"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::person::RandomBosses>("NPC/Bosses Setting"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::assets::accessory::RandomClassOutfits>("Random Class Outfits"));
+    config_menu.add_item(randomizer::names::vibe_generic());
+    config_menu.add_item(crate::assets::accessory::vibe_enemy_outfit());
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::assets::accessory::RandomAssets>("Randomized Assets"));
+    config_menu.add_item(crate::assets::bust::vibe_bust());
+    TitleBar::open_header("Draconic Vibe Crystal", "Asset Settings", "");
+    BasicMenuResult::se_cursor()
+}

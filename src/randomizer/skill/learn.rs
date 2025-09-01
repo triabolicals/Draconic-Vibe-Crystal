@@ -33,9 +33,9 @@ pub fn update_learn_skills(forced: bool) {
 pub fn unit_update_learn_skill(unit: &Unit) { 
     if unit.learned_job_skill.is_some() && unit.job.learn_skill.is_some() {
         unit.set_learn_skill(None);
-        if let Some(skill) = crate::randomizer::skill::learn::unit_learn_job_skill_hook(unit, unit.job, None) {
+        if let Some(skill) = unit_learn_job_skill_hook(unit, unit.job, None) {
             if CONFIG.lock().unwrap().equip_learn_skill { unit.add_to_equip_skill_pool(skill); }
-            println!("{} Learned {}", Mess::get_name(unit.person.pid), Mess::get(skill.name.unwrap()));
+            //println!("{} Learned {}", Mess::get_name(unit.person.pid), Mess::get(skill.name.unwrap()));
         }
     }
     else { unit.try_learn_job_skill(); }
@@ -51,7 +51,7 @@ impl ConfigBasicMenuItemSwitchMethods for JobLearnSkillMode {
     }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let is_main = DVCVariables::is_main_menu();
-        if is_main && !CONFIG.lock().unwrap().random_skill {
+        if is_main && CONFIG.lock().unwrap().random_skill == 0 {
             this.help_text = "Enable skill randomization to enable this setting.".into();
             Self::set_command_text(this, None);
             this.update_text();
@@ -67,12 +67,12 @@ impl ConfigBasicMenuItemSwitchMethods for JobLearnSkillMode {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){ 
         let is_main = DVCVariables::is_main_menu();
-        if is_main && !CONFIG.lock().unwrap().random_skill {
+        if is_main && CONFIG.lock().unwrap().random_skill == 0 {
             this.help_text = "Enable skill randomization to enable this setting.".into();
             this.command_text = "Disabled".into();
             return;
@@ -92,8 +92,8 @@ impl ConfigBasicMenuItemSwitchMethods for JobLearnSkillMode {
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){ 
         let is_main = DVCVariables::is_main_menu();
-        if is_main && !CONFIG.lock().unwrap().random_skill {
-            this.help_text = "Enable skill randomization to enable this setting.".into();
+        if is_main && CONFIG.lock().unwrap().random_skill & 2 == 0 {
+            this.help_text = "Enable class skill randomization to enable this setting.".into();
             return;
         }
         let value = if DVCVariables::is_main_menu()  { CONFIG.lock().unwrap().learn_skill }  else { GameVariableManager::get_number("LSkC") };
@@ -103,10 +103,10 @@ impl ConfigBasicMenuItemSwitchMethods for JobLearnSkillMode {
 
         this.help_text = format!("{}{}",
             match value {
-                1 => { "Playable units will have randomized class skill learnset."},
-                2 => { "Enemy units will have randomized class skill learnset."},
-                3 => { "All units will have randomized class skill learnset."},
-                _ => { "No randomized unit class skill learnset."}
+                1 => { "Playable units will have randomized class skill learn-sets."},
+                2 => { "Enemy units will have randomized class skill learn-sets."},
+                3 => { "All units will have randomized class skill learn-sets."},
+                _ => { "No randomized unit class skill learn-sets."}
             },
             changed
         ).into();
@@ -126,8 +126,8 @@ impl ConfigBasicMenuItemSwitchMethods for EquipLearnSkill {
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){ 
         this.command_text = if CONFIG.lock().unwrap().equip_learn_skill { "Enable"} else { "Disable" }.into();
@@ -142,7 +142,9 @@ pub struct LearnSkillConfirm;
 impl TwoChoiceDialogMethods for LearnSkillConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
         GameVariableManager::set_number(DVCVariables::JOB_LEARN_SKILL_KEY, GameVariableManager::get_number("LSkC"));
-        let menu = unsafe {  std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap()) };
+        let menu = unsafe {
+            std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap())
+        };
         let index = menu.select_index;
         JobLearnSkillMode::set_help_text(menu.menu_item_list[index as usize], None);
         JobLearnSkillMode::set_command_text(menu.menu_item_list[index as usize], None);
@@ -156,7 +158,7 @@ impl TwoChoiceDialogMethods for LearnSkillConfirm {
 pub fn lsk_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
     if GameVariableManager::get_number("LSkC") == GameVariableManager::get_number(DVCVariables::JOB_LEARN_SKILL_KEY) { return BasicMenuResult::new();}
     YesNoDialog::bind::<LearnSkillConfirm>(this.menu, "Change Randomization Setting?", "Do it!", "Nah..");
-    return BasicMenuResult::new();
+    BasicMenuResult::new()
 }
 
 pub extern "C" fn vibe_learn_skill() -> &'static mut ConfigBasicMenuItem {  
@@ -194,7 +196,7 @@ pub fn initialize_job_skill_restrictions() {
             }
         });
         println!("{} skills in the restrict skills list.", list.len());
-        SkillRestriction{ list: list }
+        SkillRestriction{ list }
     });
 }
 
@@ -232,7 +234,7 @@ pub fn random_job_learn_skill(unit: &Unit, job: &JobData) -> Option<&'static Ski
 pub fn unit_learn_job_skill_hook(this: &Unit, job: &JobData, _method_info: OptionalMethod) -> Option<&'static SkillData> {
     let result = call_original!(this, job, None);
     let mode = GameVariableManager::get_number(DVCVariables::JOB_LEARN_SKILL_KEY);
-    if !can_rand() || !GameVariableManager::get_bool(DVCVariables::SKILL_KEY) { 
+    if !can_rand() || GameVariableManager::get_number(DVCVariables::SKILL_KEY) & 2 == 0 {
         if CONFIG.lock().unwrap().equip_learn_skill && result.is_some() { this.add_to_equip_skill_pool(result.unwrap()); }
         return result; 
     }
@@ -259,7 +261,7 @@ pub struct ClassChangeJobMenuContent {
 #[unity::hook("App", "ClassChangeJobMenuContent", "SetJobDetails")]
 pub fn class_change_job_menu_content_hook(this: &mut ClassChangeJobMenuContent, data: &ChangeJobData, _method_info: OptionalMethod) {
     call_original!(this, data, None);
-    if data.job.learn_skill.is_none() || !can_rand() || !GameVariableManager::get_bool(DVCVariables::SKILL_KEY)  { return; }
+    if data.job.learn_skill.is_none() || !can_rand() || GameVariableManager::get_number(DVCVariables::SKILL_KEY) & 2 == 0  { return; }
     if GameVariableManager::get_number(DVCVariables::JOB_LEARN_SKILL_KEY) & 1 == 0 { return; }
     if let Some(skill) = random_job_learn_skill(SortieSelectionUnitManager::get_unit(), data.job) {
         this.skill_name.set_text(Mess::get(skill.name.unwrap()), false);

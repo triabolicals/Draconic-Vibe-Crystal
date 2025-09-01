@@ -14,14 +14,18 @@ pub struct WeaponData {
     pub avo: i16,
     pub secure: i16,
     pub rank: u8,
-    pub is_magic: bool,
-    pub is_smash: bool,
-    pub is_range: bool,
-    pub is_crit: bool,
-    pub is_slim: bool,
-    pub is_rare: bool,
-    pub is_effective: bool,
-    pub no_follow_up: bool,
+    pub flag: i32,
+    /*
+    pub is_magic: bool, 0
+    pub is_smash: bool, 1
+    pub is_range: bool, 2
+    pub is_crit: bool, 3 8|64|128|32
+    pub is_slim: bool, 4
+    pub is_rare: bool, 5
+    pub is_effective: bool, 6
+    pub no_follow_up: bool, 7
+    pub edible: bool, 8
+     */
 }
 pub struct DragonStoneData {
     pub item_index: i32,
@@ -43,17 +47,23 @@ impl WeaponData {
             else { false }; 
 
         let e_skills = item.get_equip_skills();
-        let smash = e_skills.find_sid("SID_スマッシュ").is_some();
-        let slim = item.secure > 15;
-        let crit = item.critical > 15;
-        let range = 
-            if magic && item.range_o > 3 { true }
-            else if !magic && item.range_o > 1 { true }
-            else { false };
-        let is_rare = item.price == 100 || flags & 18 != 0;
+        let mut flag = 0;
+        if magic { flag |= 1; }
+        if e_skills.find_sid("SID_スマッシュ").is_some() { flag |= 2; }
+        if ((item.kind > 3 || item.kind < 7) && item.range_o > 2) ||
+            ((item.kind < 4 || item.kind > 6 )&& item.range_o > 1) {
+            flag |= 4;
+        }
+        if item.critical >= 15 { flag |= 8; }
+        if item.secure >= 15 { flag |= 16; }
+        if item.price == 100 || flags & 18 != 0 || item.range_o > 5 || flags & 3 != 0  { flag |= 32; }
+        if effectivness { flag |= 64; }
+        if e_skills.find_sid("SID_追撃不可").is_some() { flag |= 128; }
+        if item.flag.value & 4 != 0 { flag |= 256 }
+        if e_skills.find_sid("SID_２回行動").is_some() { flag |= 512; }
         Self {
             item_index: item.parent.index,
-            weapon_type: item.kind as u8 - 1,
+            weapon_type: item.kind as u8,
             might: item.power,
             weight: item.weight,
             hit: item.hit,
@@ -61,36 +71,25 @@ impl WeaponData {
             avo: item.avoid,
             secure: item.secure,
             rank: item.get_weapon_level() as u8,
-            is_magic: magic,
-            is_smash: smash,
-            is_slim: slim,
-            is_crit: crit,
-            is_range: range,
-            is_effective: effectivness,
-            is_rare: flags & 2 != 0 || is_rare || item.range_o > 5,
-            no_follow_up: e_skills.find_sid("SID_追撃不可").is_some(),
+            flag,
         }
     }
 
     pub fn can_replace(&self, item2: &WeaponData, kind: u8, enemy: bool) -> bool {
-        if item2.is_rare { 
+        if item2.flag & 32 != 0 { 
             if !enemy || !DVCVariables::is_main_chapter_complete(8) { return false; }
         }
         if item2.weapon_type != kind { return false; }
-        if self.is_slim == item2.is_slim { return true; }
+        if (self.flag & item2.flag) & 16 != 0 { return true; }
         if item2.rank == self.rank { return true; }
         else {
             let might_diff = item2.might as i8 - self.might as i8;
-            if might_diff > 15 || might_diff < -2 { return false;}
+            might_diff < 15 && might_diff > -2
         }
-        return true;
     }
     pub fn is_valid_tome(&self, tome_rank: i32, enemy: bool) -> bool {
-        if self.weapon_type != 6 { return false; }
-        if enemy && self.is_rare { return true; }
-        return self.rank == tome_rank as u8;
+        self.weapon_type == 6 && ( enemy == (self.flag & 32 != 0)) && self.rank == tome_rank as u8
     }
-
 }
 
 pub struct StaffData {
@@ -167,6 +166,7 @@ pub struct WeaponDatabase {
     pub staff_list: Vec<StaffData>,
     pub dragonstones: Vec<DragonStoneData>,
     pub effective_sids: Vec<i32>,
+    pub extra_items: Vec<i32>,
     pub base_might: [[u8; 9]; 6],   
 }
 
@@ -179,30 +179,31 @@ impl WeaponDatabase {
             bullet_list: Vec::new(),
             staff_list: Vec::new(),
             dragonstones: Vec::new(),
-            effective_sids: SkillData::get_list().unwrap().iter().filter(|x| x.efficacy_value > 1 && x.efficacy_value == 0).map(|x| x.parent.hash).collect(),
+            extra_items: Vec::new(),
+            effective_sids: SkillData::get_list().unwrap().iter()
+                .filter(|x| x.efficacy_value > 1 && x.efficacy !=  0).map(|x| x.parent.hash).collect(),
             base_might: [[0; 9]; 6],
         }
     }
-    pub fn intitalize(&mut self) {
+    pub fn initialize(&mut self) {
         let item_list = ItemData::get_list().unwrap();
         for x in 3..item_list.len() {
             let item = &item_list[x];
-            if !is_vaild_weapon(item) { continue; }
+            if !is_vaild_weapon(item) {
+                if item.usetype == 42 || item.usetype == 28 || item.usetype == 21 {
+                    self.extra_items.push(item.parent.hash);
+                }
+                if item.kind == 7 {
+
+                }
+            }
             self.try_add_weapon(item);
         }
-        println!("Total of {} weapons in the database.", self.weapon_list.len());
-        let kinds = ["Swords", "Lance", "Axes", "Bows", "Daggers", "Tomes", "Rods", "Fists", "Others"];
-        for x in 0..9 {
-            let count = self.weapon_list.iter().filter(|w| w.weapon_type == x as u8).count();
-            println!("{} {}", count, kinds[x as usize]);
-        }
-        println!("Total of {} staffs in the database.", self.staff_list.len());
-        println!("Total of {} dragonstones in database", self.dragonstones.len());
     }
     pub fn try_add_weapon(&mut self, item: &ItemData) {
         let effectiveness = self.check_effectiveness(item);
         if item.icon.is_none() { return; }
-        if item.kind == 7 { //Staff
+        if item.kind == 7 && item.flag.value & 128 == 0{  //Staff
             self.staff_list.push(StaffData::new(item));
             return;
         }
@@ -220,7 +221,7 @@ impl WeaponDatabase {
                 }
             }
         }
-        else if item.kind == 9 {
+        else if item.kind == 9 && item.icon.is_some_and(|s| !s.to_string().contains("Sombre")) {
             if item.flag.value & 0x4000000 != 0 && item.hit > 0 { self.dragonstones.push(DragonStoneData::new(item));  }
             else if item.flag.value & 0x8000000 != 0 { self.bullet_list.push(WeaponData::new(item, effectiveness)); }
         }
@@ -241,9 +242,9 @@ impl WeaponDatabase {
             let rng = Random::get_system();
             let selection = rng.get_value(possible_weapons.len() as i32) as usize;
             let index = possible_weapons[selection].item_index;
-            return ItemData::try_index_get(index);
+            ItemData::try_index_get(index)
         }
-        return None;
+        else { None }
     }
 
     pub fn get_generic_weapon(&self, new_type: i32, rank: i32) -> Option<&'static ItemData> {
@@ -259,56 +260,55 @@ impl WeaponDatabase {
             let rng = Random::get_system();
             let selection = rng.get_value(possible_weapons.len() as i32) as usize;
             let index = possible_weapons[selection].item_index;
-            return ItemData::try_index_get(index);
+            ItemData::try_index_get(index)
         }
-        else { return None; }
+        else {  None }
     }
 
     pub fn get_range_melee(&self, new_type: i32, max_rank: i32) -> Option<&'static ItemData> {
         let possible_weapons: Vec<&WeaponData> = self.generic_weapons.iter().filter(|&x|
             x.rank <= max_rank as u8 && 
-            x.weapon_type == new_type as u8 &&
-            x.is_range == true).collect();
+            x.weapon_type == new_type as u8 && (x.flag & 4 != 0) == true).collect();
 
-        if possible_weapons.len() == 1 {
-            return ItemData::try_index_get(possible_weapons[0].item_index);
-        }
-        if possible_weapons.len() > 1 {
+        if possible_weapons.len() == 1 { ItemData::try_index_get(possible_weapons[0].item_index) }
+        else if possible_weapons.len() > 1 {
             let rng = Random::get_system();
             let selection = rng.get_value(possible_weapons.len() as i32) as usize;
             let index = possible_weapons[selection].item_index;
-            return ItemData::try_index_get(index);
+            ItemData::try_index_get(index)
         }
-        return None;
+        else { None }
     }
 
     pub fn get_staff(&self, level: i32, staff_type: i32, job_rank: i32, enemy: bool) -> Option<&'static ItemData> {
-        let possible_staffs: Vec<&StaffData> = self.staff_list.iter().filter(|&x| x.can_add(level, staff_type as u8, job_rank as u8, enemy)).collect();
-        if possible_staffs.len() == 1 { return ItemData::try_index_get(possible_staffs[0].item_index);   }
-        if possible_staffs.len() > 1 {
+        let possible_staffs: Vec<&StaffData> = self.staff_list.iter()
+            .filter(|&x| x.can_add(level, staff_type as u8, job_rank as u8, enemy)).collect();
+
+        if possible_staffs.len() >= 1 {
             let rng = Random::get_system();
             let selection = rng.get_value(possible_staffs.len() as i32) as usize;
             let index = possible_staffs[selection].item_index;
-            return ItemData::try_index_get(index);
+            ItemData::try_index_get(index)
         }
-        else { return None; }
+        else { None }
     }
 
     pub fn get_tome(&self, job_rank: i32, total_level: i32, enemy: bool) -> Option<&'static ItemData> {
-        let non_basic = total_level >= 10; 
+        let non_basic = total_level >= 10;
         let rank_level = 
         if total_level < 14 { 1 }
         else if total_level < 21 { 2 }
-        else if total_level < 28 { 3 }
-        else { 4 };
+        else if total_level < 26 { 3 }
+        else if total_level < 31 { 4 }
+        else { 5 };
         let rank = min(rank_level, job_rank) as u8;
 
         let mut possible_weapons: Vec<_> = 
             self.weapon_list.iter()
                 .filter(|&x|{
-                    x.weapon_type == 5 && x.rank == rank &&
-                    ((non_basic == (x.is_effective | x.no_follow_up | x.is_crit | x.is_rare)) || non_basic) && 
-                    ((enemy == x.is_rare) || enemy)
+                    x.weapon_type == 6 && x.rank == rank &&
+                    ((non_basic == (x.flag & 232 != 0)) || non_basic) &&
+                    ((enemy == (x.flag & 32 != 0)) || enemy)
                 })
                 .map(|x| x.item_index)
                 .collect();
@@ -317,17 +317,20 @@ impl WeaponDatabase {
     }
     pub fn get_dragon_stone(&self, is_enemy: bool) -> Option<&'static ItemData> {
         let possible_weapons: Vec<&DragonStoneData> = self.dragonstones.iter().filter(|&x|  (is_enemy == x.is_enemy_only) || is_enemy).collect();
-        if possible_weapons.len() == 0 { 
-            println!("no weapons dragonstone and enemy: {}", is_enemy);
-            return None; }
-        let rng = Random::get_system();
-        let selection = rng.get_value(possible_weapons.len() as i32) as usize;
-        return ItemData::try_index_get( possible_weapons[selection].item_index);
+        if possible_weapons.len() > 1 {
+            let rng = Random::get_system();
+            let selection = rng.get_value(possible_weapons.len() as i32) as usize;
+            ItemData::try_index_get(possible_weapons[selection].item_index)
+        }
+        else { None }
     }
 
-    pub fn get_random_weapon(&self, kind: i32, enemy: bool) -> Option<&'static ItemData> {
+    pub fn get_random_weapon(&self, kind: i32, rank: i32, enemy: bool) -> Option<&'static ItemData> {
         let weapon = kind  as u8;
-        let possible_weapons: Vec<&WeaponData>  = self.weapon_list.iter().filter(|x| x.weapon_type == weapon && ((enemy == x.is_rare) || enemy) ).collect();
+        let possible_weapons: Vec<&WeaponData>  = self.weapon_list.iter().filter(|x|
+            x.weapon_type == weapon && ( (x.flag & 32 != 0 && enemy) || (!x.flag & 32 != 0 && (rank == -1 || (x.rank == rank as u8))))
+        )
+        .collect();
         if possible_weapons.len() == 0 {
             println!("no weapons of kind: {} and enemy: {}", kind, enemy);
             return None;
@@ -335,11 +338,11 @@ impl WeaponDatabase {
         let rng = Random::get_system();
         let selection = rng.get_value(possible_weapons.len() as i32) as usize;
         let index = possible_weapons[selection].item_index;
-        return ItemData::try_index_get(index);
+        ItemData::try_index_get(index)
     }
     pub fn get_simple_replacement(&self, item: &ItemData, weapon_mask: i32, weapon_levels: &Array<i32>) -> Option<&'static ItemData> {
         if weapon_mask & (1 << item.kind) != 0 && item.get_weapon_level() <= weapon_levels[item.kind as usize] { return None; }
-        let is_rare = item.flag.value & 3 != 0;
+        let is_rare = item.flag.value & 32 != 0;
         let mut weapon_order = [0; 4];
         let mut search_mask = weapon_mask;
         for w in 0..4 {
@@ -359,31 +362,41 @@ impl WeaponDatabase {
             }
         }
         if let Some(weapon) = self.weapon_list.iter().find(|x| x.item_index == item.parent.index) {
-            let extra_conditions = weapon.is_smash || weapon.is_effective || weapon.is_crit || weapon.is_slim || weapon.is_range ;
             for kind in weapon_order {
+                let conditions = if weapon.weapon_type == 4 { 0 } else { 32 } | 538 |
+                    if weapon.flag & 4 != 0 && (kind != 1 && kind != 8) { 4 } else { 0 };
+                let target_conditions = if weapon.flag & 512 != 0 && weapon.weapon_type != 8 { 606 } else {  94 };
                 let mut search_rank = clamp_value(item.get_weapon_level(), 1,  weapon_levels[kind as usize]) as u8;
                 while search_rank != 0 {
                     let dmight = self.base_might[search_rank as usize][item.kind as usize] -  self.base_might[search_rank as usize][kind as usize];
                     let mut selection: Vec<_> = self.weapon_list.iter()
-                        .filter(|w|
-                            ( extra_conditions && ((( w.is_smash && weapon.is_smash ) || (w.is_effective && weapon.is_effective) || (w.is_crit && weapon.is_crit) || (w.is_slim && weapon.is_slim) || (( weapon.is_range == w.is_range) || w.is_range))) ||
-                            ( w.might - weapon.might ) * ( w.might - weapon.might ) <= (dmight+1)*dmight) &&
-                            search_rank == w.rank  &&
-                            (kind - 1) == w.weapon_type && 
-                            ( (is_rare == w.is_rare) || is_rare )
+                        .filter(|w| {
+                            ((weapon.flag & conditions) == (w.flag & target_conditions)) &&
+                                ((w.might - weapon.might) * (w.might - weapon.might) <= 2*(dmight + 1) * dmight) &&
+                                search_rank == w.rank && w.flag & 256 == 0 &&
+                                kind == w.weapon_type &&
+                                ((is_rare == (w.flag & 32 != 0)) || is_rare)
+                        }
                         ).collect();
-                    if selection.len() > 1 {
-                        if let Some(weapon) = utils::get_random_element(&mut selection, Random::get_game()) { return ItemData::try_index_get(weapon.item_index); }
+                    if selection.len() >= 1 {
+                        if let Some(new_weapon) = utils::get_random_element(&mut selection, Random::get_game()) {
+                            println!("Simple Replacement: {} to {}", Mess::get_name(item.iid), Mess::get_name(ItemData::try_index_get(new_weapon.item_index).unwrap().iid));
+                            return ItemData::try_index_get(new_weapon.item_index);
+                        }
                     }
                     let mut selection: Vec<_> = self.weapon_list.iter()
                         .filter(|w|
-                            !w.is_smash &&
+                            w.flag & 66 == 0 && ((weapon.flag & 512 != 0) == (w.flag & 512 != 0)) &&
                             search_rank == w.rank &&
-                            (kind - 1) == w.weapon_type && 
-                            ( (is_rare == w.is_rare) || is_rare )
+                            kind == w.weapon_type &&
+                            w.flag & 256 == 0 &&
+                            ((is_rare == (w.flag & 32 != 0)) || is_rare )
                         ).collect();
-                    if selection.len() > 1 {
-                        if let Some(weapon) = utils::get_random_element(&mut selection, Random::get_game()) { return ItemData::try_index_get(weapon.item_index); }
+                    if selection.len() >= 1 {
+                        if let Some(new_weapon) = utils::get_random_element(&mut selection, Random::get_game()) {
+                            // println!("Simple Replacement 2: {} to {}", Mess::get_name(item.iid), Mess::get_name(ItemData::try_index_get(new_weapon.item_index).unwrap().iid));
+                            return ItemData::try_index_get(new_weapon.item_index);
+                        }
                     }
                     search_rank -= 1;
                 }
@@ -405,17 +418,19 @@ impl WeaponDatabase {
     pub fn get_additional_weapon(&self, item: &ItemData) -> Option<&'static ItemData> {
         if let Some(weapon) = self.weapon_list.iter().find(|x| x.item_index == item.parent.index) {
             let mut search_rank = weapon.rank;
-            while search_rank != 0 {
+            while search_rank > 1 {
                 let mut selection: Vec<_> = self.weapon_list.iter()
                     .filter(|w|
                         w.item_index != item.parent.index &&
-                        ( ( w.is_smash ^ weapon.is_smash) || (w.is_effective ^ weapon.is_effective) || (w.is_crit ^ weapon.is_crit) || ( w.is_range ^  weapon.is_range ) ) &&
+                        (w.flag & 78) ^ (weapon.flag & 78) != 0 &&
                         search_rank == w.rank &&
                         weapon.weapon_type == w.weapon_type && 
-                        !w.is_rare
+                        w.flag & 32 == 0
                     ).collect();
                 if selection.len() > 1 {
-                    if let Some(weapon) = utils::get_random_element(&mut selection, Random::get_game()) { return ItemData::try_index_get(weapon.item_index); }
+                    if let Some(weapon) = utils::get_random_element(&mut selection, Random::get_game()) {
+                        return ItemData::try_index_get(weapon.item_index);
+                    }
                 }
                 search_rank -= 1;
             }
@@ -425,9 +440,7 @@ impl WeaponDatabase {
 }
 
 
-pub fn is_generic(item: &ItemData) -> bool {
-    return item.price > 100 && item.flag.value & 131 == 0 && item.equip_condition.is_none();
-}
+pub fn is_generic(item: &ItemData) -> bool { item.price > 100 && item.flag.value & 135 == 0 && item.equip_condition.is_none()  }
 pub fn is_vaild_weapon(item: &ItemData) -> bool {
     let iid = item.iid.to_string(); 
     if item.icon.is_none() { return false; }
@@ -435,32 +448,32 @@ pub fn is_vaild_weapon(item: &ItemData) -> bool {
     if Mess::get(item.name).to_string().len() <= 1 { return false;}
     if item.kind == 0 || item.kind > 9 { return false; }
     if iid == "IID_メティオ" || iid == "IID_ミセリコルデ" || iid == "IID_リベラシオン" { return false; }    // No Meteor / Liberation / Misercode
-    return enums::ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == item.parent.index).is_none();
+    ITEM_BLACK_LIST.lock().unwrap().iter().find(|x| **x == item.parent.index).is_none()
 }
 
 pub fn get_min_rank() -> u8 {
     let story_chapter = crate::continuous::get_story_chapters_completed();
     let continous = DVCVariables::is_random_map();
-    if DVCVariables::is_main_chapter_complete(25) || (continous && story_chapter >= 25 ) { return 5;}
-    if DVCVariables::is_main_chapter_complete(17) || (continous && story_chapter >= 16 && DVCVariables::is_main_chapter_complete(11)) { return 3;}
-    if DVCVariables::is_main_chapter_complete(6) || (continous && story_chapter >= 6)  { return 2;}
-    return 1;
+    if DVCVariables::is_main_chapter_complete(25) || (continous && story_chapter >= 25 ) { 5 }
+    else if DVCVariables::is_main_chapter_complete(17) || (continous && story_chapter >= 16 && DVCVariables::is_main_chapter_complete(11)) { 3 }
+    else if DVCVariables::is_main_chapter_complete(6) || (continous && story_chapter >= 6)  { 2 }
+    else { 1 }
 }
 
 pub fn get_magic_staff() -> usize {
     let story_chapter = crate::continuous::get_story_chapters_completed();
     let continous = DVCVariables::is_random_map();
-    if DVCVariables::is_main_chapter_complete(21) { return 4;}
-    if DVCVariables::is_main_chapter_complete(17) || (continous && story_chapter >= 16 && DVCVariables::is_main_chapter_complete(11)) { return 3;}
-    if DVCVariables::is_main_chapter_complete(11) { return 2;}
-    if DVCVariables::is_main_chapter_complete(6) || (continous && story_chapter >= 6) { return 1;}
-    return 0;
+    if DVCVariables::is_main_chapter_complete(21) { 4 }
+    else if DVCVariables::is_main_chapter_complete(17) || (continous && story_chapter >= 16 && DVCVariables::is_main_chapter_complete(11)) { 3}
+    else if DVCVariables::is_main_chapter_complete(11) { 2 }
+    else if DVCVariables::is_main_chapter_complete(6) || (continous && story_chapter >= 6) { 1}
+    else { 0 }
 }
 
 pub fn get_magic_staff_by_level(level: i32) -> usize {
-    if level > 32 { return 4;}
-    if level > 25 { return 3;}
-    if level > 15 { return 2;}
-    if level > 10 { return 1;}
-    return 0;
+    if level > 32 { 4}
+    else if level > 25 { 3}
+    else if level > 15 { 2}
+    else if level > 10 { 1}
+    else { 0 }
 }

@@ -11,15 +11,25 @@ titleid = "01006A800016E000" # Smash Ultimate
 crate-type = ["cdylib"]
 
 [dependencies]
-skyline = "0.2.0"
-unity = { version="0.3.0", git = "https://github.com/DivineDragonFanClub/unity" }
-engage = { version="0.6.1", git = "https://github.com/DivineDragonFanClub/engage"}
-cobapi = { version = "0.3.0", git = "https://github.com/DivineDragonFanClub/cobapi" }
-serde = { version = "1.0", features = ["derive"] }
-toml = "0.8.0"
+skyline = { git = "https://github.com/Raytwo/skyline-rs", branch = "preview" }
+unity = { git = "https://github.com/DivineDragonFanClub/unity" }
+engage = { git = "https://github.com/DivineDragonFanClub/engage"}
+cobapi = { git = "https://github.com/DivineDragonFanClub/cobapi" }
+serde = { version = "1.0.219", features = ["derive"] }
+paste = "1.0.15"
+toml = "0.9.2"
+concat-string = "1.0.1"
+bitflags = "2.9.1"
+num-traits = "0.2.19"
 
 [patch."https://github.com/DivineDragonFanClub/engage"]
 engage = {path = "/Users/trile/Project/lib/engage"}
+
+[patch."https://github.com/DivineDragonFanClub/unity"]
+unity = {path = "/Users/trile/Project/unity"}
+
+[patch."https://github.com/DivineDragonFanClub/cobapi"]
+cobapi = {path = "/Users/trile/Project/lib/cobapi" }
 
 [profile.dev]
 panic = "abort"
@@ -27,4 +37,4 @@ panic = "abort"
 [profile.release]
 panic = "abort"
 lto = true
-opt-level = 1
+opt-level = 2

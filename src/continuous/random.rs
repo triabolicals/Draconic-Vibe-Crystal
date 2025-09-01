@@ -5,7 +5,7 @@ pub fn random_map_mode_level() -> i32 {
 }
 
 pub fn continous_rand_emblem_adjustment() {
-    if GameVariableManager::get_number(DVCVariables::CONTINIOUS) < 3 { return; }
+    if GameVariableManager::get_number(DVCVariables::CONTINUOUS) < 3 { return; }
     unsafe { enable_map_rewind(None); }
     if DVCVariables::is_main_chapter_complete(22) { for x in 0..12 { escape_god(EMBLEM_GIDS[x], false); }   return; }
     let current_chapter = GameUserData::get_chapter().cid.to_string();

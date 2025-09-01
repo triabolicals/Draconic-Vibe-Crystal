@@ -91,7 +91,9 @@ pub fn reset_enemy_ai_and_items(unit: &mut Unit) {
         .find(|data| 
             data.flag.value & diff != 0 && 
             unit.force.map_or_else(|| 1, |f| f.force_type) == data.force as i32 &&
-            data.get_person().is_some_and(|dispos_person| dispos_person.parent.hash == unit.person.parent.hash) && data.dispos_x == unit.dispos_y as i8  && data.dispos_y == unit.dispos_z as i8 )
+            data.get_person().is_some_and(|dispos_person| dispos_person.parent.hash == unit.person.parent.hash) &&
+                data.dispos_x == unit.dispos_y as i8  && data.dispos_y == unit.dispos_z as i8
+        )
     {
         unit.item_list.put_off_all_item();
         unsafe { 
@@ -105,7 +107,7 @@ pub fn reset_enemy_ai_and_items(unit: &mut Unit) {
 
 pub fn adjust_unitai(unit: &mut Unit) {
     let job = unit.get_job();
-    let m022 = GameUserData::get_chapter().cid.to_string() == "CID_M022";
+    let m022 = GameUserData::get_chapter().cid.str_contains("CID_M022");
     let activation = unit.ai.sequence[0].to_string();
     let ac_every_time = activation.contains("AC_Everytime");
     let ac_turn =  activation.contains("Turn");

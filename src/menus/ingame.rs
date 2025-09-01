@@ -1,29 +1,33 @@
+use crate::VERSION;
 use super::*;
 
 fn add_in_game_dvc_menu_items(config_menu: &mut ConfigMenu<ConfigBasicMenuItem>) {
+    config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::AssetSubMenu>("Asset Settings"));
     config_menu.add_item(deployment::vibe_deployment());
     config_menu.add_item(deployment::vibe_emblem_deployment());
     config_menu.add_item(randomizer::terrain::menu::vibe_energy());
     config_menu.add_item(randomizer::terrain::menu::vibe_fow());
-    config_menu.add_item(crate::assets::accessory::vibe_enemy_outfit());
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<crate::assets::accessory::RandomAssets>("Randomized Assets"));
     config_menu.add_item(randomizer::job::menu::vibe_job_rerand());
-    config_menu.add_item(randomizer::item::unit_items::vibe_prw());
-    config_menu.add_item(crate::assets::bust::vibe_bust());
-    config_menu.add_item(randomizer::names::vibe_generic());
     config_menu.add_item(randomizer::grow::vibe_pgmode());
+    config_menu.add_item(randomizer::item::menu::vibe_prw());
     config_menu.add_item(autolevel::menu::vibe_autolevel());
     config_menu.add_item(autolevel::menu::autobench());
     config_menu.add_item(randomizer::job::menu::vibe_custom_job());
-    config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::menu::RandomCC>("Random Reclassing"));
+    if DVCVariables::get_single_class(false).is_some() || DVCVariables::get_random_reclass() == 0 {
+        config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::single::SingleJob>("Opps! All"));
+    }
+    else {
+        config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::menu::RandomCC>("Re-Classing Settings"));
+    }
+
     config_menu.add_item(randomizer::skill::learn::vibe_learn_skill());
     config_menu.add_item(randomizer::emblem::emblem_skill::vibe_rand_esc());
     config_menu.add_item(randomizer::skill::menu::vibe_rand_spc());
     config_menu.add_item(randomizer::skill::menu::vibe_skill_gauge());
     config_menu.add_item(randomizer::job::menu::vibe_job_gauge());
-    config_menu.add_item(randomizer::item::vibe_drops());
+    config_menu.add_item(randomizer::item::menu::vibe_drops());
     config_menu.add_item(randomizer::item::hub::vibe_hub_items());
-    config_menu.add_item(randomizer::item::vibe_item_gauge());
+    config_menu.add_item(randomizer::item::menu::vibe_item_gauge());
     config_menu.add_item(randomizer::bgm::vibe_bgm());
     config_menu.add_item(randomizer::styles::vibe_styles());
     config_menu.add_item(randomizer::interact::vibe_interaction());
@@ -59,21 +63,18 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalInGameMenu {
             else { BasicMenuResult::new() }
         }
         else if pad_instance.npad_state.buttons.plus() {
-            if DVCVariables::random_enabled() {
-                let text = format!("Create Output File for this Save?\n Save as 'sd:/Draconic Vibe Crystal/{}.log'",  crate::utils::get_player_name());
-                YesNoDialog::bind::<WriteOutputConfirm>(this.menu, text, "Do it!", "Nah..");
-            }
+            output_bind(this, None);
             BasicMenuResult::se_cursor()
         }
         else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { this.command_text = "View Settings".into(); }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) { 
-        this.help_text = if GameVariableManager::get_number("G_Random_Seed") == 0 {  
-            "Open up In-Game Draconic Vibe Crystal settings.".to_string() 
-        }
-        else { format!("Press + to Create Output. Seed: {}", GameVariableManager::get_number(DVCVariables::SEED))
-        }.into();
+        this.help_text =
+            if GameVariableManager::get_number("G_Random_Seed") == 0 {
+                "Open up In-Game Draconic Vibe Crystal settings.".to_string()
+            }
+            else { format!("Press + to Create Output. Seed: {}", GameVariableManager::get_number(DVCVariables::SEED)) }.into();
     }
 }
 
@@ -82,12 +83,14 @@ pub extern "C" fn vibe2() -> &'static mut ConfigBasicMenuItem {
     let command = ConfigBasicMenuItem::new_command::<TriabolicalInGameMenu>(title);
     command
 }
-
+fn output_bind(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) {
+    if DVCVariables::random_enabled() {
+        let text = format!("Create Output File for this Save?\n Save as 'sd:/Draconic Vibe Crystal/{}.log'",  crate::utils::get_player_name());
+        YesNoDialog::bind::<WriteOutputConfirm>(this.menu, text, "Do it!", "Nah..");
+    }
+}
 pub fn dvc_in_game_menu_create_bind(this: &mut BasicMenuItem, _method_info: OptionalMethod) ->  BasicMenuResult {
     this.menu.close_anime_all();
-    if engage::sortie::SortieTopMenuManager::get_instance().is_some() {
-        this.menu.save_select(SortieTopMenuManager::get_menu_select());
-    }
     // Initialize the menu
     ConfigSequence::create_bind(this.menu);
 
@@ -107,15 +110,6 @@ pub fn dvc_in_game_menu_create_bind(this: &mut BasicMenuItem, _method_info: Opti
     BasicMenuResult::se_decide()
 }
 
-pub fn dvc_minus_calls() {
-    Il2CppClass::from_name("App", "SortieTopMenu").unwrap().get_nested_types().iter().for_each(|cc|{
-        Il2CppClass::from_il2cpptype(cc.get_type()).unwrap()
-            .get_virtual_method_mut("MinusCall").map(|method| method.method_ptr = dvc_in_game_menu_create_bind as _);
-    });
-    Il2CppClass::from_name("App", "MapSystemMenu").unwrap().get_nested_types().iter().for_each(|cc|{
-        Il2CppClass::from_il2cpptype(cc.get_type()).unwrap().get_virtual_method_mut("MinusCall").map(|method| method.method_ptr = dvc_in_game_menu_create_bind as _);
-    });
-}
 #[skyline::from_offset(0x0253a650)]
 pub fn config_sequeunce_create_bint<P: Bindable + Sized>(proc: &P, method_info: OptionalMethod);
 
@@ -128,4 +122,38 @@ extern "C" fn create_dvc_config_menu(this: &mut ConfigSequence, _method_info: Op
     config_menu.full_menu_item_list.clear();
     add_in_game_dvc_menu_items(config_menu);
     TitleBar::open_header("Draconic Vibe Crystal", super::super::VERSION, "");
+}
+
+#[skyline::from_offset(0x02671300)]
+pub fn map_sequence_sortie_human_create_sys_menu(map_sequence: &mut ProcInst, method_info: OptionalMethod);
+#[skyline::from_offset(0x024eb880)]
+fn sortie_top_menu_create_bind(proc: &ProcInst, method_info: OptionalMethod);
+
+
+pub extern "C" fn map_system_add_dvc_add(proc: &mut ProcInst) {
+    let top_menu = proc.cast_mut::<BasicMenu<BasicMenuItem>>();
+    if let Some(menu) = top_menu.full_menu_item_list
+        .iter_mut().find(|x| x.get_class().get_name() == "SystemMenuItem")
+    {
+        let menu_item_class = menu.get_class_mut().clone();
+        let new_menu_item = il2cpp::instantiate_class::<BasicMenuItem>(menu_item_class.clone()).unwrap();
+        new_menu_item.get_class_mut().get_virtual_method_mut("GetName")
+            .map(|m| m.method_ptr = dvc_name as _);
+        new_menu_item.get_class_mut().get_virtual_method_mut("ACall")
+            .map(|m| m.method_ptr = dvc_in_game_menu_create_bind as _);
+        new_menu_item.get_class_mut().get_virtual_method_mut("GetHelpText").map(|m|
+            m.method_ptr = dvc_help as _);
+        new_menu_item.get_class_mut().get_virtual_method_mut("PlusCall").map(|m|
+            m.method_ptr = output_bind as _ );
+
+        top_menu.full_menu_item_list.insert(2, new_menu_item);
+        let items = top_menu.full_menu_item_list.len() as i32;
+        top_menu.set_show_row_num(items);
+    }
+}
+pub fn dvc_name(_this: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString {
+    format!("DVC v. {}", VERSION).into()
+}
+pub fn dvc_help(_this: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString {
+    engage::mess::Mess::get("MID_MENU_H_CONFIG")
 }
