@@ -29,7 +29,7 @@ pub fn randomize_enemy_emblems() {
     let different_order = GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) != 0;
     if !different_order &&
         GameVariableManager::get_number(DVCVariables::EMBLEM_SYNC_KEY) == 0 &&
-        GameVariableManager::get_number(DVCVariables::EMBLEM_ITEM_KEY) == 0 &&
+        !DVCVariables::get_flag(DVCFlags::EngageWeapons, false) &&
         GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_KEY) == 0
     { return; }
     if !crate::randomizer::RANDOMIZER_STATUS.read().unwrap().emblem_data_randomized { return; }

@@ -31,15 +31,13 @@ pub static SYNCHO_RANDOM_LIST: Mutex<SynchoList> = Mutex::new(
 pub struct EmblemSkillChaos;
 impl ConfigBasicMenuItemSwitchMethods for EmblemSkillChaos {
     fn init_content(_this: &mut ConfigBasicMenuItem){
-        if GameUserData::get_sequence() != 0 { GameVariableManager::make_entry("ESkC", GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY));  }
+        if GameUserData::get_sequence() != 0 { DVCVariables::set_temp(DVCVariables::EMBLEM_SKILL_CHAOS_KEY);  }
     }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().emblem_skill_chaos }
-            else { GameVariableManager::get_number("ESkC")};
+        let value = DVCVariables::get_emblem_skill_chaos();
         let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
         if value != result {
-            if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().emblem_skill_chaos = result; }
-            else { GameVariableManager::set_number("ESkC", result)};
+            DVCVariables::set_emblem_appearance(result);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -47,64 +45,46 @@ impl ConfigBasicMenuItemSwitchMethods for EmblemSkillChaos {
         } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().emblem_skill_chaos }
-            else { GameVariableManager::get_number("ESkC")};
-        let changed = DVCVariables::changed_setting_text("ESkC", DVCVariables::EMBLEM_SKILL_CHAOS_KEY);
-
-        this.command_text = format!("{}{}",changed, match value {
+        let value = DVCVariables::get_emblem_skill_chaos();
+        this.is_command_icon = DVCVariables::is_temp_change(DVCVariables::EMBLEM_SKILL_CHAOS_KEY);
+        this.command_text = match value {
             1 => { "Sync" },
             2 => { "Engage" },
             3 => { "Sync / Engage "},
             _ => { "Default"},
-        }).into();
+        }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let main = DVCVariables::is_main_menu();
-        let value = if main { CONFIG.lock().unwrap().emblem_skill_chaos } else { GameVariableManager::get_number("ESkC")};
-        let changed = if main { "" }
-            else if GameVariableManager::get_number("ESkC") != GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY) { " (A to Confirm)"}
-            else { "" };
-
-        this.help_text = format!("{}{}", match value {
+        let value = DVCVariables::get_emblem_skill_chaos();
+        this.help_text = match value {
             1 => { "Expands pool for sync skills." },
             2 => { "Expands pool for engage skills." },
             3 => { "Expands pool for engage and sync skills." },
             _ => { "Default pool for sync and engage skills."},
-        }, changed).into();
+        }.into();
+    }
+    extern "C" fn a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        if !this.is_command_icon { BasicMenuResult::new() }
+        else {
+            YesNoDialog::bind::<EmblemSkillChaosConfirm>(this.menu, "Change Emblem Chaos Skill Setting?\nMust save and reload to take effect.", "Do it!", "Nah..");
+            BasicMenuResult::se_cursor()
+        }
+    }
+    extern "C" fn build_attributes(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
+        if can_rand() && GameVariableManager::get_number(DVCVariables::EMBLEM_SYNC_KEY ) > 1 { BasicMenuItemAttribute::Enable } else { BasicMenuItemAttribute::Hide }
     }
 }
-
 pub struct EmblemSkillChaosConfirm;
 impl TwoChoiceDialogMethods for EmblemSkillChaosConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
-        GameVariableManager::set_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY, GameVariableManager::get_number("ESkC"));
-        unsafe { 
-            let menu = std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap());
-            let index = menu.select_index;
-            EmblemSkillChaos::set_help_text(menu.menu_item_list[index as usize], None);
-            EmblemSkillChaos::set_command_text(menu.menu_item_list[index as usize], None);
-            menu.menu_item_list[index as usize].update_text();
-        }
-        BasicMenuResult::se_cursor().with_close_this(true)
+        DVCVariables::update_var_from_temp(DVCVariables::EMBLEM_SKILL_CHAOS_KEY);
+        crate::menus::utils::dialog_restore_text::<EmblemSkillChaos>(this, false);
+        BasicMenuResult::se_cursor()
     }
-    extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
 }
 
-pub fn esc_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    if GameVariableManager::get_number("ESkC") == GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY) { return BasicMenuResult::new();}
-    YesNoDialog::bind::<EmblemSkillChaosConfirm>(this.menu, "Change Randomization Setting?\nMust save and reload to take effect.", "Do it!", "Nah..");
-    return BasicMenuResult::new();
-}
-pub fn esc_build_attr(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
-    if can_rand() && GameVariableManager::get_number(DVCVariables::EMBLEM_SYNC_KEY ) > 1 { BasicMenuItemAttribute::Enable } else { BasicMenuItemAttribute::Hide }
-}
 
-pub extern "C" fn vibe_rand_esc() -> &'static mut ConfigBasicMenuItem {
-    let switch = ConfigBasicMenuItem::new_switch::<EmblemSkillChaos>("Emblem Skill Chaos Mode");
-    switch.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = esc_acall as _ );
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = esc_build_attr as _ );
-    switch
-}
+pub extern "C" fn vibe_rand_esc() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_switch::<EmblemSkillChaos>("Emblem Skill Chaos Mode") }
 
 
 pub fn create_emblem_skill_pool() {
@@ -139,7 +119,7 @@ pub fn create_emblem_skill_pool() {
     SYNCHO_RANDOM_LIST.lock().unwrap().add_by_sid("SID_太陽の腕輪＋", true, false);
     SYNCHO_RANDOM_LIST.lock().unwrap().add_by_sid("SID_日月の腕輪＋", true, false);
     SYNCHO_RANDOM_LIST.lock().unwrap().add_by_sid("SID_蒼穹＋", true, false);
-    crate::enums::EXTRA_SYNCS.iter().for_each(|&x| { SYNCHO_RANDOM_LIST.lock().unwrap().add_to_non_upgrade(x, true); } );
+    EXTRA_SYNCS.iter().for_each(|&x| { SYNCHO_RANDOM_LIST.lock().unwrap().add_to_non_upgrade(x, true); } );
     SYNCHO_RANDOM_LIST.lock().unwrap().get_sync_list_size(); // Calc size
 
     ENGAGE_ATTACKS.get_or_init(||{
@@ -163,7 +143,6 @@ pub fn create_emblem_skill_pool() {
 }
 
 pub fn reset_emblem_skills() {
-    println!("Resetting skills to normal");
     SYNCHO_RANDOM_LIST.lock().unwrap().reset();
     unsafe { EIRIKA_INDEX = 11; }
 }
@@ -185,7 +164,7 @@ pub fn randomized_inherit(grow_list: &mut Vec<&mut List<GodGrowthData>>) {
 }
 
 pub fn randomized_god_data(){
-    if crate::randomizer::RANDOMIZER_STATUS.read().unwrap().emblem_data_randomized { return; }
+    if RANDOMIZER_STATUS.read().unwrap().emblem_data_randomized { return; }
     let mode = GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_KEY);
     println!("Randomizing God Data...");
     let rng = Random::instantiate().unwrap();
@@ -194,7 +173,6 @@ pub fn randomized_god_data(){
     let rng2 = Random::instantiate().unwrap();
     rng2.ctor( 2*seed as u32);
     let emblem_list: Vec<_> = EMBLEM_LIST.get().unwrap().iter().enumerate().filter(|x|  x.0 < 20 || x.0 >= 24).map(|(_, x)| *x).collect();
-    println!("Emblem List: {}", emblem_list.len());
     let god_list: Vec<_> = emblem_list.iter().flat_map(|&x| GodData::try_get_hash_mut(x)).collect();
     let mut level_data: Vec<_> = emblem_list.iter().flat_map(|&x| GodData::try_get_hash_mut(x)).flat_map(|god| god.get_level_data()).collect();
     let mut grow_data: Vec<_> = emblem_list.iter().flat_map(|&x| GodData::try_get_hash_mut(x)).flat_map(|god| GodGrowthData::try_get_from_god_data(god)).collect();
@@ -276,7 +254,7 @@ pub fn randomized_god_data(){
             );
         }
     }
-    if GameVariableManager::get_bool(DVCVariables::EMBLEM_ITEM_KEY) {
+    if DVCVariables::get_flag(DVCFlags::EngageWeapons, false) {
         println!("Randomizing Engage Weapons");
         rng2.initialize(2*DVCVariables::get_seed() as u32);
         ENGAGE_ITEMS.lock().unwrap().randomize_list(&god_list, rng2);
@@ -545,7 +523,7 @@ pub fn adjust_emblem_common_skills() {
 }
 
 fn adjust_engage_weapon_type(god: &Vec<&mut GodData>) {
-    if GameVariableManager::get_bool(DVCVariables::EMBLEM_ITEM_KEY) || GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_KEY) & 2 != 0 {
+    if DVCVariables::get_flag(DVCFlags::EngageWeapons, false) || GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_KEY) & 2 != 0 {
         let engage_skills = ENGAGE_ATTACKS.get().unwrap();
         let mut engage_weapon_mask = EMBLEM_WEAPON.clone();
         engage_skills.iter()

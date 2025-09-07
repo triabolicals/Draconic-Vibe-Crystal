@@ -10,6 +10,7 @@ use engage::resourcemanager::{ResourceManager, ResourceManagerStaticFields};
 use crate::{randomizer::emblem::EMBLEM_LIST, utils::str_contains, DVCVariables};
 use job::{Mount, *};
 use search::*;
+use crate::config::DVCFlags;
 use crate::enums::ENGAGE_PREFIX;
 use super::{result_commit_scaling, ConditionFlags, EMBLEM_ASSET, accessory::{change_accessory, clear_accessory_at_locator}, get_unit_outfit_mode, AnimSetDB};
 
@@ -411,7 +412,7 @@ impl AssetData {
             let body_sel = (((unit.drop_seed as u32) >> 4) % size as u32) as usize;
             if let Some(entry) = set.get(body_sel).and_then(|&index|AssetTable::try_index_get(index)) {
                 result_commit_scaling(result, entry);
-                if with_dress && !GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) {
+                if with_dress && !DVCVariables::get_flag(DVCFlags::EnemyOutfits, false) {
                     entry.dress_model.map(|dress| result.dress_model = dress);
                 }
                 if let Some(head) = entry.head_model.filter(|head| !head.to_string().contains("null") ) {
@@ -510,18 +511,18 @@ impl AssetData {
                     self.get_default_battle_outfits(result, mode, unit);
                 }
             }
-            if GameVariableManager::get_number("G_RandAsset") > 1 {
+            if GameVariableManager::get_number(DVCVariables::ASSETS) > 1 {
                 let skip = (unit.status.value & 0x800000 != 0) as usize;
                 self.random_aoc(unit, result, conditions.clone(), skip);
             }
             return false;
         }
         let key =
-        if unit.person.parent.index == 1 {
-            if unit.edit.gender == 2 { "G_AMPID_LueurF".to_string() }
-            else { "G_AMPID_LueurM".to_string() }
-        }
-        else { format!("G_A{}", unit.person.name.unwrap()) };
+            if unit.person.parent.index == 1 {
+                if unit.edit.gender == 2 { "G_AMPID_LueurF" }
+                else { "G_AMPID_LueurM" }.to_string()
+            }
+            else { format!("G_A{}", unit.person.name.unwrap()) };
         if GameVariableManager::exist(key.as_str()) {
             let index = GameVariableManager::get_number(key.as_str());
             if let Some(data) = self.personal_data.get(index as usize) {
@@ -630,7 +631,6 @@ impl AssetData {
 pub struct PersonAsset {
     pub is_female: bool,
     pub asset_table_mode: [i32; 3],
-    pub icon: String,
     pub name: String,
     pub default_outfit: Option<String>,
 }
@@ -639,7 +639,6 @@ impl PersonAsset {
     pub fn new(line: &str) -> Self {
         let params = line.split_whitespace().collect::<Vec<&str>>();
         let is_female = params[2].parse::<i32>().unwrap() == 2;
-        let icon = params[3].to_string();
         let name =
         if params[0].starts_with("MPID") { params[0].to_string() }
         else if params[0].starts_with("PID") {
@@ -683,7 +682,6 @@ impl PersonAsset {
             asset_table_mode,
             name,
             is_female,
-            icon,
             default_outfit: if params[1] == "none" { None } else { Some(params[1].to_string())}
         }
     }
@@ -744,8 +742,8 @@ impl SearchData {
         Self {
             search_type: ty,   // person
             hash: hash,
-            gender: gender,
-            index: index,
+            gender,
+            index,
             mode: entry.mode,
             entry_index: entry.parent.index,
             mount: determine_mount(entry),

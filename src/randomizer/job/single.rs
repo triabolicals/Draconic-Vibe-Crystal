@@ -99,7 +99,8 @@ fn get_next_class(increase: bool) {
         else {
             if current_index >= job_count { current_index = 0; }
             else if current_index > 1 { current_index -= 1 }
-            else { current_index = 0 }
+            else if current_index == 0 { current_index = job_count - 1;}
+            else { current_index = 0; }
         }
         if current_index <= 0 || current_index >= job_count {
             if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().single_class = 0; }
@@ -136,11 +137,11 @@ impl TwoChoiceDialogMethods for ChangeSingleClassConfirm {
                 if let Some(unit) = UnitPool::get_by_index(x)
                     .filter(|u| u.force.is_some_and(|f| (1 << f.force_type) & 57 != 0))
                 {
-                    unit_change_to_random_class(unit);
+                    unit_change_to_random_class(unit, false);
                 }
             }
         }
-        utils::dialog_restore_text::<SingleJob>(this);
+        utils::dialog_restore_text::<SingleJob>(this, false);
         BasicMenuResult::se_cursor().with_close_this(true)
     }
     extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult {

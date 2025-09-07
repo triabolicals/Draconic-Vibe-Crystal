@@ -29,11 +29,17 @@ pub fn map_sequence_events(proc: &ProcInst, label: i32) {
             crate::randomizer::terrain::fow::resume_fow();
             crate::randomizer::in_map_randomize();
             crate::randomizer::map::tilabolical();
+            if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
+                crate::script::replace_lueur_chapter22();
+            }
         },
         MapSequenceLabel::TurnHuman => {
             crate::randomizer::terrain::terrain_spots();   // Random TerrainTiles
             crate::randomizer::emblem::player_emblem_check(); 
             unsafe { autosave_proc_inst(proc, 5, 0, None, None); }
+            if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
+                crate::script::replace_lueur_chapter22();
+            }
         },
         MapSequenceLabel::TurnBranch => {
             if !crate::randomizer::RANDOMIZER_STATUS.read().unwrap().accessory {
@@ -99,6 +105,7 @@ pub fn main_sequence_events(_proc: &ProcInst, label: i32) {
             if GameUserData::get_sequence() > 3 && !GameUserData::is_evil_map() {
                 GameUserData::get_status().value &= !8192;
             }
+            crate::ironman::map_save_menu_edits();
             crate::continuous::update_next_chapter();  // For Chapter 11/22 Continue Flag 
             crate::ironman::ironman_code_edits();
             crate::autolevel::calculate_player_cap(); 
@@ -136,37 +143,24 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
 
 pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
     if label == 0 {
-        println!("[DVC] DVC Outfits Menu Install");
-        println!("[DVC] Blacklist Classes");
         crate::randomizer::job::reclass::black_list_jobs();
         crate::misc::set_personal_caps();
         crate::randomizer::randomize_stuff();
         crate::randomizer::tutorial_check();
         crate::randomizer::skill::learn::update_learn_skills(false);
-        println!("[DVC] Continuious Mode");
         crate::continuous::do_continious_mode();
-        println!("[DVC] Update Next Chapter");
         crate::continuous::update_next_chapter();
-        println!("[DVC] Ironman Edits");
         crate::ironman::ironman_code_edits();
-        println!("[DVC] Emblem Gmap Spot Adjust");
         crate::randomizer::emblem::emblem_gmap_spot_adjust();
         crate::randomizer::terrain::adjust_miasma_tiles();
-        println!("[DVC] Lueur Status Check");
         crate::deployment::lueur_status_check();
 
         crate::randomizer::person::change_map_dispos();
         crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.map_complete() ).unwrap();
-        if engage::gamevariable::GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 { 
-            crate::script::replace_lueur_chapter22();
-        }
-
         if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 {
-            println!("[DVC] Map Inspector Adjustments");
             crate::script::adjust_person_map_inspectors();
         }
         crate::assets::assign_rand_appearance();
-        println!("[DVC] Checks End");
     }
 }
 

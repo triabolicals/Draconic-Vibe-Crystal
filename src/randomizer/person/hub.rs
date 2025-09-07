@@ -39,7 +39,9 @@ pub fn change_kizuna_dispos() {
                         let key = format!("G_R_{}", aid);
                         if GameVariableManager::exist(key.as_str()) {
                             let pid = GameVariableManager::get_string(key);
-                            dispos.set_aid( pid); 
+                            // println!("Locator: {} has: {} to {}", dispos.locator, Mess::get_name(aid), Mess::get_name(pid));
+                            dispos.set_aid( pid);
+
                         }
                     }
                 }

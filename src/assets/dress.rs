@@ -3,6 +3,7 @@ use engage::gameuserdata::GameUserData;
 use accessory::*;
 use conditions::*;
 use transform::{has_enemy_tiki, MONSTER_PERSONS};
+use crate::config::DVCFlags;
 use crate::randomizer::names::get_emblem_person;
 use crate::randomizer::person::ENEMY_PERSONS;
 use super::*;
@@ -28,7 +29,7 @@ pub fn commit_for_unit_dress(
     remove_condition("AID_NoEngage3");
     let sf = AssetTableStaticFields::get();
     let mut flags = ConditionFlags::get_from_conditions(conditions);
-    if m022_god_dress(result, mode, conditions) || random_emblem_name_asset_switch(result, unit, mode, equipped, conditions) {
+    if m022_god_dress(result, unit, mode, conditions) || random_emblem_name_asset_switch(result, unit, mode, equipped, conditions) {
         flags.set(ConditionFlags::AllyDarkEmblem, true);
         return flags;  
     }
@@ -85,7 +86,7 @@ pub fn commit_for_unit_dress(
             flags.set(ConditionFlags::Generic, false);
         }
     }
-    else if GameVariableManager::get_bool(DVCVariables::RANDOM_BOSS_KEY) && condition_unit.person.get_flag().value & 2048 != 0 {
+    else if DVCVariables::get_flag(DVCFlags::RandomBossesNPCs, false) && condition_unit.person.get_flag().value & 2048 != 0 {
         if let Some(new_person) = ENEMY_PERSONS.get()
             .and_then(|v| v.iter().find(|x| x.1 == unit.person.parent.index && x.0 >= 150))
             .and_then(|p| crate::randomizer::names::get_new_npc_person(p.0 as usize - 150))
@@ -393,7 +394,8 @@ pub fn adjust_dress(result: &mut AssetTableResult, mode: i32, unit: &Unit, condi
             if search.get_default_battle_outfits(result, mode, unit) { return; }
         }
         if !conditions.contains(ConditionFlags::CausalClothes) {
-            if !changed && (DVCVariables::is_changed_recruitment_order(false) || GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0) {
+            if random_mode != 0 { search.get_random_job_dress(result, random_mode + 10 * changed as i32, mode, unit, conditions); }
+            else if !changed && (DVCVariables::is_changed_recruitment_order(false) || GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0) {
                 let stating_job_hash = GameVariableManager::get_number(format!("G_JG_{}", unit.person.pid));
                 if let Some(default_job) = JobData::try_get_hash(stating_job_hash) {
                     if default_job.parent.hash == unit.job.parent.hash { search.get_default_battle_outfits(result, mode, unit); } else {
@@ -407,9 +409,6 @@ pub fn adjust_dress(result: &mut AssetTableResult, mode: i32, unit: &Unit, condi
                         }
                     }
                 }
-            }
-            else if random_mode != 0 {
-                search.get_random_job_dress(result, random_mode + 10 * changed as i32, mode, unit, conditions);
             }
         }
         if is_sword_fighter_outfit(result) && !unit.job.jid.str_contains("JID_ソードファイター") {
@@ -486,9 +485,8 @@ pub fn change_result_colors_by_unit(unit: &Unit, result: &mut AssetTableResult) 
     }
 }
 
-fn m022_god_dress(result: &mut AssetTableResult, mode: i32, conditions: &mut Array<&'static Il2CppString>) -> bool {
-    if result.pid.is_null() { return false; }
-    let pid = result.pid.to_string();
+fn m022_god_dress(result: &mut AssetTableResult, unit: &Unit, mode: i32, conditions: &mut Array<&'static Il2CppString>) -> bool {
+    let pid = unit.person.pid.to_string();
     if pid.contains("M022_紋章士") && GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) != 0 {
         if let Some(god) = EMBLEM_ASSET.iter().position(|x| pid.contains(x))
             .and_then(|x| DVCVariables::get_god_from_index(x as i32, true))
@@ -510,7 +508,7 @@ fn random_emblem_name_asset_switch(
     if PIDS.iter().any(|x| pid == *x) || condition_unit.person.name.is_none() || condition_unit.person.get_flag().value & 1536 != 0 { return false; }
     let name = condition_unit.person.name.unwrap().to_string();
 
-    if GameVariableManager::get_bool(DVCVariables::EMBLEM_NAME_KEY) && !pid.contains(PIDS[0]) && !pid.contains("M022")
+    if DVCVariables::get_flag(DVCFlags::GodNames, false) && !pid.contains(PIDS[0]) && !pid.contains("M022")
     {
         if condition_unit.person.get_summon_rank() > 0 || condition_unit.force.is_some_and(|f| f.force_type == 1) {
             let mid = name.replace("MPID", "MGID");

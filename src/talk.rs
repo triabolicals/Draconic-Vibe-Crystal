@@ -13,6 +13,7 @@ pub use engage::{
     mess::*,
     tmpro::*,
 };
+use crate::config::DVCFlags;
 use crate::enums::*;
 use crate::utils::*;
 use crate::DVCVariables;
@@ -100,6 +101,7 @@ fn get_current_mid(method_info: OptionalMethod) -> &'static Il2CppString;
 
 fn is_character_specific() -> bool {
     let mid = unsafe { get_current_mid(None) }.to_string();
+    (mid.contains("MID_TK_") && GameUserData::get_chapter().cid.str_contains("M022")) ||
     mid.contains( "MID_KR_") ||
     mid.contains( "MID_GR_") ||
     mid.contains( "MID_DIE") ||
@@ -277,7 +279,6 @@ impl TextReplacer {
 
 #[skyline::hook(offset=0x020c5260)]
 pub fn talk_ptr(this: &mut TalkPtr, method_info: OptionalMethod) -> u16 {
-    //if IS_GHAST {  return call_original!(this, method_info);  }
     let mut replacer = TEXT_REPLACE.lock().unwrap();
     if !replacer.is_enabled || replacer.replace.len() == 0 {
         return call_original!(this, method_info);
@@ -306,20 +307,17 @@ pub fn talk_ptr(this: &mut TalkPtr, method_info: OptionalMethod) -> u16 {
         }
         result = replacer.get_char();
         this.now = original_now_ptr;
-        // println!("Now: {}", this.now - this.original);
     }
     if result == 15 { 
         replacer.reset(); 
         this.now = original_now_ptr;
         return original; 
     }
-    //println!("TalkPtr: active ({}) {} / {} => {}", replacer.is_enabled, result, original, std::char::from_u32(result as u32).unwrap() );
-    return result;
+    result
 }
 
 #[skyline::hook(offset=0x020c7e90)]
 pub fn calculate_str_width(this: &TalkSequence, add_character_count: i32, method_info: OptionalMethod) {
-    //println!("TalkSequence Process Message: {} with Mid: {}", add_character_count, this.mid.unwrap().to_string());
     if let Some(mid) = this.mid { do_replacement(mid);  }
     call_original!(this, add_character_count, method_info);
 }
@@ -354,7 +352,7 @@ pub fn do_replacement(mid: &Il2CppString) {
             }
         });
     }
-    if GameVariableManager::get_bool(DVCVariables::RANDOM_BOSS_KEY) {
+    if DVCVariables::get_flag(DVCFlags::RandomBossesNPCs, false) {
         names.other_names.iter().enumerate().for_each(|(i, x)| {
             if new_str.contains(Mess::get(&x).to_string().as_str()) { others.push(i); }
         });

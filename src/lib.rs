@@ -24,7 +24,7 @@ use crate::script::map_opening_proc_edit;
 #[allow(static_mut_refs)] mod sprite;
 
 pub static CONFIG: LazyLock<Mutex<DeploymentConfig>> = LazyLock::new(|| DeploymentConfig::new().into() );
-pub const VERSION: &str = "2.13.5";
+pub const VERSION: &str = "2.14.0";
 extern "C" fn event_install(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
         match ev {

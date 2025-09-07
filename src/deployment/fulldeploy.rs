@@ -208,5 +208,17 @@ pub fn load_extras() -> Option<Vec<(i32, i32, i32)>> {
     }
     None
 }
+pub fn create_new_dispos(flag: i32) -> &'static mut DisposData {
+    let data = DisposData::instantiate().unwrap();
+    unsafe { dispos_data_ctor(data, None); }
+    if let Some(flag_field) = DisposData::class().get_nested_types().iter()
+        .find(|ty| ty.get_name() == "FlagField")
+        .and_then(|ty|Il2CppObject::<DisposDataFlag>::from_class( ty ).ok())
+    {
+        flag_field.value |= flag;
+        data.set_flag(flag_field);
+    }
+    data
+}
 #[skyline::from_offset(0x01cfa220)]
-fn dispos_data_ctor(this: &DisposData, method_info: OptionalMethod);
+pub fn dispos_data_ctor(this: &DisposData, method_info: OptionalMethod);

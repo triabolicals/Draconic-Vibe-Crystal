@@ -8,14 +8,11 @@ pub static mut EMBLEM_NAMES: [i32; 25] = [-1; 25];
 pub static mut NPCS_NAMES: [i32; 25] = [-1; 25];
 pub struct RandomNameMods;
 impl ConfigBasicMenuItemSwitchMethods for RandomNameMods {
-    fn init_content(_this: &mut ConfigBasicMenuItem){
-        GameVariableManager::make_entry(DVCVariables::EMBLEM_NAME_KEY, 0);
-    }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value = DVCVariables::get_random_names();
+        let value = DVCVariables::get_random_names(false);
         let result = ConfigBasicMenuItem::change_key_value_b(value);
         if value != result {
-            DVCVariables::set_random_names(result);
+            DVCVariables::set_random_names(result, false);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -24,10 +21,10 @@ impl ConfigBasicMenuItemSwitchMethods for RandomNameMods {
         else {BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = if DVCVariables::get_random_names() { "Randomized" } else { "Default" }.into();
+        this.command_text = if DVCVariables::get_random_names(false) { "Randomized" } else { "Default" }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = if DVCVariables::get_random_names() {"Emblem will have random names and appearances if possible." }
+        this.help_text = if DVCVariables::get_random_names(false) {"Emblem will have random names and appearances if possible." }
             else { "Emblem will have their default name and appearances." }.into();
     }
 }
@@ -54,8 +51,9 @@ impl ConfigBasicMenuItemSwitchMethods for GenericAppearance {
         } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap(). generic_mode }
+        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().generic_mode }
         else { GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY) };
+        this.is_command_icon = value != 0 && !DVCVariables::is_main_menu();
         this.command_text =
             match value {
                 1 => { "Appearance"}
@@ -65,11 +63,10 @@ impl ConfigBasicMenuItemSwitchMethods for GenericAppearance {
             }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        //G_GenericMode
         let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap(). generic_mode }
         else { GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY) };
 
-        let str = if DVCVariables::is_main_menu() || value == 0 { "" } else { " (Press A to reseed.)"};
+        let str = if DVCVariables::is_main_menu() || value == 0 { "" } else { " (A to reseed.)"};
 
         this.help_text = format!("{}{}",
             match value {
@@ -79,36 +76,30 @@ impl ConfigBasicMenuItemSwitchMethods for GenericAppearance {
                 _ => { "Default appearance for generic enemies." }
             }, str).into();
     }
-}
-
-pub extern "C" fn vibe_generic() -> &'static mut ConfigBasicMenuItem { 
-    let switch = ConfigBasicMenuItem::new_switch::<GenericAppearance>("Generic Enemy Appearance");
-    switch.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = generic_acall as _ );
-    switch
-}
-
-pub fn generic_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    if DVCVariables::is_main_menu() { return BasicMenuResult::new(); }
-    let mode = GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY);
-    let msg; 
-    match mode {
-        1 => { msg = "Reseed generic enemy appearance?" }
-        2 => { msg = "Reseed generic enemy colors?"}
-        3 => { msg = "Reseed generic enemy appearance/colors?"}
-        _ => { return BasicMenuResult::new() }
+    extern "C" fn a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        if !this.is_command_icon { return BasicMenuResult::new(); }
+        let mode = GameVariableManager::get_number(DVCVariables::GENERIC_APPEARANCE_KEY);
+        let msg;
+        match mode {
+            1 => { msg = "Reseed generic enemy appearance?" }
+            2 => { msg = "Reseed generic enemy colors?"}
+            3 => { msg = "Reseed generic enemy appearance/colors?"}
+            _ => { return BasicMenuResult::new() }
+        }
+        YesNoDialog::bind::<ReseedEnemyConfirm>(this.menu, msg, "Do it!", "Nah..");
+        BasicMenuResult::new()
     }
-    YesNoDialog::bind::<ReseedEnemyConfirm>(this.menu, msg, "Do it!", "Nah..");
-    BasicMenuResult::new()
 }
+
+pub extern "C" fn vibe_generic() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_switch::<GenericAppearance>("Generic Enemy Appearance") }
+
+
 pub struct ReseedEnemyConfirm;
 impl TwoChoiceDialogMethods for ReseedEnemyConfirm {
     extern "C" fn on_first_choice(_this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
         change_enemy_seed();
         crate::assets::accessory::change_enemy_outfits();
         BasicMenuResult::se_cursor().with_close_this(true)
-    }
-    extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult {
-        BasicMenuResult::new().with_close_this(true)
     }
 }
 
@@ -141,7 +132,7 @@ pub fn get_new_npc_person_name(index: usize) -> Option<String> {
     }
 }
 pub fn get_emblem_person(mid: &Il2CppString) -> Option<&'static PersonData> {
-    if !GameVariableManager::get_bool(DVCVariables::EMBLEM_NAME_KEY) { return None; }
+    if !DVCVariables::get_flag(DVCFlags::GodNames, false) { return None; }
     let mut key = format!("G_GN_{}", mid);
     if mid.str_contains("Lueur") {
         if DVCVariables::is_lueur_female() { key.push('F'); } else { key.push('M'); }

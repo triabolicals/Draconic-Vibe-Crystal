@@ -13,9 +13,33 @@ pub use engage::{
 };
 use super::{DVCVariables, CONFIG};
 use crate::{enums::*, randomizer::emblem::EMBLEM_LIST};
+use crate::config::DVCFlags;
+use crate::deployment::shuffle::shuffle_deployment;
 
 pub mod fulldeploy;
 pub mod sortie;
+pub mod shuffle;
+pub struct RandomDeploySpots;
+impl ConfigBasicMenuItemSwitchMethods for RandomDeploySpots {
+    extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        let value = DVCVariables::get_random_deploy_spots(false);
+        let result = ConfigBasicMenuItem::change_key_value_b(value);
+        if value != result {
+            DVCVariables::set_random_deploy_spots(result, false);
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+            BasicMenuResult::se_cursor()
+        } else { BasicMenuResult::new() }
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.command_text = if DVCVariables::get_random_deploy_spots(false) { "Enable" } else { "Disable" }.into();
+    }
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text = "Deployment locations for units will be randomized.".into();
+    }
+}
+
 
 pub struct DeploymentMod;
 impl ConfigBasicMenuItemSwitchMethods for DeploymentMod {
@@ -178,14 +202,15 @@ pub fn get_emblem_paralogue_level() {
         level_difference = PARA_LEVEL[ new_emblem_index as usize ] - PARA_LEVEL[emblem_index as usize];
         GameVariableManager::set_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL, level_difference);
     }
-    println!("Paralogue Level Difference: {} | {}", level_difference, GameVariableManager::get_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL));
 }
 
 
 #[unity::hook("App", "MapDispos", "CreatePlayerTeam")]
 pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
-    if GameVariableManager::get_number(DVCVariables::DEPLOYMENT_KEY) == 4 { fulldeploy::load_extra_deployment_slots();  }
+    if DVCVariables::get_flag(DVCFlags::RandomDeploySpot, false) { shuffle_deployment(); }
+    else if GameVariableManager::get_number(DVCVariables::DEPLOYMENT_KEY) == 4 { fulldeploy::load_extra_deployment_slots();  }
     crate::randomizer::terrain::randomized_emblem_power_spots();
+
     if GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) != 0 { get_emblem_paralogue_level(); }
     crate::randomizer::terrain::fow::map_start_fow();
     let absent_force = Force::get(ForceType::Absent).unwrap();
@@ -196,9 +221,9 @@ pub fn create_player_team(group: &Il2CppString, method_info: OptionalMethod){
         if GameUserData::get_status().value & 64 != 0 { GameUserData::get_status().value &= !64;  }  //Disables Continuous Flag 
     }
     if DVCVariables::random_enabled() {  
-        if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 && !GameVariableManager::get_bool(DVCVariables::LUEUR_RANDOM_JOB_KEY) {
-            crate::randomizer::job::unit_change_to_random_class(hero_unit);
-            GameVariableManager::set_bool(DVCVariables::LUEUR_RANDOM_JOB_KEY, true);
+        if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 && !DVCVariables::get_flag(DVCFlags::LueurJobSet, false) {
+            crate::randomizer::job::unit_change_to_random_class(hero_unit, true);
+            DVCVariables::set_flag(DVCFlags::LueurJobSet, true, false);
             crate::randomizer::person::unit::adjust_unit_items(hero_unit);
         }
         crate::randomizer::item::change_liberation_type();

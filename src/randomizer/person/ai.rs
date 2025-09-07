@@ -4,6 +4,14 @@ use engage::gamedata::ai::*;
 static mut AISET: bool = false;
 
 pub fn adjust_person_unit_ai(unit: &mut Unit) {
+    if DVCVariables::get_flag(DVCFlags::RandomDeploySpot, false) {
+        if unit.ai.sequence[1].str_contains("BreakDown") {
+            unit.ai.set_sequence(1, "AI_MI_Null");
+        }
+        if unit.ai.sequence[3].str_contains("BreakDown") {
+            unit.ai.set_sequence(1, "AI_MV_WeakEnemy");
+        }
+    }
     if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) == 0 { return; }
     for order in 0..4 {
         for index in 0..4 {

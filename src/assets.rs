@@ -206,7 +206,9 @@ pub fn asset_table_result_setup_hook(
         !conditions_flags.contains(ConditionFlags::AllyDarkEmblem) &&
         !conditions_flags.contains(ConditionFlags::Talk)
     {
+        /*
         if CONFIG.lock().unwrap().debug {
+
             if mode == 2 {
                 println!("{} Body / Dress: {} / {}",  Mess::get_name(unit.person.pid), result.body_model ,result.dress_model);
             }
@@ -233,7 +235,10 @@ pub fn asset_table_result_setup_hook(
                 result.body_anims.iter().for_each(|m| println!("After Body Act: {}", m));
             }
         }
-        else { set_class_animations(result, unit.job, equipped, unit, mode, conditions_flags); }
+        else {
+          }
+         */
+        set_class_animations(result, unit.job, equipped, unit, mode, conditions_flags);
         if mode == 2 { edit_asset_weapon(result, false, mode, equipped); }
     }
     result
@@ -263,12 +268,12 @@ pub fn edit_asset_weapon(result: &mut AssetTableResult, equipped: bool, mode: i3
                         let weapon = weapons.get_random(6, rng);
                         let _ = AssetTable::try_index_get(weapon.asset_entry).map(|entry| result.commit_asset_table(entry));
                         if weapon.kind == 6 { result.magic = concat_string!("MG_", MAGIC[rng.get_value(31) as usize]).into();  }
-                        else if weapon.kind == 7 { 
+                        else if weapon.kind == 7 {
                             if !result.left_hand.is_null() {
                                 result.right_hand = result.left_hand;
                                 result.left_hand = "null".into();
                             }
-                            result.magic = concat_string!("RD_", animation::ROD[rng.get_value(16) as usize]).into(); 
+                            result.magic = concat_string!("RD_", animation::ROD[rng.get_value(16) as usize]).into();
                         }
                     }
                 }
@@ -286,8 +291,8 @@ pub fn edit_asset_weapon(result: &mut AssetTableResult, equipped: bool, mode: i3
                     else {
                         let weapon = weapons.get_random(w_item.kind, rng);
                         let _ = AssetTable::try_index_get(weapon.asset_entry).map(|entry| result.commit_asset_table(entry));
-                        if weapon.kind == 7 { 
-                            result.magic = concat_string!("RD_", animation::ROD[rng.get_value(16) as usize]).into(); 
+                        if weapon.kind == 7 {
+                            result.magic = concat_string!("RD_", animation::ROD[rng.get_value(16) as usize]).into();
                             if !result.left_hand.is_null() {
                                 result.right_hand = result.left_hand;
                                 result.left_hand = "null".into();
@@ -307,7 +312,7 @@ pub fn unit_dress_gender(unit: &Unit) -> i32 {
 }
 
 pub fn is_sword_fighter_outfit(this: &mut AssetTableResult) -> bool {
-    if !this.dress_model.is_null() { 
+    if !this.dress_model.is_null() {
         let dress_model = this.dress_model.to_string();
         dress_model.contains("Swd0A") && !dress_model.contains("c251")
     }
@@ -330,7 +335,7 @@ pub fn result_commit_scaling(result: &mut AssetTableResult, data: &AssetTable) {
     if data.scale_stuff[12] > 0.0 { result.scale_stuff[10] = data.scale_stuff[12]; }  //  VAbdomen
     if data.scale_stuff[13] > 0.0 { result.scale_stuff[11] = data.scale_stuff[13]; }  // VTorso
     if data.scale_stuff[9] > 0.0 { result.scale_stuff[12] = data.scale_stuff[9]; }    // VArms
-    if data.scale_stuff[10] > 0.0 { result.scale_stuff[13] = data.scale_stuff[10]; }  // VLeg               
+    if data.scale_stuff[10] > 0.0 { result.scale_stuff[13] = data.scale_stuff[10]; }  // VLeg
     for x in 14..19 { if data.scale_stuff[x] > 0.0 { result.scale_stuff[x] = data.scale_stuff[x]; } }
 }
 
@@ -341,7 +346,7 @@ pub fn try_add_accessory_list(this: &mut List<AssetTableAccessory>, accessory: &
 fn unit_get_accessory_list(this: &Unit, method_info: OptionalMethod) -> &'static mut UnitAccessoryList;
 
 #[skyline::from_offset(0x01f266a0)]
-fn get_dress_gender(person: &PersonData, method_info: OptionalMethod) -> i32; 
+fn get_dress_gender(person: &PersonData, method_info: OptionalMethod) -> i32;
 
 pub fn assign_rand_appearance() {
     if GameVariableManager::exist("G_AMPID_LueurM") { return; }

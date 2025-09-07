@@ -46,14 +46,13 @@ pub const SKILL_SIDS: &[&str] = &[
 pub mod effects;
 
 pub struct MapTileRandomizer;
-impl ConfigBasicMenuItemSwitchMethods for  MapTileRandomizer {
+impl ConfigBasicMenuItemSwitchMethods for MapTileRandomizer {
     fn init_content(_this: &mut ConfigBasicMenuItem){ GameVariableManager::make_entry(DVCVariables::TERRAIN, 0); }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().tile } else { GameVariableManager::get_bool(DVCVariables::TILE) };
+        let value = DVCVariables::get_tile(false);
         let result =  ConfigBasicMenuItem::change_key_value_b(value);
         if value != result {
-            if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().tile = result; }
-            else { GameVariableManager::set_bool(DVCVariables::TILE, result); }
+            DVCVariables::set_tile(result, false);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -61,15 +60,10 @@ impl ConfigBasicMenuItemSwitchMethods for  MapTileRandomizer {
         } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().tile } else { GameVariableManager::get_bool(DVCVariables::TILE) };
-        this.command_text = if value { "Enabled" } else { "Disabled" }.into();
+        this.command_text = if DVCVariables::get_tile(false) { "Enable" } else { "Disable" }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().tile }
-        else { GameVariableManager::get_bool(DVCVariables::TILE) };
-        this.help_text =
-            if value { "Additional map event tiles will produce a random effect." }
-            else { "No additional map event tiles are added."}.into();
+        this.help_text = "Map tiles with various effects will appear.".into();
     }
 }
 
@@ -91,13 +85,11 @@ fn register_action(script: &EventScript, name: &str, action: extern "C" fn(&Il2C
 pub extern "C" fn register_script_commands(script: &EventScript) {
     println!("Installing DVC Lua Commands");
     effects::install_tilebolical_effects(script);
-    GameVariableManager::make_entry_norewind(DVCVariables::TILE, 0);
 }   
-
 
 pub fn tilabolical() {
     if RANDOMIZER_STATUS.read().unwrap().map_tile { return; }
-    if !GameVariableManager::get_bool(DVCVariables::TILE) { return; }
+    if !DVCVariables::get_tile(false) { return; }
     if CONFIG.lock().unwrap().debug {
         Force::get(ForceType::Player).unwrap().iter().for_each(|u|{
             u.private_skill.add_sid("SID_迅走", 10, 0);
@@ -171,9 +163,7 @@ pub fn tilabolical() {
 
 pub fn remove_map_effects() {
     if GameVariableManager::get_bool("Revive") {
-        if let Some(dead) = Force::get(ForceType::Dead) {
-            dead.transfer(3, true);
-        }
+        if let Some(dead) = Force::get(ForceType::Dead) { dead.transfer(3, true); }
         GameVariableManager::remove("Revive");
     }
     Il2CppClass::from_name("App", "UnitPool").unwrap()
@@ -212,7 +202,7 @@ pub fn visit_command_name(_item: BasicMenuItem, _method_info: OptionalMethod) ->
         9 => { Mess::get("MID_SYS_Class") }
         10 => { Mess::get("MID_SYS_GOLD_COUNT")}
         11 => { Mess::get("MID_SYS_GOLD_SKILL")}
-        12 => { Mess::get("MID_CONFIG_ROD_DANCE_MYUNIT") }
+        12 => { Mess::get("MID_MENU_UNIT_LIST")}
         _ => { Mess::get("MID_MENU_VISIT") }
     };
     format!("{}: {}", Mess::get("MID_H_INFO_Param_Correction_Effect"), ty).into()

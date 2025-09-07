@@ -8,8 +8,12 @@ use engage::{
     gamevariable::*,
 };
 use std::{collections::HashSet, sync::Mutex};
+use engage::dialog::yesno::YesNoDialog;
+use engage::pad::Pad;
+use engage::util::get_instance;
 use crate::{enums::*, randomizer::emblem::EMBLEM_LIST};
 use crate::{DVCVariables, CONFIG};
+use crate::randomizer::emblem::menu::EmblemSkillChangeConfirm;
 
 pub static ENGAGE_ITEMS: Mutex<EngageItemList> = Mutex::new(
     EngageItemList{ 
@@ -310,29 +314,44 @@ fn randomize_god_apts(god: &GodData, mode: i32, rng: &Random) {
 
 pub struct EmblemWeaponProfs;
 impl ConfigBasicMenuItemSwitchMethods for EmblemWeaponProfs {
-    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    fn init_content(_this: &mut ConfigBasicMenuItem){
+        if !DVCVariables::is_main_menu() { DVCVariables::set_temp(DVCVariables::WEAPON_PROF_KEY); }
+    }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().emblem_weap_prof_mode, 0, 2, 1);
-        if CONFIG.lock().unwrap().emblem_weap_prof_mode != result {
-            CONFIG.lock().unwrap().emblem_weap_prof_mode = result;
+        let value = DVCVariables::get_emblem_weap_prof_mode();
+        let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 2, 1);
+        if value != result {
+            DVCVariables::set_emblem_weap_prof_mode(result);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            return BasicMenuResult::se_cursor();
-        } else {return BasicMenuResult::new(); }
+            BasicMenuResult::se_cursor()
+        }
+        else { BasicMenuResult::new() }
+    }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) {
+        this.is_command_icon = DVCVariables::is_temp_change(DVCVariables::WEAPON_PROF_KEY);
+        this.command_text =
+            match DVCVariables::get_emblem_weap_prof_mode() {
+                1 => { "Randomize" },
+                2 => { "None" },
+                _ => { "Default" },
+            }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match CONFIG.lock().unwrap().emblem_weap_prof_mode {
-            1 => { "Emblems weapon proficiencies will be randomized." },
-            2 => { "Emblems will not give any weapon proficiencies." },
-            _ => { "Emblem weapon proficiencies will not be changed."},
+        this.help_text =
+            match DVCVariables::get_emblem_weap_prof_mode() {
+            1 => { "Randomized emblem proficiencies." },
+            2 => { "No emblem weapon proficiencies." },
+            _ => { "Default emblem proficiencies."},
         }.into();
     }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = match CONFIG.lock().unwrap().emblem_weap_prof_mode {
-            1 => { "Randomized" },
-            2 => { "None" },
-            _ => { "Default"},
-        }.into();
+    extern "C" fn a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        if DVCVariables::is_temp_change(DVCVariables::WEAPON_PROF_KEY) {
+            YesNoDialog::bind::<EmblemProfChangeConfirm>(this.menu, "Change Proficiencies Setting?\nRequires Save and Reload.", "Do it!", "Nah..");
+            BasicMenuResult::se_cursor()
+        }
+        else { BasicMenuResult::new() }
     }
 }
+crate::random_confirm!(WEAPON_PROF_KEY, EmblemProf);

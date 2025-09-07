@@ -10,152 +10,113 @@ use engage::{
 use std::sync::OnceLock;
 use concat_string::concat_string;
 pub static GROW_RANGE: OnceLock<[i32; 41]> = OnceLock::new();
-
-
 use crate::{DVCVariables, CONFIG};
 
 pub struct RandomGrowMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomGrowMod {
-    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    fn init_content(_this: &mut ConfigBasicMenuItem){
+        if !DVCVariables::is_main_menu() { DVCVariables::set_temp(DVCVariables::GROWTH_KEY); }
+    }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().random_grow, 0, 3, 1);
-        if CONFIG.lock().unwrap().random_grow != result {
-            CONFIG.lock().unwrap().random_grow = result;
+        let value = DVCVariables::get_random_grow();
+        let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
+        if value != result {
+            DVCVariables::set_random_grow(result);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
-            CONFIG.lock().unwrap().save();
             BasicMenuResult::se_cursor()
-        } else { BasicMenuResult::new() }
+        }
+        else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text =  match CONFIG.lock().unwrap().random_grow {
+        this.command_text = match DVCVariables::get_random_grow() {
             1 => { "Personal Growths" },
             2 => { "Class Growths" },
             3 => { "Personal / Class" },
-            _ => { "Disable" },
+            _ => { "Default" },
         }.into();
+        this.is_command_icon = DVCVariables::is_temp_change(DVCVariables::GROWTH_KEY);
+
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match CONFIG.lock().unwrap().random_grow {
+        let value = DVCVariables::get_random_grow();
+        this.help_text = match value {
             1 => { "Personal growths rate will be randomized."},
             2 => { "Class growth rates modifiers will be randomized."},
             3 => { "Personal and class growth rates modifiers will be randomized." },
             _ => { "No changes made to growth rates." },
         }.into();
     }
+    extern "C" fn a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        if this.is_command_icon && !DVCVariables::is_main_menu() {
+            YesNoDialog::bind::<GrowthChangeConfirm>(this.menu, "Change Growth Setting?\nRequires Save and Reload.", "Do it!", "Nah..");
+            BasicMenuResult::se_cursor()
+        }
+        else if DVCVariables::is_main_menu() { BasicMenuResult::new() }
+        else { BasicMenuResult::se_miss() }
+    }
 }
-
+crate::random_confirm!(GROWTH_KEY, Growth);
 pub struct PersonalGrowMode;
 impl ConfigBasicMenuItemSwitchMethods for PersonalGrowMode {
     fn init_content(_this: &mut ConfigBasicMenuItem){
-        if !DVCVariables::is_main_menu() {
-            GameVariableManager::make_entry("PGMode", GameVariableManager::get_number(DVCVariables::PERSONAL_GROWTH_KEY) );
-        }
+        if !DVCVariables::is_main_menu() { DVCVariables::set_temp(DVCVariables::PERSONAL_GROWTH_KEY); }
     }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        if DVCVariables::is_main_menu() {
-            if CONFIG.lock().unwrap().random_grow & 1 == 0 { 
-                this.help_text = "Enable personal growth randomization to enable this setting.".into();
-                this.update_text();
-                return BasicMenuResult::new(); 
-            }
-            let mode = CONFIG.lock().unwrap().player_growth;
-            let result = ConfigBasicMenuItem::change_key_value_i(mode, 0, 3, 1);
-            if mode != result {
-                CONFIG.lock().unwrap().player_growth = result;
-                Self::set_command_text(this, None);
-                Self::set_help_text(this, None);
-                this.update_text();
-               BasicMenuResult::se_cursor()
-            } else { BasicMenuResult::new() }
+        let grow = DVCVariables::get_random_grow();
+        if grow & 1 == 0 {
+            this.help_text = "Enable personal growth randomization to enable this setting.".into();
+            this.update_text();
+            return BasicMenuResult::new();
         }
-        else {
-            let mode = GameVariableManager::get_number("PGMode");
-            let result = ConfigBasicMenuItem::change_key_value_i(mode, 0, 3, 1);
-            if mode != result {
-                GameVariableManager::set_number("PGMode", result);
-                Self::set_command_text(this, None);
-                Self::set_help_text(this, None);
-                this.update_text();
-                BasicMenuResult::se_cursor()
-            } else { BasicMenuResult::new() }
+        let value = DVCVariables::get_player_growth();
+        let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
+        if value != result {
+            DVCVariables::set_player_growth(result);
+            Self::set_command_text(this, None);
+            Self::set_help_text(this, None);
+            this.update_text();
+           BasicMenuResult::se_cursor()
         }
-
+        else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().player_growth } else {GameVariableManager::get_number("PGMode")  };
-        this.command_text =  match value {
-            1 => { "Unrestrict" },
+        this.is_command_icon = DVCVariables::is_temp_change(DVCVariables::PERSONAL_GROWTH_KEY);
+        this.command_text =  match DVCVariables::get_player_growth() {
+            1 => { "Un-Restrict" },
             2 => { "U-Adaptive" },
-            3 => { "R-Adaptive" },
+            3 => { "B-Adaptive" },
             _ => { "Balanced" },
         }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if DVCVariables::is_main_menu() {
-            this.help_text = match CONFIG.lock().unwrap().player_growth {
-                1 => { "Growth rates are not restrictive by growth total."},
-                2 => { "Growth rates are influenced by starting class and unrestrictive."},
-                3 => { "Growth rates are influenced by starting class and restrictive."},
-                _ => { "Growth rates are restrictive by growth total." },
-            }.into();
-        }
-        else {
-            let current_mode = GameVariableManager::get_number(DVCVariables::PERSONAL_GROWTH_KEY);
-            let selection = GameVariableManager::get_number("PGMode");
-            let description = match selection {
+        this.help_text =
+            match DVCVariables::get_player_growth() {
                 1 => { "Growth rates are not restrictive by growth total."},
                 2 => { "Growth rates are influenced by starting class and un-restrictive."},
                 3 => { "Growth rates are influenced by starting class and restrictive."},
                 _ => { "Growth rates are restrictive by growth total." },
-            };
-            this.help_text =
-                if current_mode != selection { concat_string!(description, " (Press A to Change)") }
-                else { description.to_string() }.into();
+            }.into();
+    }
+    extern "C" fn a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        if DVCVariables::is_main_menu() {  return BasicMenuResult::new();  }
+        if DVCVariables::is_temp_change(DVCVariables::PERSONAL_GROWTH_KEY){
+            YesNoDialog::bind::<PersonalGrowChangeConfirm>(this.menu, "Change Personal Growth Mode?", "Do it!", "Nah..");
+            BasicMenuResult::se_cursor()
         }
-
+        else { BasicMenuResult::new() }
     }
 }
 
-pub struct PersonalGrowConfirm;
-impl TwoChoiceDialogMethods for PersonalGrowConfirm {
-    extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
-        GameVariableManager::set_number(DVCVariables::PERSONAL_GROWTH_KEY, GameVariableManager::get_number("PGMode"));
-        randomize_person_grow();
-        let menu = unsafe {
-            std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap())
-        };
-        let index = menu.select_index;
-        PersonalGrowMode::set_help_text(menu.menu_item_list[index as usize], None);
-        menu.menu_item_list[index as usize].update_text();
-        BasicMenuResult::se_cursor().with_close_this(true)
-    }
-    extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult {
-        BasicMenuResult::new().with_close_this(true)
-    }
-}
-
-
-pub fn growth_mode_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    if DVCVariables::is_main_menu() {  return BasicMenuResult::new();  }
-    let current_mode = GameVariableManager::get_number(DVCVariables::PERSONAL_GROWTH_KEY);
-    let selection = GameVariableManager::get_number("PGMode");
-    if current_mode != selection { YesNoDialog::bind::<PersonalGrowConfirm>(this.menu, "Change Personal Growth Mode?", "Do it!", "Nah..");  }
-    BasicMenuResult::new()
-}
+crate::random_confirm!(PERSONAL_GROWTH_KEY, PersonalGrow);
 
 fn growth_mode_build_attr(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
     if GameVariableManager::get_number(DVCVariables::GROWTH_KEY) & 1 == 1 { BasicMenuItemAttribute::Enable }
     else { BasicMenuItemAttribute::Hide }
 }
 
-pub extern "C" fn vibe_pgmode() -> &'static mut ConfigBasicMenuItem {
-    let switch = ConfigBasicMenuItem::new_switch::<PersonalGrowMode>("Personal Growth Mode");
-    switch.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = growth_mode_setting_acall as _ );
-    switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = growth_mode_build_attr as _ );
-    switch
-}
+pub extern "C" fn vibe_pgmode() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_switch::<PersonalGrowMode>("Personal Growth Mode") }
 
 
 pub fn get_growth_min_max() {
@@ -192,24 +153,27 @@ pub fn get_growth_min_max() {
                 }
             }
         );
-        for x in 0..40 { grow_range[x] = grow_range[x] / 5; }
+        for x in 0..10 {
+            if grow_range[x+10] > 125 { grow_range[x+10] = 125; }
+            if grow_range[x+30] > 50 { grow_range[x+30] = 50; }
+        }
+        for x in 0..40 {
+            grow_range[x] = grow_range[x] / 5;
+        }
         grow_range[40] = 1;
         grow_range
     });
 }
 
 pub fn randomize_person_grow(){
-
     let person_list = PersonData::get_list_mut().unwrap();
     let rng = crate::utils::get_rng();
-
     let mode = GameVariableManager::get_number(DVCVariables::PERSONAL_GROWTH_KEY);
-    println!("Randomization Personal Growth Rates: {}", mode);
     let grow_range = GROW_RANGE.get().unwrap();
     let limits: (i32, i32) = 
         match mode {
-            0|3 => { (150, 400) },  // Balanced
-            1|2 => { (10, 2000) },   // Unrestricted
+            0|3 => { (175, 450) },  // Balanced
+            1|2 => { (20, 2000) },   // Unrestricted
             _ => { (150, 400) },
         };
 
@@ -329,7 +293,6 @@ pub fn random_grow(){
         }
     }
     let growth_mode = GameVariableManager::get_number(DVCVariables::GROWTH_KEY);
-    println!("Growth Randomization: {}", growth_mode);
     if growth_mode & 1 != 0 { randomize_person_grow(); }
     if growth_mode & 2 != 0 { randomize_job_grow();  }
 }

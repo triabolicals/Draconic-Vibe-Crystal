@@ -81,7 +81,7 @@ pub fn randomize_bgm_map() {
     if !DVCVariables::random_enabled() { return; }
     if GameUserData::is_encount_map() { return; }
     get_current_chapter_chapter_bgm();
-    if !GameVariableManager::get_bool(DVCVariables::BGM_KEY) { return; }
+    if !DVCVariables::get_flag(DVCFlags::BGM, false) { return; }
     set_random_bgm_phase();
     get_random_special(true);
 }
@@ -112,7 +112,7 @@ pub fn change_bgm() {
     if !GameVariableManager::exist("CBGM1") || !GameVariableManager::exist("CBGM2") || !GameVariableManager::exist("CBGM3") {
         get_current_chapter_chapter_bgm();
     }
-    if GameVariableManager::get_bool(DVCVariables::BGM_KEY) {
+    if DVCVariables::get_flag(DVCFlags::BGM, false) {
         set_random_bgm_phase();
         get_random_special(true);
     }
@@ -131,17 +131,11 @@ pub fn change_bgm() {
 
 pub struct RandomBGMMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomBGMMod {
-    fn init_content(_this: &mut ConfigBasicMenuItem){
-        GameVariableManager::make_entry(DVCVariables::BGM_KEY, 0);
-    }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_map_bgm } 
-            else { GameVariableManager::get_bool(DVCVariables::BGM_KEY) };
-            
+        let value = DVCVariables::get_random_map_bgm(false);
         let result = ConfigBasicMenuItem::change_key_value_b(value);
         if value != result {
-            if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_map_bgm = result; }
-            else { GameVariableManager::set_bool(DVCVariables::BGM_KEY, result);  }
+            DVCVariables::set_random_map_bgm(result, false);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -149,21 +143,15 @@ impl ConfigBasicMenuItemSwitchMethods for RandomBGMMod {
         }
         else { BasicMenuResult::new() }
     }
-    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        if GameUserData::get_sequence() != 3 {
-            this.help_text = if CONFIG.lock().unwrap().random_map_bgm { "Map BGM will be randomized for each phase." }
-            else { "Default Map BGM for each phase."}.into();
-        }
-        else {
-            this.help_text = if  GameVariableManager::get_bool(DVCVariables::BGM_KEY) { "Map BGM will be randomized. Press A to Change." }
-            else { "Default Map BGM. Press A to Change."}.into();
-        }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.is_command_icon = GameUserData::get_sequence() == 3;
+        this.command_text = if DVCVariables::get_random_map_bgm(false) { "Random" } else { "Default" }.into();
     }
 
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_map_bgm }
-            else {  GameVariableManager::get_bool(DVCVariables::BGM_KEY) };
-        this.command_text = if value { "Random" } else { "Default" }.into();
+    extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        this.help_text =
+            if DVCVariables::get_random_map_bgm(false) { "Map BGM will be randomized for each phase." }
+            else { "Default Map BGM for each phase."}.into();
     }
 }
 
@@ -173,13 +161,12 @@ impl TwoChoiceDialogMethods for BGMConfirm {
         change_bgm();
         BasicMenuResult::se_cursor().with_close_this(true)
     }
-    extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
 }
 
 pub fn bgm_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
     if GameUserData::get_sequence() != 3 {return BasicMenuResult::new(); }
     YesNoDialog::bind::<BGMConfirm>(this.menu, "Change Map BGM?", "Do it!", "Nah..");
-    return BasicMenuResult::new();
+    BasicMenuResult::new()
 }
 
 pub extern "C" fn vibe_bgm() -> &'static mut ConfigBasicMenuItem {  
@@ -191,10 +178,8 @@ pub extern "C" fn vibe_bgm() -> &'static mut ConfigBasicMenuItem {
 pub fn random_special_bgm(calculator: &BattleCalculator) -> bool {
     unsafe {
         if is_special_battle_bgm(calculator, None) {
-            println!("Special Battle");
             start_special_bgm(None);
             let s = get_random_special(false);
-                println!("Playing {}", s);
                 if !is_event_playing(s, None) {
                     if set_phase_bgm(s, s, s, None) {
                         field_bgm_play(0, None);
@@ -209,20 +194,20 @@ pub fn random_special_bgm(calculator: &BattleCalculator) -> bool {
 }
 
 pub extern "C" fn map_sequence_battle_pre_bgm(this: &mut MapSequenceBattle, method_info: OptionalMethod) {
-    if GameVariableManager::get_bool(DVCVariables::BGM_KEY) {
+    if DVCVariables::get_flag(DVCFlags::BGM, false) {
         if random_special_bgm(this.calculator) { return; }
     }
     unsafe { map_sequence_battle_to_pre_bgm(this, method_info); }
 }
 pub extern "C" fn map_sequence_battle_action_pre_bgm(this: &mut MapSequenceBattleAction, method_info: OptionalMethod) {
-    if GameVariableManager::get_bool(DVCVariables::BGM_KEY)  {
+    if DVCVariables::get_flag(DVCFlags::BGM, false)  {
         if random_special_bgm(this.calculator) {return; }
     }
     unsafe { map_sequence_battle_action_to_pre_bgm(this, method_info); }
 }
 
 pub extern "C" fn combat_sequence_pre_bgm(this: &mut CombatSequence, method_info: OptionalMethod) {
-    if GameVariableManager::get_bool(DVCVariables::BGM_KEY) && this.calculator.mode == 0 {
+    if DVCVariables::get_flag(DVCFlags::BGM, false) && this.calculator.mode == 0 {
         if random_special_bgm(this.calculator) { return; }
     }
     unsafe { combat_sequence_to_pre_bgm(this, method_info); }

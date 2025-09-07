@@ -42,7 +42,9 @@ use crate::assets::emblem::{get_random_engage_voice, has_engage_decide};
 pub use super::{CONFIG, VERSION};
 pub static mut LINKED: [i32; 20] = [-1; 20];
 
-pub static RANDOMIZER_STATUS: RwLock<status::RandomizerStatus> = RwLock::new(status::RandomizerStatus{
+pub static RANDOMIZER_STATUS: RwLock<status::RandomizerStatus> =
+    RwLock::new(
+    status::RandomizerStatus{
         alear_person_set: false,
         well_randomized: false,
         enemy_emblem_randomized: false,
@@ -133,7 +135,6 @@ impl ConfigBasicMenuItemCommandMethods for SeedRandomizer {
         let set_seed = CONFIG.lock().unwrap().seed as i32;
         this.help_text = if set_seed != 0 { format!("Press + to change the set seed. Currently set to: {}", set_seed) }
             else { "Press + to manually set seed.".to_string() }.into();
-
     }
 }
 
@@ -153,8 +154,8 @@ impl ConfigBasicMenuItemCommandMethods for ReseedRandomizer {
         else if pad_instance.npad_state.buttons.a(){
             let new_seed = get_new_seed();
             let text = format!("Change randomization seed to {}?\nRecruitment order will not be affected.\nRequires saving and reloading.", new_seed);
-            GameVariableManager::make_entry("NewSeed", new_seed as i32);
-            GameVariableManager::set_number("NewSeed", new_seed as i32);
+            GameVariableManager::make_entry("NewSeed", new_seed);
+            GameVariableManager::set_number("NewSeed", new_seed);
             YesNoDialog::bind::<ReseedConfirm>(this.menu, text, "Do it!", "Nah..");
             BasicMenuResult::se_cursor()
         }
@@ -217,6 +218,7 @@ pub fn tutorial_check(){
     }
     if CONFIG.lock().unwrap().debug {
         GameVariableManager::find_starts_with("G_GmapSpot_").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
+        //GameVariableManager::find_starts_with("G_Cleared_").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 0));
         EMBLEM_LIST.get().unwrap().iter().flat_map(|&hash| GodData::try_get_hash(hash)).for_each(|g| { GodPool::create(g); });
     }
 }
@@ -475,11 +477,7 @@ pub fn save_file_load() {
     }
     
     if DVCVariables::get_seed() != RANDOMIZER_STATUS.read().unwrap().seed {
-        if GameVariableManager::get_number(DVCVariables::SHOP_KEY) == 0 && CONFIG.lock().unwrap().random_shop_items {
-            GameVariableManager::set_number(DVCVariables::SHOP_KEY,  CONFIG.lock().unwrap().random_shop_items as i32 );
-        }
         println!("[SaveLoad Event] Randomized Save File Seed {}", DVCVariables::get_seed());
-        
         if GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE) != 0  { item::change_liberation_type(); }
         if GameVariableManager::get_bool(DVCVariables::JOB_KEY) && GameVariableManager::get_number(DVCVariables::MISERCODE_TYPE) != 0 { item::change_misercode_type(); }
 
@@ -553,10 +551,12 @@ pub fn in_map_randomize() {
 pub fn start_new_game(){
     // *CONFIG.lock().unwrap() = DeploymentConfig::new();
     CONFIG.lock().unwrap().correct_rates();
+    GameVariableManager::make_entry("G_DVC_Version", 1);
     let seed = CONFIG.lock().unwrap().seed;
     // Settings that does not get added
+    GameVariableManager::make_entry_norewind(DVCVariables::DVC_STATUS, 0);
     if CONFIG.lock().unwrap().iron_man { 
-        GameVariableManager::make_entry(DVCVariables::IRONMAN, 1);
+        DVCVariables::set_flag(DVCFlags::Ironman, true, false);
         crate::ironman::ironman_code_edits();
     }
     GameVariableManager::make_entry(DVCVariables::CONTINUOUS, CONFIG.lock().unwrap().continuous);
@@ -683,6 +683,11 @@ pub fn reset_gamedata() {
 
 pub fn randomize_stuff() {
     job::single::single_class_exists();
+    if !GameVariableManager::exist("G_DVC_Version") {
+        GameVariableManager::make_entry("G_DVC_Version", 1);
+        crate::config::migrate_to_v1();
+    }
+
     println!("[DVC Randomization] {}", can_rand());
     if !utils::can_rand() {  return;  }
     if RANDOMIZER_STATUS.read().unwrap().seed == 0 {
@@ -693,9 +698,6 @@ pub fn randomize_stuff() {
     if GameVariableManager::get_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY) == 4 {  GameVariableManager::set_number(DVCVariables::EMBLEM_SKILL_CHAOS_KEY, 0);   }
 
     if DVCVariables::get_seed() != RANDOMIZER_STATUS.read().unwrap().seed {
-        if GameVariableManager::get_number(DVCVariables::SHOP_KEY) == 0 && CONFIG.lock().unwrap().random_shop_items {
-            GameVariableManager::set_number(DVCVariables::SHOP_KEY,  CONFIG.lock().unwrap().random_shop_items as i32 );
-        }
         println!("Randomized Stuff with Save File Seed {}", DVCVariables::get_seed());
         randomize_gamedata(false);
         if GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE) != 0  { item::change_liberation_type(); }
@@ -727,11 +729,9 @@ pub fn intitalize_game_data() {
     item::create_item_pool();
     engage_count();
     emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().intialize_list();
-
     grow::get_growth_min_max();
     emblem::emblem_skill::get_pid_emblems();
     person::check_playable_classes();
-
     emblem::enemy::initalize_dark_emblems();
     skill::fixed_skill_inherits();
     skill::learn::initialize_job_skill_restrictions();
@@ -783,8 +783,6 @@ pub fn person_sound(
     character: u64,
     method_info: OptionalMethod)
 {
-    println!("Person Sound Switch: {}", person_switch_name);
-    println!("Person Sound Evebt: {}", event_name);
     if event_name.to_string() == "V_Engage_Respond" {
         let person_switch = person_switch_name.to_string();
         if person_switch == "Lueur1" {
@@ -811,6 +809,17 @@ pub fn person_sound(
                     else { person_switch.as_str() }
                 }
             };
+        if let Some(engage_switch) = engage_switch_name {
+            if engage_switch.contains("PlayerM") {
+                call_original!(new_voice.into(), Some("Lueur1".into()), event_name, character, method_info);
+                return;
+            }
+            else if engage_switch.contains("PlayerF") {
+                call_original!(new_voice.into(), Some("Lueur2".into()), event_name, character, method_info);
+                return;
+            }
+
+        }
         call_original!(new_voice.into(), engage_switch_name, event_name, character, method_info);
         return;
     }

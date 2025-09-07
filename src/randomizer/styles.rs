@@ -6,21 +6,19 @@ use engage::{
     gamedata::*,
 };
 use std::sync::OnceLock;
-use super::{CONFIG, DVCVariables};
+use super::DVCVariables;
 pub static BATTLE_STYLES_DEFAULT: OnceLock<Vec<i32>> = OnceLock::new();
 
 pub struct RandomBattleStyles;
 impl ConfigBasicMenuItemSwitchMethods for RandomBattleStyles {
     fn init_content(_this: &mut ConfigBasicMenuItem){
-        GameVariableManager::make_entry("BattleStyles", GameVariableManager::get_number(DVCVariables::STYLES_KEY) );
+        if !DVCVariables::is_main_menu() { DVCVariables::set_temp(DVCVariables::STYLES_KEY); }
     }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_battle_styles }
-        else { GameVariableManager::get_number("BattleStyles") };
+        let value = DVCVariables::get_random_battle_styles();
         let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 2, 1);
         if value != result {
-            if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_battle_styles = result; }
-            else { GameVariableManager::set_number("BattleStyles", result); };
+            DVCVariables::set_random_battle_styles(result);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -28,42 +26,35 @@ impl ConfigBasicMenuItemSwitchMethods for RandomBattleStyles {
         } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_battle_styles }
-                    else { GameVariableManager::get_number("BattleStyles") };
-        let changed = if GameVariableManager::get_number(DVCVariables::STYLES_KEY) != value { "*"} else { ""};
-
-        this.command_text = format!("{}{}", changed, match value {
+        let value = DVCVariables::get_random_battle_styles();
+        this.is_command_icon = DVCVariables::is_temp_change(DVCVariables::STYLES_KEY);
+        this.command_text = match value {
             1 => { "Random" },
             2 => { "No Types"},
             _ => { "Default"},
-        }).into();
+        }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() { CONFIG.lock().unwrap().random_battle_styles }
-        else { GameVariableManager::get_number("BattleStyles") };
-
-        let string1 = match value {
+        let value = DVCVariables::get_random_battle_styles();
+        this.help_text = match value {
             1 => { "Class types will be randomized." },
-            2 => { "Classes will have no special types."},
-            _ => { "Classes will have their default type."},
-        }.to_string();
-        if GameVariableManager::get_number(DVCVariables::STYLES_KEY) != GameVariableManager::get_number("BattleStyles") {
-            this.help_text = format!("{} (Press A to change)", string1).into();
-        }
-        else { this.help_text = string1.into(); }
+            2 => { "Classes will have no special types." },
+            _ => { "Classes will have their default type." },
+        }.into();
     }
-}
-
-pub fn battle_style_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    if DVCVariables::is_main_menu() {return BasicMenuResult::new(); }
-    if GameVariableManager::get_number(DVCVariables::STYLES_KEY) == GameVariableManager::get_number("BattleStyles") { return BasicMenuResult::new();}
-    if GameVariableManager::get_number("BattleStyles") == 1 && !DVCVariables::random_enabled()  { return BasicMenuResult::new();}
-    let text = format!("Change Class Type Setting:\nFrom '{}' to '{}'?",
-        style_setting_text( GameVariableManager::get_number(DVCVariables::STYLES_KEY)), 
-        style_setting_text( GameVariableManager::get_number("BattleStyles")), 
-    );
-    YesNoDialog::bind::<BattleStyleConfirm>(this.menu, text, "Do it!", "Nah..");
-    BasicMenuResult::new()
+    extern "C" fn a_call(this: &mut ConfigBasicMenuItem, method_info: OptionalMethod) -> BasicMenuResult {
+        if DVCVariables::is_main_menu() {return BasicMenuResult::new(); }
+        if DVCVariables::is_temp_change(DVCVariables::STYLES_KEY) {
+            let text =
+                format!("Change Class Type Setting:\nFrom '{}' to '{}'?",
+                        style_setting_text( GameVariableManager::get_number(DVCVariables::STYLES_KEY)),
+                        style_setting_text( DVCVariables::get_temp_var(DVCVariables::STYLES_KEY))
+                );
+            YesNoDialog::bind::<BattleStyleConfirm>(this.menu, text, "Do it!", "Nah..");
+            BasicMenuResult::se_cursor()
+        }
+        else { BasicMenuResult::new() }
+    }
 }
 
 fn style_setting_text(choice: i32) -> String {
@@ -77,27 +68,17 @@ fn style_setting_text(choice: i32) -> String {
 pub struct BattleStyleConfirm;
 impl TwoChoiceDialogMethods for BattleStyleConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
-        GameVariableManager::set_number(DVCVariables::STYLES_KEY, GameVariableManager::get_number("BattleStyles"));
+        DVCVariables::update_var_from_temp(DVCVariables::STYLES_KEY);
         randomize_job_styles();
-        let menu =
-            unsafe {
-                std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap())
-            };
-        let index = menu.select_index;
-        RandomBattleStyles::set_help_text(menu.menu_item_list[index as usize], None);
-        RandomBattleStyles::set_command_text(menu.menu_item_list[index as usize], None);
-        menu.menu_item_list[index as usize].update_text();
+        crate::menus::utils::dialog_restore_text::<RandomBattleStyles>(this, false);
         BasicMenuResult::se_cursor().with_close_this(true)
     }
-    extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
 }
 
 pub extern "C" fn vibe_styles() -> &'static mut ConfigBasicMenuItem {  
     let item_gauge = ConfigBasicMenuItem::new_switch::<RandomBattleStyles>("Random Class Types");
     item_gauge.get_class_mut().get_virtual_method_mut("BuildAttribute")
         .map(|method| method.method_ptr = crate::menus::buildattr::build_attribute_normal as _);
-    item_gauge.get_class_mut().get_virtual_method_mut("ACall")
-        .map(|method| method.method_ptr = battle_style_setting_acall as _ );
     item_gauge
 }
 

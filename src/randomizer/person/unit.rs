@@ -17,9 +17,8 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     }
     if this.person.parent.hash == 1879825845 || this.status.value & 134217728 != 0 { return; }  // Doubles
     let single_class = DVCVariables::get_single_class(false).is_some();
-    println!("Creating Person: # {} {}", this.person.parent.index, Mess::get_name(this.person.pid));
     if !can_rand() && single_class && (is_player_unit(this.person) || is_playable_person(this.person)){
-        job::unit_change_to_random_class(this);
+        job::unit_change_to_random_class(this, true);
         adjust_unit_items(this);
         this.auto_equip();
         return;
@@ -33,11 +32,15 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     ai::adjust_person_unit_ai(this);
     if !is_player_unit(this.person) {
         if is_playable_person(this.person) {
-            if random_class || single_class { job::unit_change_to_random_class(this);  }
+            if random_class || single_class { job::unit_change_to_random_class(this, true);  }
             if adjust_items {  adjust_unit_items(this);  }
             if random_inventory { unit_items::adjust_missing_weapons(this); }
             grow::adaptive_growths(this, true);
-            auto_level_unit_for_random_map(this, false); 
+            auto_level_unit_for_random_map(this, false);
+            if this.person.unit_icon_id.is_some_and(|x| x.str_contains("Lueur")) {
+                this.person.set_gender(GameVariableManager::get_number(DVCVariables::LUEUR_GENDER));
+                this.edit.set_gender(GameVariableManager::get_number(DVCVariables::LUEUR_GENDER));
+            }
         }
         else {  // Enemy Randomization
             println!("Enemy Randomization of {}", Mess::get_name(this.person.pid));
@@ -63,7 +66,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             change_unit_autolevel(this, true);
             if old_person == PIDS[2] || old_person == PIDS[3] {
                 if GameUserData::get_chapter().cid.str_contains("M001") {
-                    if single_class { job::unit_change_to_random_class(this); }
+                    if single_class { job::unit_change_to_random_class(this, true); }
                     this.item_list.put_off_all_item();
                     if random_inventory { adjust_unit_items(this); }
                     grow::adaptive_growths(this, true);
@@ -91,7 +94,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         }
         else if switch_person(this.person).pid ==  this.person.pid {
             if random_class || single_class  {
-                job::unit_change_to_random_class(this);
+                job::unit_change_to_random_class(this, true);
                 fixed_unit_weapon_mask(this);
                 adjust_unit_items(this);
                 if GameVariableManager::get_number(DVCVariables::PLAYER_INVENTORY) & 1 != 0 { unit_items::adjust_missing_weapons(this); }
@@ -111,7 +114,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             }
         }
     }
-    if random_class || single_class {  job::unit_change_to_random_class(this);  }
+    if random_class || single_class {  job::unit_change_to_random_class(this, true);  }
     if adjust_items {
         adjust_unit_items(this);
         if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 {

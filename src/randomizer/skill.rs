@@ -1,8 +1,7 @@
 use unity::{engine::Sprite, prelude::*};
 use super::{person::{*, PLAYABLE}, emblem::emblem_skill::*};
 use engage::{
-    dialog::yesno::*, 
-    gamedata::ring::RingData, 
+    dialog::yesno::*,
     gameicon::GameIcon, 
     gameuserdata::GameUserData, 
     menu::{config::{ConfigBasicMenuItem, *}, BasicMenuResult}, 
@@ -16,6 +15,7 @@ use crate::{enums::*, utils::*};
 
 pub mod learn;
 pub mod menu;
+pub(crate) mod bond;
 
 pub static SKILL_POOL: Mutex<Vec<SkillIndex>> = Mutex::new(Vec::new());
 pub static MADDENING_POOL: Mutex<Vec<i32>> = Mutex::new(Vec::new());
@@ -131,7 +131,6 @@ pub fn get_random_skill(difficulty: i32, rng: &Random) -> &'static SkillData {
 
 
 pub fn reset_skills() {
-    println!("Resetting skills to normal");
     SKILL_POOL.lock().unwrap().iter_mut().for_each(|x|x.in_use = false);
     reset_emblem_skills();
 }
@@ -151,8 +150,8 @@ pub fn replace_all_sid_person(person_index: i32) {
     );
     let jid = 
         if old_job.is_high() && ( new_job.is_high() || (new_job.is_low() && new_job.max_level == 40 ) ) { new_job.jid }
-        else if old_job.is_high() && ( new_job.is_low() && new_job.has_high() ) { new_job.get_high_jobs()[0].jid }
-        else if old_job.is_low() &&  new_job.is_high() {
+        else if (old_job.is_high() || person.get_level() > 20) && ( new_job.is_low() && new_job.has_high() ) { new_job.get_high_jobs()[0].jid }
+        else if old_job.is_low() && new_job.is_high() {
             let lows = get_base_classes(new_job);
             if lows.len() == 0 { "JID_ソードファイター".into() }
             else {  lows[0].jid }
@@ -227,6 +226,9 @@ pub fn randomize_skills() {
     if crate::randomizer::RANDOMIZER_STATUS.read().unwrap().skill_randomized { return; }
     let skill_mode = GameVariableManager::get_number(DVCVariables::SKILL_KEY);
     if skill_mode == 0 || !DVCVariables::random_enabled() {
+        if DVCVariables::get_bond_ring_skill(false) && DVCVariables::random_enabled(){
+            bond::randomize_bond_ring_skills()
+        }
         crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.skill_randomized = true).unwrap();
         return; 
     }
@@ -336,40 +338,10 @@ pub fn randomize_skills() {
         change_weapon_restrict("SID_全弾発射", 1023);
 
     }
-    randomize_bond_ring_skills();
+    bond::randomize_bond_ring_skills();
     crate::randomizer::RANDOMIZER_STATUS
         .try_write()
         .map(|mut lock| lock.skill_randomized = true).unwrap();
-}
-
-pub fn randomize_bond_ring_skills(){
-    let ring_list = RingData::get_list_mut().unwrap();
-    let ranks = [3, 2, 1, 0]; 
-    let ranks_rate: [i32; 4] = CONFIG.lock().unwrap().get_bond_ring_rates();
-    let rng_rings = crate::utils::get_rng();
-    ring_list.iter_mut().for_each(|ring| { ring.get_equip_skills().clear(); } );
-    for y in 0..4 {
-        let current_rank = ranks[y as usize];
-        let odds = ranks_rate[y as usize];
-        if odds == 0 { continue; }
-        let mut pool = MADDENING_POOL.lock().unwrap().clone();
-        ring_list.iter_mut()
-            .filter(|ring| ring.rank == current_rank && rng_rings.get_value(100) < odds )
-            .for_each(|ring|{
-                let equip_skills = ring.get_equip_skills();
-                let mut skill_count = 0;
-                let mut skill_odds = odds;
-                while rng_rings.get_value(100) < skill_odds  && skill_count < 4 {
-                    if let Some(skill) = crate::utils::get_random_and_remove(&mut pool, rng_rings).and_then(|i| SkillData::try_index_get(get_highest_priority(i))) {
-                        equip_skills.add_skill(skill, 6, 0);
-                        skill_count += 1;
-                    }
-                    else { break; }  // no more skills
-                    skill_odds = 1/ ( 1 + skill_count + y)* skill_odds + (10 - y)*current_rank;
-                }
-            }
-        );
-    }
 }
 
 fn change_personal_sid(person: &mut PersonData, skill: &SkillData) {

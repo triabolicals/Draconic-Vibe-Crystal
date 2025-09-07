@@ -1,35 +1,55 @@
+use engage::pad::Pad;
+use engage::util::get_instance;
 use super::*;
+
 pub struct RandomSkillMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomSkillMod {
-    fn init_content(_this: &mut ConfigBasicMenuItem){}
+    fn init_content(_this: &mut ConfigBasicMenuItem){
+        if !DVCVariables::is_main_menu() { DVCVariables::set_temp(DVCVariables::SKILL_KEY); }
+    }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().random_skill, 0, 3, 1);
-        if CONFIG.lock().unwrap().random_skill != result {
-            CONFIG.lock().unwrap().random_skill  = result;
+        let value = DVCVariables::get_random_skill();
+        let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
+        if value != result {
+            DVCVariables::set_random_skill(result);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
             BasicMenuResult::se_cursor()
-        } else { BasicMenuResult::new() }
+        }
+        else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let value = DVCVariables::get_random_skill();
+        this.is_command_icon = DVCVariables::is_temp_change(DVCVariables::SKILL_KEY);
         this.command_text =
-        match CONFIG.lock().unwrap().random_skill {
-            1 => "Personals",
-            2 => "Class",
-            3 => "Personals + Class",
-            _ => "Default"
-        }.into();
+            match value {
+                1 => "Personal",
+                2 => "Class",
+                3 => "Personal + Class",
+                _ => "Default"
+            }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match CONFIG.lock().unwrap().random_skill {
-                1 => "Player personal skills are randomized",
+        let value = DVCVariables::get_random_skill();
+        this.help_text =
+            match value {
+                1 => "Personal skills are randomized",
                 2 => "Class learn skills are randomized.",
-                3 => "Player Personals and class learn skills are randomized.",
+                3 => "Personal/Learn skills are randomized.",
                 _ => "No changes to personal and class skills.",
-        }.into();
+            }.into();
+    }
+    extern "C" fn a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        if DVCVariables::can_update_var(DVCVariables::SKILL_KEY){
+            YesNoDialog::bind::<SkillChangeConfirm>(this.menu, "Change Skill Setting?\nRequires Save and Reload.", "Do it!", "Nah..");
+            BasicMenuResult::se_cursor()
+        }
+        else if !DVCVariables::is_main_menu() { BasicMenuResult::se_miss() }
+        else { BasicMenuResult::new() }
     }
 }
+crate::random_confirm!(SKILL_KEY, Skill);
 pub struct RandomSkillCost;
 impl ConfigBasicMenuItemSwitchMethods for RandomSkillCost {
     fn init_content(_this: &mut ConfigBasicMenuItem){
@@ -76,28 +96,21 @@ impl ConfigBasicMenuItemSwitchMethods for RandomSkillCost {
             _ => { "Default SP cost for inheritance." }
         }, changed).into();
     }
+    extern "C" fn a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        if GameUserData::get_sequence() == 0 { return BasicMenuResult::new(); }
+        if GameVariableManager::get_number("RSkC") == GameVariableManager::get_number(DVCVariables::SP_KEY) { return BasicMenuResult::new();}
+        YesNoDialog::bind::<SkillCostConfirm>(this.menu, "Change SP Setting?\nMust save and reload to take effect.", "Do it!", "Nah..");
+        BasicMenuResult::new()
+    }
 }
 
 pub struct SkillCostConfirm;
 impl TwoChoiceDialogMethods for SkillCostConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
         GameVariableManager::set_number(DVCVariables::SP_KEY, GameVariableManager::get_number("RSkC"));
-        let menu = unsafe {
-            std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap())
-        };
-        let index = menu.select_index;
-        RandomSkillCost::set_help_text(menu.menu_item_list[index as usize], None);
-        RandomSkillCost::set_command_text(menu.menu_item_list[index as usize], None);
-        menu.menu_item_list[index as usize].update_text();
+        crate::menus::utils::dialog_restore_text::<RandomSkillCost>(this, false);
         BasicMenuResult::se_cursor().with_close_this(true)
     }
-    extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
-}
-
-pub fn spc_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    if GameVariableManager::get_number("RSkC") == GameVariableManager::get_number(DVCVariables::SP_KEY) { return BasicMenuResult::new();}
-    YesNoDialog::bind::<SkillCostConfirm>(this.menu, "Change Randomization Setting?\nMust save and reload to take effect.", "Do it!", "Nah..");
-    BasicMenuResult::new()
 }
 pub fn spc_build_attr(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
     if can_rand() { BasicMenuItemAttribute::Enable } else { BasicMenuItemAttribute::Hide }
@@ -105,7 +118,6 @@ pub fn spc_build_attr(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMet
 
 pub extern "C" fn vibe_rand_spc() -> &'static mut ConfigBasicMenuItem {
     let switch = ConfigBasicMenuItem::new_switch::<RandomSkillCost>("Skill Inheritance SP Cost");
-    switch.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = spc_acall as _ );
     switch.get_class_mut().get_virtual_method_mut("BuildAttribute").map(|method| method.method_ptr = spc_build_attr as _ );
     switch
 }
@@ -135,10 +147,10 @@ impl ConfigBasicMenuItemGaugeMethods for EnemySkillGauge {
         let is_main = DVCVariables::is_main_menu();
         let gauge = if is_main {  CONFIG.lock().unwrap().random_enemy_skill_rate }
             else { GameVariableManager::get_number(DVCVariables::ENEMY_SKILL_GAUGE_KEY) };
-            
-        if gauge == 0 { this.help_text = "Enemy units will not gain a random skill.".into(); }
-        else if gauge == 10 { this.help_text = "Only bosses will gain a random skill".into(); }
-        else {this.help_text = format!("{}% chance of enemy units will gain a random skill.", gauge).into(); }
+        this.help_text =
+            if gauge == 0 { "Enemy units will not gain a random skill.".into() }
+            else if gauge == 10 { "Only bosses will gain a random skill".into() }
+            else { format!("{}% chance of enemy units will gain a random skill.", gauge).into() };
     }
 }
 pub extern "C" fn vibe_skill_gauge() -> &'static mut ConfigBasicMenuItem {  

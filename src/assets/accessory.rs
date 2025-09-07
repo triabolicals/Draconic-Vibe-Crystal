@@ -1,7 +1,7 @@
 use data::job::Mount;
 use crate::assets::dress::IDS;
 use super::*;
-use crate::config::DVCVariables;
+use crate::config::{DVCFlags, DVCVariables};
 
 pub struct RandomPlayerAppearance;
 impl ConfigBasicMenuItemSwitchMethods for RandomPlayerAppearance {
@@ -20,18 +20,15 @@ impl ConfigBasicMenuItemSwitchMethods for RandomPlayerAppearance {
         this.command_text = if CONFIG.lock().unwrap().player_appearance { "Enable" } else { "Disable" }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = if CONFIG.lock().unwrap().player_appearance {
-            "Original playable characters will have random appearances."
-        }
-        else { "Original playable characters will have default appearances." }.into();
+        this.help_text =
+            if CONFIG.lock().unwrap().player_appearance { "Original playable characters will have random appearances." }
+            else { "Original playable characters will have default appearances." }.into();
     }
 }
 pub struct EmblemAppearance;
 impl ConfigBasicMenuItemSwitchMethods for EmblemAppearance {
     fn init_content(_this: &mut ConfigBasicMenuItem) {
-        if !DVCVariables::is_main_menu() {
-            GameVariableManager::make_entry(DVCVariables::EMBLEM_APPEAR_KEY, 0);
-        }
+        if !DVCVariables::is_main_menu() { GameVariableManager::make_entry(DVCVariables::EMBLEM_APPEAR_KEY, 0); }
     }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let value = DVCVariables::get_emblem_appearance();
@@ -46,12 +43,12 @@ impl ConfigBasicMenuItemSwitchMethods for EmblemAppearance {
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.command_text =
-        match DVCVariables::get_emblem_appearance() {
-            1 => "Outfits",
-            2 => "Color",
-            3 => "Outfits+Color",
-            _ => "None",
-        }.into();
+            match DVCVariables::get_emblem_appearance() {
+                1 => "Outfits",
+                2 => "Color",
+                3 => "Outfits+Color",
+                _ => "None",
+            }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.help_text =
@@ -65,9 +62,7 @@ impl ConfigBasicMenuItemSwitchMethods for EmblemAppearance {
 }
 pub struct RandomClassOutfits;
 impl ConfigBasicMenuItemSwitchMethods for RandomClassOutfits {
-    fn init_content(_this: &mut ConfigBasicMenuItem) {
-        GameVariableManager::make_entry(DVCVariables::RANDOM_CLASS_OUTFITS, 0);
-    }
+    fn init_content(_this: &mut ConfigBasicMenuItem) { GameVariableManager::make_entry(DVCVariables::RANDOM_CLASS_OUTFITS, 0); }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let value = DVCVariables::get_random_class_outfits();
         let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 2, 1);
@@ -93,7 +88,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomClassOutfits {
         this.help_text =
             match value {
                 1 => "Units will have a random set of class outfits.",
-                2 => "Class outfits will be randomized based on growth seed.",
+                2 => "Class outfits will be randomized based on unit's current growth seed.",
                 _ => "Class outfits are not randomized.",
             }.into();
     }
@@ -101,9 +96,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomClassOutfits {
 
 pub struct RandomAssets;
 impl ConfigBasicMenuItemSwitchMethods for RandomAssets {
-    fn init_content(_this: &mut ConfigBasicMenuItem){
-        GameVariableManager::make_entry(DVCVariables::ASSETS, 0);
-    }
+    fn init_content(_this: &mut ConfigBasicMenuItem){ GameVariableManager::make_entry(DVCVariables::ASSETS, 0); }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let value = DVCVariables::get_assets();
         let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
@@ -129,24 +122,18 @@ impl ConfigBasicMenuItemSwitchMethods for RandomAssets {
         this.help_text = match value {
             1 => { "Weapons assets are randomized"  }
             2 => { "Info animations are randomized."}
-            3 => { "Weapons / player info animations are randomized."}
+            3 => { "Weapons / Info animations are randomized."}
             _ => { "No assets are randomized." }
         }.into();
     }
 }
 pub struct RandomEnemyOutfits;
 impl ConfigBasicMenuItemSwitchMethods for RandomEnemyOutfits {
-    fn init_content(_this: &mut ConfigBasicMenuItem){
-        if !DVCVariables::is_main_menu() {
-            GameVariableManager::make_entry(DVCVariables::ENEMY_OUTFIT_KEY, 0);
-        }
-        GameVariableManager::make_entry("EnemyOutfits", GameVariableManager::get_number(DVCVariables::ENEMY_OUTFIT_KEY));
-    }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let value = GameVariableManager::get_bool("EnemyOutfits");
+        let value = DVCVariables::get_flag(DVCFlags::EnemyOutfits, true);
         let result = ConfigBasicMenuItem::change_key_value_b(value);
         if value != result {
-            GameVariableManager::set_bool("EnemyOutfits", result);
+            DVCVariables::set_flag(DVCFlags::EnemyOutfits, result,GameUserData::get_sequence() == 2 || GameUserData::get_sequence() == 3);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -154,61 +141,45 @@ impl ConfigBasicMenuItemSwitchMethods for RandomEnemyOutfits {
         } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let changed = if GameVariableManager::get_bool("EnemyOutfits") != GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) { "*"} else { "" };
-        this.command_text = format!("{}{}", changed,
-            if GameVariableManager::get_bool("EnemyOutfits") { "Randomized"  }
-            else { "Normal "}
-        ).into();
+        this.is_command_icon = (GameUserData::get_sequence() == 2 || GameUserData::get_sequence() == 3) && DVCVariables::flag_changed(DVCFlags::EnemyOutfits);
+        this.command_text = if DVCVariables::get_flag(DVCFlags::EnemyOutfits, this.is_command_icon){ "Randomized" } else { "Normal "}.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let str1 =  if GameVariableManager::get_bool("EnemyOutfits") { "Enemies will wear random outfits."  }
-            else { "Enemies will wear their regular outfits." };
+        let is_map = GameUserData::get_sequence() == 2 || GameUserData::get_sequence() == 3;
+        this.help_text =
+            if DVCVariables::get_flag(DVCFlags::EnemyOutfits, is_map) { "Enemies will wear random outfits." }
+            else { "Enemies will wear their regular outfits." }.into();
+    }
+    extern "C" fn a_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
+        if !DVCVariables::flag_changed(DVCFlags::EnemyOutfits) { return BasicMenuResult::new(); }
+        if GameUserData::get_sequence() != 2 && GameUserData::get_sequence() != 3 {
+            return BasicMenuResult::new();
+        }
+        let str1 = if DVCVariables::get_flag(DVCFlags::EnemyOutfits, true) { "Randomized enemy outfits?"}
+        else { "Revert enemies to their default outfits?"};
 
-        this.help_text = if GameVariableManager::get_bool("EnemyOutfits") != GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) {
-            format!("{} (Press A to Confirm)", str1) }
-        else { str1.to_string() }.into();
+        YesNoDialog::bind::<OutfitConfirm>(this.menu, str1, "Do it!", "Nah..");
+        BasicMenuResult::new()
     }
 }
 
-pub fn outfits_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    if GameVariableManager::get_bool("EnemyOutfits") == GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) { return BasicMenuResult::new();}
-    let str1 = if GameVariableManager::get_bool("EnemyOutfits") { "Randomized enemy outfits?"}
-        else { "Revert enemies to their default outfits?"};
-
-    YesNoDialog::bind::<OutfitConfirm>(this.menu, str1, "Do it!", "Nah..");
-    BasicMenuResult::new()
-}
-pub extern "C" fn vibe_enemy_outfit() -> &'static mut ConfigBasicMenuItem {
-    let switch = ConfigBasicMenuItem::new_switch::<RandomEnemyOutfits>("Random Enemy Outfits");
-    switch.get_class_mut().get_virtual_method_mut("ACall").map(|method| method.method_ptr = outfits_setting_acall as _ );
-    switch
-}
+pub extern "C" fn vibe_enemy_outfit() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_switch::<RandomEnemyOutfits>("Random Enemy Outfits") }
 
 pub struct OutfitConfirm;
 impl TwoChoiceDialogMethods for OutfitConfirm {
     extern "C" fn on_first_choice(this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
-        GameVariableManager::set_bool(DVCVariables::ENEMY_OUTFIT_KEY, GameVariableManager::get_bool("EnemyOutfits"));
+        DVCVariables::update_flag(DVCFlags::EnemyOutfits);
         change_enemy_outfits();
-        crate::menus::utils::dialog_restore_text::<RandomEnemyOutfits>(this);
-        /*
-        let menu =  unsafe {
-            std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap())
-        };
-        let index = menu.select_index;
-        RandomEnemyOutfits::set_help_text(menu.menu_item_list[index as usize], None);
-        RandomEnemyOutfits::set_command_text(menu.menu_item_list[index as usize], None);
-        menu.menu_item_list[index as usize].update_text();
-        */
+        crate::menus::utils::dialog_restore_text::<RandomEnemyOutfits>(this, false);
         BasicMenuResult::se_cursor().with_close_this(true)
     }
-    extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
 }
 
 pub fn accesorize_enemy_unit(enemy: &Unit) {
     if enemy.force.is_some_and(|f| f.force_type != 1 ) { return; }
     let accessory_list = &mut unsafe { unit_get_accessory_list(enemy, None) }.unit_accessory_array;
     let length = accessory_list.len();
-    if !GameVariableManager::get_bool(DVCVariables::ENEMY_OUTFIT_KEY) && enemy.person.get_asset_force() != 0 { 
+    if !DVCVariables::get_flag(DVCFlags::EnemyOutfits, false) && enemy.person.get_asset_force() != 0 {
         for x in 0..length { accessory_list[x].index = 0; }
         return;
     }

@@ -14,11 +14,6 @@ impl ConfigBasicMenuItemGaugeMethods  for EnemyDropGauge {
     }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let is_main = DVCVariables::is_main_menu();
-        if is_main && CONFIG.lock().unwrap().random_item == 0 {
-            this.help_text = "Enable item randomization to enable this setting.".into();
-            this.update_text();
-            return BasicMenuResult::new();
-        }
         let gauge = if is_main { CONFIG.lock().unwrap().enemy_drop_rate  }
         else { GameVariableManager::get_number(DVCVariables::ITEM_DROP_GAUGE_KEY) };
 
@@ -73,9 +68,10 @@ pub struct RandomItemMod;
 impl ConfigBasicMenuItemSwitchMethods for RandomItemMod {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_i(CONFIG.lock().unwrap().random_item, 0, 3, 1);
-        if CONFIG.lock().unwrap().random_item != result {
-            CONFIG.lock().unwrap().random_item  = result;
+        let value = DVCVariables::get_random_item();
+        let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
+        if value!= result {
+            DVCVariables::set_random_item(result);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -83,7 +79,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomItemMod {
         } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = match CONFIG.lock().unwrap().random_item {
+        this.command_text = match DVCVariables::get_random_item() {
             1 => { "Events"},
             2 => { "Drops"},
             3 => { "Events/Drops"}
@@ -91,7 +87,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomItemMod {
         }.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = match CONFIG.lock().unwrap().random_item {
+        this.help_text = match DVCVariables::get_random_item() {
             1 => { "Items obtained from chests/villages will be random." },
             2 => { "Item drops from enemies will be random." },
             3 => { "Item obtained from events and enemy drops will be random." },

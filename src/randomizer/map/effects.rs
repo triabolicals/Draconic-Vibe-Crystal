@@ -6,7 +6,8 @@ pub fn install_tilebolical_effects(script: &EventScript) {
     GameVariableManager::make_entry("DVC", 1);
     GameVariableManager::make_entry("TileSkills", 0);
     script.register_function("PlayerGender", crate::script::dvc_alear_is_female);
-
+    script.register_function("IsAlearFemale", crate::script::is_alear_female);
+    script.register_action("UnitMovePos", crate::script::unit_move);
     register_action(script, "ShuffleEmblems", shuffle_emblems, Emblem);
     register_action(script, "DanceTeam", dance_all, Other);
     register_action(script, "EngageOn", all_engage, Emblem);
@@ -207,7 +208,7 @@ extern "C" fn class_change(_args: &Array<DynValue>, _method_info: OptionalMethod
         let job_hash = mind_unit.job.parent.hash;
         unsafe { maphistory_cc(mind_unit, None); }
         println!("Random Class Change!");
-        job::unit_change_to_random_class(mind_unit);
+        job::unit_change_to_random_class(mind_unit, false);
         person::unit::fixed_unit_weapon_mask(mind_unit);
         mind_unit.update_weapon_mask();
         cc = job_hash != mind_unit.get_job().parent.hash;

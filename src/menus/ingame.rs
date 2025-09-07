@@ -3,39 +3,17 @@ use super::*;
 
 fn add_in_game_dvc_menu_items(config_menu: &mut ConfigMenu<ConfigBasicMenuItem>) {
     config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::AssetSubMenu>("Asset Settings"));
-    config_menu.add_item(deployment::vibe_deployment());
-    config_menu.add_item(deployment::vibe_emblem_deployment());
+    config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::ItemSubMenu>("Item Settings"));
+    config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::ClassSubMenu>("Class/Skill Settings"));
+    config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::EmbelmSubMenu>("Emblem Settings"));
+    config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::RecruitmentSubMenu>("Player Unit Settings"));
+    config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::EnemySubMenu>("Enemy Unit Settings"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<deployment::RandomDeploySpots>("Random Deployment Spots"));
+    config_menu.add_item(randomizer::job::menu::vibe_job_rerand());
+    config_menu.add_item(randomizer::bgm::vibe_bgm());
+    config_menu.add_item(randomizer::map::vibe_tile());
     config_menu.add_item(randomizer::terrain::menu::vibe_energy());
     config_menu.add_item(randomizer::terrain::menu::vibe_fow());
-    config_menu.add_item(randomizer::job::menu::vibe_job_rerand());
-    config_menu.add_item(randomizer::grow::vibe_pgmode());
-    config_menu.add_item(randomizer::item::menu::vibe_prw());
-    config_menu.add_item(autolevel::menu::vibe_autolevel());
-    config_menu.add_item(autolevel::menu::autobench());
-    config_menu.add_item(randomizer::job::menu::vibe_custom_job());
-    if DVCVariables::get_single_class(false).is_some() || DVCVariables::get_random_reclass() == 0 {
-        config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::single::SingleJob>("Opps! All"));
-    }
-    else {
-        config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::job::menu::RandomCC>("Re-Classing Settings"));
-    }
-
-    config_menu.add_item(randomizer::skill::learn::vibe_learn_skill());
-    config_menu.add_item(randomizer::emblem::emblem_skill::vibe_rand_esc());
-    config_menu.add_item(randomizer::skill::menu::vibe_rand_spc());
-    config_menu.add_item(randomizer::skill::menu::vibe_skill_gauge());
-    config_menu.add_item(randomizer::job::menu::vibe_job_gauge());
-    config_menu.add_item(randomizer::item::menu::vibe_drops());
-    config_menu.add_item(randomizer::item::hub::vibe_hub_items());
-    config_menu.add_item(randomizer::item::menu::vibe_item_gauge());
-    config_menu.add_item(randomizer::bgm::vibe_bgm());
-    config_menu.add_item(randomizer::styles::vibe_styles());
-    config_menu.add_item(randomizer::interact::vibe_interaction());
-    config_menu.add_item(randomizer::emblem::engrave::vibe_engrave());
-    config_menu.add_item(autolevel::enemy::vibe_enemy_emblem());
-    config_menu.add_item(autolevel::revival::vibe_enemy_stones());
-    config_menu.add_item(randomizer::emblem::menu::vibe_engage_links());
-    config_menu.add_item(randomizer::map::vibe_tile());
 }
 
 pub struct TriabolicalInGameMenu;

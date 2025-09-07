@@ -68,7 +68,7 @@ pub fn reset_shopdata(){
 }
 
 pub fn randomize_shop_data() {
-    if !DVCVariables::random_enabled() || GameVariableManager::get_number(DVCVariables::SHOP_KEY) == 0  { return; }
+    if !DVCVariables::random_enabled() || DVCVariables::get_flag(DVCFlags::AddedShopItems, false)  { return; }
     if super::super::RANDOMIZER_STATUS.read().unwrap().shop_randomized { return; }
 
     let rng = crate::utils::get_rng();
@@ -200,7 +200,7 @@ impl ShopData for ItemEvolveData {}
 
 
 pub fn randomize_item_evolve() {
-    if !DVCVariables::random_enabled() || !GameVariableManager::get_bool(DVCVariables::SHOP_KEY)  { return; }
+    if !DVCVariables::random_enabled() || !DVCVariables::get_flag(DVCFlags::AddedShopItems, false)   { return; }
     let rng = crate::utils::get_rng();
     let item_pool_size = RANDOM_ITEM_POOL.lock().unwrap().len();
     ItemEvolveData::get_list_mut().unwrap().iter_mut()

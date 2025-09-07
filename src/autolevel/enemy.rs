@@ -30,17 +30,14 @@ impl ConfigBasicMenuItemGaugeMethods  for EnemyEmblemGauge {
 
         if value == 0 { this.help_text = "Enemy units will not have an chance to equipped emblems.".into(); }
         else {  this.help_text = format!("{}% chance of enemy units equipped with an emblem.", value).into();  }
-
+    }
+    extern "C" fn build_attributes(this: &mut ConfigBasicMenuItem, method_info: OptionalMethod) -> BasicMenuItemAttribute {
+        crate::menus::buildattr::not_in_map_sortie_build_attr(this, method_info)
     }
 }
 
 
-pub extern "C" fn vibe_enemy_emblem() -> &'static mut ConfigBasicMenuItem { 
-    let enemy_emblem = ConfigBasicMenuItem::new_gauge::<EnemyEmblemGauge>("Enemy Emblem Rate"); 
-    enemy_emblem.get_class_mut().get_virtual_method_mut("BuildAttribute")
-        .map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
-    enemy_emblem
-}
+pub extern "C" fn vibe_enemy_emblem() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_gauge::<EnemyEmblemGauge>("Enemy Emblem Rate") }
 
 pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
     if EMBLEM_LIST.get().and_then(|v| v.get(emblem))

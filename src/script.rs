@@ -8,12 +8,19 @@ use engage::{
     proc::{ProcVoidFunction, desc::*},
 
 };
+use engage::unitpool::UnitPool;
 use unity::prelude::*;
 use crate::{utils::*, enums::PIDS, randomizer::{*, person::PLAYABLE, RANDOMIZER_STATUS}, config::DVCVariables};
+use crate::randomizer::person::{switch_person, switch_person_reverse};
 
 pub extern "C" fn dvc_alear_is_female(_args: &Il2CppArray<DynValue>, _method_info: OptionalMethod) -> &'static DynValue{
     DynValue::new_number(GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) as f64)
 }
+pub extern "C" fn is_alear_female(_args: &Il2CppArray<DynValue>, _method_info: OptionalMethod) -> &'static DynValue {
+    let r = GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) == 2;
+    DynValue::new_boolean(r)
+}
+
 extern "C" fn hub_sequence_map_opening(proc: &mut ProcInst, _optional_method: OptionalMethod) {
     if get_singleton_proc_instance::<HubSequence>().is_some() && (GameUserData::get_sequence() == 4 || GameUserData::get_sequence() == 5) {
         unsafe { hub_sequence_map_opening_event(proc, None); }
@@ -27,11 +34,17 @@ extern "C" fn gmap_sequence_startup(proc: &mut ProcInst, optional_method: Option
 extern "C" fn map_sequence_map_opening(proc: &mut ProcInst, optional_method: OptionalMethod) {
     unsafe { event_sequence_map_opening(proc, optional_method); }
     adjust_person_map_inspectors();
+    move_unit_to_deploy_spot(false);
+}
+
+extern "C" fn map_sequence_sortie_desc(proc: &mut ProcInst, optional_method: OptionalMethod) {
+    move_unit_to_deploy_spot(false);
+    unsafe { map_sequence_sortie(proc, optional_method); }
 }
 pub fn map_opening_proc_edit() {
     if let Some(hub_sequence) = get_singleton_proc_instance::<HubSequence>() {
         unsafe {
-            (*hub_sequence.proc.descs.get())[28] = ProcDesc::call(ProcVoidFunction::new(None, hub_sequence_map_opening));
+          (*hub_sequence.proc.descs.get())[28] = ProcDesc::call(ProcVoidFunction::new(None, hub_sequence_map_opening));
         }
     }
     if let Some(singleton_proc) = get_singleton_proc_instance::<GmapSequence>(){
@@ -42,6 +55,7 @@ pub fn map_opening_proc_edit() {
     if let Some(singleton_proc) = get_singleton_proc_instance::<MapSequence>() {
         unsafe {
             (*singleton_proc.proc.descs.get())[45] = ProcDesc::call(ProcVoidFunction::new(None, map_sequence_map_opening));
+            (*singleton_proc.proc.descs.get())[51] = ProcDesc::call(ProcVoidFunction::new(None, map_sequence_sortie_desc));
         }
     }
     get_nested_virtual_methods_mut("App", "SortieUnitSelect", "UnitMenuItem", "YCall")
@@ -54,6 +68,10 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
     if result.is_none() || !DVCVariables::random_enabled() { return result; }
     let result_string = result.unwrap();
     let str1 = result_string.to_string();
+    if DVCVariables::get_flag(DVCFlags::RandomDeploySpot, false){
+        if str1.contains("AI_MV_BreakDown") { return Some("AI_MV_NearestEnemy".into()); }
+        if str1.contains("AI_MI_BreakDown") { return Some("AI_MI_Null".into()); }
+    }
     if str1.contains("Kengen") && !GameVariableManager::get_bool("G_CustomEmblem") {
         if GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) == 0 { return result; }
         let emblem_index = KENGEN.iter().position(|x| *x == str1);
@@ -78,13 +96,13 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
             if let Some(person) = PersonData::get(str1.as_str()) {
                 let playable = PLAYABLE.get().unwrap();
                 if let Some(pos) = playable.iter().position(|&x| x == person.parent.index){
-                    if pos > 40 && GameVariableManager::get_bool(DVCVariables::CUSTOM_UNIT_RECRUIT_DISABLE) { return None; }
+                    if pos > 40 && DVCVariables::get_flag(DVCFlags::CustomUnitRecruitDisable, false) { return None; }
                     if pos > 96 { return None; }
                 }
             }
         }
         let cid = GameUserData::get_chapter().cid.to_string();
-        if cid == "CID_M022" {
+        if cid == "CID_M022" && GameUserData::get_sequence() == 3 {
             if !GameVariableManager::exist("VeyleRecruitment") {
                 GameVariableManager::make_entry_norewind("VeyleRecruitment", 0);
             }
@@ -106,6 +124,7 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
         }
         else if cid == "CID_M026" { return result; }
         if GameVariableManager::exist(format!("G_R_{}", str1).as_str()) {
+            println!("Returing PID {}", Mess::get_name(GameVariableManager::get_string(format!("G_R_{}", str1).as_str())));
             Some(GameVariableManager::get_string(format!("G_R_{}", str1).as_str()))
         }
         else { result }
@@ -132,8 +151,7 @@ pub fn change_g_pid_lueur() {
 }
 
 pub fn replace_lueur_chapter22() {
-    if GameUserData::get_chapter().cid.to_string() == "CID_M022" &&
-        GameUserData::get_sequence() == 3 {  change_g_pid_lueur(); }
+    if GameUserData::get_chapter().cid.to_string() == "CID_M022" && GameUserData::get_sequence() == 3 {  change_g_pid_lueur(); }
 }
 
 pub fn post_sortie_script_adjustment() {
@@ -209,6 +227,16 @@ fn adjust_inspector(inspector: &mut MapInspector, free_deploy: bool) {
     }
 
     match kind {
+        MapInspectorKind::BreakdownEnemy => {
+            let inspector = inspector.cast_mut::<PokeInspector>();
+            if DVCVariables::get_flag(DVCFlags::RandomDeploySpot, false) && GameUserData::get_chapter().cid.str_contains("M008") {
+                inspector.x = -1;
+                inspector.z = -1;
+                inspector.h = -1;
+                inspector.w = -1;
+            }
+            person_index_convert(&mut inspector.person);
+        }
         MapInspectorKind::UnitCommandPrepare | MapInspectorKind::TargetSelect | MapInspectorKind::EngageAfter | MapInspectorKind::EngageBefore|
         MapInspectorKind::Pickup => {
             let inspector = inspector.cast_mut::<PersonInspector>();
@@ -227,15 +255,99 @@ fn adjust_inspector(inspector: &mut MapInspector, free_deploy: bool) {
             let inspector = inspector.cast_mut::<InterruptInspector>();
             person_index_convert(&mut inspector.person);
         }
-       MapInspectorKind::Escape | MapInspectorKind::BreakdownEnemy | MapInspectorKind::Breakdown => {
+       MapInspectorKind::Escape | MapInspectorKind::Breakdown => {
            let inspector = inspector.cast_mut::<PokeInspector>();
            person_index_convert(&mut inspector.person);
         }
         _ => {}
     }
 }
+
+fn move_unit_to_deploy_spot(is_ally: bool) {
+    if DVCVariables::get_flag(DVCFlags::RandomDeploySpot, false) && !GameVariableManager::get_bool("RDSet") {
+        GameVariableManager::make_entry("RDSet", 1);
+        for x in 0..41 {
+            // Alear, Vander, Framme, Clanne are listed under the replacement pid in DisposData
+            let person =
+                if x == 0 || GameVariableManager::get_bool("DDFanClub") { PersonData::get(DVCVariables::get_dvc_person(x, false)) }
+                else { PersonData::get(PIDS[x as usize]) };
+            if x > 4 && person.is_some_and(|x| x.pid == DVCVariables::get_dvc_person(0, false)) { continue; }
+            if let Some(data) = person.and_then(|p| get_dispos_data_by_person(p, if is_ally { 2 } else { 0 })){
+                if let Some(unit) = UnitPool::get_from_person_mut(DVCVariables::get_dvc_person(x, false), false) {
+                    if unit.x != data.dispos_x as u8 || unit.z != data.dispos_y as u8 {
+                        let array: &mut Array<_> = Array::from_slice(
+                            vec![
+                                DynValue::new_string(PIDS[x as usize].into()),
+                                DynValue::new_number(data.dispos_x as f64),
+                                DynValue::new_number(data.dispos_y as f64),
+                            ]
+                        ).unwrap();
+                        unsafe {
+                            script_set_pos_unit(array, None);
+                            script_move_unit(array, None);
+                        }
+                        unit.x = data.dispos_x as u8;
+                        unit.z = data.dispos_y as u8;
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub extern "C" fn unit_move(args: &Il2CppArray<DynValue>, _method_info: OptionalMethod) {
+    if let Some(unit) = args.try_get_unit(0).filter(|f| f.force.is_some_and(|f| f.force_type == 2)){
+        if args.try_get_i32(1) != 0 {
+            let person_data =
+                if GameVariableManager::get_bool("DDFanClub") { &unit.person } else { switch_person(unit.person) };
+            let position = GameVariableManager::get_number(format!("RD_{}", person_data.pid));
+            let x = position % 100;
+            let z = position / 100;
+            let original = switch_person_reverse(person_data);
+            if x != 0 && z != 0 {
+                let array: &mut Array<_> = Array::from_slice(
+                    vec![
+                        DynValue::new_string(original.pid.clone()),
+                        DynValue::new_number(x as f64),
+                        DynValue::new_number(z as f64),
+                    ]
+                ).unwrap();
+                unsafe {
+                    script_set_pos_unit(array, None);
+                    script_move_unit(array, None);
+                }
+                return;
+            }
+        }
+    }
+    unsafe { script_move_unit_1(args, None); }
+}
+
+fn get_dispos_data_by_person(person_data: &PersonData, force: i8) -> Option<&'static &'static mut DisposData> {
+    if let Some(dispos_data) = DisposData::get_list() {
+        dispos_data.iter().flat_map(|g| g.iter())
+            .find(|x| x.get_person().is_some_and(|p| p.parent.hash == person_data.parent.hash) && x.force == force)
+    }
+    else { None }
+}
+
+#[skyline::from_offset(0x02199dc0)]
+fn unit_join_original(args: &Il2CppArray<DynValue>, method_info: OptionalMethod);
+
+#[skyline::from_offset(0x0219cff0)]
+fn script_move_unit(arg: &mut Il2CppArray<&mut DynValue>, optional_method: OptionalMethod);
+
+#[skyline::from_offset(0x0219cff0)]
+fn script_move_unit_1(arg: &Il2CppArray<DynValue>, optional_method: OptionalMethod);
+
+#[skyline::from_offset(0x0219cec0)]
+fn script_set_pos_unit(arg: &mut Il2CppArray<&mut DynValue>, optional_method: OptionalMethod);
+
 #[unity::from_offset("App", "HubSequence", "MapOpeningEvent")]
 fn hub_sequence_map_opening_event(this: &ProcInst, method_info: OptionalMethod);
+
+#[unity::from_offset("App", "MapSequence", "Sortie")]
+fn map_sequence_sortie(this: &ProcInst, method_info: OptionalMethod);
 
 #[skyline::from_offset(0x024e46d0)]
 fn event_sequence_map_opening(proc: &ProcInst, optional_method: OptionalMethod);

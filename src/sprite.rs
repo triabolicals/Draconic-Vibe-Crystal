@@ -8,10 +8,9 @@ use engage::unitpool::UnitPool;
 use unity::engine::Sprite;
 use unity::prelude::*;
 use crate::assets::data::SEARCH_LIST;
-use crate::config::DVCVariables;
+use crate::config::{DVCFlags, DVCVariables};
 use crate::enums::{MPIDS, PIDS, RINGS};
 use crate::randomizer::names::get_emblem_person;
-use crate::randomizer::RANDOMIZER_STATUS;
 use crate::utils::{create_rng, str_contains};
 
 #[skyline::hook(offset=0x021e1250)]
@@ -101,23 +100,33 @@ pub fn try_get_sprite(this: &SpriteAtlasManager, name: &Il2CppString, method_inf
         }
         return call_original!(this, ascii_name.into(), method_info).or_else(|| call_original!(this, "Phantom".into(), method_info));
     }
-    let parts = name.to_string().split("_").map(|str| str.to_string()).collect::<Vec<String>>();
-    if path.contains("Unit/UnitIndexes") && parts.len() >= 2 && GameUserData::get_sequence() != 0 {
-        let default = format!("{}_{}", parts[0], parts[0]).into();
-        let id = parts[0].as_str()[0..3].parse::<u32>();
-        call_original!(this, name, None)
-            .or_else(|| call_original!(this, format!("{}_{}_NoWeapon", parts[0], parts[1]).into(), None))
-            .or_else(|| find_person_id(parts[1].as_str()).zip(get_job_from_id(parts[1].as_str()))
-                .and_then(|(unit, job)|
-                    if id.is_ok_and(|i| i >= 700) {
-                        call_original!(this, format!("{}_{}_{}", unit, parts[1], job.unit_icon_weapon_id).into(), None)
-                    }
-                    else { None }
+
+    if path.contains("Unit/UnitIndexes") && GameUserData::get_sequence() != 0 {
+        let parts = name.to_string().split("_").map(|str| str.to_string()).collect::<Vec<String>>();
+        if parts.len() >= 2 && parts[0].len() > 3 {
+            let id = parts[0].as_str()[0..3].parse::<u32>();
+            if id.clone().is_ok_and(|x| x >= 700) {
+                if let Some(unit_icon) = get_unit_icon_from_unique(parts[1].as_str()) {
+                    return call_original!(this, format!("{}_{}_NoWeapon", unit_icon, parts[1]).into(), None);
+                }
+            }
+            let default = format!("{}_{}", parts[0], parts[0]).into();
+            call_original!(this, name, None)
+                .or_else(|| call_original!(this, format!("{}_{}_NoWeapon", parts[0], parts[1]).into(), None))
+                .or_else(|| find_person_id(parts[1].as_str()).zip(get_job_from_id(parts[1].as_str()))
+                    .and_then(|(unit, job)|
+                        if id.is_ok_and(|i| i >= 700) {
+                            call_original!(this, format!("{}_{}_{}", unit, parts[1], job.unit_icon_weapon_id).into(), None)
+                        }
+                        else { None }
+                    )
                 )
-            )
-            .or_else(|| get_job_from_id(parts[1].as_str()).and_then(|job| call_original!(this, format!("{}_{}_{}", parts[0], parts[1], job.unit_icon_weapon_id).into(), None)))
-            .or_else(|| call_original!(this, default, None))
-            .or_else(|| get_unit_job_icon_from_unit(parts[0].as_str()).and_then(|uji| call_original!(this, uji.into(), None)))
+                .or_else(|| get_job_from_id(parts[1].as_str()).and_then(|job| call_original!(this, format!("{}_{}_{}", parts[0], parts[1], job.unit_icon_weapon_id).into(), None)))
+                .or_else(|| call_original!(this, default, None))
+                .or_else(|| get_unit_job_icon_from_unit(parts[0].as_str()).and_then(|uji| call_original!(this, uji.into(), None)))
+        }
+        else { call_original!(this, name, None) }
+
     }
     else { call_original!(this, name, None) }
 }
@@ -147,7 +156,7 @@ fn unit_icon_try_set(this: u64, index: Option<&Il2CppString>, palette_name: Opti
 
 #[skyline::hook(offset=0x2d52340)]
 pub fn facethumbnail_getpath_god(god: &GodData, method_info: OptionalMethod) -> Option<&'static Il2CppString> {
-    if GameVariableManager::get_bool(DVCVariables::EMBLEM_NAME_KEY) {
+    if DVCVariables::get_flag(DVCFlags::GodNames, false) {
         if let Some(person) = get_emblem_person(god.mid)
             .and_then(|p| p.get_ascii_name().filter(|x| FaceThumbnail::exists(x)))
         {
@@ -187,4 +196,28 @@ fn get_unit_job_icon_from_unit(unit_icon: &str) -> Option<String>  {
             }
             else { None }
         })
+}
+
+fn get_unit_icon_from_unique(job_icon: &str) -> Option<String>  {
+    match job_icon {
+        "600DragonLord"|"602DragonKing" => Some("001Lueur".to_string()),
+        "601DragonLord"|"603DragonKing" => Some("051Lueur".to_string()),
+        "718ShadowLord" => Some("002Lueur".to_string()),
+        "719ShadowLord" => Some("052Lueur".to_string()),
+        "681ShadowPrincess" => Some("551Veyre".to_string()),
+        "694ShadowKing" => Some("504Sombre".to_string()),
+        "678AvenirLC"|"679Avenir" => Some("100Alfred".to_string()),
+        "675FleurageLC"|"676Fleurage" => Some("150Celine".to_string()),
+        "683SuccesseurLC"|"684Successeur" => Some("200Diamand".to_string()),
+        "685TirailleurLC"|"686TirailleurLC" => Some("201Staluke".to_string()),
+        "687LindwurmLC"|"656Lindwurm" => Some("350Ivy".to_string()),
+        "688SleipnirLC"|"651Sleipnir" => Some("351Hortensia".to_string()),
+        "692PitchforkLC"|"693Pitchfork" => Some("450Misutira".to_string()),
+        "690CupidoLC"|"691Cupido" => Some("400Fogato".to_string()),
+        "716Melusine" => Some("553Selestia".to_string()),
+        "673Dancer" => Some("403Seadas".to_string()),
+        "748ShadowPrincessR" => Some("099El".to_string()),
+        "749ShadowLordR" => Some("049Il".to_string()),
+        _ => None,
+    }
 }

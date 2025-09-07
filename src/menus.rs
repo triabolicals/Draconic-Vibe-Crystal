@@ -16,6 +16,7 @@ pub mod global;
 pub mod submenu;
 pub mod buildattr;
 pub mod utils;
+pub mod menuitem;
 
 pub extern "C" fn open_anime_all_ondispose(this: &mut ProcInst, _method_info: OptionalMethod) {
     this.parent.as_ref().unwrap().get_class().get_virtual_method("OpenAnimeAll").map(|method| {
@@ -39,6 +40,7 @@ fn add_dvc_menu_options(config_menu: &mut ConfigMenu<ConfigBasicMenuItem>){
     config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::ItemSubMenu>("Item Randomization"));
     config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::EnemySubMenu>("Enemy Settings"));
     config_menu.add_item(ConfigBasicMenuItem::new_command::<submenu::AssetSubMenu>("Asset Settings"));
+    config_menu.add_item(ConfigBasicMenuItem::new_switch::<deployment::RandomDeploySpots>("Random Deployment Spots"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::grow::RandomGrowMod>("Random Growth Mode"));
     config_menu.add_item(ConfigBasicMenuItem::new_switch::<randomizer::grow::PersonalGrowMode>("Personal Growth Mode"));
     config_menu.add_item(randomizer::terrain::menu::vibe_energy());

@@ -15,6 +15,7 @@ pub use engage::{
 };
 use unity::il2cpp::object::Array;
 use crate::{enums::*, utils::*, autolevel::*};
+use crate::config::DVCFlags;
 use super::{DVCVariables, CONFIG, RANDOMIZER_STATUS};
 
 pub mod ai;
@@ -31,16 +32,12 @@ pub struct RandomPersonMod;
 pub struct RandomBosses;
 
 impl ConfigBasicMenuItemSwitchMethods for RandomPersonMod {
-    fn init_content(this: &mut ConfigBasicMenuItem){
-        this.get_class_mut()
-            .get_virtual_method_mut("ACall")
-            .map(|method| method.method_ptr = custom::crecruitment_menu_a_call as _).unwrap();
-    }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
         let value = CONFIG.lock().unwrap().random_recruitment;
         let result = ConfigBasicMenuItem::change_key_value_i(value, 0, 3, 1);
         if value != result {
             CONFIG.lock().unwrap().random_recruitment = result;
+            this.is_command_icon = result == 3;
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -50,7 +47,7 @@ impl ConfigBasicMenuItemSwitchMethods for RandomPersonMod {
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.command_text = match CONFIG.lock().unwrap().random_recruitment {
             1 => { "Random"},
-            3 => { "Custom Order (A)"},
+            3 => { "Custom Order"},
             2 => { "Reverse"},
             _ => { "Standard"},
         }.into();
@@ -58,29 +55,22 @@ impl ConfigBasicMenuItemSwitchMethods for RandomPersonMod {
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.help_text = match CONFIG.lock().unwrap().random_recruitment {
             1 => { "Characters will be recruited in a random order." },
-            3 => { "Unit recruitment order is determined by list. (Press A)"},
+            3 => { "Unit recruitment order is determined by list."},
             2 => { "Characters will be recruited in reversed order."}
             _ => { "Standard recruitment order." },
         }.into();
     }
+    extern "C" fn a_call(this: &mut ConfigBasicMenuItem, method_info: OptionalMethod) -> BasicMenuResult {
+        custom::crecruitment_menu_a_call(this, method_info)
+    }
 }
 
 impl ConfigBasicMenuItemSwitchMethods for RandomBosses  {
-    fn init_content(_this: &mut ConfigBasicMenuItem){
-        if !DVCVariables::is_main_menu() {
-            GameVariableManager::make_entry(DVCVariables::RANDOM_BOSS_KEY, 0);
-        }
-    }
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let is_main = DVCVariables::is_main_menu();
-        let value = if is_main { CONFIG.lock().unwrap().bosses }
-        else { GameVariableManager::get_bool(DVCVariables::RANDOM_BOSS_KEY) };
-
+        let value = DVCVariables::get_bosses(false);
         let result = ConfigBasicMenuItem::change_key_value_b(value);
         if value != result {
-            if is_main { CONFIG.lock().unwrap().bosses = result }
-            else { GameVariableManager::set_bool(DVCVariables::RANDOM_BOSS_KEY, result) };
-
+            DVCVariables::set_bosses(result, false);
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
             this.update_text();
@@ -88,14 +78,10 @@ impl ConfigBasicMenuItemSwitchMethods for RandomBosses  {
         } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() {  CONFIG.lock().unwrap().bosses }
-        else { GameVariableManager::get_bool(DVCVariables::RANDOM_BOSS_KEY) };
-        this.command_text = if value { "Random" } else { "Default"}.into();
+        this.command_text = if DVCVariables::get_bosses(false) { "Random" } else { "Default"}.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = if DVCVariables::is_main_menu() {  CONFIG.lock().unwrap().bosses }
-        else { GameVariableManager::get_bool(DVCVariables::RANDOM_BOSS_KEY) };
-        this.help_text = if value { "NPCs and enemy bosses may look a bit different." }
+        this.help_text = if DVCVariables::get_bosses(false) { "NPCs and enemy bosses may look a bit different." }
         else { "Default behavior."}.into();
     }
 }
@@ -104,8 +90,9 @@ pub struct CustomPersonMod;
 impl ConfigBasicMenuItemSwitchMethods for CustomPersonMod {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        let result = ConfigBasicMenuItem::change_key_value_b(CONFIG.lock().unwrap().custom_units);
-        if CONFIG.lock().unwrap().custom_units != result {
+        let value = CONFIG.lock().unwrap().custom_units;
+        let result = ConfigBasicMenuItem::change_key_value_b(value);
+        if value != result {
             CONFIG.lock().unwrap().custom_units = result;
             Self::set_command_text(this, None);
             Self::set_help_text(this, None);
@@ -114,29 +101,22 @@ impl ConfigBasicMenuItemSwitchMethods for CustomPersonMod {
         } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = if CONFIG.lock().unwrap().custom_units  { "Include" }
-            else { "Default"}.into();
+        this.command_text = if CONFIG.lock().unwrap().custom_units { "Include" } else { "Default"}.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.help_text = if CONFIG.lock().unwrap().custom_units { "Custom units are include in random recruitment order." }
             else { "Custom units will excluded from random recruitment order." }.into();
     }
-}
-fn build_attribute_custom_units(_this: &mut ConfigBasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute  {
-    if PLAYABLE.get().unwrap().len() == 41 { BasicMenuItemAttribute::Hide }
-    else { BasicMenuItemAttribute::Enable }
+    extern "C" fn build_attributes(this: &mut ConfigBasicMenuItem, method_info: OptionalMethod) -> BasicMenuItemAttribute {
+        if PLAYABLE.get().unwrap().len() == 41 { BasicMenuItemAttribute::Hide }
+        else { BasicMenuItemAttribute::Enable }
+    }
 }
 
 pub struct CustomPersonRecruitDisable;
 impl ConfigBasicMenuItemSwitchMethods for CustomPersonRecruitDisable {
     fn init_content(_this: &mut ConfigBasicMenuItem){}
     extern "C" fn custom_call(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-        if PLAYABLE.get().unwrap().len() > 94 {
-            this.help_text = "Added recruitment slots are disabled. (Exceeds unit limit)".into();
-            this.command_text = "Disable".into();
-            this.update_text();
-            return BasicMenuResult::new();
-        }
         let result = ConfigBasicMenuItem::change_key_value_b(CONFIG.lock().unwrap().custom_unit_recruitment_disable);
         if CONFIG.lock().unwrap().custom_unit_recruitment_disable != result {
             CONFIG.lock().unwrap().custom_unit_recruitment_disable = result;
@@ -147,27 +127,31 @@ impl ConfigBasicMenuItemSwitchMethods for CustomPersonRecruitDisable {
         } else {BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = if CONFIG.lock().unwrap().custom_unit_recruitment_disable  { "Disable" }
+        if PLAYABLE.get().unwrap().len() > 96 && !CONFIG.lock().unwrap().custom_unit_recruitment_disable { this.command_text = "Enabled*".into(); }
+        else {
+            this.command_text = if CONFIG.lock().unwrap().custom_unit_recruitment_disable  { "Disable" }
             else { "Enable"}.into();
+        }
+
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.help_text = if CONFIG.lock().unwrap().custom_unit_recruitment_disable { "Added Somniel recruitment slots will be disabled." }
+        if PLAYABLE.get().unwrap().len() > 96 && !CONFIG.lock().unwrap().custom_unit_recruitment_disable {
+            this.help_text = "Limited Somniel recruitment. (Exceeds Unit Limit).".into();
+        }
+        else {
+            this.help_text = if CONFIG.lock().unwrap().custom_unit_recruitment_disable { "Added Somniel recruitment slots will be disabled." }
             else { "Added Somniel recruitment slots will be enabled." }.into();
+        }
+    }
+    extern "C" fn build_attributes(_this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
+        if PLAYABLE.get().unwrap().len() == 41 { BasicMenuItemAttribute::Hide }
+        else { BasicMenuItemAttribute::Enable }
     }
 }
 
-pub extern "C" fn vibe_custom_units() -> &'static mut ConfigBasicMenuItem { 
-    let item = ConfigBasicMenuItem::new_switch::<CustomPersonMod>("Custom Units");
-    item.get_class_mut().get_virtual_method_mut("BuildAttribute").
-        map(|method| method.method_ptr = build_attribute_custom_units as _);
-    item
-}
-pub extern "C" fn vibe_custom_slot_disable() -> &'static mut ConfigBasicMenuItem { 
-    let item = ConfigBasicMenuItem::new_switch::<CustomPersonRecruitDisable>("Added Recruitment Slots");
-    item.get_class_mut().get_virtual_method_mut("BuildAttribute")
-        .map(|method| method.method_ptr = build_attribute_custom_units as _);
-    item
-}
+pub extern "C" fn vibe_custom_units() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_switch::<CustomPersonMod>("Custom Units") }
+pub extern "C" fn vibe_custom_slot_disable() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_switch::<CustomPersonRecruitDisable>("Added Recruitment Slots") }
+
 pub fn get_playable_list() {
     // Add the 41 units first
     PLAYABLE.get_or_init(||{
@@ -316,8 +300,8 @@ fn set_hub_facilities() {
 }
 pub fn randomize_person() {
     if !can_rand() { return; }
-    if !GameVariableManager::exist("G_Random_Person_Set") {  GameVariableManager::make_entry("G_Random_Person_Set", 0);  }
-    if GameVariableManager::get_bool("G_Random_Person_Set") { 
+    println!("Recruitment Set: {}", DVCVariables::get_flag(DVCFlags::RecruitmentSet, false));
+    if DVCVariables::get_flag(DVCFlags::RecruitmentSet, false) {
         if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 { 
             set_hub_facilities(); 
             hub::change_somniel_hub_dispos();
@@ -399,7 +383,8 @@ pub fn randomize_person() {
             _ => {},
         }
     }
-    GameVariableManager::set_bool("G_Random_Person_Set", true);
+    DVCVariables::set_flag(DVCFlags::RecruitmentSet, true, false);
+    println!("Recruitment Set: {}", DVCVariables::get_flag(DVCFlags::RecruitmentSet, false));
     set_hub_facilities(); 
     hub::change_somniel_hub_dispos();
 }
@@ -476,7 +461,7 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
         if let Some(lueur_unit) = UnitPool::get_from_person_mut(PIDS[0].into(), false) {
             unit::change_unit_autolevel(lueur_unit, true);
             if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 {
-                super::job::unit_change_to_random_class(lueur_unit);
+                super::job::unit_change_to_random_class(lueur_unit, true);
                 unit::fixed_unit_weapon_mask(lueur_unit);
                 unit::adjust_unit_items(lueur_unit);
             }

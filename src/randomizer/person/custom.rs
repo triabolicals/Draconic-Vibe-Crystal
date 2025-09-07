@@ -78,6 +78,12 @@ impl ConfigBasicMenuItemSwitchMethods for CustomRecruitmentMenuItem {
             BasicMenuResult::new()
         }
     }
+    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
+        let value = CUSTOM_RECRUITMENT_TABLE.lock().unwrap()[this.index as usize];
+        this.command_text =
+            if value == 0 { "Random".into()  }
+            else {  Mess::get(MPIDS[value as usize - 1]) };
+    }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         let value = CUSTOM_RECRUITMENT_TABLE.lock().unwrap()[this.index as usize];
         if value == 0 {
@@ -89,12 +95,6 @@ impl ConfigBasicMenuItemSwitchMethods for CustomRecruitmentMenuItem {
         else {
             this.help_text = format!("{} will replace {}.",  Mess::get(MPIDS[value as usize - 1]), Mess::get(MPIDS[this.index as usize])).into();
         }
-    }
-    extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let value = CUSTOM_RECRUITMENT_TABLE.lock().unwrap()[this.index as usize];
-        this.command_text = 
-            if value == 0 { "Random".into()  }
-            else {  Mess::get(MPIDS[value as usize - 1]) };
     }
 }
 

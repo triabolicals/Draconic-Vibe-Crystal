@@ -39,7 +39,7 @@ fn rerandomize_jobs() {
         UnitPool::class().get_static_fields_mut::<UnitPoolStaticFieldsMut>().s_unit
         .iter_mut().filter(|unit| unit.force.is_some_and(|f| (1 << f.force_type) & 6 != 0 )).for_each(|unit|{
             if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 {
-                if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit); }
+                if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit, false); }
                 else {
                     person::ai::reset_enemy_ai_and_items(unit);
                     enemy_unit_change_to_random_class(unit); 
@@ -56,7 +56,7 @@ fn rerandomize_jobs() {
         UnitPool::class().get_static_fields_mut::<UnitPoolStaticFieldsMut>().s_unit
         .iter_mut().filter(|unit| unit.force.is_some_and(|f| f.force_type == 0 )).for_each(|unit|{
             if GameVariableManager::get_number(DVCVariables::JOB_KEY) & 1 != 0 {
-                if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit); }
+                if unit.person.get_asset_force() == 0 { unit_change_to_random_class(unit, false); }
                 else {  enemy_unit_change_to_random_class(unit); }
                 crate::autolevel::auto_level_unit_for_random_map(unit, false);
                 person::unit::adjust_unit_items(unit);
@@ -65,11 +65,10 @@ fn rerandomize_jobs() {
             }
         });
     }
-
 }
 
 fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, player: bool, emblem: bool) -> bool {
-    if !GameVariableManager::get_bool(DVCVariables::CUSTOM_JOB_KEY) { if !JOB_HASH.iter().any(|&hash| hash == job.parent.hash ) { return false;} }
+    if !DVCVariables::get_flag(DVCFlags::CustomClass, false) { if !JOB_HASH.iter().any(|&hash| hash == job.parent.hash ) { return false;} }
     let job_flags = job.flag.value;
     if job_flags & 32 != 0 { return false; }
     let jid = job.jid.to_string();
@@ -112,8 +111,12 @@ fn get_old_person_data(unit: &Unit) -> (i32, i32, i32) {
     else { (0, level, internal) }
 }
 
-pub fn unit_change_to_random_class(unit: &mut Unit) {
-    let old_data = get_old_person_data(unit);
+pub fn unit_change_to_random_class(unit: &mut Unit, change_level: bool) {
+    let old_data = if change_level { get_old_person_data(unit) }
+    else {
+        let current_tier = if unit.job.is_high() { 1 } else if unit.job.max_level >= 40 { 2 } else { 0 };
+        (current_tier, unit.level as i32, unit.internal_level as i32)
+    };
     let is_high = old_data.0 == 1 || (old_data.0 == 2 && old_data.1 > 15);
     let rng = Random::get_game();
     let unit_level = old_data.1;
@@ -140,21 +143,25 @@ pub fn unit_change_to_random_class(unit: &mut Unit) {
     match old_data.0 {
         2 => { //Special
             if unit.job.is_high() {
-                if unit_level > 35 {
+                if unit_level > 25 {
                     unit.set_level(unit_level - 20);
                     unit.set_internal_level(20);
-                } else if unit_level > 15 {
+                }
+                else if unit_level > 15 {
                     unit.set_level(unit_level - 15);
                     unit.set_internal_level(15);
-                } else {
+                }
+                else {
                     unit.set_level(1);
                     unit.set_internal_level(unit_level);
                 }
-            } else if unit.job.max_level == 40 {
+            }
+            else if unit.job.max_level == 40 {
                 let new_level = if unit_level > 40 { 40 } else { unit_level };
                 unit.set_level(new_level);
                 unit.set_internal_level(0);
-            } else {
+            }
+            else {
                 unit.set_level(unit_level);
                 unit.set_internal_level(0);
             }
@@ -190,6 +197,7 @@ pub fn unit_change_to_random_class(unit: &mut Unit) {
             }
         }
     }
+
     unit.set_hp(unit.get_capability(0, true));  // fix HP
     unit.set_weapon_mask_from_person(); 
 
@@ -427,5 +435,5 @@ fn add_to_list(this: &ChangeJobData, unit: &Unit, cc_type: i32) -> bool {
 
 pub fn can_reclass(job: &JobData) -> bool {
     let vanilla_class = JOB_HASH.iter().any(|x| *x == job.parent.hash);
-    (vanilla_class && job.get_flag().value & 32 == 0) || (!vanilla_class && GameVariableManager::get_bool(DVCVariables::CUSTOM_JOB_KEY) )
+    (vanilla_class && job.get_flag().value & 32 == 0) || (!vanilla_class && DVCVariables::get_flag(DVCFlags::CustomClass, false) )
 }

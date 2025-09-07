@@ -28,10 +28,13 @@ pub fn get_random_element<'a, T>(vec: &'a mut Vec<T>, rng: &Random) -> Option<&'
 }
 
 pub fn get_random_and_remove<T: Clone>(vec: &mut Vec<T>, rng: &Random) -> Option<T> {
-    let index = rng.get_value(vec.len() as i32 ) as usize;
-    let v = vec.get(index).cloned();
-    if v.is_some() { vec.remove(index); }
-    v
+    if vec.len() == 0 { return None }
+    else {
+        let index = rng.get_value(vec.len() as i32 ) as usize;
+        let v = vec.get(index).cloned();
+        if v.is_some() { vec.remove(index); }
+        v
+    }
 }
 
 pub fn get_rng() -> &'static Random {
@@ -42,10 +45,11 @@ pub fn get_rng() -> &'static Random {
 
 
 pub fn is_tile_good(tid: &Il2CppString) -> bool{
-    if let Some(terrain) = TerrainData::get(&tid.to_string()) {  terrain.prohibition == 0  }
-    else { false }
+    TerrainData::get(&tid.to_string()).is_some_and(|f| f.prohibition == 0)
  }
-
+pub fn tid_can_fly(tid: &Il2CppString) -> bool{
+    TerrainData::get(&tid.to_string()).is_some_and(|t|{ t.prohibition == 2 })
+}
 pub fn can_rand() -> bool { GameVariableManager::get_number(DVCVariables::SEED) != 0 }
 
 pub fn create_rng(seed: i32, rng_mode: i32) -> &'static Random {

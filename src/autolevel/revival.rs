@@ -31,11 +31,9 @@ impl ConfigBasicMenuItemGaugeMethods  for EnemyRevivalStones {
             this.help_text = format!("Chance of enemy units gaining a revival stone: {}%.", value).into();
         }
     }
+    extern "C" fn build_attributes(this: &mut ConfigBasicMenuItem, method_info: OptionalMethod) -> BasicMenuItemAttribute {
+        crate::menus::buildattr::not_in_map_sortie_build_attr(this, method_info)
+    }
 }
 
-pub extern "C" fn vibe_enemy_stones() -> &'static mut ConfigBasicMenuItem { 
-    let enemy_stones = ConfigBasicMenuItem::new_gauge::<EnemyRevivalStones>("Enemy Revival Stone Rate"); 
-    enemy_stones.get_class_mut().get_virtual_method_mut("BuildAttribute")
-        .map(|method| method.method_ptr = crate::menus::buildattr::not_in_map_sortie_build_attr as _);
-    enemy_stones
-}
+pub extern "C" fn vibe_enemy_stones() -> &'static mut ConfigBasicMenuItem { ConfigBasicMenuItem::new_gauge::<EnemyRevivalStones>("Enemy Revival Stone Rate") }

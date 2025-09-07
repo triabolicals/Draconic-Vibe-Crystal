@@ -21,11 +21,11 @@ impl ConfigBasicMenuItemGaugeMethods  for BustGauge {
         } else { BasicMenuResult::new() }
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        let confirm = if GameVariableManager::get_bool("BustSettingChange") { "(Press A to Confirm)" } else { "" };
+        this.is_command_icon = GameVariableManager::get_bool("BustSettingChange");
         this.help_text = 
-            if this.gauge_ratio <= 0.09 {  format!("Current Volume Value: Default. {}", confirm) }
-            else if this.gauge_ratio >= 0.95 { format!("Current Volume Value: Randomized. {}", confirm) }
-            else { format!("Current Volume Value: {:2}. {}", this.gauge_ratio*5.0, confirm)  }.into();
+            if this.gauge_ratio <= 0.09 {  "Current Volume Value: Default".into() }
+            else if this.gauge_ratio >= 0.95 { "Current Volume Value: Randomized".into() }
+            else { format!("Current Volume Value: {:2}.", this.gauge_ratio*5.0).into() };
     }
 }
 
@@ -37,11 +37,10 @@ impl TwoChoiceDialogMethods for BustConfirm {
         let menu =
             unsafe {  std::mem::transmute::<&mut engage::proc::ProcInst, &mut engage::menu::ConfigMenu<ConfigBasicMenuItem>>(this.parent.parent.menu.proc.parent.as_mut().unwrap()) };
         let index = menu.select_index;
-        BustGauge::set_help_text(menu.menu_item_list[index as usize], None);
+        menu.menu_item_list[index as usize].is_command_icon = false;
         menu.menu_item_list[index as usize].update_text();
         BasicMenuResult::se_cursor().with_close_this(true)
     }
-    extern "C" fn on_second_choice(_this: &mut BasicDialogItemNo, _method_info: OptionalMethod) -> BasicMenuResult { BasicMenuResult::new().with_close_this(true) }
 }
 
 pub fn bust_setting_acall(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {

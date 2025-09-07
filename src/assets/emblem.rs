@@ -6,6 +6,7 @@ use conditions::{add_condition, remove_condition};
 use data::search::search_by_2_keys;
 use crate::assets::data::search::{search_by_iid, search_by_key};
 use crate::assets::dress::change_result_colors_by_unit;
+use crate::config::DVCFlags;
 use crate::randomizer::names::get_emblem_person;
 use crate::randomizer::person::ENEMY_PERSONS;
 
@@ -38,7 +39,7 @@ fn houses_unite_plus_act(result: &mut AssetTableResult, kind: i32) {
 fn emblem_asset_rand(result: &mut AssetTableResult, mode: i32, god: &GodData) {
     let emblem_appearance = DVCVariables::get_emblem_appearance();
 
-    let name = GameVariableManager::get_bool(DVCVariables::EMBLEM_NAME_KEY);
+    let name = DVCVariables::get_flag(DVCFlags::GodNames, false);
     let rng = utils::create_rng(god.parent.hash, 1);
     let female = if god.parent.index == 13 { GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) == 2 } else { god.female == 1 };
     let hash =
@@ -121,7 +122,7 @@ pub fn asset_table_result_god_setup(
         return result;
     }
     // Swapping Emblem appearance to Playable Characters appearance
-    if GameVariableManager::get_bool(DVCVariables::EMBLEM_NAME_KEY) {
+    if DVCVariables::get_flag(DVCFlags::GodNames, false) {
         if let Some(person) = get_emblem_person(god.mid) {
             let rng = Random::get_system();
             let is_engaging = conditions.iter_mut().any(|str| str.str_contains("エンゲージ開始"));
@@ -169,6 +170,21 @@ pub fn asset_table_result_god_setup(
             return result;
         }
         else if !is_lueur { return call_original!(this, mode2, god_data, is_darkness, conditions, method_info); }
+    }
+    // Chapter 22 Emblem
+    if mode > 10 {
+        println!("Is Chapter 22 Emblem Unit: {}", god.mid);
+        if god.flag.value & 32 != 0 {
+            let new_god = GodData::get(god.gid.to_string().replace("GID_", "GID_E006_敵"));
+            if new_god.is_some() {
+                let result = call_original!(this, mode2, new_god, true, conditions, method_info);
+                emblem_asset_rand(result, mode2, god);
+                return result;
+            }
+        }
+        let result = call_original!(this, mode2, Some(god), true, conditions, method_info);
+        emblem_asset_rand(result, mode2, god);
+        return result;
     }
     if is_lueur {   // Emblem Alear
         let result = call_original!(this,  mode2 ,god_data, is_darkness, conditions, method_info);
@@ -233,20 +249,7 @@ pub fn asset_table_result_god_setup(
         emblem_asset_rand(result, mode2, god);
         return result;
     }
-    // Chapter 22 Emblem
-    if mode > 10 {   
-        if god.flag.value & 32 != 0 {
-            let new_god = GodData::get(god.gid.to_string().replace("GID_", "GID_E006_敵"));
-            if new_god.is_some() {
-                let result = call_original!(this, mode2, new_god, true, conditions, method_info);
-                emblem_asset_rand(result, mode2, god);
-                return result;
-            }
-        }
-        let result = call_original!(this, mode2, Some(god), true, conditions, method_info);
-        emblem_asset_rand(result, mode2, god);
-        return result;
-    }
+
 
     let index = god_data.unwrap().parent.index;
     let gid = god.gid.to_string();
@@ -521,7 +524,7 @@ pub fn asset_table_robin_hook(this: &mut AssetTableResult, mode: i32, person: &m
         }
         return result;
     }
-    if mode == 2 && GameVariableManager::get_bool(DVCVariables::RANDOM_BOSS_KEY) && person.get_flag().value & 2048 != 0 {
+    if mode == 2 && DVCVariables::get_flag(DVCFlags::RandomBossesNPCs, false) && person.get_flag().value & 2048 != 0 {
         if let Some(new_person) = ENEMY_PERSONS.get()
             .and_then(|v| v.iter().find(|x| x.1 == person.parent.index && x.0 >= 150))
             .and_then(|p| crate::randomizer::names::get_new_npc_person(p.0 as usize - 150))

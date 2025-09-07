@@ -110,7 +110,7 @@ pub fn emblem_gmap_spot_adjust(){
             }
             continue;
         }
-        if cid.starts_with("G") {               // divine paralogue opened by edelgard ring
+        if cid.starts_with("G") {
             if edelgard_obtain {
                 let gmap_spot_flag = format!("G_GmapSpot_{}", cid);
                 if GameVariableManager::get_number(&gmap_spot_flag) != 3 {  GameVariableManager::set_number(&gmap_spot_flag, 3);  }
@@ -123,7 +123,6 @@ pub fn emblem_gmap_spot_adjust(){
                 if GameVariableManager::get_number(&gmap_spot_flag) <= 2 { GameVariableManager::set_number(&gmap_spot_flag, 3); }
             }
             else { GameVariableManager::set_number(&gmap_spot_flag, 1); }
-            //println!("Paralogue CID_{}: {} is unlocked by G_Cleared_{}: {}", cid, GameVariableManager::get_number(&gmap_spot_flag), unlock_cid, GameVariableManager::get_bool(&unlock_flag) );
         }
     }
     //Calculating Recommended Level
@@ -189,15 +188,13 @@ fn get_custom_recruitment_list() -> Vec<(i32, i32)> {   // person_x to person_y
 
 pub fn randomize_emblems() {
     if !DVCVariables::random_enabled() { return; }
-    GameVariableManager::make_entry("G_CustomEmblem", 0);
-    if !GameVariableManager::exist("G_Random_Emblem_Set") { GameVariableManager::make_entry("G_Random_Emblem_Set", 0); }
-    if GameVariableManager::get_bool("G_Random_Emblem_Set") {
+    if DVCVariables::get_flag(DVCFlags::GodRecruitmentSet, false) {
         set_emblem_paralogue_unlock();
         set_m022_emblem_assets();
         return; 
     }
     else {
-        let rng = crate::utils::get_rng();
+        let rng = get_rng();
         let emblem_list_size = if dlc_check() { if CONFIG.lock().unwrap().dlc & 1 != 0 { 12 } else {19 } } else { 12 };
         match GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) {
             1 => {
@@ -220,12 +217,11 @@ pub fn randomize_emblems() {
             3 => {  // Custom
                 get_custom_recruitment_list().iter().for_each(|&x|{
                     DVCVariables::set_emblem_recruitment(x.0, x.1);
-                    println!("Custom Emblem Order: {} -> {}", x.0, x.1);
                 });
             },
             4 => {
                 let mut list = get_playable_emblem_hashes();
-                list.remove(19);    // Emblem Alear Removed
+                list.remove(19);
                 let mut available = list.clone();
                 if !dlc_check() {
                     available.drain(12..19);
@@ -244,17 +240,17 @@ pub fn randomize_emblems() {
                         }
                     }
                 );
-                GameVariableManager::set_bool("G_CustomEmblem", true);
+                DVCVariables::set_flag(DVCFlags::CustomEmblemsRecruit, true, false);
             },
             _ => {},
         }
     }
     set_m022_emblem_assets();
     set_emblem_paralogue_unlock();
-    GameVariableManager::set_bool("G_Random_Emblem_Set", true);
+    DVCVariables::set_flag(DVCFlags::GodRecruitmentSet, true, false);
 }
 fn set_emblem_paralogue_unlock() {
-    if GameVariableManager::get_bool("G_CustomEmblem") { return; } 
+    if DVCVariables::get_flag(DVCFlags::GodRecruitmentSet, false) { return; }
     for x in 0..19 {
         let index = pid_to_index(&EMBLEM_GIDS[x as usize].to_string(), false);
         let string2 = format!("CID_{}",EMBELM_PARA[index as usize]);
@@ -323,7 +319,7 @@ pub fn randomize_engage_links(reset: bool) {
             }
         }
     }
-    if !GameVariableManager::get_bool(DVCVariables::ENGAGE_P_KEY) { return; }
+    if !DVCVariables::get_engage_link(false) { return; }
     let mut pid_set: [bool; 41] = [false; 41];
     pid_set[0] = true;
     let rng = get_rng();
@@ -360,7 +356,7 @@ pub fn randomize_engage_links(reset: bool) {
 }
 
 pub fn pre_map_emblem_adjustment() {
-    if !GameVariableManager::get_bool(DVCVariables::ENGAGE_P_KEY) { return; }
+    if !DVCVariables::get_engage_link(false){ return; }
     for x in EMBLEM_GIDS {
         let god = GodData::get(x).unwrap();
         if let Some(god_unit) = GodPool::try_get(god, false) {
@@ -374,7 +370,7 @@ pub fn pre_map_emblem_adjustment() {
 
 
 pub fn post_map_emblem_adjustment() {
-    if !GameVariableManager::get_bool(DVCVariables::ENGAGE_P_KEY) { return; }
+    if !DVCVariables::get_engage_link(false) { return; }
     let mut god_unit_pair: Vec<(i32, i32)> = Vec::new();
 
     let variables = GameVariableManager::find_starts_with("E_GID");
@@ -474,7 +470,7 @@ pub fn player_emblem_check() {
 
 #[unity::hook("App", "ArenaOrderSequence", "SetEmblemWeapon")]
 pub fn arena_emblem_weapon(this: u64, unit: &mut Unit, god: &engage::gamedata::unit::GodUnit, bond_level: i32, method_info: OptionalMethod) {
-    if !GameVariableManager::get_bool(DVCVariables::EMBLEM_ITEM_KEY) {  call_original!(this, unit, god, bond_level, method_info);  }
+    if !DVCVariables::get_flag(DVCFlags::EngageWeapons, false) {  call_original!(this, unit, god, bond_level, method_info);  }
     else {
         if let Some(item) = super::job::get_weapon_for_asset_table(unit.job) {
             unit.put_off_all_item();

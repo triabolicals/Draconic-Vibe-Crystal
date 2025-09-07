@@ -3,11 +3,12 @@ use engage::{
     mess::Mess,
     proc::{desc::ProcDesc, ProcVoidMethod, ProcInst},
     sequence::mapsequence::human::MapSequenceHumanLabel,
-    gameuserdata::GameUserData, gamevariable::*, menu::{
+    gameuserdata::GameUserData, menu::{
         config::{ ConfigBasicMenuItem, ConfigBasicMenuItemSwitchMethods}, BasicMenuItem, BasicMenuItemAttribute, BasicMenuResult
     }
 };
 use crate::{utils::{get_nested_virtual_methods_mut, get_nested_nested_virtual_method_mut}, CONFIG};
+use crate::config::{DVCFlags, DVCVariables};
 
 pub struct IronmanMod;
 impl ConfigBasicMenuItemSwitchMethods for IronmanMod {
@@ -23,7 +24,7 @@ impl ConfigBasicMenuItemSwitchMethods for IronmanMod {
         } else { BasicMenuResult::new() }
     }
     extern "C" fn set_command_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
-        this.command_text = if CONFIG.lock().unwrap().iron_man {  "On" } else { "Off"}.into();
+        this.command_text = if CONFIG.lock().unwrap().iron_man { "On" } else { "Off"}.into();
     }
     extern "C" fn set_help_text(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod){
         this.help_text = if CONFIG.lock().unwrap().iron_man {  "Disables Draconic Time Crystal and bookmarks." }
@@ -31,10 +32,9 @@ impl ConfigBasicMenuItemSwitchMethods for IronmanMod {
     }
 }
 
-
 pub fn ironman_code_edits(){
-    if GameVariableManager::get_bool("G_Ironman") { unsafe { map_history_rewind_disable(None); } }
-    else  {  unsafe { map_history_rewind_enable(None); } }
+    if DVCVariables::get_flag(DVCFlags::Ironman, false) { unsafe { map_history_rewind_disable(None); } }
+    else  { unsafe { map_history_rewind_enable(None); } }
 } 
 
 pub fn map_save_proc_edit(map_sequence_human: &ProcInst) {
@@ -74,17 +74,17 @@ fn map_system_temp_save_menu_name(_temp_save_menu_item: &BasicMenuItem, _method_
 fn map_system_temp_save_get_help_text(_temp_save_menu_item: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString { Mess::get("MID_SORTIE_SAVE_HELP") }
 
 fn map_system_temp_save_build_attr(_temp_save_menu_item: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
-    if GameVariableManager::get_bool("G_Ironman") { BasicMenuItemAttribute::Hide }
+    if DVCVariables::get_flag(DVCFlags::Ironman, false) { BasicMenuItemAttribute::Hide }
     else { BasicMenuItemAttribute::Enable }
 }
 
 fn restart_menu_item_build_attr(restart_item: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
-    if GameVariableManager::get_bool("G_Ironman") { BasicMenuItemAttribute::Hide }
+    if DVCVariables::get_flag(DVCFlags::Ironman, false) { BasicMenuItemAttribute::Hide }
     else { unsafe { original_restart_item_build_attr(restart_item, None) } }
 }
 
 fn reset_menu_item_build_attr(_reset_item: &BasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute {
-    if GameVariableManager::get_bool("G_Ironman") { BasicMenuItemAttribute::Hide }
+    if DVCVariables::get_flag(DVCFlags::Ironman, false) { BasicMenuItemAttribute::Hide }
     else { BasicMenuItemAttribute::Enable } 
 }
 

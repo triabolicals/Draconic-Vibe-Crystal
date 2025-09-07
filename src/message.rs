@@ -39,14 +39,12 @@ pub fn initialize_mess_hashs() {
         vec.insert("MID_RULE_M017_WIN".to_string(), ( 4, -1) );
         for x in 1..12 {
             vec.insert(format!("MTID_Ring_{}",  RINGS[ x as usize ]), ( 5, x)); // Tile Replacement
-            vec.insert(format!("MID_TUT_NAVI_M022_GET_{}",  RINGS[ x as usize ]), ( 6, x)); // "Pick up"
         }
         vec.insert("MID_Hub_Next_Go".to_string(), (8, 0));  // Continious Mode
         vec.insert("MID_Hub_Next_Go1".to_string(), (8, 1));  // Continious Mode
         vec.insert("MPID_Il_E006".to_string(), (10, 0));
         EMBLEM_LIST.get().unwrap().iter().enumerate().map(|x| (x.0, GodData::try_get_hash(*x.1).unwrap()))
             .for_each(|(index, god)|{ vec.insert(god.mid.to_string(), (11, index as i32)); });
-        println!("Mess Entries: {}", vec.len());
         vec
     });
 
@@ -70,7 +68,7 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
 
         if mess_label.contains("XPID") {
             let original_label = mess_label.replace("XPID", "MPID");
-            if GameVariableManager::get_bool(DVCVariables::RANDOM_BOSS_KEY) {
+            if DVCVariables::get_flag(DVCFlags::RandomBossesNPCs, false) {
                 if let Some(new_name) = NAMES.read().unwrap().other_names.iter().position(|x| *x == original_label)
                     .and_then(|pos| crate::randomizer::names::get_new_npc_person(pos))
                     .and_then(|person| person.get_name() )
@@ -81,6 +79,25 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
             }
             else { return call_original!(Some(original_label.into()), is_replaced, None); }
         }
+        if mess_label.contains("MID_TUT_NAVI_M022_GET_") && (DVCVariables::get_flag(DVCFlags::GodNames, false) || DVCVariables::is_changed_recruitment_order(true)){
+            let mock_text = call_original!(Some("MID_TUT_NAVI_M022_GET_Siglud".into()), is_replaced, method_info);
+            let mpid = mess_label.trim_start_matches("MID_TUT_NAVI_M022_GET_");
+            let sigurd_text = call_original!(Some("MGID_Ring_Siglud".into()), true, None);
+            if let Some(emblem) = EMBLEM_LIST.get().unwrap().iter().flat_map(|&h| GodData::try_get_hash(h)).find(|x| x.mid.str_contains(&mpid)) {
+                if let Some(person) = get_emblem_person(emblem.mid).and_then(|x| x.get_name()) {
+                    let new_name = call_original!(Some(person), true, None);
+                    return replace_string(mock_text, sigurd_text, new_name);
+                }
+                else {
+                    let new_name = call_original!(emblem.ring_name, true, None);
+                    return replace_string(mock_text, sigurd_text, new_name);
+                }
+            }
+            else {
+                let new_name = call_original!(Some(format!("MPID_{}", mpid).into()), true, None);
+                return replace_string(mock_text, sigurd_text, new_name);
+            }
+        }
         let hash_map = MID_SWAPS.get().unwrap();
         if let Some(v) = hash_map.get(&mess_label) {
             match v.0 {
@@ -89,7 +106,7 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                     else { return result; }
                 }
                 2 => {  // Alear Name Swap
-                    if v.1 == 2 && GameVariableManager::get_bool(DVCVariables::EMBLEM_NAME_KEY) {   // Emblem Alear Name Swap
+                    if v.1 == 2 && DVCVariables::get_flag(DVCFlags::GodNames, false) {   // Emblem Alear Name Swap
                         if let Some(person) = get_emblem_person(mess_il2cp) {
                             let replacement_name = call_original!(person.get_name(), true, None);
                             return replace_string(result, Mess::get_name(DVCVariables::get_dvc_person(0, false)), replacement_name);
@@ -127,18 +144,6 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                         else { return result; }
                     }
                 }
-                6 => {  // You acquired the Ring of the [XXXXXX].
-                    if GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) != 0 {
-                        let mock_text = call_original!(Some("MID_TUT_NAVI_M022_GET_Siglud".into()), is_replaced, method_info);
-                        let new_index = crate::randomizer::person::pid_to_index(&EMBLEM_GIDS[v.1 as usize].to_string(), false);
-                        if new_index < 23 && new_index >= 0 {
-                            let sigurd_text = call_original!(Some("MGID_Ring_Siglud".into()), true, None);
-                            let new_emblem = call_original!(Some(concat_string!("MGID_Ring_", RINGS[new_index as usize]).into()), false, None);
-                            return replace_string(mock_text, sigurd_text, new_emblem);
-                        }
-                        else { return result; }
-                    }
-                }
                 8 => {
                     if GameVariableManager::get_number(DVCVariables::CONTINUOUS) != 0 {
                         if let Some(next) = GameUserData::get_chapter().get_next_chapter() {
@@ -166,9 +171,9 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                     return replace_string(result, eirika, new_emblem);
                 }
                 10 => { return name_replace(result, 37); }
-                11 => {if let Some(name) = get_emblem_person(mess_il2cp).and_then(|x| x.get_name())
-                    {
-                        return  call_original!(Some(name), true, None);
+                11 => {
+                    if let Some(name) = get_emblem_person(mess_il2cp).and_then(|x| x.get_name()) {
+                        return call_original!(Some(name), true, None);
                     }
                 }
                 _ => {}
@@ -201,7 +206,7 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                 return result;
             }
             let count = GameVariableManager::get_number("BossCount");
-            if count > 0 && GameVariableManager::get_bool(DVCVariables::RANDOM_BOSS_KEY) {
+            if count > 0 && DVCVariables::get_flag(DVCFlags::RandomBossesNPCs, false) {
                 result = name_replace(result, 32); // Veyle
                 let mut new_result = result.to_string();
                 for x in 0..count {

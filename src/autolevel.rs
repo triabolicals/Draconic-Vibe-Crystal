@@ -11,6 +11,7 @@ use engage::{
 };
 use super::CONFIG;
 use crate::{randomizer::{self, emblem::ENEMY_EMBLEM_LIST}, utils::*, DVCVariables};
+use crate::config::DVCFlags;
 use crate::randomizer::item::unit_items::adjust_missing_weapons;
 
 pub mod enemy;
@@ -84,7 +85,7 @@ pub fn auto_level_unit(unit: &mut Unit, leader: bool){
         auto_level_unit_for_random_map(unit, leader);
         return;
     }
-    if !GameVariableManager::get_bool(DVCVariables::DVC_AUTOLEVEL_KEY) || !DVCVariables::is_main_chapter_complete(6) { 
+    if !DVCVariables::get_flag(DVCFlags::Autolevel, false)|| !DVCVariables::is_main_chapter_complete(6) {
         if GameVariableManager::get_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL) != 0 {
             emblem_paralogue_level_adjustment(unit);
         }
@@ -231,7 +232,6 @@ pub fn calculate_average_level(sortie_count: i32) -> i32 {
     let mut sum = 0;
     for x in 0..sum_count { sum += collection[x as usize]; }
     let average = sum / count;
-    println!("Player Average Level: {}", average);
     average
 }
 
@@ -251,8 +251,8 @@ pub fn get_difficulty_adjusted_average_level() -> i32 {
 }
 
 pub fn autolevel_party(){
-    if !GameVariableManager::get_bool(DVCVariables::AUTOLEVEL_BENCH_KEY) { return; }
-    let player_average = get_instance::<MapSituation>().average_level - 1 - 2*GameUserData::get_difficulty(false);
+    if !DVCVariables::get_flag(DVCFlags::PostChapterAutolevel, false) { return; }
+    let player_average =  get_difficulty_adjusted_average_level() -  2*GameUserData::get_difficulty(false);
     println!("Autoleveling Bench to average of {}", player_average);
     Force::get(ForceType::Absent).unwrap().iter()
         .for_each(|unit|{
