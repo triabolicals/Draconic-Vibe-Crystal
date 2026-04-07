@@ -1,0 +1,45 @@
+50 Inversione
+100	Tutti
+101	Testa
+102	Collo
+103	Torso
+104	Spalle
+105	Braccia
+106	Mani
+107	Gambe
+108	Piedi
+109	Busto (Volume)
+110	Addome (Volume)
+111	Torso (Volume)
+112	Base Braccia (Volume)
+113	Base Gambe (Volume)
+114	Braccia (Volume)
+115	Gambe (Volume)
+116	Capelli
+117	Sfumatura Capelli
+118	Pelle
+119	Toon Shading
+120	Rosso
+121	Verde
+122	Blu
+123	Alpha
+124	Informazioni Anim
+125	Modelli di corsa
+126	Cavallo
+127	Lupo
+128	Viverna
+129	Pegaso
+130	Grifone
+131	Seleziona un componente.
+132	Reimpostare tutti i componenti.
+133	Aspetto
+134	Nome
+141 Accessorio Testa 1
+142 Accessorio Testa 2
+143 Accessorio Spina Dorsale
+144 Accessorio Effetto
+145 Accessorio Scudo
+165 Animazione Info
+166 Animazione Parla
+167 Animazione Demo
+168 Animazione Hub

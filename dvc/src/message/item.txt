@@ -1,0 +1,10 @@
+swords,sword,blade
+lances,lance,spear
+axes,axe
+bows,bow
+knives,knife
+tomes,tome
+staves,staff
+scrolls,scroll
+dragonstones,dragonstone
+cannonballs,cannonball

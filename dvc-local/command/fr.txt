@@ -1,0 +1,84 @@
+50 Inverse
+52 Joueur
+53 Ennemis
+54 Tous
+55 Aucun
+56 Statique
+57 Éval la plus basse
+58 Non forcé
+59 Éval la plus élevée
+60 Hommes seulement
+61 Femmes uniquement
+62 Événement
+63 Récupérés
+64 Cadeaux
+69 Unité
+70 Faible variance
+71 Variance moyenne
+72 Variance élevée
+73 Limité
+74 Aucune Limite
+76 Couleur
+77 Couleurs
+78 Nourriture
+80 Continu
+81 Ouvrir
+82 Ouvrir (à l'échelle)
+83 Chapitre
+84 Tour
+85 Avec des rares
+86 Sans rare
+87 Générique
+88 Bataille
+90 Personnaliser
+100	Tous
+101	Tête
+102	Cou
+103	Torse
+104	Épaule
+105	Bras
+106	Main
+107	Jambes
+108	Pieds
+109	Buste (V)
+110	Abdomen (V)
+111	Torse (V)
+112	Base des bras (V)
+113	Base des jambes (V)
+114	Bras (V)
+115	Jambes (V)
+116	Cheveux
+117	Dégradé de cheveux
+118	Peau
+119	Toon Shading
+120	Rojo
+121	Verde
+122	Azul
+123	Alfa
+124	Infos Anim
+125	Modèles de manèges
+126	Cheval
+127	Loup
+128	Vouivre
+129	Pégase
+130	Griffon
+131 Nom Configuré
+133	Apparence
+134	Nom
+135 Couleurs
+136 L'échelle
+137 Accessoires en Combat
+138 Apparition Aléatoire
+141 Accessoire pour la Tête 1
+142 Accessoire pour la Tête 2
+143 Accessoire pour Colonne
+144 Accessoire à effet
+145 Accessoire de bouclier
+146 Personnaliser
+147 Exporter AssetTable
+148 Données d'importation
+149 Personnaliser: Emblème
+165 Anim: Infos
+166 Anim: Dialogue
+167 Anim: Cinématique
+168 Anim: Hub

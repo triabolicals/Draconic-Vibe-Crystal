@@ -1,0 +1,153 @@
+[Command]
+Randomizer Seed: $$|Set|Set Randomizer Seed. $+ to randomly set the seed.
+Randomizer Seed: $$|Reseed|Set new seed ($+ random seed). Requires save/reload to apply seed.
+Re-Randomize Classes|Randomize|Rerandomizes player-controlled unit's classes and items|Rerandomized non-player controlled unit's classes/items.
+[SubMenu]
+Recruitment Order Settings|Change the order that unit/emblems are recruited.|-|Recruitment Menu
+Item Randomization Settings|Change how items are obtained and their properties.|-|Item Menu
+Emblem Randomization Settings|View settings that changes emblem data.|-|Emblem Data Menu
+Class Settings|View settings involving classes.|-|Class Settings Menu
+Skills Setting/Features|View settings involving skills.|-|Skill Settings Menu|
+Asset/Appearance Settings|Change how units and emblems look.|-|Asset Menu|Change how units/emblem look.
+Map Settings/Features|Change various behavior in maps.|-|Map Menu|Settings that change map-related behavior.
+View Applied Settings|View non-changeable settings.|-|Unchangeable Settings|View settings that cannot be changed.
+Cutscene Settings|Randomize various aspects of cutscenes.|-|Cutscene Menu
+Growth/Scaling Settings|Settings for growth rates and auto-scaling.|-|Growth/Scaling Menu
+Enemy Settings|Change the chance of enemy unit randomization.|-|Enemy Settings
+Other Settings|Global settings / Map progression modes.|-|Misc. Settings
+Main|DVC
+Edit Unit Order|Set unit recruitment order.|Edit|Unit Recruitment Order|Adjust recruitment order.
+Edit Emblem Order|Set emblem recruitment order.|Edit|Emblem Recruitment Order|Adjust recruitment order.
+View Unit Order|View the assigned unit recruitment order.|View|Unit Recruitment Order|View the set recruitment order and more.
+View Emblem Order|View the assigned emblem recruitment order.|View|Emblem Recruitment Order|View the set recruitment order and more.
+Edit Unit Order|Set unit recruitment order with custom units.|Edit|Unit Recruitment Order|Adjust recruitment order with custom units.
+[Variables]
+Map Progression Mode|d|Continuous|r|Open|Scaled Open
+Default progression.|No world map access|No world map access with random chapter order.|World map available in sections|World map available in sections with scaled enemies.
+Unit Recruitment Order|d|r|rv|List|List + Custom Units
+Default unit recruitment order.|Units are recruited in a random order.|Units are recruited in reversed order|Custom unit recruitment order.|Custom recruitment order with custom units, with restrictions.
+Emblem Recruitment Order|d|r|rv|List
+Default emblem recruitment order.|Emblem are recruited in a random order.|Non-DLC emblems are recruited in reversed order.|Custom emblem recruitment order.
+Weapon Proficiencies|d|r|n
+No changes to emblem proficiencies|Emblems will give random weapon proficiencies.|Emblems will not give any proficiencies
+Sync Skills|d|s|fr
+No changes to sync skills|Sync skills are shuffled between emblems.|Sync skills are randomized with other skills.
+Engrave Randomization|o|Low|Medium|High|Chaos
+No changes to engrave stats.|Sets the variance for engrave stat randomization.
+Engage Skills|d|s|fr
+No changes to engage skills.|Engage skills are shuffled between emblems.|Engage skill are randomized with other skills.
+Skill Inheritance List|d|s|fr|u
+Skills match the emblem's sync/engage skills.|Skills are shuffled between emblems.|Skills are randomized with other skills.|List is fully randomized by unit.
+Emblem Outfit/Color|d|Outfit|Color|Outfit/Color
+Randomization of emblem outfit/color.
+Body Scaling|d|r|Chest
+Randomization of body scaling for human units/emblems.
+Class Learn Skill|d|r|u
+Default class learn skills behavior.|Class learn skills are randomized.|Class learn skills are randomized by unit. Can repeat.
+Reclassing|d|r|o|c|
+Default reclassing behavior|Unit's new class is randomly determined.|Units can only change class within the class line.|Unit class/inventory will change on level ups.
+Class Types|d|r|n|
+Default class types.|Classes will be assigned a random type.|Classes will not have special types.
+Opps all!
+Sets all playable units to the selected class line.
+Weapon Interaction (Break)|d|r|rv|Same|Fates|n|All
+Default weapon breaking behavior.|Randomized weapon break behavior.|Reverse weapon break behavior.|Only weapons of the same type will break.|Sword/Tome > Axe/Bow > Lance/Dagger > Sword/Tome|Weapons will not inflict breaks.|Weapons inflict break regardless of opposing type.
+Player Class Mode|d|r|Opps all!
+Playable units will start in their default classes.|Playable units will start in random class.|Playable units are restricted to a single class line.
+Gift Item Setting|d|r|Rare
+Gift items are not changed.|Gift items are randomized without rare items.|Gift items are randomized with rare items.
+Exploration Items Exclusion|n|Gift|Food
+Exclude food/gifts when randomizing exploration items.
+Starting Inventory|o|Player|Enemy
+Randomizes the starting inventories for units.
+Personal Growth Randomization|o|Restricted|Unrestricted
+Randomizes unit personal growth rates with total restrictions.
+Random Class Outfits|o|Static|r|
+No unit class outfit changes.|Units will have a pre-randomized set of class outfits.|Class outfits are randomized by unit's growth seed.
+Terrain Setting|o|Emblem Energy|Effect|Energy+Effects
+Random Emblem Energy spots/chance for terrain effect after turn.
+Fog of War|d|O|o|Turn|Chapter
+Default chapter fog behavior.|Enables fog for all maps.|Disable fog for all maps.|Chance at end of turn for the fog to change.|Chance for chapters to have fog.
+Unit Deployment|d|r|Lowest Rating|Free|Expanded|Highest Rating|Male|Female
+Default unit selection behavior.|Deployed units are randomly selected.|Lowest rated units are deployed.|No forced deployment (Exception Chapter 22).|Extra deployment slots are added if possible.|Highest rated units are deployed|Only male units can be selected|Only female units can be selected.
+Emblem Deployment|d|r|s|n|All
+Default emblem selection behavior.|Emblems are randomly selected and assigned.|Equipped emblems will be shuffled among deployed units.|Emblems will not be selectable or equipped by deployed units.|All playable emblems are available.
+Generic Unit Appearance|o|Appearance|Color
+Randomly sets generic unit's appearance/color.
+Var26
+-
+Var27
+-
+Var28
+-
+Var29
+-
+Revival Stone Chance
+Enemies will not have an additional revival stone.|Enemy bosses will gain a revival stone.|$$% chance of enemy unit gaining a revival stone.
+Extra Skill Chance
+Enemy units will not have an additional skill.|Enemy bosses will gain a random skill, if possible.|$$% chance of enemy units gain a random skill, if possible.
+Random Class Chance
+Enemy units will not change into a random class.|$$% chance of enemy units change into a random class.
+Enemy Emblem Chance
+Generic enemy units will not equip enemy emblems.|$$% chance of generic units equipped with an enemy emblem.
+Item Drop Chance
+Enemy units will not have additional random item drops.|$$% chance of an empty inventory slot becoming a random item drop.
+$R-Bond Ring Skill Chance
+No skills on bond rings.|$$% chance. Additional skills have reduced odds based on rank.
+[Flags]
+F0
+Continuous Mode Items|Enables post chapter completion item collections.|ed
+Custom Emblems|Factor in custom emblems in random recruitment order.|ie
+F3
+Ironman Mode|Disables Draconic Time Crystal.|ed
+Tilabolical|Adds various tiles with random effects|.of
+Custom Class|Include modded extra classes in randomization.|ei
+Autoscale Units|Units will be scaled by average party rating.|of
+Post Chapter Autolevel|Inactive units will level up to the adjusted average level.
+Equippable Learn Skills|Learned skills are added to the unit's equip skill list.|ed
+Custom Unit Recruitment|Allows custom units to be recruited in the somniel.|de
+Continuous DLC|Enable Divine paralogues/DLC features for Continuous/Random mode.|ed
+NPC Appearance|Bosses/NPCs take on a random pre-defined appearance.|rn
+Weapon Assets|Weapon appearance are randomized in battle.|rn
+Unit Info|Human units will have a random unit info animation.|rn
+Custom Enemy Skills|Enemy skill randomization with custom skills.|de
+Random BGM|Randomizes various BGMs.|of
+Emblem Appearance|Emblems take on a random pre-defined appearance and name.|rn
+Engage Item/Weapon|Randomizes engage items/weapons.|rn
+Random Shop Items|10 random items added to shop upon map completion.|ie
+Event Items|Items obtained from events are randomized.|rn
+Random Bond Ring Skills|Randomizes the skills on bond rings.|of
+Random Deployment Spots|Enemy units will have their deployment randomized.|ed
+Engage Attacks|Randomizes emblem engage attacks/link attacks.|rn
+Emblem Sync Stats|Randomizes the emblem sync stat boosts.|rn
+SP Cost|Randomizes the SP cost for skill inheritance.|rn
+Class Eff.|Randomizes class effectiveness attributes.|rn
+F27
+Adaptive Growths|Adjusts Str/Mag growth based on starting class.|of
+Random Class Growths|Randomizes the additional growth rates from classes.|of
+Personal Skills|Randomizes all playable unit personal skills.|rn
+Weapon Forges|Randomizes weapon forges to other weapons/items.|rn
+Cutscene BGM|Randomly replaces any BGM changes in cutscenes.|rn
+Character Expressions|Randomly replaces facial expression changes.|rn
+Character Motion|Randomly replaces character motions.|rn
+Cutscene Background|Randomly replace cutscene backgrounds.|rn
+Weapon Refine|Non-engaged weapons have shuffled refine data.|rn
+Max Class Stat Caps|Class max stats set to 120 + Class Base.|ed
+Cutscene SFX|Randomly replaces sound effects in cutscenes.|rn
+Personal Stat Caps|Randomizes character stat caps. Range: -5 to 5.|rn
+Bond Ring Stats|Randomize the stat boosts from bond rings.|rn
+F41
+F42
+F43
+F44
+F45
+F46
+F47
+F48
+F49
+Random Player Appearance|Sets all playable units to use their random appearance.|of
+Custom Units|Custom units included in random recruitment order.|ei
+DVC Randomization|Applies randomization settings to save.|ed
+Unit Gender Match|Forces unit random recruitment order to swap by gender.|of
+DLC Units|DLC units included in random recruitment order.|ei
+DLC Emblems|DLC emblems included in random recruitment order.|ei

@@ -1,0 +1,142 @@
+Roi-héros
+Chevalier Sacré
+Tendre Princesse
+Fille de l'Aube
+Young Lion
+Souverain Éclairé
+Sainte-Lignée
+Lady de Sacae
+Héros de l'Aube
+l'Instructeur
+Main du Destin
+Jumeaux Célestes
+Trois Maisons
+l'Ancêtre
+Général Impétueux
+l'Héritière Solitaire
+Stratège
+Sœur Dévouée
+Saint-Veilleur
+Cohésion
+Resplendissez
+Offrez-nous votre soutien
+veillez sur nous
+Soignez-nous
+Dressez-vous
+Libérez-nous
+Embrasez-nous
+Déchaînez-vous
+Combattez
+Enseignez-nous
+Montrez vos griffes
+Restaurez la quiétude
+Guidez nos pas
+Rêvez pour nous
+Prêtez-nous votre courage
+Entendez notre appel
+Prodiguez-nous vos conseils
+Pourfendez les cieux
+Éveillez-vous
+Liez-nous
+Emblème du Commencement
+Emblème de la Guerre Saint
+Emblème des Échos
+Emblème de l'Aurore
+Emblème du Sceau
+Emblème de la Généalogie
+Emblème de l'Éveil
+Emblème des Flammes
+Emblème du Rayonnement
+Emblème de l'Académie
+Emblème des Destinées
+Emblème du Sacré
+Emblème des Rivaux
+Emblème des Dragons
+Emblème de la Force
+Emblème des Héros
+Emblème de la Perspicacité
+Emblème de la Révélation
+Emblème des Liens
+Emblème du Feu
+END
+Votre Divinité
+Dragon
+Dragons divins
+END
+Messire:Dame
+Messire:Dame
+Prince:Princesse:le prince:la princesse
+le prince:la princesse
+---He:She
+---His:Her
+---King:Queen
+frère:sœur:mon frère:ma sœur
+---8 He'll:She'll
+fils:fille:le fils:la fille
+---10 Him:Her
+---11 Boy:Girl
+---12 Man:Woman
+Mon grande frère:Ma grande sœur
+le prince héritier:la princesse héritière
+---15 second prince:second princess
+---16 himself:herself
+l'Anneau:le bracelet
+---18 He's:She's
+---19 His:Hers
+nous étions frères:nous étions frères et sœurs
+aidez-le:aidez-la
+END
+épées,épée
+lances,lance
+haches,hache
+arcs,arc
+dagues,dague
+tomes,tome
+bâtons,bâtons
+parchemins,parchemin
+dracopierre,dracopierre
+boulets,boulet
+END
+Votre Divinité
+Holy One
+Calm One
+Eager One
+Floral One
+Fit One
+Soft One
+Joyous One
+Fairy One
+Watchful One
+Hidden One
+Tender One
+Caring One
+Mighty One
+Rising One
+Alpaca One
+Iron One
+Snow One
+Onigiri One
+Mysterious One
+Affable One
+Party One
+Culinary One
+Desert One
+Suave One
+Classy One
+Charming One
+Mystical One
+Adorable One
+Elegant One
+Valiant One
+Thunder One
+Gentle One
+Penitent One
+Li'l One
+Budding One
+Stoic One
+Atoning One
+Loving One
+Fading One
+Healing One
+Strange One
+END

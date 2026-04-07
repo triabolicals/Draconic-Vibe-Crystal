@@ -1,0 +1,142 @@
+Hero-King
+Holy Knight
+Caring Princess
+Dawn Maiden
+Young Lion
+Sage Lord
+Princess Exalt
+Lady of the Plains
+Radiant Hero
+Instructor
+Crux of Fate
+Azure Twins
+Three Houses
+Ancestor
+Brash General
+Lonely Heir
+Strategist
+Doting Sister
+Shepherd Exalt
+Connector
+Shine on
+Provide for us
+Care for us
+Heal us
+Rise up
+Free us
+Sweep across
+Fight on
+Reignite us
+Teach us
+Bare your fangs
+Restore calm
+Lead us
+Dream well
+Embolden us
+Heed our summons
+Advise us
+Soar high
+Awaken
+Connect us
+Emblem of Beginnings
+Emblem of the Holy War
+Emblem of Echoes
+Emblem of Dawn
+Emblem of Binding
+Emblem of Genealogy
+Emblem of Awakening
+Emblem of Blazing
+Emblem of Radiance
+Emblem of the Academy
+Emblem of Fates
+Emblem of the Sacred
+Emblem of Rivals
+Emblem of Dragons
+Emblem of Strength
+Emblem of Heroes
+Emblem of Acumen
+Emblem of Revelation
+Emblem of Bonds
+Fire Emblem
+END
+Divine One
+Dragon
+Divine Dragons
+END
+Lord:Lady
+Sir:Lady
+Prince:Princess
+Prince's:Princess's
+He:She
+His:Her
+King:Queen
+Brother:Sister
+He'll:She'll
+Son:Daughter
+Him:Her
+Boy:Girl
+Man:Woman
+Bro:Sis
+crown prince:crown princess
+second prince:second princess
+himself:herself
+ring:bracelet
+He's:She's
+His:Hers
+brothers:siblings
+help him:help her
+END
+swords,sword,blade
+lances,lance,spear
+axes,axe
+bows,bow
+knives,knife
+tomes,tome
+staves,staff
+scrolls,scroll
+dragonstones,dragonstone
+cannonballs,cannonball
+END
+Divine One
+Holy One
+Calm One
+Eager One
+Floral One
+Fit One
+Soft One
+Joyous One
+Fairy One
+Watchful One
+Hidden One
+Tender One
+Caring One
+Mighty One
+Rising One
+Alpaca One
+Iron One
+Snow One
+Onigiri One
+Mysterious One
+Affable One
+Party One
+Culinary One
+Desert One
+Suave One
+Classy One
+Charming One
+Mystical One
+Adorable One
+Elegant One
+Valiant One
+Thunder One
+Gentle One
+Penitent One
+Li'l One
+Budding One
+Stoic One
+Atoning One
+Loving One
+Fading One
+Healing One
+Strange One
+END

@@ -1,0 +1,44 @@
+100	Alle
+101	Kopf
+102	Hals
+103	Rumpf
+104	Schulter
+105	Arme
+106	Hände
+107	Beine
+108	Füße
+109	Brust (V)
+110	Bauch (V)
+111	Rumpf (V)
+112	Basis Arme (V)
+113	Basis Beine (V)
+114	Arme (V)
+115	Beine (V)
+116	Haare
+117	Haarverlauf
+118	Haut
+119	Toon Shading
+120	Rot
+121	Grün
+122	Blau
+123	Alpha
+124	Info Anim
+125	Fahrmodelle
+126	Pferd
+127	Wolf
+128	Wyvern
+129	Pegasus
+130	Greif
+131	Wählen Sie eine Komponente aus.
+132	Alle Komponenten zurücksetzen.
+133	Aussehen
+134	Name
+141 Kopf-Accessoire 1
+142 Kopf-Accessoire 2
+143 Wirbelsäulen-Accessoire
+144 Effekt-Accessoire
+145 Schild-Accessoire
+165 Info-Animation
+166 Sprech-Animation
+167 Demo-Animation
+168 Hub-Animation

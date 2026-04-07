@@ -1,0 +1,83 @@
+use engage::gamedata::{ChapterData, Gamedata};
+use engage::gameuserdata::GameUserData;
+use engage::gamevariable::GameVariableManager;
+use engage::proc::desc::ProcDesc;
+use engage::proc::{Bindable, ProcInst, ProcVoidMethod};
+use outfit_core::UnitAssetMenuData;
+use unity::il2cpp::object::Array;
+use unity::prelude::OptionalMethod;
+use crate::{menus, message, DVCVariables};
+use crate::procs::{call_proc_original_method, replace_desc_void_function};
+use crate::randomizer::RANDOMIZER_STATUS;
+use engage::menu::menus::accessory::change::AccessoryShopChangeRoot;
+use engage::sequence::mainsequence::MainSequence;
+use crate::config::menu::DVCConfigText;
+
+pub fn main_sequence_desc_edit(descs: &mut Array<&mut ProcDesc>) {
+    descs[18] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_initialize));
+
+    replace_desc_void_function(descs, "LoadResource", main_sequence_load_resource as _);
+    // descs[30] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_load_resource));
+    descs[43] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_game_reset));
+    descs[101] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_try_jump_to_next_chapter));
+    descs[116] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_jump_to_continue_map));
+    /*
+        115 - TryJumpKizuana
+        116 - TryContinueMap
+        117 - TryJumpHub
+        118 - TryJumpGmap
+        119 - TryJumpNextChapter
+     */
+    //
+}
+
+extern "C" fn main_sequence_initialize(map_sequence: &mut ProcInst, _optional_method: OptionalMethod) {
+    UnitAssetMenuData::get().is_dvc = true;
+    call_proc_original_method(map_sequence, "Initialize");
+    crate::randomizer::initialize_game_data();
+    menus::menu_calls_install();
+}
+
+extern "C" fn main_sequence_load_resource(main_sequence: &mut MainSequence, _optional_method: OptionalMethod) {
+    crate::config::menu::CONFIG_TEXT.get_or_init(|| DVCConfigText::init());
+    main_sequence.load_resource();
+    main_sequence.pad = 1;
+    message::initialize_mess_hashs();
+    crate::randomizer::emblem::god_pool();
+
+    // menus::items::DVC_MENU_INFO.get_or_init(|| DVCMenuInfo::init());
+    AccessoryShopChangeRoot::load_prefab_async();
+}
+
+extern "C" fn main_sequence_game_reset(main_sequence: &mut ProcInst, _optional_method: OptionalMethod) {
+    if RANDOMIZER_STATUS.try_read().ok().map(|v| v.seed != 0 ).unwrap_or(false) {
+        // println!("GameReset");
+        crate::randomizer::reset_gamedata();
+    }
+    call_proc_original_method(main_sequence, "GameReset");
+}
+extern "C" fn main_sequence_jump_to_continue_map(main_sequence: &mut ProcInst, _optional_method: OptionalMethod) {
+    // println!("[MainSequence] Jump to continue map: Desc Index: {}", main_sequence.desc_index);
+    let con_mode = DVCVariables::Continuous.get_value();
+    if con_mode == 2 && GameUserData::get_status().value & 64 != 0{
+        if let Some(chapter) = ChapterData::try_get_hash(GameVariableManager::get_number("G_DVC_Next")) {
+            GameUserData::set_chapter(chapter);
+            main_sequence.jump(5);
+            return;
+        }
+    }
+    call_proc_original_method(main_sequence, "TryJumpToContinueMap");
+}
+
+extern "C" fn main_sequence_try_jump_to_next_chapter(main_sequence: &mut ProcInst, _optional_method: OptionalMethod) {
+    // println!("[MainSequence] Jump to Next Chapter Desc Index: {}", main_sequence.desc_index);
+    let con_mode = DVCVariables::Continuous.get_value();
+    if con_mode == 2 || con_mode == 1 {
+        if let Some(chapter) = ChapterData::try_get_hash(GameVariableManager::get_number("G_DVC_Next")) {
+            GameUserData::set_chapter(chapter);
+            main_sequence.jump(5);
+            return;
+        }
+    }
+    call_proc_original_method(main_sequence, "TryJumpToNextChapter");
+}

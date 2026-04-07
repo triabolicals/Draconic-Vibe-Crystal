@@ -1,0 +1,99 @@
+use engage::gamedata::Gamedata;
+use engage::gameuserdata::GameUserData;
+use engage::gamevariable::GameVariableManager;
+use engage::proc::{*, desc::*};
+use unity::il2cpp::object::Array;
+use unity::prelude::MethodInfo;
+use crate::{continuous, ironman, randomizer, DVCVariables};
+
+mod hubsequence;
+mod mapsequence;
+mod gmapsequence;
+mod mainsequence;
+mod summon;
+mod unitgrow;
+mod levelup;
+mod eventdemo;
+
+pub fn replace_desc_void_function(desc: &mut Array<&mut ProcDesc>, method_name: &str, function: *mut u8) {
+    let method_name = method_name.to_string();
+    if let Some(void_method) = desc.iter_mut()
+        .flat_map(|d| d.cast_to_method_call_mut())
+        .find(|d| d.function.method.as_ref().is_some_and(|m| m.get_name().is_some_and(|s| s == method_name)))
+    {
+        // println!("Replacing ProcDesc Method: {}", method_name);
+        void_method.function.method_ptr = function;
+    }
+}
+
+pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
+    let hashcode = proc.hashcode;
+    let name = proc.name.map(|v| v.to_string());
+    let descs = proc.descs.get_mut();
+    if let Some(name) = name {
+        if name.contains("TelopManager") {
+            if name.contains("ProcBondLevelUp") {
+                replace_desc_void_function(descs, "LoadFace", crate::sprite::telop::proc_bond_level_up_load_face as _);
+                replace_desc_void_function(descs, "ReleaseFace", crate::sprite::telop::proc_bond_level_up_release_face as _);
+            }
+            else if name.contains("ProcBondEngagePair") {
+                replace_desc_void_function(descs, "LoadFace", crate::sprite::telop::proc_bond_engage_pair_load_face as _);
+                replace_desc_void_function(descs, "ReleaseFace", crate::sprite::telop::proc_bond_engage_pair_release_face as _);
+            }
+            return;
+        }
+    }
+    match hashcode {
+        engage::proc::MAIN_SEQUENCE => { mainsequence::main_sequence_desc_edit(descs); }
+        1959640519 => { // LevelUpSequence
+            descs[0] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::job::chaos::level_up_prepare));
+            descs[9] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::job::chaos::level_up_reflect));
+        }
+        engage::proc::GMAP_SEQUENCE => { gmapsequence::gmap_sequence_desc_edit(descs); }
+        engage::proc::SORTIE_SEQUENCE => { descs[1] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::sortie_play_bgm)); }
+        engage::proc::WELL_SEQUENCE => { descs[19] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::item::well::well_get_item_rng)); }
+        engage::proc::HUB_SEQUENCE => { hubsequence::hub_sequence_desc_edit(descs); }
+        engage::proc::MAP_SEQUENCE_BATTLE => { descs[60] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::map_sequence_battle_pre_bgm)); }
+        engage::proc::MAP_SEQUENCE_BATTLE_ACTION => { descs[1] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::map_sequence_battle_action_pre_bgm)); }
+        engage::proc::COMBAT_COMBAT_SEQUENCE => { descs[4] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::combat_sequence_pre_bgm)); }
+        engage::proc::MAP_SEQUENCE => {
+            if GameUserData::get_sequence() > 3 && !GameUserData::is_evil_map() { GameUserData::get_status().value &= !8192; }
+            mapsequence::map_sequence_desc_edit(descs);
+            ironman::map_save_menu_edits();
+            continuous::update_next_chapter();  // For Chapter 11/22 Continue Flag
+            ironman::ironman_code_edits();
+            continuous::postchapter::update_bonds();
+            randomizer::bgm::randomize_bgm_map();
+            continuous::random::continous_rand_emblem_adjustment();
+        }
+        engage::proc::EVENT_DEMO_SEQUENCE => { eventdemo::event_demo_function_edit(); }
+        engage::proc::HUB_MENU_SEQUENCE => {
+            let con = DVCVariables::Continuous.get_value();
+            // println!("Continuous Mode: {}", con);
+            if (con == 1 || con == 2) && GameVariableManager::get_bool("G_Cleared_M004"){
+                continuous::set_next_chapter();
+                if let Some(chapter) = engage::gamedata::ChapterData::try_get_hash(GameVariableManager::get_number("G_DVC_Next")) {
+                    println!("Next Chapter: {}", chapter.cid);
+                }
+                descs[21] = ProcDesc::call(ProcVoidFunction::new(None, hubsequence::hub_menu_sequence_next_map_bind));
+                descs[24] = ProcDesc::call(ProcVoidFunction::new(None, hubsequence::hub_menu_sequence_next_map_bind));
+            }
+        }
+        31745184 => {   // MapEngageSummon
+            descs[13] = ProcDesc::call(ProcVoidFunction::new(None, summon::commit_summon));
+        }
+        engage::proc::UNIT_GROW_SEQUENCE => {
+            descs[1] = ProcDesc::call(ProcVoidFunction::new(None, unitgrow::unit_grow_gain_exp));
+        }
+        1918405982 => { randomizer::latertalk::edit_later_talk_data(); }
+        _ => {} 
+    }
+}
+
+pub fn call_proc_original_method(proc: &ProcInst, method_name: &str) {
+    if let Some(method) = proc.klass.get_method_from_name(method_name, 0).ok() {
+        let method_call = unsafe { std::mem::transmute::<_, fn(&ProcInst, &MethodInfo)>(method.method_ptr) };
+        method_call(proc, method);
+    }
+    else { println!("Unable to call method '{}' for {}", method_name, proc.klass.get_name()); }
+}

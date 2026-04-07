@@ -1,0 +1,22 @@
+Lord:Lady
+Sir:Lady
+Prince:Princess
+Prince's:Princess's
+He:She
+His:Her
+King:Queen
+Brother:Sister
+He'll:She'll
+Son:Daughter
+Him:Her
+Boy:Girl
+Man:Woman
+Bro:Sis
+crown prince:crown princess
+second prince:second princess
+himself:herself
+ring:bracelet
+He's:She's
+His:Hers
+brothers:siblings
+help him:help her

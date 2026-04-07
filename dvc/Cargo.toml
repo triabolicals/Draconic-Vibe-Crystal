@@ -1,0 +1,30 @@
+[package]
+name = "dvc"
+version = "0.1.0"
+authors = []
+edition = "2021"
+
+[package.metadata.skyline]
+titleid = "01006A800016E000"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+skyline = { git = "https://github.com/ultimate-research/skyline-rs", version = "0.6.0" }
+outfit_core = { path = "/Users/trile/Project/outfit/outfit-core"}
+unity = { version = "0.3.0", git = "https://github.com/triabolicals/unity", branch = "macro" }
+engage = { git = "https://github.com/triabolicals/engage", branch = "macro" }
+cobapi = { git = "https://github.com/triabolicals/cobapi", branch = "test" }
+toml = "1.0.3"
+bitflags = "2.11.0"
+num-traits = "0.2.19"
+serde = { version = "1.0.228", features = ["derive"] }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+lto = true
+opt-level = 2
