@@ -269,9 +269,11 @@ pub fn god_unit_on_deserialize(this: &mut GodUnit, stream: &Stream, version: i32
 fn check_fix_god_bonds(this: &mut GodUnit) {
     let hash = this.data.main_data.parent.hash;
     if let Some(bond) = this.get_god_bonds() {
-        if bond.data.is_some_and(|g| g.main_data.parent.hash != hash) {
-            println!("GodUnit [{}] / GodBondHolder has different GodData", Mess::get(this.data.mid));
-            bond.data = GodData::try_get_hash(hash);
+        if bond.data.is_some_and(|g| g.main_data.parent.hash != hash && g.force_type == 0) {
+            if hash == 2044088482 || hash == 1120993642 {   // Chrom or Robin, use Chrom
+                bond.data = GodData::try_get_hash(1120993642);
+            }
+            else { bond.data = GodData::try_get_hash(hash); }
         }
         else if bond.bonds.is_none(){
             println!("GodBonds are missing. Deleting GodBondHolder.");
