@@ -229,9 +229,6 @@ pub fn adjust_non_unit_items_inventory() {
                     changed = true;
                 });
             if changed { unit.item_list.put_engage_item(unit.god_link.or(unit.god_unit), unit.status.value & 8388608 != 0); }
-            if !DVCVariables::is_main_chapter_complete(3) {
-                if get_number_of_usable_weapons(unit) == 0 { add_generic_weapons(unit); }
-            }
         }
     }
     // if count > 0 { println!("Total of {} items removed.", count); }
