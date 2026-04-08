@@ -366,7 +366,10 @@ impl DeploymentConfig {
         GameVariableManager::make_entry_norewind(DVCVariables::LIBERATION_TYPE, 0);
         GameVariableManager::make_entry_norewind(DVCVariables::PLAYER_AVERAGE_CAP, 0);
         self.get_bond_ring_rates();
-
+        for x in 0..10 {    // ShopItems
+            GameVariableManager::make_entry_norewind(format!("G_DVC_I{}", x).as_str(), 0);
+            GameVariableManager::make_entry_norewind(format!("G_DVC_W{}", x).as_str(), 0);
+        }
         for x in 0..30 {
             if x == 26  { continue; }
             if let Some(v) = DVCVariables::from(x) {

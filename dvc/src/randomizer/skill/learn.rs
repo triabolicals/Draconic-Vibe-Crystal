@@ -161,6 +161,8 @@ pub fn set_menu_content_for_learn_skill(this: &ClassChangeJobMenuContent, data: 
 pub fn class_change_job_menu_content_hook(this: &mut ClassChangeJobMenuContent, data: &ClassChangeJobData, _method_info: OptionalMethod) {
     call_original!(this, data, None);
     if !can_rand() { return; }
+    set_menu_content_for_learn_skill(this, data);
+    /*
     if let Some(skill) = get_learn_job_skill(SortieSelectionUnitManager::get_unit(), data.job) {
         this.skill_name.set_text(Mess::get(skill.name.unwrap()), false);
         if let Some(label) = skill.icon_label {
@@ -170,6 +172,8 @@ pub fn class_change_job_menu_content_hook(this: &mut ClassChangeJobMenuContent, 
         }
         this.skill_help_text.set_text(Mess::get(skill.help.unwrap()), false);
     }
+    
+     */
 }
 
 pub fn get_learn_job_skill(unit: &Unit, job: &JobData) -> Option<&'static SkillData> {

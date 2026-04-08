@@ -45,8 +45,6 @@ pub(crate) mod latertalk;
 use num_traits::FromPrimitive;
 use outfit_core::UnitAssetMenuData;
 use crate::assets::emblem::{get_random_engage_voice, has_engage_decide};
-use crate::assets::gmap::GmapPlayerUnit;
-use crate::message::{TextSwapper, MESSAGE_SWAPPER};
 use crate::randomizer::blacklist::DVCBlackLists;
 use crate::randomizer::data::{GameData, RandomizedGameData};
 pub use super::{CONFIG, VERSION};
@@ -65,23 +63,13 @@ pub static RANDOMIZER_STATUS: RwLock<status::RandomizerStatus> =
     status::RandomizerStatus{
         alear_person_set: false,
         well_randomized: false,
-        enemy_emblem_randomized: false,
-        enemy_unit_randomized: false,
-        emblem_unit_skill_randomized: false,
-        skill_randomized: false,
-        emblem_data_randomized: false,
-        emblem_apt_randomized: false,
-        shop_randomized: false,
         enabled: false,
-        stat_caps: false,
-        accessory: false,
         kizuna_replacements: false,
         map_tile: false,
         learn_skill: false,
         seed: 0,
-        continious_random_chapter: String::new(),
-        enemy_edelgard: false,
         inspectors_set: false,
+        init: false,
         tilabolical: [0; 1024],
     }
 );
@@ -102,14 +90,15 @@ pub fn tutorial_check() {
         GameVariableManager::set_bool("G_CC_エンチャント", true);
         GameVariableManager::set_bool("G_CC_マージカノン", true);
     }
-    if DeploymentConfig::get().debug {
+
+    /*
+        if DeploymentConfig::get().debug {
         GameVariableManager::find_starts_with("G_Cleared_M0").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 0));
         GameVariableManager::find_starts_with("G_GmapSpot_").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
         GameData::get_playable_god_list().iter().for_each(|g|{
             if let Some(g_unit) = GodPool::create(g) { g_unit.set_escape(false); }
         });
     }
-    /*
         GameData::get_playable_god_list().iter().for_each(|g|{
             if let Some(g_unit) = GodPool::create(g) { g_unit.set_escape(false); }
         });
@@ -390,14 +379,15 @@ pub fn write_seed_output_file() -> bool {
 /// SaveLoad Event Randomizing for Cobalt 1.21+
 pub fn save_file_load() {
     tutorial_check();
+    let seed_key = DVCVariables::Seed.get_key();
+    GameVariableManager::make_entry_norewind(FLAGNAME2, 0);
+    GameVariableManager::make_entry_norewind(FLAGNAME, 0);
+    if !GameVariableManager::exist(seed_key) { GameVariableManager::make_entry_norewind(seed_key, 0); }
     if !DVCVariables::random_enabled() {  return;  }
     upgrade();
     remove_old_keys();
     if DVCVariables::get_seed() != RANDOMIZER_STATUS.read().unwrap().seed {
         println!("[SaveLoad Event] Randomized Save File Seed {}", DVCVariables::get_seed());
-        if GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE) != 0  { item::change_liberation_type(); }
-        if GameVariableManager::get_number(DVCVariables::MISERCODE_TYPE) != 0 { item::change_misercode_type(); }
-
         person::change_lueur_for_recruitment(false);
         if GameUserData::get_sequence() == 5 { person::hub::change_kizuna_dispos(); }
         DVCFlags::Initialized.set_value(false);
@@ -407,6 +397,7 @@ pub fn save_file_load() {
 
 /// Main Randomizing Event and after starting NG (include SaveLoad Event if not using Cobalt 1.21)
 pub(crate) fn randomize_gamedata(is_new_game: bool) {
+    job::single::single_class_exists();
     let sequence = GameUserData::get_sequence();
     println!("[RandomizeGameData] Is New Game {}", is_new_game);
     emblem::randomize_emblems();
@@ -421,24 +412,21 @@ pub(crate) fn randomize_gamedata(is_new_game: bool) {
         random.commit(data);
     }
     if sequence == 5 { person::hub::change_kizuna_dispos(); }
-    emblem::engrave::random_engrave_by_setting( DVCVariables::EngraveLevel.get_value(), true);
-    interact::change_interaction_data( DVCVariables::InteractSetting.get_value(), true);
-    grow::random_grow();
-    styles::randomize_job_styles();
-    styles::randomize_job_attrs();
     if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() {
         lock.seed = DVCVariables::get_seed();
         lock.enabled = true;
     }
+    if GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE) != 0  { item::change_liberation_type(); }
+    if GameVariableManager::get_number(DVCVariables::MISERCODE_TYPE) != 0 { item::change_misercode_type(); }
     for x in 0..33 {
         if let Some(key) = DVCVariables::from(x).map(|v| v.get_key()) { DVCVariables::log_variable(key); }
     }
+
     println!("Game data randomized");
 }
 
 /// Used to randomized enemy emblem stuff if loading save from map
 pub fn in_map_randomize() {
-   // emblem::enemy::randomize_enemy_emblems();
     person::unit::reload_all_actors();
 }
 /// Routine after NG is started to randomize gamedata
@@ -448,6 +436,7 @@ pub fn start_new_game(){
     let seed = DeploymentConfig::get().seed;
     // Settings that does not get added
     GameVariableManager::make_entry_norewind(DVCVariables::DVC_STATUS, 0);
+
     let iron_man = DeploymentConfig::get().ironman;
     let randomized = DeploymentConfig::get().randomized;
     let ran_seed =
@@ -556,14 +545,17 @@ pub fn reset_gamedata() {
     }
 }
 fn upgrade() {
-    if !GameVariableManager::exist("G_DVC_Version") { GameVariableManager::make_entry_norewind("G_DVC_Version", 1); }
+    if !GameVariableManager::exist("G_DVC_Version") {
+        GameVariableManager::make_entry_norewind("G_DVC_Version", 1);
+    }
     let version = GameVariableManager::get_number("G_DVC_Version");
     // if version < 2 { migrate_to_v2(); }
     if version < 3 { migrate_to_v3(); }
     if version < 5 { migrate_to_v5(); }
+
 }
 pub fn randomize_stuff() {
-    job::single::single_class_exists();
+
     upgrade();
     for x in 0..10 {    // ShopItems
         GameVariableManager::make_entry_norewind(format!("G_DVC_I{}", x).as_str(), 0);
@@ -578,10 +570,7 @@ pub fn randomize_stuff() {
     if DVCVariables::get_seed() != RANDOMIZER_STATUS.read().unwrap().seed {
         println!("Randomized Stuff with Save File Seed {}", DVCVariables::get_seed());
         randomize_gamedata(false);
-        if GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE) != 0  { item::change_liberation_type(); }
-        if DVCVariables::ClassMode.get_value()& 1 != 0 && GameVariableManager::get_number(DVCVariables::MISERCODE_TYPE) != 0 {
-            item::change_misercode_type();
-        }
+
         if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() {
             lock.enabled = true;
             lock.seed =  DVCVariables::get_seed();
@@ -595,7 +584,6 @@ pub fn initialize_game_data() {
     let emblems = GameData::get_playable_god_list().len();
     let playables = GameData::get().playables.len();
     RANDOMIZED_DATA.get_or_init(|| RwLock::new(RandomizedGameData::new(emblems, playables)));
-    println!("Finished with Randomized Data Init");
     bgm::initalize_bgm_pool();
     person::ai::create_custom_ai();
     emblem::initialize_emblem_list();

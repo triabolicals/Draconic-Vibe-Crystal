@@ -53,34 +53,6 @@ impl EmblemAptitudeRandomizer {
     }
 }
 
-pub fn randomized_emblem_apts(on_save_load: bool) {
-    if crate::randomizer::RANDOMIZER_STATUS.read().unwrap().emblem_apt_randomized && on_save_load { return; }
-    let mode = DVCVariables::EmblemWepProf.get_value();
-    let data = get_data_read();
-    if mode == 0 {
-        if !on_save_load {
-            data.emblem_pool.emblem_data.iter().for_each(|emblem| {
-                if let Some(god) = GodData::try_get_hash(emblem.hash){
-                    if let Some(level) = god.get_level_data() {
-                        level.iter_mut().zip(emblem.level_data.iter()).for_each(|(level_data, entry)| {
-                            level_data.aptitude.value = entry.apt;
-                        });
-                    }
-                    if let Some(grow) = GodGrowthData::try_get_from_god_data(god) {
-                        grow.iter_mut().zip(emblem.growth_apt.iter()).for_each(|(level_data, apt)| {
-                            level_data.aptitude.value = *apt;
-                        });
-                    }
-                }
-            });
-        }
-        return;
-    }
-    let rng = get_rng();
-    GameData::get_playable_god_list().iter().for_each(|god|{ randomize_god_apts(god, mode, rng); });
-    let _ = crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.emblem_apt_randomized = true);
-}
-
 fn randomize_god_apts(god: &GodData, mode: i32, rng: &Random) {
     if let Some((level_data, grow_data)) = god.grow_table
         .and_then(|ggid|  GodGrowthData::get_level_data(ggid.to_string()).zip(GodGrowthData::try_get_from_god_data(god)))

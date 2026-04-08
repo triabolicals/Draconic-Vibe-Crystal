@@ -277,7 +277,8 @@ impl EmblemSkillRandomizer {
         let inherit_skills: Vec<i32> = pool.inherit_only.iter().flat_map(|v| v.indexes.iter()).map(|v| *v).collect();
         let mut chaos_random_pool: Vec<i32> = chaos_pool.iter().flat_map(|s| s.indexes.last()).map(|x| *x).collect();
         if chaos_random_pool.len() < inherit_skills.len() {
-            chaos_random_pool.extend(chaos_pool.iter().filter(|s| s.indexes.len() > 2).flat_map(|s| s.indexes.first()).map(|x| *x));
+            chaos_random_pool.extend(chaos_pool.iter().filter(|s| s.indexes.len() > 2)
+                .flat_map(|s| s.indexes.first()).map(|x| *x));
         }
         self.chaos_inherit = inherit_skills.iter().zip(chaos_random_pool.iter()).map(|(x, y)| (*x, *y)).collect();
         chaos_random_pool.shuffle(rng, emblem_count as i32);

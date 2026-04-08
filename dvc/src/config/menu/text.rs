@@ -195,7 +195,7 @@ impl DVCConfigText {
                 match command {
                     DVCCommand::SetSeed => {
                         let v = DVCVariables::Seed.get_value() as u32;
-                        if DVCVariables::is_main_menu() {
+                        if DVCVariables::is_main_menu() || v == 0 {
                             item.command_text = "Input".into();
                             item.help_text = format!("Set randomizer seed. {} Random Seed", Mess::create_sprite_tag_str(2, "Plus")).into();
                             if v == 0 { item.title = "Seed: Unset".into(); }
@@ -280,16 +280,14 @@ impl DVCConfigText {
                     let com = m.flag_command / 2;
                     let reverse = m.flag_command & 1 == 1;
                     let xor = v ^ reverse;
-                    let command =
+                    item.command_text =
                     match com {
-                        -1 => { "---" }
-                        0 => { if xor { "On" } else { "Off" } }
-                        1 => { if xor { "Random" } else { "Normal" } }
-                        2 => { if xor { "Enable" } else { "Disable" } }
-                        3 => { if xor { "Include"} else { "Exclude"} }
-                        _ => { if v { "On" } else { "Off" } }
+                        -1 => { Mess::get_item_none() }
+                        1 => { Self::normal_random(xor) }
+                        2 => { if xor { "Enable" } else { "Disable" }.into() }
+                        3 => { Self::include_exclude(xor) }
+                        _ => { Self::on_off(xor) }
                     };
-                    item.command_text = command.into();
                     item.help_text = m.help.into();
                 }
             }

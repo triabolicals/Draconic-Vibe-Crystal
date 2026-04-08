@@ -21,6 +21,9 @@ bitflags = "2.11.0"
 num-traits = "0.2.19"
 serde = { version = "1.0.228", features = ["derive"] }
 
+[patch."https://github.com/triabolicals/engage"]
+engage = {path = "/Users/trile/Project/lib/engage"}
+
 [profile.dev]
 panic = "abort"
 

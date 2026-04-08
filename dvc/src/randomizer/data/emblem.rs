@@ -20,6 +20,18 @@ pub struct EmblemPool {
 }
 
 impl EmblemPool {
+    pub fn reset_all(&self) {
+        self.emblem_persons.iter().for_each(|p| {
+            p.reset_skill();
+            p.reset_engage_skill();
+        });
+        self.enemy_emblem.iter().for_each(|e| { e.reset(); });
+        self.emblem_data.iter().for_each(|e|{
+            e.reset_weapons();
+            e.reset_all_skills();
+            e.reset_weapon_prof();
+        });
+    }
     pub fn init() -> Self {
         let god_list = GodData::get_list().unwrap();
         let mut emblem_data = vec![];
@@ -64,7 +76,6 @@ impl EmblemPool {
             enemy_emblem: god_list.iter()
                 .filter(|x| !x.gid.str_contains("_M026") && ( x.gid.contains("_M0") || x.gid.contains("_E0")))
                 .map(|x| EnemyEmblemData::new(x)).collect(),
-
         }
     }
 

@@ -6,15 +6,15 @@ use engage::menu::BasicMenuItemAttribute;
 use crate::config::DVCVariables;
 use crate::DeploymentConfig;
 use crate::randomizer::data::GameData;
+use crate::randomizer::status::RandomizerStatus;
 use crate::utils::dlc_check;
 
 pub const FLAGNAME: &'static str = "G_DVC_Status";
-pub const FLAGNAME2: &'static str = "D_DVC_Status2";
+pub const FLAGNAME2: &'static str = "G_DVC_Status2";
 
 #[repr(i32)]
 #[derive(Clone, Copy, PartialEq, Eq,Ord, PartialOrd)]
 pub enum DVCFlags {
-    Initialized = 0,
     ContinuousModeItems = 1,
     CustomEmblemsRecruit = 2,
     LueurJobSet = 3,
@@ -61,6 +61,7 @@ pub enum DVCFlags {
     RRGenderUnitMatch = 53,
     ExcludeDLCUnitRR = 54,
     ExcludeDLCEmblemRR = 55,
+    Initialized = 56,
 }
 impl DVCFlags {
     pub fn need_confirm_to_change(&self) -> bool {
@@ -186,8 +187,12 @@ impl DVCFlags {
         let v = self as i32;
         if DVCVariables::is_main_menu() || v >= 50 { self.get_from_config() }
         else {
-            if v < 32 { GameVariableManager::get_number(FLAGNAME) & (1 << v) != 0 }
-            else { GameVariableManager::get_number(FLAGNAME2) & (1 << (v-32)) != 0 }
+            if self == DVCFlags::Initialized { RandomizerStatus::is_init() }
+            else if v < 32 { GameVariableManager::get_number(FLAGNAME) & (1 << v) != 0 }
+            else {
+                let num = GameVariableManager::get_number(FLAGNAME2);
+                num & (1 << (v - 32)) != 0
+            }
         }
     }
     pub fn set_value(self, value: bool) {
@@ -211,7 +216,6 @@ impl DVCFlags {
         for x in 1..50 {
             if let Some(flag) = Self::from(x) {
                 let v = flag.get_from_config();
-                println!("Flag #{} set to {}", x, v);
                 let mut flag_value =
                     if x < 32 { GameVariableManager::get_number(FLAGNAME) }
                     else { GameVariableManager::get_number(FLAGNAME2) };
@@ -280,7 +284,7 @@ impl DVCFlags {
     pub fn set_config(self, value: bool) {
         let config = DeploymentConfig::get();
         match self {
-            Self::Initialized|Self::LueurJobSet => {}
+            // Self::Initialized|Self::LueurJobSet => {}
             Self::RandomEventItems => { config.random_item = value }
             Self::ContinuousModeItems => { config.continuous_items = value; },
             Self::CustomEmblemsRecruit => set_bit_from_bool(&mut config.recruitment_option, 0, value),
@@ -323,12 +327,11 @@ impl DVCFlags {
             Self::ExcludeDLCEmblemRR => set_bit_from_bool(&mut config.recruitment_option, 5, value),
             Self::PlayerAppearance => set_bit_from_bool(&mut config.recruitment_option, 6, value),
             Self::MaxStatCaps => { config.max_stat_caps = value; }
-            Self::SingleJobEnabled => {  }
             Self::PersonalCaps => { config.personal_caps = value; }
             Self::RingStats => { config.bond_ring_stat = value; }
+            _ => {}
         }
     }
-
 }
 fn set_bit_from_bool(v: &mut i32, bit: usize, value: bool) {
     let mask = 1 << bit;

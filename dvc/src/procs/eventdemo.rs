@@ -1,3 +1,4 @@
+use engage::gamesound::{GameSound, GameSoundFadeSpeedType};
 use engage::random::Random;
 use engage::sequence::eventdemo::*;
 use unity::prelude::OptionalMethod;
@@ -67,14 +68,14 @@ fn set_motion(this: &EventDemoSequence, cmd_info: &mut CmdInfo, _: OptionalMetho
     this.func_character_play_motion(cmd_info)
 }
 fn sound_event(this: &EventDemoSequence, cmd_info: &mut CmdInfo, _: OptionalMethod) -> EventDemoSequenceEventCmdResult {
-    if cmd_info.args.len() >= 1 {
-        println!("Sound Event: {}", cmd_info.args[0]);
-        if DVCFlags::CutsceneBGM.get_value() {
-            if let Some(bgm) = crate::randomizer::bgm::BGM_POOL.get().and_then(|v| v.get_random_element(Random::get_system())){
+    if cmd_info.args.len() >= 1 && DVCFlags::CutsceneBGM.get_value()  {
+        if cmd_info.args[0].str_contains("BGM") {
+            println!("Sound Event: {}", cmd_info.args[0]);
+            GameSound::stop_all_bgm(GameSoundFadeSpeedType::Normal);
+            if let Some(bgm) = crate::randomizer::bgm::BGM_POOL.get().and_then(|v| v.get_random_element(Random::get_system())) {
                 cmd_info.args[0] = bgm.into();
             }
         }
-
     }
     this.func_sound_event(cmd_info)
 }

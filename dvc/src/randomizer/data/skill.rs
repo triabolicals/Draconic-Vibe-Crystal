@@ -168,9 +168,9 @@ impl SkillPool {
             .for_each(|(skill, sp)| { skill.inheritance_cost = sp; });
     }
     pub fn randomize(&self, data: &GameData) {
-        if crate::randomizer::RANDOMIZER_STATUS.read().unwrap().skill_randomized { return; }
+        // if crate::randomizer::RANDOMIZER_STATUS.read().unwrap().skill_randomized { return; }
         let personal_bl = DVCBlackLists::get_read();
-        crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.skill_randomized = true).unwrap();
+        // crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.skill_randomized = true).unwrap();
         let rng = Random::new(2 * DVCVariables::get_seed() as u32);
 
         let mut skill_pool: Vec<_> = self.non_upgrades.iter().filter(|x| !personal_bl.personal_skill.indexes.contains(*x)).map(|x| *x).collect();

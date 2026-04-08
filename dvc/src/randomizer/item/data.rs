@@ -381,7 +381,7 @@ impl WeaponDatabase {
                 .min_by(|x1, x2| x1.1.cmp(&x2.1))
                 .and_then(|x| ItemData::try_index_get(x.0));
         }
-        let weapon = Mess::get(item.name);
+        // let weapon = Mess::get(item.name);
         replace.or_else(|| {
             // println!("Item {} has no replacement", weapon);
             let rank = item.get_weapon_level();

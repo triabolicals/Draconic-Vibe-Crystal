@@ -175,21 +175,19 @@ impl DVCVariables {
         }
         else {
             println!("Set Value #{}: {}", self.get_key(), value);
-            if *self == Self::SingleJob {
-                if (value >= 0 && value < 3) || JobData::try_get_hash(value).is_some(){
+            match self {
+                Self::Seed => { Self::set_by_variable(self.get_key(), value); }
+                Self::SingleJob => {
+                    if (value >= 0 && value < 3) || JobData::try_get_hash(value).is_some(){
+                        Self::set_by_variable(self.get_key(), value);
+                    }
+                    else { Self::set_by_variable(self.get_key(), 0); }
+                }
+                _ => {
+                    let value = clamp_value(value, 0, self.get_max());
                     Self::set_by_variable(self.get_key(), value);
                 }
-                else { Self::set_by_variable(self.get_key(), 0); }
             }
-            else {
-                let value = clamp_value(value, 0, self.get_max());
-                Self::set_by_variable(self.get_key(), value);
-            }
-            if *self != Self::SingleJob {
-                let value = clamp_value(value, 0, self.get_max());
-                Self::set_by_variable(self.get_key(), value);
-            }
-            else { Self::set_by_variable(self.get_key(), value); }
         }
     }
     pub fn get_key(&self) -> &'static str {

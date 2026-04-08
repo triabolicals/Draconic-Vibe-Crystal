@@ -7,7 +7,7 @@ use crate::menus::ingame::draconic_vibe_name;
 use super::*;
 use crate::config::{DVCFlags::*, DVCVariables::*};
 use crate::config::menu::DVCMenuItemKind::Order;
-use crate::utils::dlc_check;
+use crate::utils::{can_rand, dlc_check};
 use DVCMenuItemKind::*;
 
 pub static mut MENU_SELECT: [i32; 21] = [0; 21];
@@ -166,9 +166,9 @@ impl DVCMenu {
         match item.menu_item_kind {
             Variable(UnitRecruitment)|Variable(EmblemRecruitment)|Variable(Continuous)|Flag(BondRing)|Variable(ClassMode) => {
                 item.menu.full_menu_item_list.clear();
-                menu.get_items().into_iter().for_each(|k|{
+                menu.get_items().into_iter().for_each(|k| {
                     let i = DVCConfigMenuItem::new_kind(k);
-                    if let Some((_, v, c)) = s.iter().find(|x| x.0 == k){
+                    if let Some((_, v, c)) = s.iter().find(|x| x.0 == k) {
                         i.dvc_value = *v;
                         i.is_command = *c;
                         i.menu_kind = menu.clone();
@@ -184,9 +184,15 @@ impl DVCMenu {
 }
 impl DVCCMenuItem for DVCMenu {
     fn a_call(&self, item: &mut DVCConfigMenuItem) -> BasicMenuResult {
-        DVCMenu::save_select(item);
-        self.rebuild_menu(item, false);
+        if item.attribute & 2 != 0 {
+            GameMessage::create_key_wait(item.menu, "Access settings by setting the DVC seed.");
+        }
+        else {
+            DVCMenu::save_select(item);
+            self.rebuild_menu(item, false);
+        }
         BasicMenuResult::se_cursor()
+
     }
     fn build_attribute(&self, _item: &DVCConfigMenuItem) -> BasicMenuItemAttribute {
         let enable =
@@ -198,7 +204,10 @@ impl DVCCMenuItem for DVCMenu {
             Self::CustomEmblemOrder => EmblemRecruitment.get_value() == 3,
             _ => { true }
         };
-        if enable { BasicMenuItemAttribute::Enable } else { BasicMenuItemAttribute::Hide }
+        if enable {
+            if can_rand() { BasicMenuItemAttribute::Enable }
+            else { BasicMenuItemAttribute::Disable }
+        } else { BasicMenuItemAttribute::Hide }
     }
 }
 pub extern "C" fn open_anime_all_ondispose_to_dvc_main(this: &mut ProcInst, _method_info: OptionalMethod) {

@@ -115,7 +115,6 @@ pub fn menu_calls_install() {
     crate::sprite::install_sprite_menu_methods();
 }
 pub fn my_b_call(this: &ConfigMenu<()>, _: OptionalMethod) -> BasicMenuResult {
-    println!("MyBCall!");
     BasicMenuResult::close_cancel()
 }
 pub fn show(_this: &BasicMenuItem, _optional_method: OptionalMethod) -> i32 { 1 }

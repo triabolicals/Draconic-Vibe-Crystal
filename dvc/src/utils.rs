@@ -73,9 +73,7 @@ pub fn create_rng(seed: i32, rng_mode: i32) -> &'static Random {
     rng
 }
 pub fn lueur_on_map() -> bool {
-    let lueur_unit = UnitPool::get_hero(false);
-    if lueur_unit.is_none() { return false;  }
-    lueur_unit.unwrap().force.unwrap().force_type < 3
+    UnitPool::get_hero(false).filter(|f| f.force.is_some_and(|f| f.force_type < 3)).is_some()
 }
 
 pub fn is_player_unit(person: &PersonData) -> bool {
@@ -148,7 +146,7 @@ pub fn get_nested_nested_virtual_method_mut(namespace: &str, class_name: &str, n
 }
 */
 pub fn get_random_number_for_seed() -> u32 {
-    //Convet frame count to a random seed
+    //Convert frame count to a random seed
     unsafe {
         let seed = get_frame_count(None);
         let rng = Random::get_system();
@@ -266,9 +264,6 @@ pub fn replace_strs(this: &Il2CppString, str1: &str, str2: &str) -> &'static Il2
     unsafe { replace_str(this, str1.into(), str2.into(), None) }
 }
 
-pub fn replace_strs_il2str<'a>(this: &Il2CppString, str1: impl Into<&'a Il2CppString>, str2: impl Into<&'a Il2CppString>) -> &'static mut Il2CppString {
-    unsafe { replace_str(this, str1.into(), str2.into(), None) }
-}
 pub fn replace_string(this: &Il2CppString, str1: &Il2CppString, str2: &Il2CppString) -> &'static mut Il2CppString {
     unsafe { replace_str(this, str1, str2, None) }
 }
@@ -281,10 +276,6 @@ pub fn clamp(value: i32, min: i32, max: i32, method_info: OptionalMethod) -> i32
 
 pub fn max(v1: i32, v2: i32) -> i32 { if v1 > v2 { v1 } else { v2 } }
 pub fn min(v1: i32, v2: i32) -> i32 { if v1 > v2 { v2 } else { v1 } }
-
-pub fn in_map_chapter() -> bool { GameUserData::get_sequence() == 3 }
-
-pub fn get_fnv_hash<'a>(value: impl Into<&'a Il2CppString>) -> i32 { unsafe { fnv_hash_string(value.into(), None ) } }
 
 //DLC Check 
 #[unity::from_offset("App", "DLCManager", "HasContent")]
@@ -305,7 +296,3 @@ pub fn is_null_empty(this: &Il2CppString, method_info: OptionalMethod) -> bool;
 
 #[skyline::from_offset(0x03773720)]
 pub fn replace_str(this: &Il2CppString, old_value: &Il2CppString, new_value: &Il2CppString, method_info: OptionalMethod) -> &'static mut Il2CppString;
-
-
-#[skyline::from_offset(0x01c80e30)]
-pub fn fnv_hash_string(name: &Il2CppString, method_info: OptionalMethod) -> i32;

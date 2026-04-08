@@ -2,10 +2,11 @@ use engage::gamemessage::GameMessage;
 use engage::gamevariable::GameVariableManager;
 use engage::keyboard::SoftwareKeyboard;
 use unity::system::action::Action1;
-use crate::DeploymentConfig;
+use crate::{DeploymentConfig, CONFIG};
 use crate::randomizer::data::GameData;
 use crate::randomizer::RANDOMIZER_STATUS;
-use crate::utils::{can_rand, get_fnv_hash, get_random_number_for_seed};
+use crate::randomizer::status::RandomizerStatus;
+use crate::utils::{can_rand, get_random_number_for_seed};
 use super::*;
 
 #[repr(C)]
@@ -37,8 +38,9 @@ impl DVCCMenuItem for DVCCommand {
             DVCCommand::ReRandJob => {
                 let action = Action::new_method_mut(Some(item), re_rand_job);
                 let message =
-                    if GameVariableManager::get_bool("G_Cleared_M003") { "Re-Randomize player unit classes?" }
-                    else { "Re-Randomize un-recruited unit classes?" };
+                    if GameVariableManager::get_bool("G_Cleared_M003") { "Re-Randomize unrecruited player classes?" }
+                    else { "Re-Randomize player unit classes?" };
+
                 BasicDialog2::create_confirm_cancel_bind(item.menu, message, Some(action));
             }
         }
@@ -60,12 +62,8 @@ impl DVCCMenuItem for DVCCommand {
         }
     }
     fn build_attribute(&self, _item: &DVCConfigMenuItem) -> BasicMenuItemAttribute {
-        let main = DVCVariables::is_main_menu();
         match self {
-            DVCCommand::SetSeed => {
-                if main || can_rand() { BasicMenuItemAttribute::Enable }
-                else { BasicMenuItemAttribute::Hide }
-            }
+            DVCCommand::SetSeed => { BasicMenuItemAttribute::Enable }
             DVCCommand::ReRandJob => { crate::randomizer::job::re_rand_jobs_build_attr() }
         }
     }
@@ -74,19 +72,32 @@ fn set_string_value(item: &mut DVCConfigMenuItem, value: &Il2CppString, _: Optio
     if value.is_null() { return; }
     let v = value.to_string();
     if v.len() == 0 { return; }
-    let seed = if let Ok(seed) = v.parse::<u32>() { seed } else { get_fnv_hash(v) as u32 };
+    let seed = if let Ok(seed) = v.parse::<u32>() { seed } else { engage::ut::Ut::hash_fnv_1_string(value) as u32 };
     if seed == 0 || seed == DVCVariables::Seed.get_value() as u32 { return; }
-    update_seed(seed);
-    item.update_config_text();
+    if !DVCVariables::is_main_menu() {
+        item.dvc_value = seed as i32;
+        let message =
+            if DVCVariables::Seed.get_value() == 0 { format!("Set Randomizer Seed to:\n{}?", seed) }
+            else { format!("Change save file seed to:\n{}?", seed) };
+
+        let action = Action::new_method_mut(Some(item), set_seed_yes);
+        BasicDialog2::create_confirm_cancel_bind(item.menu, message, Some(action));
+    }
 }
 fn set_seed_yes(item: &mut DVCConfigMenuItem, _: OptionalMethod) {
+    let not_random = DVCVariables::Seed.get_value() == 0;
     update_seed(item.dvc_value as u32);
-    item.update_config_text();
+    if not_random {
+        DeploymentConfig::get().create_game_variables(false);
+        DVCMenu::Main.rebuild_menu(item, true);
+    }
+    else { item.update_config_text(); }
 }
 fn update_seed(new_seed: u32) {
     if new_seed == DVCVariables::Seed.get_value() as u32 { return; }
     DVCVariables::Seed.set_value(new_seed as i32);
     if !DVCVariables::is_main_menu() {
+        RandomizerStatus::set_init(false);
         GameVariableManager::find_starts_with("G_P_PID").iter()
             .for_each(|person_key| GameVariableManager::set_number(person_key.to_string().as_str(), 0));
 
@@ -95,9 +106,10 @@ fn update_seed(new_seed: u32) {
 
         let data = GameData::get();
         let mut rando = RandomizedGameData::get_write();
+        data.emblem_pool.reset_all();
         rando.randomize(data);
-        println!("Seed updated: {}", new_seed);
         rando.commit(data);
+        println!("Seed updated: {}", new_seed);
         let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.seed = GameVariableManager::get_number(DVCVariables::SEED));
     }
 }

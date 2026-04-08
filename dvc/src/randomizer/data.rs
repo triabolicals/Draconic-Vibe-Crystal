@@ -36,6 +36,7 @@ pub use bondring::*;
 pub use items::*;
 use crate::config::menu::{DVCMenuItemKind, CUSTOM_RECRUITMENT_ORDER};
 use crate::randomizer::data::emblem::item::EngageItemRandomizer;
+use crate::randomizer::status::RandomizerStatus;
 
 pub struct GrowthData {
     person_stats: [Vec<u8>; 10],
@@ -367,6 +368,7 @@ impl RandomizedGameData {
         data.growth_data.personal_caps();
         crate::randomizer::emblem::engrave::random_engrave_by_setting(engrave_setting, true);
         styles::randomize_job_styles();
+        styles::randomize_job_attrs();
         interact::change_interaction_data(DVCVariables::InteractSetting.get_value(), true);
         self.update_evolve_items(data);
         self.engage_skills.commit_stats(data);
@@ -376,7 +378,8 @@ impl RandomizedGameData {
         self.emblem_aptitude_randomizer.commit(data);
         data.update_personals();
         data.update_bond_ring();
-        DVCFlags::Initialized.set_value(true);
+        grow::random_grow();
+        RandomizerStatus::set_init(true);
     }
     pub fn update_enemy_emblem(&self, data: &GameData) {
         if !DVCFlags::Initialized.get_value() && DVCVariables::is_changed_recruitment_order(true) {
