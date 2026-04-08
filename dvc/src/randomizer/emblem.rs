@@ -244,7 +244,7 @@ pub fn get_engage_attack_type(skill: Option<&SkillData>) -> i32 {
 
 #[unity::hook("App", "GodBondHolder", "Get")]
 pub fn god_bond_holder_get(this: &GodBondHolder, unit: Option<&mut Unit>, method_info: OptionalMethod) -> Option<&'static mut GodBond> {
-    if this.data.is_some_and(|f| f.force_type != 0) { call_original!(this, unit, method_info) }
+    if this.data.is_some_and(|f| f.force_type != 0 && !f.gid.str_contains("M0")) { call_original!(this, unit, method_info) }
     else {
         if unit.as_ref()
             .is_some_and(|unit|{
