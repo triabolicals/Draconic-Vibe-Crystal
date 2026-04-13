@@ -1,7 +1,6 @@
 use engage::{
-    menu::{
-        menu_item::config::{ConfigBasicMenuItem, ConfigBasicMenuItemCommandMethods},
-    },
+    language::*,
+    menu::{menu_item::config::{ConfigBasicMenuItem, ConfigBasicMenuItemCommandMethods}, },
     mess::Mess,
 };
 use crate::VERSION;
@@ -26,29 +25,21 @@ impl ConfigBasicMenuItemCommandMethods for TriabolicalInGameMenu {
         BasicMenuResult::se_cursor()
     }
 }
-/*
-fn output_bind(this: &mut ConfigBasicMenuItem, _method_info: OptionalMethod) {
-    if DVCVariables::random_enabled() {
-        let text = format!("Create Output File for this Save?\n Save as 'sd:/Draconic Vibe Crystal/{}.log'",  crate::utils::get_player_name());
-        YesNoDialog::bind::<WriteOutputConfirm>(this.menu, text, "Do it!", "Nah..");
-    }
-}
- */
 pub extern "C" fn vibe2() -> &'static mut ConfigBasicMenuItem { 
     let title = format!("{} {}", draconic_vibe_name(), VERSION);
     ConfigBasicMenuItem::new_command::<TriabolicalInGameMenu>(title)
 }
 
 pub fn draconic_vibe_name() -> &'static str {
-    match unsafe { get_lang(None) } {
-        0 => "竜の振動水晶",
-        2|5 => "Cristal de Vibration Draconique",
-        3|6 => "Gema de Vibración Dracónica",
-        7 => "Drachenvibrationskristall",
-        8 => "Gemma di Vibrazione del Drago",
-        9 => "龍之氣息水晶",
-        10 => "龙之气息水晶",
-        11 => "용의 분위기석",
+    match Language::get_lang() { 
+        LanguageLangs::JPJapanese => "竜の振動水晶",
+        LanguageLangs::USFrench|LanguageLangs::EUEnglish  => "Cristal de Vibration Draconique",
+        LanguageLangs::USSpanish|LanguageLangs::EUSpanish => "Gema de Vibración Dracónica",
+        LanguageLangs::EUGerman => "Drachenvibrationskristall",
+        LanguageLangs::EUItalian => "Gemma di Vibrazione del Drago",
+        LanguageLangs::CNTraditional => "龍之氣息水晶",
+        LanguageLangs::CNSimplified => "龙之气息水晶",
+        LanguageLangs::KRKorean => "용의 분위기석",
         _ => "Draconic Vibe Crystal",
     }
 }

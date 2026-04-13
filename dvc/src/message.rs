@@ -112,36 +112,7 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
             }
         }
         if result.is_null() { return result; }
-
-        /*
-        if mess_label.contains("MID_TUT_NAVI_M022_GET_") && (DVCFlags::GodNames.get_value() || DVCVariables::is_changed_recruitment_order(true)) {
-            let mock_text = call_original!(Some("MID_TUT_NAVI_M022_GET_Siglud".into()), is_replaced, method_info);
-            let mpid = mess_label.trim_start_matches("MID_TUT_NAVI_M022_GET_");
-            let sigurd_text = call_original!(Some("MGID_Ring_Siglud".into()), true, None);
-            if let Some(emblem) = GameData::get_playable_emblem_hashes().iter().flat_map(|&h| GodData::try_get_hash(h))
-                .find(|x| x.mid.str_contains(&mpid))
-            {
-                if let Some(person) = get_emblem_person(emblem.mid).and_then(|x| x.get_name()) {
-                    let new_name =
-                        if let Some(mid) = MPIDS.iter().find(|mid| person.str_contains(*mid)) {
-                            call_original!(Some(mid.replace("MPID_", "MPID_alias_").into()), true, None)
-                        }
-                        else { call_original!(Some(person), true, None) };
-
-                    return replace_string(mock_text, sigurd_text, new_name);
-                }
-                else {
-                    let new_name = call_original!(emblem.ring_name, true, None);
-                    return replace_string(mock_text, sigurd_text, new_name);
-                }
-            }
-            else {
-                let new_name = call_original!(Some(format!("MPID_{}", mpid).into()), true, None);
-                return replace_string(mock_text, sigurd_text, new_name);
-            }
-        }
         
-         */
         let hash_map = MID_SWAPS.get_or_init(||{
         let mut vec: HashMap<String, (i32, i32)> = HashMap::new();
         for x in 0..LUEUR_MIDS.len() {
@@ -273,26 +244,6 @@ fn name_replace(str: &Il2CppString, index: i32) -> &mut Il2CppString {
     let replace_name = Mess::get_name(DVCVariables::get_dvc_person(index, false));
     replace_string(str, name, replace_name)
 }
-/*
-fn is_player_name_replace(ptr: *const u8) -> bool {
-    let mut offset = 0;
-    loop {
-        let value = unsafe { get_u16(ptr, offset, None) };
-        match value {
-            0..11 => { return false; }
-            15 => { offset += 6; }
-            14 => {
-                let group = unsafe { get_u16(ptr, offset + 2 , None) };
-                let tag = unsafe { get_u16(ptr, offset + 4 , None) };
-                if group == 6 && tag == 3 { return true; }
-                offset += 8;
-            }
-            _ => { offset += 2; }
-        }
-    }
-}
- */
-
 // Prevents Alear or anyone with no cooking data from cooking 
 pub fn cooking_menu_build_attribute(_this: u64, _method_info: OptionalMethod) -> i32 {
     if let Some(chef) = util::HubUtil::get_current_cooking_pid() {
@@ -301,11 +252,3 @@ pub fn cooking_menu_build_attribute(_this: u64, _method_info: OptionalMethod) ->
     if GameVariableManager::get_bool("G_拠点_料理済み") { 2 } else { 1 }
 }
 pub fn lol_map_attribute(_this: u64, _method_info: OptionalMethod) -> i32 { 1 }
-
-/*
-#[skyline::from_offset(0x0336d1f0)]
-pub fn get_u16(ptr: *const u8, offset: i32, method_info: OptionalMethod) -> u16;
-
-#[skyline::from_offset(0x025d7f90)]
-fn get_u16_ptr(label: &Il2CppString, method_info: OptionalMethod) -> *const u8;
-*/

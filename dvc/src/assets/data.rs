@@ -12,7 +12,6 @@ pub mod item;
 pub mod search;
 
 pub struct AssetData {
-    // pub bid: Vec<i32>,
     pub items: WeaponAssets,
     pub bond_face: Vec<String>,
     pub engaging: Vec<i32>,
@@ -22,7 +21,6 @@ impl AssetData {
     pub fn new() -> Self {
         Self{
             map_events: vec![],
-            // bid: vec![],
             items: WeaponAssets::new(),
             bond_face: vec![],
             engaging: vec![],
@@ -40,11 +38,7 @@ impl AssetData {
 pub fn initialize_search_list() {
     SEARCH_LIST.get_or_init(||{
         let mut slist = AssetData::new();
-        /*
-        slist.bid = ["BID_フィレネ", "BID_ブロディア", "BID_イルシオン", "BID_ソルム", "BID_無所属", "AID_幻影兵"].iter()
-            .flat_map(|bid| search_by_key(0, *bid, None).map(|a| a.parent.index)).collect();
-            
-         */
+        
         slist.bond_face = ResourceManager::class().get_static_fields::<ResourceManagerStaticFields>().files.entries.iter()
             .filter(|x|x.key.is_some_and(|x| x.str_contains("Telop/LevelUp/FaceThumb/")))
             .map(|x| x.key.unwrap().to_string()).collect();

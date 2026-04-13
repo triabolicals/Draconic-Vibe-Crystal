@@ -32,28 +32,6 @@ pub fn install_sprite_menu_methods() {
         ring_select::god_select_menu_content_build as _
     );
 }
-/*
-#[skyline::hook(offset=0x021e1250)]
-pub fn get_bond_face(this: &Unit, _method_info: OptionalMethod) -> &Il2CppString {
-    if let Some(name) = this.person.name.as_ref().map(|v| v.to_string()) {
-        let result = call_original!(this, None);
-        if let Some(old) = MPIDS.iter().position(|&x| x == name) {
-            if old == 0 { return format!("Telop/LevelUp/FaceThumb/{}", get_gender_lueur_ascii(false)).into(); }
-            let new_name = &MPIDS[old][5..];
-            format!("Telop/LevelUp/FaceThumb/{}", new_name).into()
-        }
-        else if let Some(pos) = RINGS.iter().find(|&x| this.person.name.is_some_and(|v| v.to_string().contains(x))) {
-            format!("Telop/LevelUp/FaceThumb/{}", pos).into()
-        }
-        else if ResourceManager::file_exist(result) { result } else {
-            let rng = create_rng(this.person.parent.hash, 1);
-            let len = SEARCH_LIST.get().unwrap().bond_face.len();
-            SEARCH_LIST.get().unwrap().bond_face.get(rng.get_value(len as i32) as usize).unwrap().into()
-        }
-    }
-    else { call_original!(this, None) }
-}
-*/
 pub fn get_gender_lueur_ascii(god: bool, _female: bool) -> String {
     let is_female =
         if GameVariableManager::exist(DVCVariables::LUEUR_GENDER) {  GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) == 2  }
@@ -69,28 +47,6 @@ pub fn get_gender_lueur_ascii(god: bool, _female: bool) -> String {
         (false, false) => {"Lueur"}
     }.to_string()
 }
-/*
-#[skyline::hook(offset=0x021e16f0)]
-pub fn get_god_face(this: &GodData, method_info: OptionalMethod) -> &Il2CppString {
-    let mid = this.mid;
-    let mut is_rng = false;
-    if let Some(person) = get_emblem_person(mid).and_then(|x| x.get_ascii_name()) {
-        let path = format!("Telop/LevelUp/FaceThumb/{}", person).into();
-        if ResourceManager::file_exist(path) { return path; }
-        is_rng = true;
-    }
-    let result = call_original!(this, method_info);
-    if mid.str_contains("Lueur") && this.gid.str_contains("リュール") {
-        return format!("Telop/LevelUp/FaceThumb/God{}", get_gender_lueur_ascii(false)).into();
-    }
-    if !is_rng && ResourceManager::file_exist(result) { result }
-    else {
-        let rng = create_rng(this.parent.hash, 1);
-        let len = SEARCH_LIST.get().unwrap().bond_face.len();
-        SEARCH_LIST.get().unwrap().bond_face.get(rng.get_value(len as i32) as usize).unwrap().into()
-    }
-}
-*/
 
 #[unity::hook("App", "SpriteAtlasManager", "TryGet")]
 pub fn try_get_sprite(this: &SpriteAtlasManager, name: &Il2CppString, method_info: OptionalMethod) -> Option<&'static Sprite> {

@@ -200,14 +200,6 @@ pub fn adjust_unit_items(unit: &mut Unit) {
         unit_items::add_monster_weapons(unit);
         return;
     }
-    /*
-    if crate::DeploymentConfig::get().debug {
-        println!("Adjusting Items for {} Job: #{} {}", Mess::get_name(unit.person.pid), job.parent.index, Mess::get_name(job.jid));
-        unit.item_list.unit_items.iter().flat_map(|x| x)
-            .for_each(|item| { println!("Adjusting item for #{}, {}", item.item.parent.index, Mess::get_name(item.item.iid)); });
-    }
-
-     */
     unit.update_weapon_mask();
     let mut has_drops = unit_items::has_drops(unit);
     let custom_inventory = DVCVariables::UnitInventory.get_value() & 255;
@@ -254,15 +246,6 @@ pub fn adjust_unit_items(unit: &mut Unit) {
                 if let Some(god) = playable_gods.get_random_element(rng) { item.set_engrave(god); }
             });
     }
-    /*
-    if crate::DeploymentConfig::get().debug {
-        unit.item_list.unit_items.iter().flat_map(|x| x)
-            .for_each(|item| {
-                println!("Final Items #{}, {}", item.item.parent.index, Mess::get_name(item.item.iid));
-            });
-    }
-    
-     */
 }
 
 pub fn set_unit_edit_name(unit: &Unit) {
@@ -515,7 +498,6 @@ fn enemy_unit_randomization(unit: &mut Unit) {
         let job = unit.get_job();
         if MONSTERS.iter().any(|str| job.jid.contains(str)) {
             if random_map && m004_complete { auto_level_unit_for_random_map(unit, is_boss);  }
-            // else { emblem_paralogue_level_adjustment(unit); }
             return;  
         }
         let mut has_master = unit.item_list.has_item_iid("IID_マスタープルフ");
@@ -529,10 +511,9 @@ fn enemy_unit_randomization(unit: &mut Unit) {
         if unit.person.get_asset_force() != 0 {
             if random_map && m004_complete && !GameUserData::get_chapter().cid.contains("E00") { // Continuous Mode Random Map
                 fixed_unit_weapon_mask(unit);
-                let maps_completed = crate::continuous::get_continious_total_map_complete_count();
+                let maps_completed = get_continious_total_map_complete_count();
                 if maps_completed < 16 {
                     unit.item_list.put_off_all_item();
-                    //println!("Adjust Weapon RNG");
                     adjust_unit_items(unit); 
                     unit.auto_equip();
                 }
@@ -554,7 +535,6 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                 let gauge = DVCVariables::EnemyJobGauge.get_value();
                 if unit.person.get_bmap_size()  == 1 && ( rng.get_value(100) < gauge && gauge > 11 )  || ( gauge > 0 && gauge <= 11  && is_boss ) {
                     if job::enemy_unit_change_to_random_class(unit){
-                        // println!("Class Changed to {}", Mess::get(unit.job.name));
                         changed_class = true;
                         fixed_unit_weapon_mask(unit);
                         adjust_unit_items(unit); 
@@ -569,11 +549,6 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                     }
                 }
             }
-            /*
-            if GameUserData::get_chapter().cid.str_contains("CID_S0") && DVCVariables::EmblemRecruitment.get_value() != 0 {
-                emblem_paralogue_level_adjustment(unit);
-            }
-            */
             if DVCVariables::EnemyItemDropGauge.get_value() > 0 { unit_items::random_items_drops(unit); }
             if !m004_complete { 
                 unit.auto_equip();
@@ -609,9 +584,7 @@ fn enemy_unit_randomization(unit: &mut Unit) {
         }
         if has_master {  unit.item_list.add_iid_no_duplicate("IID_マスタープルフ"); }    // Add Seal if lost seal
         unit_set_drop_seals(unit);    // Drop Seals
-    
-       // Prevent Green Emblems from dying in Chapter 22 if AI is changed
-
+        
         if changed_class {
             unit_items::adjust_missing_weapons(unit);
             ai::adjust_unitai(unit);

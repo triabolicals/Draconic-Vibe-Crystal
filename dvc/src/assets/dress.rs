@@ -6,7 +6,6 @@ use accessory::*;
 use transform::{has_enemy_tiki};
 use crate::assets::transform::is_dragonstone;
 use crate::config::DVCFlags;
-use crate::config::menu::DVCMenu::Asset;
 use crate::randomizer::data::RandomizedGameData;
 use crate::randomizer::names::get_emblem_person;
 use crate::randomizer::person::is_playable_person;
@@ -31,11 +30,7 @@ fn tiki_engage(result: &mut AssetTableResult, condition_unit: &Unit, mode: i32, 
                 result.body_anims.add("End0AF-No2_c099_N".into());
             }
         }
-        else {
-            result.commit(mode, Some(condition_unit.person), Some(condition_unit.get_job()), equipped);
-        }
-        // println!("Tiki Engaged!");
-        // print_asset_table_result(result, mode);
+        else { result.commit(mode, Some(condition_unit.person), Some(condition_unit.get_job()), equipped); }
         true
     }
     else { false }
@@ -167,7 +162,6 @@ pub fn commit_for_unit_dress(
 
     if let Some(data) = UnitAssetMenuData::get_unit_data(condition_unit) {
         let profile_flag = data.get_active_flag(engaged);
-        // println!("{}: Profile {} Mode: {}", condition_unit.get_name(), profile_flag, mode);
         if let Some(god) = condition_unit.god_link.or(condition_unit.god_unit).filter(|_| engaged  ) {
             if profile_flag & 256 != 0 { conditionss.flags.set_condition_flag(AssetFlags::Engaged, false); }
             if profile_flag & 6 == 2 { conditionss.remove_god_eid_conditions(); }
@@ -254,12 +248,6 @@ pub fn commit_for_unit_dress(
         if condition_unit.person.get_job().map(|j| j.parent.hash).unwrap_or(condition_unit.job.parent.hash) == 185671037 { lueur_fell_child_hair(result); }
     }
     if DVCVariables::BodyScaling.get_value() != 0 && mode == 2 { random_body_scale(result, Some(unit.grow_seed), false); }
-    /*
-    if crate::DeploymentConfig::get().debug {
-        println!("Dress Complete {}: Job: {} Mode: {}", Mess::get_name(unit.person.pid), Mess::get_name(unit.job.jid), mode);
-        print_asset_table_result(result, mode);
-    }
-     */
     conditionss
 }
 pub fn change_result_colors_by_unit(unit: &Unit, result: &mut AssetTableResult) {

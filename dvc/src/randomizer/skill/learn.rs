@@ -105,7 +105,7 @@ pub fn class_change_job_menu_after_build(this: &mut BasicMenu<ClassChangeJobMenu
     this.after_build();
     if !can_rand() { return; }
     if let Some(select) = this.get_item(this.select_index) {
-        let mut menu_item_content = unsafe { std::mem::transmute::<&BasicMenuContent, &ClassChangeJobMenuContent>(this.menu_content) };
+        let menu_item_content = unsafe { std::mem::transmute::<&BasicMenuContent, &ClassChangeJobMenuContent>(this.menu_content) };
         set_menu_content_for_learn_skill(menu_item_content, select.job_data);
     }
 }
@@ -162,18 +162,6 @@ pub fn class_change_job_menu_content_hook(this: &mut ClassChangeJobMenuContent, 
     call_original!(this, data, None);
     if !can_rand() { return; }
     set_menu_content_for_learn_skill(this, data);
-    /*
-    if let Some(skill) = get_learn_job_skill(SortieSelectionUnitManager::get_unit(), data.job) {
-        this.skill_name.set_text(Mess::get(skill.name.unwrap()), false);
-        if let Some(label) = skill.icon_label {
-            if let Some(sprite) = GameIcon::try_get_skill(label) {
-                unsafe { info_utils_try_set_sprite(this.skill_image, sprite, None) };
-            }
-        }
-        this.skill_help_text.set_text(Mess::get(skill.help.unwrap()), false);
-    }
-    
-     */
 }
 
 pub fn get_learn_job_skill(unit: &Unit, job: &JobData) -> Option<&'static SkillData> {
@@ -189,13 +177,6 @@ pub fn get_learn_job_skill(unit: &Unit, job: &JobData) -> Option<&'static SkillD
 #[skyline::from_offset(0x0290f730)]
 pub fn info_utils_try_set_sprite(image: u64, spr: &Sprite, method_info: OptionalMethod);
 
-/*
-#[skyline::from_offset(0x19c7ac0)]
-fn class_change_menu_item_on_select(this: &ClassChangeJobMenuItem, method_info: OptionalMethod);
-
-#[skyline::from_offset(0x01ea35d0)]
-fn class_change_after_build(this: &mut BasicMenu<ClassChangeJobMenuItem>, method_info: OptionalMethod);
- */
 fn create_job_growth_string(job: &JobData) -> String {
     let mut out = "".to_string();
     let diff = job.get_diff_grow();

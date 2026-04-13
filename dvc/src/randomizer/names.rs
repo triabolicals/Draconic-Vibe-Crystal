@@ -86,29 +86,6 @@ impl AppearanceRandomizer {
                 if let Some(m) =  set.get_remove(rng){ self.npcs[i as usize] = m.0; }
             }
         }
-        let db = get_outfit_data();
-        for x in 0..42 {
-            let index = self.playables[x];
-            if index >= 0 {
-                let name = db.dress.personal.get(index as usize).map(|x| x.mpid.as_str()).unwrap();
-                // println!("Playable Appearance #{} {}-> #{} {}", x, MPIDS[if x < 2 { 0 } else { x - 1 }], self.playables[x], name);
-            }
-        }
-        for x in 0..30 {
-            let index = self.npcs[x];
-            if index >= 0 {
-                let name = db.dress.personal.get(index as usize).map(|x| x.mpid.as_str()).unwrap();
-                // println!("NPC Appearance #{} -> #{} {}", x, self.npcs[x], name);
-            }
-        }
-
-        for x in 0..30 {
-            let index = self.emblem[x];
-            if index >= 0 {
-                let name = db.dress.personal.get(index as usize).map(|x| x.mpid.as_str()).unwrap();
-                // println!("Emblem Appearance #{} -> #{}, {}", x, index, name);
-            }
-        }
     }
     pub fn get_npc_name(&self, index: i32) -> Option<&String> {
         get_outfit_data().dress.personal.get(self.npcs[index as usize] as usize).map(|a| &a.mpid)

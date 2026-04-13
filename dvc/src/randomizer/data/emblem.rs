@@ -1,4 +1,3 @@
-use std::iter::chain;
 use engage::gamedata::{god::GodGrowthData, item::ItemData, skill::SkillData, Gamedata, GodData, PersonData};
 use engage::gamedata::skill::SkillDataCategorys;
 use engage::mess::Mess;

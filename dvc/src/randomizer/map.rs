@@ -74,18 +74,6 @@ fn register_action(script: &EventScript, name: &str, action: extern "C" fn(&Il2C
 }
 
 pub fn tilabolical() {
-    /*
-    if crate::DeploymentConfig::get().debug {
-        Force::get(ForceType::Player).unwrap().iter().for_each(|u|{
-            let move_stat = u.base_capability[10] as i32;
-            if move_stat < 20 { u.set_base_capability(10,move_stat + 20); }
-            for x in 1..10 { u.set_base_capability(x, 5); }
-            u.private_skill.add_sid("SID_絆の力", SkillDataCategorys::Private, 0);
-            u.private_skill.add_sid("SID_デュアルアシスト＋", SkillDataCategorys::Private, 0);
-        });
-    }
-
-     */
     if !DVCFlags::Tile.get_value() { return; }
 
     if let Some(mut ran) = RANDOMIZED_DATA.get().and_then(|v| v.write().ok()) { ran.person_appearance.randomize(true); }

@@ -43,13 +43,6 @@ fn emblem_asset_rand(result: &mut AssetTableResult, mode: i32, god: &GodData, is
         menu_data.preview.preview_data.set_result(result, mode, false, false);
     }
     else { UnitAssetMenuData::set_god_assets(result, mode, god, is_dark); }
-    /*
-    if crate::DeploymentConfig::get().debug {
-        if mode == 2 { println!("God: {} Body / Dress: {} / {}",  Mess::get(god.mid), result.body_model ,result.dress_model); }
-        outfit_core::print_asset_table_result(result, mode);
-    }
-
-     */
 }
 
 #[skyline::hook(offset=0x01bb2d80)]
@@ -123,11 +116,6 @@ pub fn asset_table_result_god_setup(
             let db =  get_outfit_data();
             if let Some(appearance) = UnitPool::get_hero(false).and_then(|unit| db.dress.get_personal_dress(unit)){
                 appearance.apply_appearance(result, mode, false, None, &db.hashes, true);
-                /*
-                if let Some(hair) = outfit_core::get_hair(result, mode).and_then(|hair| db.hashes.get_engaged_hair(hair)) {
-                    outfit_core::apply_hair(&hair.to_string(), result);
-                }
-                 */
             }
             if is_darkness { lueur_fell_child_hair(result); } else { lueur_god_hair(result) }
             result.body_anims.clear();
@@ -229,121 +217,6 @@ pub fn asset_table_result_god_setup(
     emblem_asset_rand(result, mode, god, is_darkness);
     result
 }
-/*
-#[skyline::hook(offset=0x01bb7ca0)]
-pub fn asset_table_result_get_preset_name(name: &Il2CppString, method_info: OptionalMethod) -> &'static mut AssetTableResult {
-    let mut result = call_original!(name, method_info);
-    let asset_table = AssetTable::get_list().unwrap();
-    let pre_name = name.to_string();
-
-    if pre_name == "エンゲ技/【エイリーク】ツインストリーム/エフラム" { // Replacing Ephraim in Twin Strike
-        for x in 1..1000 {
-            if let Some(con) = &asset_table[x].conditions {
-                let status = ASSET_STATUS.try_read().unwrap();
-                let new_conditions = Array::<&Il2CppString>::new_specific( con.get_class(), 1).unwrap();
-                let eirika = status.engage_atk_eirika;
-                let is_dark = status.darkness;
-                let engage_type = status.engage_atk_type;
-                if eirika > 21 { break; }
-                new_conditions[0] = "".into();
-                let link_god = GodData::try_get_hash(status.link_god);
-                if link_god.is_some_and(|d| d.female != 1) && engage_type == 2 { asset_table_result_god_setup(result, 2, link_god, is_dark, new_conditions, None); }
-                else {               
-                    let partner = combo_engage_attack_male_emblem_index(eirika as usize, false);
-                    match partner {
-                        23|50 => { asset_table_result_god_setup(result, 2, GodData::get("GID_エフラム"), is_dark, new_conditions, None); } // Ephraim
-                        19 => { // Male Alear
-                            new_conditions[0] = "男装".into();
-                            asset_table_result_god_setup(result, 2, GodData::get("GID_リュール"), is_dark, new_conditions, None);
-                            result.sound.voice = Some("PlayerM".into());
-                        }
-                        22 => { //
-                            let pid = if is_dark { "PID_闇ルフレ"} else { "PID_ルフレ" };
-                            result.setup_for_person(2, PersonData::get(pid), new_conditions);
-                        }
-                        _ => {
-                            let gid = format!("GID_{}", EMBLEM_ASSET[partner]);
-                            result = asset_table_result_god_setup(result, 2, GodData::get(gid), is_dark, new_conditions, None); 
-                        }
-                    }
-                }
-                // Animation Replacement ;
-                dress::random_body_scale(result, None, false);
-                result.body_anims.clear();
-                result.body_anims.add("Eir1AM-Lc1_c536_N".into());
-                result.right_hand = "uWep_Lc19".into(); 
-                result.left_hand = "null".into(); 
-                return result;
-            }
-        }
-    }
-    result
-}
- */
-
-
-/*
-println!("{} is Engage Attacking: {} hash: {}", Mess::get_name(unit.person.pid), Mess::get(engage_attack.name.unwrap()), engage_attack.parent.hash);
-        let engage_sid = engage_attack.sid.to_string();
-
-
-         // Replace Generic with random character voices
-
-        let mut old_engage = EATK_ACT.iter().position(|prefix|{ result.body_anims.iter().any(|act| act.to_string().contains(prefix)) }).unwrap_or(50);
-
-        if old_engage == 22 {
-            lueur_engage_atk(result, unit, flags);
-            return;
-        }
-        else if old_engage == 50 {
-            if let Some(god) = unit.god_link.or(unit.god_unit){
-                let rr = god.data.gid.to_string();
-                if let Some(pos) = EMBLEM_ASSET.iter().position(|r| rr.contains(r)) {
-                    old_engage = match pos {
-                        12|20|21 => { 12 },
-                        22 => { 18 },
-                        23 => { 11 },
-                        _ => { pos },
-                    };
-                }
-            }
-        }
-        // Get New Engage Attack
-        let emblem_index = if let Some(pos) = EMBLEM_ASSET.iter().position(|god| engage_sid.contains(god)) { pos }
-            else if engage_sid.contains("三級長エンゲージ技＋") { 20 }
-            else if engage_sid.contains("三級長エンゲージ") { 12 }
-            else { 50 };
-        let engage_atk = &SEARCH_LIST.get().unwrap().engage_atks;
-        if emblem_index == 50 { 
-            if let Some(engage_atk_data) = engage_atk.iter().find(|x| x.original_god_index == 50 && x.is_engage_atk(engage_attack)) {
-                engage_atk_result_clear(result, equipped);
-                if is_tiki_engage(result) { SEARCH_LIST.get().unwrap().replace_with_god(result, 2, 13, false); }
-                engage_atk_data.apply(result, unit, gender_con);
-            }
-            return;
-        }
-        engage_atk_result_clear(result, equipped);
-        let enemy_tiki = unit.god_unit.is_some_and(|g_unit| g_unit.data.gid.to_string().contains("敵チキ") || ( g_unit.data.mid.to_string().contains("Tiki") && !g_unit.data.gid.to_string().contains("チキ") ));
-        match (emblem_index, old_engage) {
-            (13, 13) => {    // No Change
-                if result.body_model.to_string() != "uRig_Tik1AT" {
-                    tiki_engage(result, unit, 2);
-                    result.body_anims.add("Tik1AT-Mg1_c000_M".into());
-                }
-                change_result_colors_by_unit(unit, result);
-                return;
-            }
-            (_, 13) => {    // Other Tiki
-                if !unit.god_unit.is_some_and(|god| god.data.gid.to_string().contains("敵チキ")) {
-                    result.dress_model = "uBody_Tik0AF_c560".into();
-                    result.body_model = "uRig_GodF1".into();
-                    result.head_model = "uHead_c560".into();
-                    result.hair_model = "uHair_null".into();
-                    add_accessory_to_list(result.accessory_list, "uAcc_spine2_Hair560", "c_spine1_jnt");
-                    add_accessory_to_list(result.accessory_list, "uAcc_head_Tiara560", "c_head_loc");
-                    gender_con = SEARCH_LIST.get().unwrap().get_gender_condition(2);
-                }
-*/
 pub fn engage_animation_mode_1(this: &mut AssetTableResult, engage_atk_index: i32, gender: i32) {
     let gen_str = if gender == 1 { "M" } else { "F" };
     match engage_atk_index {
@@ -377,7 +250,6 @@ pub fn asset_table_robin_hook(
         if let Some(appearance) = RandomizedGameData::get_read().person_appearance.get_person_appearance(person).as_ref(){
             appearance.apply_appearance(original_result, 2, false, None, &db.hashes, true);
             random_body_scale(original_result, None, false);
-            println!("RandomNPC");
             outfit_core::print_asset_table_result(original_result, 2);
             return original_result;
         }
@@ -391,7 +263,6 @@ pub fn asset_table_robin_hook(
                 let generic_mode =  DVCVariables::GenericAppearance.get_value();
                 if generic_mode & 2 != 0 { change_color_by_rng(original_result, system); }
             }
-            println!("RandomGeneric");
             random_body_scale(original_result, None, false);
             return original_result;
         }

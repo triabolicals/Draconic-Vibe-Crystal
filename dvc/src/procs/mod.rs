@@ -45,19 +45,19 @@ pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
         }
     }
     match hashcode {
-        engage::proc::MAIN_SEQUENCE => { mainsequence::main_sequence_desc_edit(descs); }
+        MAIN_SEQUENCE => { mainsequence::main_sequence_desc_edit(descs); }
         1959640519 => { // LevelUpSequence
             descs[0] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::job::chaos::level_up_prepare));
             descs[9] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::job::chaos::level_up_reflect));
         }
-        engage::proc::GMAP_SEQUENCE => { gmapsequence::gmap_sequence_desc_edit(descs); }
-        engage::proc::SORTIE_SEQUENCE => { descs[1] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::sortie_play_bgm)); }
-        engage::proc::WELL_SEQUENCE => { descs[19] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::item::well::well_get_item_rng)); }
-        engage::proc::HUB_SEQUENCE => { hubsequence::hub_sequence_desc_edit(descs); }
-        engage::proc::MAP_SEQUENCE_BATTLE => { descs[60] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::map_sequence_battle_pre_bgm)); }
-        engage::proc::MAP_SEQUENCE_BATTLE_ACTION => { descs[1] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::map_sequence_battle_action_pre_bgm)); }
-        engage::proc::COMBAT_COMBAT_SEQUENCE => { descs[4] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::combat_sequence_pre_bgm)); }
-        engage::proc::MAP_SEQUENCE => {
+        GMAP_SEQUENCE => { gmapsequence::gmap_sequence_desc_edit(descs); }
+        SORTIE_SEQUENCE => { descs[1] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::sortie_play_bgm)); }
+        WELL_SEQUENCE => { descs[19] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::item::well::well_get_item_rng)); }
+        HUB_SEQUENCE => { hubsequence::hub_sequence_desc_edit(descs); }
+        MAP_SEQUENCE_BATTLE => { descs[60] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::map_sequence_battle_pre_bgm)); }
+        MAP_SEQUENCE_BATTLE_ACTION => { descs[1] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::map_sequence_battle_action_pre_bgm)); }
+        COMBAT_COMBAT_SEQUENCE => { descs[4] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::combat_sequence_pre_bgm)); }
+        MAP_SEQUENCE => {
             if GameUserData::get_sequence() > 3 && !GameUserData::is_evil_map() { GameUserData::get_status().value &= !8192; }
             mapsequence::map_sequence_desc_edit(descs);
             ironman::map_save_menu_edits();
@@ -67,15 +67,11 @@ pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
             randomizer::bgm::randomize_bgm_map();
             continuous::random::continous_rand_emblem_adjustment();
         }
-        engage::proc::EVENT_DEMO_SEQUENCE => { eventdemo::event_demo_function_edit(); }
-        engage::proc::HUB_MENU_SEQUENCE => {
+        EVENT_DEMO_SEQUENCE => { eventdemo::event_demo_function_edit(); }
+        HUB_MENU_SEQUENCE => {
             let con = DVCVariables::Continuous.get_value();
-            // println!("Continuous Mode: {}", con);
             if (con == 1 || con == 2) && GameVariableManager::get_bool("G_Cleared_M004"){
                 continuous::set_next_chapter();
-                if let Some(chapter) = engage::gamedata::ChapterData::try_get_hash(GameVariableManager::get_number("G_DVC_Next")) {
-                    println!("Next Chapter: {}", chapter.cid);
-                }
                 descs[21] = ProcDesc::call(ProcVoidFunction::new(None, hubsequence::hub_menu_sequence_next_map_bind));
                 descs[24] = ProcDesc::call(ProcVoidFunction::new(None, hubsequence::hub_menu_sequence_next_map_bind));
             }
@@ -83,7 +79,7 @@ pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
         31745184 => {   // MapEngageSummon
             descs[13] = ProcDesc::call(ProcVoidFunction::new(None, summon::commit_summon));
         }
-        engage::proc::UNIT_GROW_SEQUENCE => {
+        UNIT_GROW_SEQUENCE => {
             descs[1] = ProcDesc::call(ProcVoidFunction::new(None, unitgrow::unit_grow_gain_exp));
         }
         1918405982 => { randomizer::latertalk::edit_later_talk_data(); }

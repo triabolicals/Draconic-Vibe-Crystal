@@ -18,38 +18,6 @@ use super::{DVCVariables, CONFIG};
 pub mod ingame;
 use crate::menus::ingame::draconic_vibe_name;
 
-/*
-pub extern "C" fn open_anime_parent(this: &mut ProcInst, _method_info: OptionalMethod) {
-    this.parent.as_ref().unwrap().get_class().get_virtual_method("OpenAnime").map(|method| {
-        let open_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&ProcInst, &MethodInfo)>(method.method_info.method_ptr) };
-        open_anime_all(this.parent.as_ref().unwrap(), method.method_info);
-    });
-}
-
-pub extern "C" fn close_dvc_menu(this: &mut ProcInst, _method_info: OptionalMethod) {
-    if let Some(parent) = this.parent.as_ref() {
-        if parent.name.unwrap().to_string().contains("Config") {
-            TitleBar::open_header(
-                Mess::get("MID_MENU_CONFIG").to_string().as_str(), 
-                Mess::get("MID_MENU_CONFIG_HELP").to_string().as_str(), 
-                "KHID_環境設定_項目選択"
-            );
-        }
-        open_anime_parent(this, None);
-        return;
-    }
-    open_anime_all_ondispose(this, None);
-}
-fn add_dvc_menu_options(config_menu: &mut ConfigMenu<DVCConfigMenuItem>){
-    let s = if GameUserData::get_sequence() == 0 { 17 } else { 13 };
-    for x in 1..s {
-        if let Some(item) = DVCConfigMenuItem::new(x) {
-            config_menu.add_item(item);
-        }
-    }
-
-}
- */
 
 pub struct TriabolicalMenu;
 impl ConfigBasicMenuItemCommandMethods for TriabolicalMenu {

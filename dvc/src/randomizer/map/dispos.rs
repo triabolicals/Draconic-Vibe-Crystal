@@ -63,7 +63,8 @@ pub fn change_map_dispos() {
                     .for_each(|dispos| {
                         if let Some(person) = dispos.get_person() {
                             if person.engage_skill.is_some() {
-                                if pos != recruit_idx { set_dispos_levels(dispos, levels[0].1); } else if GameData::get().emblem_pool.emblem_persons.iter()
+                                if pos != recruit_idx { set_dispos_levels(dispos, levels[0].1); }
+                                else if GameData::get().emblem_pool.emblem_persons.iter()
                                     .find(|x| x.hash == person.parent.hash).is_some_and(|v| v.is_custom())
                                 {
                                     if let Some(items) = DVCVariables::get_god_from_index(pos as i32, true)
@@ -82,7 +83,8 @@ pub fn change_map_dispos() {
                                         }
                                     }
                                 }
-                            } else if pos != recruit_idx {
+                            } 
+                            else if pos != recruit_idx {
                                 if let Some(job) = dispos.get_job().or(person.get_job()) {
                                     if job.parent.hash == -1001243599 &&
                                         dispos.ai_action_value.is_some_and(|ai| ai.str_contains("Treasure") || ai.str_contains("Terrain"))

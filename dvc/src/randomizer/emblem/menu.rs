@@ -54,22 +54,12 @@ pub fn skill_inheritance_menu_item_content_build(this: &mut SkillInheritanceMenu
         }
     }
 }
-/*
-#[skyline::from_offset(0x1d5e340)]
-fn ring_skill_menu_item_skill_ctor(this: &mut BasicMenuItem, menu: *const u8, level: i32, skill_data: &SkillData, got_skill: bool, optional_method: OptionalMethod);
- */
 
 #[skyline::from_offset(0x1c81ad0)]
 fn to_string_with_comma(value: i32, optional_method: OptionalMethod) -> &'static Il2CppString;
 fn change_skill_inheritance_menu_item(menu_item: &mut SkillInheritanceMenuItem, skill: &'static mut SkillData) {
     if menu_item.original_skill_index == 0 {
         menu_item.original_skill_index = menu_item.skill.as_ref().map(|m| m.parent.index).unwrap_or(0);
-        /*
-        if let Some(name) = skill.name.map(|v| Mess::get(v)) {
-            println!("Skill has been updated with: {}", name);
-        }
-
-         */
         menu_item.skill = Some(skill);
     }
 }
@@ -100,12 +90,6 @@ fn reset_skill_inherit_menu_item_cost(menu_item: &mut SkillInheritanceMenuItem, 
                 if lower_cost > 0 {
                     if unit.equip_skill_pool.iter().any(|e| e.get_index() == low_skill.parent.index) {
                         menu_item.skill_cost = skill_cost - lower_cost;
-                        /*
-                        if let Some(name) = menu_item.skill.as_ref().and_then(|n| n.name).map(|s| Mess::get(s)) {
-                            println!("Inherited MenuItem: {} with SortID: {}, Cost: {}", name, menu_item.sort_id, menu_item.skill_cost);
-                        }
-
-                         */
                         return;
                     }
                 }
@@ -125,11 +109,6 @@ fn reset_skill_inherit_menu_item_cost(menu_item: &mut SkillInheritanceMenuItem, 
                         if unit.equip_skill_pool.iter().any(|e| e.get_index() == low.parent.index){
 
                             menu_item.skill_cost = skill_cost - lower_cost;
-                            /*
-                            if let Some(name) = menu_item.skill.as_ref().and_then(|n| n.name).map(|s| Mess::get(s)) {
-                                println!("Inherited MenuItem: {} with SortID: {}, Cost: {}", name, menu_item.sort_id, menu_item.skill_cost);
-                            }
-                            */
                             return;
                         }
                     }
@@ -140,12 +119,6 @@ fn reset_skill_inherit_menu_item_cost(menu_item: &mut SkillInheritanceMenuItem, 
             }
         }
     }
-    /*
-    if let Some(name) = menu_item.skill.as_ref().and_then(|n| n.name).map(|s| Mess::get(s)) {
-        println!("MenuItem: {} with SortID: {}, Cost: {}", name, menu_item.sort_id, menu_item.skill_cost);
-    }
-
-     */
 }
 #[unity::hook("App", "SkillInheritanceMenu", "CreateMenuItemList")]
 pub fn skill_inheritance_menu_create_menu_item_list(god: &GodData, method_info: OptionalMethod) -> &'static mut List<SkillInheritanceMenuItem> {
@@ -192,14 +165,6 @@ pub fn ring_list_skill_menu_create_menu_items(
     method_info: OptionalMethod
 ){
     call_original!(god, menu, from_lv, to_lv, max_bond, out, ring_select, method_info);
-    /*
-    let playable_index =
-        get_singleton_proc_instance::<ArenaOrderSequence>()
-            .map(|arena| arena.training_unit.person.parent.hash)
-            .or_else(||{ SortieSelectionUnitManager::get_instance().and_then(|sortie| sortie.unit).map(|v| v.person.parent.hash) })
-            .or_else(||{ GodPool::try_get(god, false).and_then(|v| v.parent_unit).map(|unit| unit.person.parent.hash) })
-            .and_then(|hash|GameData::get().playables.iter().position(|x| hash == x.hash)).unwrap_or(0);
-    */
     let get_pos = GameData::get_playable_god_list().iter().position(|x| x.parent.hash == god.main_data.parent.hash);
     let inherit_mode = DVCVariables::EmblemInherit.get_value();
     let mut ran_data = get_rand_data_write();
@@ -226,12 +191,10 @@ pub fn ring_list_skill_menu_create_menu_items(
                 if skill.inheritance_cost != 0 && inherit_mode != 3 {
                     if let Some(new_item) = ran_data.engage_skills.get_inherit(skill) {
                         set_fn(item, new_item, set_method);
-                      //  println!("Skill Inherit {}: {}", item.klass.get_name(), index);
                     }
                 }
                 else if let Some(new_item) = ran_data.engage_skills.get_sync_replacement_skill(skill.parent.index) {
                     set_fn(item, new_item, set_method);
-                    // println!("Skill Sync {}: {}", item.klass.get_name(), index);
                 }
             }
         }
@@ -243,55 +206,12 @@ pub fn ring_list_skill_menu_create_menu_items(
                 if let Some(new_apt) = apt.get(old_apt as usize) {
                     if let Some(method) = klass.get_methods().iter().find(|m| m.get_name() == Some(String::from("set_ItemKindTableIndex"))) {
                         let set = unsafe { std::mem::transmute::<_, fn(&BasicMenuItem, i32, &MethodInfo)>(method.method_ptr) };
-                        // println!("{}: {}", item.klass.get_name(), index);
                         set(item, *new_apt as i32, method);
                     }
                 }
             }
         }
     });
-    /*
-    if let Some((grow_data, klass)) = GodGrowthData::try_get_from_god_data(god)
-        .zip(get_nested_class(Il2CppClass::from_name("App", "RingListSkillMenu").ok().unwrap(),  "MenuItem").ok())
-    {
-        let skill_item = get_nested_class(klass, "Skill").unwrap();
-        for x in from_lv..to_lv {
-            let level = grow_data[ x as usize].level;
-            let mut skills = vec![];
-            if inherit_mode > 0 || DVCVariables::EmblemSyncSkill.get_value() > 0 {
-                if let Some(inherits) = grow_data[x as usize].inheritance_skills {
-                    inherits.iter().for_each(|inherit_sid| {
-                        if let Some(new_skill) = SkillData::get(inherit_sid)
-                            .and_then(|original|
-                                if inherit_mode == 3 { ran_data.engage_skills.get_unit_inherit(original, playable_index as i32) } else { ran_data.engage_skills.get_inherit(original) })
-                            .filter(|skill| skill.flag & 1 == 0)
-                        {
-                            skills.push(new_skill.parent.hash);
-                            let item = skill_item.instantiate_as::<BasicMenuItem>().ok().unwrap();
-                            unsafe { ring_skill_menu_item_skill_ctor(item, menu, level, new_skill, level <= max_bond, None); }
-                            out.add(item);
-                        }
-                    });
-                }
-            }
-            if DVCVariables::EmblemSyncSkill.get_value() > 0 {
-                if let Some(syncho) = grow_data[ x as usize].synchro_skills {
-                    syncho.iter().for_each(|inherit_sid| {
-                        if let Some(new_skill) = SkillData::get(inherit_sid)
-                            .and_then(|original| ran_data.engage_skills.get_sync_replacement_skill(original.parent.index))
-                            .filter(|skill| skill.flag & 1 == 0 && !skills.contains(&skill.parent.hash))
-                        {
-                            let item = skill_item.instantiate_as::<BasicMenuItem>().ok().unwrap();
-                            unsafe { ring_skill_menu_item_skill_ctor(item, menu, level, new_skill, level <= max_bond, None); }
-                            out.add(item);
-                        }
-                    });
-
-                }
-            }
-        }
-    }
-    */
 }
 
 pub fn weapon_talent_build_attr(_this: &BasicMenuItem, _optional_method: OptionalMethod) -> BasicMenuItemAttribute {

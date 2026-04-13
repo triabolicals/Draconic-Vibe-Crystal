@@ -44,8 +44,6 @@ extern "C" fn main_sequence_load_resource(main_sequence: &mut MainSequence, _opt
     main_sequence.pad = 1;
     message::initialize_mess_hashs();
     crate::randomizer::emblem::god_pool();
-
-    // menus::items::DVC_MENU_INFO.get_or_init(|| DVCMenuInfo::init());
     AccessoryShopChangeRoot::load_prefab_async();
 }
 
@@ -57,7 +55,6 @@ extern "C" fn main_sequence_game_reset(main_sequence: &mut ProcInst, _optional_m
     call_proc_original_method(main_sequence, "GameReset");
 }
 extern "C" fn main_sequence_jump_to_continue_map(main_sequence: &mut ProcInst, _optional_method: OptionalMethod) {
-    // println!("[MainSequence] Jump to continue map: Desc Index: {}", main_sequence.desc_index);
     let con_mode = DVCVariables::Continuous.get_value();
     if con_mode == 2 && GameUserData::get_status().value & 64 != 0{
         if let Some(chapter) = ChapterData::try_get_hash(GameVariableManager::get_number("G_DVC_Next")) {
@@ -70,7 +67,6 @@ extern "C" fn main_sequence_jump_to_continue_map(main_sequence: &mut ProcInst, _
 }
 
 extern "C" fn main_sequence_try_jump_to_next_chapter(main_sequence: &mut ProcInst, _optional_method: OptionalMethod) {
-    // println!("[MainSequence] Jump to Next Chapter Desc Index: {}", main_sequence.desc_index);
     let con_mode = DVCVariables::Continuous.get_value();
     if con_mode == 2 || con_mode == 1 {
         if let Some(chapter) = ChapterData::try_get_hash(GameVariableManager::get_number("G_DVC_Next")) {

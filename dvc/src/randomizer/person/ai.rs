@@ -30,7 +30,6 @@ pub fn adjust_enemy_emblem_unit_ai_flags(unit: &Unit){
 
 pub fn create_custom_ai() {
     if unsafe { AISET} { return; }
-    println!("Creating custom AI");
     AIData::get_list_mut().unwrap().iter_mut()
         .for_each(|ai|{
             let name = ai.array_name.to_string();
@@ -60,7 +59,6 @@ pub fn create_custom_ai() {
         }
     );
     unsafe {  AISET = true; }
-    println!("Finished custom AI");
 }
 
 fn add_to_ai_data(ai: &mut StructDataArrayList<AIData>, active: i8, code: i8, mind: i8, trans: i8, str1: &str, str2: &str, is_top: bool) {

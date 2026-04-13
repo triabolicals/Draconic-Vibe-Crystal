@@ -68,21 +68,6 @@ pub fn rerandomize_jobs() -> Vec<String> {
             unit.auto_equip();
             unit.reload_actor();
         });
-            /*
-            else {
-                let gauge = DVCVariables::EnemyJobGauge.get_value();
-                if gauge > 10 && rng.get_value(100) < gauge {
-                    person::ai::reset_enemy_ai_and_items(unit);
-                    enemy_unit_change_to_random_class(unit);
-                    crate::autolevel::auto_level_unit_for_random_map(unit, false);
-                    person::unit::adjust_unit_items(unit);
-                    unit.auto_equip();
-                    unit.reload_actor();
-                }
-            }
-        });
-
-             */
     out
 }
 
@@ -434,7 +419,6 @@ pub fn adjust_missing_weapon_mask() {
 pub fn randomize_selected_weapon_mask(unit: &mut Unit, with_kind: Option<i32>) {
     let job = unit.get_job();
     unit.selected_weapon_mask.value = 0;
-    // println!("{} {} Randomizing Weapon Mask", unit.get_name(), Mess::get(unit.job.name));
     let mut selectable_weapons = 0;
     let mut selected = 0;
     let mut possible_kinds = vec![];
@@ -457,7 +441,6 @@ pub fn randomize_selected_weapon_mask(unit: &mut Unit, with_kind: Option<i32>) {
         else { break; }
     }
     unit.update_weapon_mask();
-    println!("Final Weapon Mask: {}", unit.selected_weapon_mask.value);
 }
 fn can_change_job_to_list(this: &ClassChangeJobData, unit: &Unit, cc_type: i32) -> bool {
     if !this.cc_check(unit) { return false; }

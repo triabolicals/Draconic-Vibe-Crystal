@@ -50,7 +50,6 @@ fn adjust_emblem_zone(this: &mut CharacterGameStatus) {
 
 pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit, equipped: Option<&ItemData>, flags: &AssetConditions) {
     if unit.get_engage_attack().is_some() {
-        // println!("Adjusting Engage Attack: {}", Mess::get(engage.name.unwrap()));
         let db = get_outfit_data();
         if flags.flags.contains(AssetFlags::EngAtkCoopMain) || flags.flags.contains(AssetFlags::EngAtkCoopSub) {
             lueur_engage_atk(result, unit, flags);

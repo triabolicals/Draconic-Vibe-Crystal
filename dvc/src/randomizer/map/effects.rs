@@ -1,17 +1,14 @@
-use engage::god::GodUnit;
 use engage::map::effect::MapEffect;
 use engage::map::history::MapHistory;
 use engage::unit::UnitUtil;
 use super::*;
 use EffectType::*;
-use crate::randomizer::item::unit_items::{adjust_player_weapons, get_number_of_usable_weapons};
 
 pub fn install_tilebolical_effects(script: &EventScript) {
     GameVariableManager::make_entry("DVC", 1);
     GameVariableManager::make_entry("TileSkills", 0);
     script.register_function("PlayerGender", crate::script::dvc_alear_is_female);
     script.register_function("IsAlearFemale", crate::script::is_alear_female);
-    // script.register_action("UnitMovePos", crate::script::unit_move);
     register_action(script, "ShuffleEmblems", shuffle_emblems, Emblem);
     register_action(script, "DanceTeam", dance_all, Other);
     register_action(script, "EngageOn", all_engage, Emblem);

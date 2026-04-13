@@ -33,13 +33,7 @@ impl GmapPlayerUnit {
             self.unit.put_off_all_item();
         }
     }
-    pub fn apply_changes() {
-        /*
-        if let Some(klass) = Il2CppClass::from_name("App", "GmapPlayerUnit").ok(){
-            vtable_edit(klass, "OnCreate", Self::on_create as _);
-        }
-         */
-    }
+    pub fn apply_changes() {}
 }
 
 #[unity::from_offset("App", "GmapPlayerUnit", "LoadActor")]

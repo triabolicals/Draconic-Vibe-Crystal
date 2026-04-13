@@ -139,53 +139,6 @@ pub fn get_transformation2(unit: &Unit, weapon: &UnitItem) -> Option<&'static mu
         let db = get_outfit_data();
         db.dress.transform.iter().find(|x| !x.is_transform && job == x.hash).map(|x| x.get_result(2, unit))
     }
-    /*
-    let mut dark_tiki = false;
-    let jid = unit.job.jid.to_string();
-    let conditions = Array::new_from_element_class(Il2CppString::class(), 3).unwrap();
-    let is_tiki_engage = is_tiki_engage(unit);
-    conditions[0] = "".into();
-    conditions[1] = "".into();
-    conditions[2] = "".into();
-    let mut pid = String::new();
-    let db = get_outfit_data();
-    if weapon.item.kind == 9 && weapon.item.iid.str_contains("チキ") {
-        if has_fake_tiki(unit) {
-            pid = "PID_E001_Boss_竜化".into();
-            conditions[0] = "AID_チキ竜化".into();
-            dark_tiki = true;
-        } else {
-            conditions[0] = "AID_Person_チキ_竜化".into();
-            pid = "PID_闘技場_チキ".to_string();
-        }
-    } 
-    else if db.is_monster_class(unit) {
-        conditions[0] = jid.as_str().into();
-        pid = MONSTER_PERSONS[0].to_string();
-        let result = AssetTableResult::get_from_pid(2, pid.as_str(), conditions);
-        if db.apply_monster_asset(result, unit, 2) { return Some(result); }
-    }
-    if db.is_transform_class(unit) && weapon.item.kind == 9 && weapon.item.flag.value & 134217728 == 0 {
-        conditions[0] = jid.as_str().into();
-        pid = MONSTER_PERSONS[0].to_string();
-        let result = AssetTableResult::get_from_pid(2, pid.as_str(), conditions);
-        if db.apply_monster_asset(result, unit, 2) { return Some(result); }
-    }
-    if pid.is_empty() && weapon.item.kind == 9 && weapon.item.flag.value & 0x4000000 != 0 {
-        if unit_dress_gender(unit) == 2 {
-            conditions[0] = "AID_エル竜化".into();
-            pid = "PID_エル_竜化".to_string()
-        } else {
-            conditions[0] = "AID_ラファール竜化".into();
-            pid = "PID_ラファール_竜化".to_string();
-        }
-    }
-    if !pid.is_empty() {
-        let result = AssetTableResult::get_from_pid(2, pid, conditions);
-        if dark_tiki { result.sound.voice = None; }
-        Some(result)
-    } else { None }
-    */
 }
 
 fn get_transform_result(unit: &Unit) -> &'static mut AssetTableResult {

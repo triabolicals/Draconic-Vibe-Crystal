@@ -25,7 +25,7 @@ pub use config::variables::*;
 use crate::utils::return_true;
 
 pub static mut CONFIG: DeploymentConfig = DeploymentConfig::default();
-pub const VERSION: &str = "2.16.0H";
+pub const VERSION: &str = "2.16.0I";
 
 extern "C" fn event_install(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
@@ -57,7 +57,7 @@ extern "C" fn event_install(event: &Event<SystemEvent>) {
             _ => {}
         }
     } 
-    else { println!("NO EVENT :("); }
+    else { }
 }
 
 #[skyline::main(name = "vibe")]

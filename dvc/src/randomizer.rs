@@ -106,270 +106,7 @@ pub fn tutorial_check() {
 
      */
 }
-pub fn write_seed_output_file() -> bool {
-    false
-        /*
-    let seed = GameVariableManager::get_number(DVCVariables::SEED);
-    let _ = fs::create_dir_all("sd:/Draconic Vibe Crystal/");
-    let filename = format!("sd:/Draconic Vibe Crystal/{}.log", utils::get_player_name());
-    if let Ok(mut f) = File::options().create(true).write(true).truncate(true).open(filename) { ;
-        writeln!(&mut f, "------------- Triabolical Draconic Vibe Crystal Output - Version {} -------------", VERSION).unwrap();
-
-        writeln!(&mut f, "* Seed: {}", seed).unwrap();
-        let continuous = GameVariableManager::get_number(DVCVariables::CONTINUOUS);
-        match continuous {
-            1|2 => { writeln!(&mut f, "* Map Progression Mode: ").unwrap(); }
-            3 => { writeln!(&mut f, "* Map Progression Mode: Random").unwrap(); }
-            4 => { writeln!(&mut f, "* Open World Map").unwrap(); }
-            5 => { writeln!(&mut f, "* Open World Map with Scaling").unwrap(); }
-            _ => {}
-        };
-        if DVCFlags::Ironman.get_value() { writeln!(&mut f, "* Ironman Mode").unwrap(); }
-        writeln!(&mut f, "** Recruitment Settings **").unwrap();
-        writeln!(&mut f, "\t* Unit Recruitment Order: {}",
-            match GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) {
-                1 => { "Random" }
-                2 => { "Reverse" }
-                3 => { "List" }
-                _ => { "Normal" }
-            }
-        ).unwrap();
-        writeln!(&mut f, "\t* Emblem Recruitment Order: {}",
-                 match GameVariableManager::get_number(DVCVariables::EMBLEM_RECRUITMENT_KEY) {
-                     1 => { "Random" }
-                     2 => { "Reverse" }
-                     3 => { "List" }
-                     _ => { "Normal" }
-                 }
-        ).unwrap();
-        writeln!(&mut f, "\t* Emblem Random Recruitment with Custom Emblems: {}", DVCLocalizer::on_off(DVCFlags::CustomEmblemsRecruit.get_value())).unwrap();
-        writeln!(&mut f, "** Emblem Randomization Settings **").unwrap();
-        writeln!(&mut f, "\t* Emblem Engage Attack Randomization: {}", DVCLocalizer::on_off(DVCFlags::EngageAttacks.get_value())).unwrap();
-        writeln!(&mut f, "\t* Emblem Engage Weapon Randomization: {}", DVCLocalizer::on_off(DVCFlags::EngageWeapons.get_value())).unwrap();
-        writeln!(&mut f, "\t* Emblem Sync Stat Randomization: {}", DVCLocalizer::on_off(DVCFlags::EmblemStats.get_value())).unwrap();
-        writeln!(&mut f, "\t* Engrave Variance Randomization Level: {}", GameVariableManager::get_number(DVCVariables::ENGRAVE_KEY)).unwrap();
-        writeln!(&mut f, "\t* Emblem Skill Inheritance: {}",
-            match GameVariableManager::get_number(DVCVariables::EMBLEM_INHERIT_MODE) { 1 => { "Random" }, 2 => { "Chaos" }, 3 => { "Unit" }, _ => { "Normal" } }).unwrap();
-        writeln!(&mut f, "\t* Emblem Sync Skill Randomization: {}", 
-                 match GameVariableManager::get_number(DVCVariables::EMBLEM_SYNC_KEY) { 1 => { "Random" }, 2 => { "Chaos" }, _ => { "Normal" } }
-        ).unwrap();
-        
-        writeln!(&mut f, "\t* Emblem Engage Skill Randomization: {}",
-             match GameVariableManager::get_number(DVCVariables::EMBLEM_ENGAGE_SKILL_KEY){ 1 => { "Random" }, 2 => { "Chaos" }, _ => { "Normal" } }
-        ).unwrap();
-
-
-        writeln!(&mut f, "* Personal Skill Randomization: {}", DVCLocalizer::on_off(DVCFlags::PersonalSkills.get_value())).unwrap();
-
-
-        //  writeln!(&mut f, "* Random Classes: {}", GameVariableManager::get_bool(DVCVariables::JOB_KEY)).unwrap();
-        match GameVariableManager::get_number(DVCVariables::SKILL_KEY) {
-            1|4 => writeln!(&mut f, "* Random Skills: Personal").unwrap(),
-            2 => writeln!(&mut f, "* Random Skills: Class").unwrap(),
-            3 => writeln!(&mut f, "* Random Skills: Personal + Class").unwrap(),
-            _ => writeln!(&mut f, "* Random Skills: None").unwrap(),
-        };
-        writeln!(&mut f, "* Random Items: {}", GameVariableManager::get_bool(DVCVariables::ITEM_KEY)).unwrap();
-        let growth_mode = GameVariableManager::get_number(DVCVariables::GROWTH_KEY);
-        match growth_mode {
-            1 => { writeln!(&mut f, "* Growth Rate Mode: Personal").unwrap(); },
-            2 => { writeln!(&mut f, "* Growth Rate Mode: Class Mods").unwrap(); },
-            3 => { writeln!(&mut f, "* Growth Rate Mode: Personal + Class Mods").unwrap(); },
-            _ => { writeln!(&mut f, "* Growth Rate Mode: No Randomization").unwrap(); },
-        }
-        let sync_mode = GameVariableManager::get_number(DVCVariables::EMBLEM_SYNC_KEY) & 255;
-        match sync_mode {
-            1 => { writeln!(&mut f, "* Emblem Sync Data: Stat Bonuses").unwrap(); },
-            2 => { writeln!(&mut f, "* Emblem Sync Data: Sync / Engage Skills").unwrap(); },
-            3 => { writeln!(&mut f, "* Emblem Sync Data: Stats / Sync Skills / Engage Skills").unwrap(); },
-            _ => { writeln!(&mut f, "* Emblem Sync Data: No Randomization").unwrap(); },
-        }
-        if DVCFlags::RandomSP.get_value() {
-            writeln!(&mut f, "* Random SP Cost").unwrap();
-        }
-        let data = GameData::get();
-        if GameVariableManager::get_number(DVCVariables::RECRUITMENT_KEY) != 0 {
-            writeln!(&mut f, "\n--------------- Person Recruitment Order ---------------").unwrap();
-            data.playables.iter().flat_map(|i| PersonData::try_get_hash(i.hash)).enumerate()
-                .for_each(|(index, person)|{
-                    let key = format!("G_R_{}", person.pid.to_string());
-                    if GameVariableManager::exist(key.as_str()) {
-                        let new_pid = GameVariableManager::get_string(key.as_str());
-                        writeln!(&mut f, "* {} - {} ({}) -> {} ({})", index, Mess::get_name(person.pid), person.pid, Mess::get_name(new_pid), new_pid).unwrap();
-                    }
-                    else { writeln!(&mut f, "* {} - {} ({}) -> {} ({})", index, Mess::get_name(person.pid), person.pid, Mess::get_name(person.pid), person.pid).unwrap(); }
-                }
-                );
-        }
-        if emblem_mode != 0 {
-            writeln!(&mut f, "\n-------------- Emblems Recruitment Order Randomization ---------------").unwrap();
-            GameData::get_playable_god_list().iter().enumerate()
-                .for_each(|(index, god)|{
-                    let key = format!("G_R_{}", god.gid.to_string());
-                    if GameVariableManager::exist(key.as_str()) {
-                        let new_god = GodData::get(GameVariableManager::get_string(key.as_str())).unwrap();
-                        writeln!(&mut f, "* {} - {} ({}) -> {} ({})", index,  Mess::get(god.mid), god.gid,  Mess::get(new_god.mid), new_god.gid).unwrap();
-                    }
-                    else { writeln!(&mut f, "* {} - {} ({}) -> {} ({})", index,  Mess::get(god.mid), god.gid,   Mess::get(god.mid), god.gid).unwrap(); }
-                }
-                )
-        }
-        if GameVariableManager::get_number("G_Random_Grow_Mode") & 1 != 0 {
-            writeln!(&mut f, "\n--------------- Personal Growth Rates Randomization ---------------").unwrap();
-            PersonData::get_list().unwrap().iter()
-                .filter(|p| p.parent.index > 0 && !p.get_grow().is_zero())
-                .for_each(|person|{
-                    writeln!(&mut f, "* {} - {}", person.parent.index, utils::get_person_growth_line(person)).unwrap();
-                }
-                );
-        }
-        if GameVariableManager::get_number("G_Random_Grow_Mode") & 2 != 0 {
-            writeln!(&mut f, "\n--------------- Class Growth Rates Modifers Randomization ---------------").unwrap();
-            JobData::get_list_mut().unwrap().iter()
-                .filter(|job| job.parent.index > 0 && !job.get_diff_grow().is_zero())
-                .for_each(|job|{
-                    let grow = job.get_diff_grow();
-                    writeln!(&mut f, "* {} - {} ({})\n\t| {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% |", job.parent.index, Mess::get_name(job.jid), job.jid,
-                             Mess::get("MID_SYS_HP").to_string(), grow[0], Mess::get("MID_SYS_Str").to_string(), grow[1], Mess::get("MID_SYS_Mag").to_string(), grow[6],
-                             Mess::get("MID_SYS_Tec").to_string(), grow[2], Mess::get("MID_SYS_Spd").to_string(), grow[3], Mess::get("MID_SYS_Lck").to_string(), grow[4],
-                             Mess::get("MID_SYS_Def").to_string(), grow[5], Mess::get("MID_SYS_Res").to_string(), grow[7], Mess::get("MID_SYS_Phy").to_string(), grow[8]).unwrap();
-                }
-                );
-        }
-        if GameVariableManager::get_number(DVCVariables::SKILL_KEY) != 0 {
-            writeln!(&mut f, "\n--------------- Personal Skills Randomization ---------------").unwrap();
-            data.playables.iter()
-                .flat_map(|i| PersonData::try_get_hash(i.hash))
-                .for_each(|person|{
-                    let skill_name =
-                        person.get_common_skills().iter()
-                            .flat_map(|skill| skill.get_skill())
-                            .find(|skill| skill.flag & 1 == 0)
-                            .and_then(|skill| skill.name)
-                            .map_or_else(|| "-".into(), |msid| Mess::get(msid));
-                    writeln!(&mut f, "* {} ({}):\t{}",  Mess::get_name(person.pid), person.pid, skill_name).unwrap();
-                }
-                );
-            writeln!(&mut f, "\n--------------- Class Learn Skills --------------").unwrap();
-            JobData::get_list_mut().unwrap().iter().filter(|job| job.learn_skill.is_some())
-                .for_each(|job|{
-                    let learn_skill_name = job.learn_skill
-                        .and_then(|sid| SkillData::get(sid))
-                        .and_then(|skill| skill.name)
-                        .map_or_else(|| "-----".into(), |name| Mess::get(name) );
-
-                    writeln!(&mut f, "* {} - {} ({}):\t {}", job.parent.index, Mess::get_name(job.jid), job.jid, learn_skill_name).unwrap();
-                }
-                );
-            writeln!(&mut f, "\n--------------- Bond Ring Skill Randomization --------------").unwrap();
-            let bond_ring_rates =crate::DeploymentConfig::get().get_bond_ring_rates();
-            let ranks = ["S", "A", "B", "C"];
-            for x in 0..4 { writeln!(&mut f, "-- {} Rank Rate: {}", ranks[x as usize], bond_ring_rates[x as usize]).unwrap(); }
-            RingData::get_list().unwrap().iter()
-                .for_each(|ring|{
-                    let skills = utils::skill_array_string(ring.get_equip_skills());
-                    if skills.len() > 0 {
-                        let rank = ranks.get(ring.rank as usize).map_or_else(||"??", |f| *f);
-                        let god_name = ring.gid.map_or_else(|| "".into(), |f| Mess::get(GodData::get(f).unwrap().mid));
-                        writeln!(&mut f, "* {} {} {}:\n\tSkills: {}", god_name, Mess::get(ring.name), rank, skills).unwrap();
-                    }
-                }
-                );
-        }
-        if GameVariableManager::get_number("G_InteractSetting") != 0 {
-            let kinds = ["None", "Sword", "Lance", "Axe", "Bow", "Dagger", "Tome", "Rod", "Arts", "Special"];
-            let interact_list = interact::InteractData::get_list().unwrap();
-            writeln!(&mut f, "\n--------------- Weapon Triangle Interactions ---------------").unwrap();
-            for x in 1..10 {
-                let mut string = format!("{}: ", kinds[x]);
-                let flag_value = interact_list[x].flag.value;
-                for y in 1..10 {
-                    if flag_value & ( 1 << y ) != 0 { string = format!("{}{} (S) ", string, kinds[y]); }
-                    if flag_value & ( 1 << (y + 10) ) != 0 { string = format!("{}{} (W) ", string, kinds[y]); }
-                }
-                writeln!(&mut f, "#{} - {}", x, string).unwrap();
-            }
-            for x in 1..10 {
-                let mut string = format!("{}: ", kinds[x]);
-                let flag_value = interact_list[x].flag.value;
-                for y in 1..10 {
-                    if flag_value & ( 1 << y ) != 0 { string = format!("{}{} (S) ", string, kinds[y]); }
-                    if flag_value & ( 1 << (y + 10) ) != 0 { string = format!("{}{} (W) ", string, kinds[y]); }
-                }
-                writeln!(&mut f, "# Reversed {} - {}", x, string).unwrap();
-            }
-        }
-        if GameVariableManager::get_number("G_Random_God_Mode") >= 2 {
-            writeln!(&mut f, "\n--------------- Emblem Engage / Linked Engage Attack Randomization ---------------").unwrap();
-            emblem_list.iter().flat_map(|&h| GodData::try_get_hash(h))
-                .for_each(|god|{
-                    writeln!(&mut f, "{}", crate::message::god_engage_random_str(god)).unwrap();
-                }
-                );
-        }
-        writeln!(&mut f, "\n--------------- Emblem Engrave Data ---------------").unwrap();
-        emblem_list.iter().flat_map(|&h| GodData::try_get_hash(h))
-            .for_each(|god|{
-                let line = format!("* {} - \t{}: {}, {}: {}, {}: {}, {}: {}, {}: {}, {}: {}",
-                                   Mess::get(god.mid),
-                                   utils::get_stat_label(11), god.get_engrave_avoid(),  utils::get_stat_label(12), god.get_engrave_critical(), utils::get_stat_label(13), god.get_engrave_hit(),
-                                   utils::get_stat_label(14), god.get_engrave_power(), utils::get_stat_label(15), god.get_engrave_secure(), utils::get_stat_label(16), god.get_engrave_weight()
-                );
-                writeln!(&mut f, "{}", line).unwrap();
-            }
-            );
-        writeln!(&mut f, "\n--------------- Emblem Sync / Engage Data --------------").unwrap();
-        match god_mode {
-            1 => { writeln!(&mut f, "* Emblem Data: Inheritable Skills").unwrap();  }
-            2 => { writeln!(&mut f, "* Emblem Data: Engage Attack / Engage Link").unwrap(); }
-            3 => { writeln!(&mut f, "* Emblem Data: Inheritable / Engage Attack / Engage Link").unwrap(); }
-            _ => { writeln!(&mut f, "* Emblem Data: No Randomization").unwrap();  }
-        }
-        match sync_mode {
-            1 => { writeln!(&mut f, "* Emblem Sync Data: Stat Bonuses").unwrap(); },
-            2 => { writeln!(&mut f, "* Emblem Sync Data: Sync / Engage Skills").unwrap(); },
-            3 => { writeln!(&mut f, "* Emblem Sync Data: Stats / Sync Skills / Engage Skills").unwrap(); },
-            _ => { writeln!(&mut f, "* Emblem Sync Data: No Randomization").unwrap(); },
-        }
-        emblem_list.iter().flat_map(|&h| GodData::try_get_hash(h)).enumerate()
-            .for_each(|(index, god)|{
-                let level_data = god.get_level_data().unwrap();
-                let grow_data = GodGrowthData::try_get_from_god_data(god).unwrap();
-                let engage_skill = level_data[0].engage_skills.list.item[0].get_skill().map_or_else(|| String::from(" ------- "), |skill| Mess::get(skill.name.unwrap()).to_string());
-                let god_name =                  Mess::get(god.mid);
-                writeln!(&mut f, "\n****** {} *******\nEngage Skill: {}, Engage Atk/Link: {} / {} with ({} / {} )\n",
-                         god_name,
-                         engage_skill,
-                         utils::get_skill_name_from_sid(god.get_engage_attack()), crate::message::god_link_engage_atk_str(god),
-                         crate::message::god_link_god(god), crate::message::god_link_pid(god)
-                ).unwrap();
-
-                let blevels = [1, 10, 15];
-                for weapon_slot in 0..3 {
-                    writeln!(&mut f, "\t* Engage Weapons {}: {}",  blevels[weapon_slot], emblem::emblem_item::ENGAGE_ITEMS.lock().unwrap().print(index as i32,  weapon_slot as i32)).unwrap();
-                }
-                writeln!(&mut f, "").unwrap();
-                for y in 1..level_data.len() {
-                    writeln!(&mut f, "\t* {} Lv. {} Stats: {}", god_name, y, utils::stats_from_skill_array(level_data[y].synchro_skills)).unwrap();
-                    writeln!(&mut f, "\t\tSyncho Skills:  {}", utils::skill_array_string(level_data[y].synchro_skills)).unwrap();
-                    writeln!(&mut f, "\t\tEngaged Skills: {}", utils::skill_array_string(level_data[y].engaged_skills)).unwrap();
-                    if y-1 < grow_data.len() {
-                        let level = grow_data[y-1].get_inheritance_skills();
-                        if level.is_none() { writeln!(&mut f, "").unwrap(); continue;}
-                        let inherit_skills = level.unwrap();
-                        writeln!(&mut f, "\t\tInherit Skills: {}", utils::sid_array_string(inherit_skills)).unwrap();
-                    }
-                    writeln!(&mut f, "").unwrap();
-                }
-            }
-            );
-        println!("Randomization Print to file");
-    }
-    else {
-
-    }
-    */
-}
+pub fn write_seed_output_file() -> bool { false }
 
 
 
@@ -418,14 +155,11 @@ pub(crate) fn randomize_gamedata(is_new_game: bool) {
     for x in 0..33 {
         if let Some(key) = DVCVariables::from(x).map(|v| v.get_key()) { DVCVariables::log_variable(key); }
     }
-
-    println!("Game data randomized");
 }
 
 /// Used to randomized enemy emblem stuff if loading save from map
-pub fn in_map_randomize() {
-    person::unit::reload_all_actors();
-}
+pub fn in_map_randomize() { person::unit::reload_all_actors(); }
+
 /// Routine after NG is started to randomize gamedata
 pub fn start_new_game(){
     DeploymentConfig::get().correct_rates();
@@ -530,9 +264,7 @@ pub fn reset_gamedata() {
     Patch::in_text(0x01c77620).bytes(&[0xfd, 0x7b, 0xbc, 0xa9]).unwrap();   // Summon Delete Impl
     Patch::in_text(0x01dee3a8).bytes(&[0x42, 0x00, 0x80, 0x52]).unwrap();
 
-    if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() {
-        lock.reset();
-    }
+    if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() { lock.reset(); }
 }
 fn upgrade() {
     if !GameVariableManager::exist("G_DVC_Version") { GameVariableManager::make_entry_norewind("G_DVC_Version", 1); }
@@ -577,7 +309,7 @@ pub fn engage_count() {
         .flat_map(|&x|GodData::try_index_get_mut(x))
         .for_each(|x| { x.force_type = 1; });
 }
-
+/*
 #[skyline::hook(offset=0x02291fd0)]
 pub fn person_sound(
     person_switch_name: &Il2CppString,
@@ -628,6 +360,7 @@ pub fn person_sound(
     }
     call_original!(person_switch_name, engage_switch_name, event_name, character, method_info);
 }
+*/
 
 pub trait Randomizer<T> {
     fn get_random_element(&self, rng: &Random) -> Option<&T>;

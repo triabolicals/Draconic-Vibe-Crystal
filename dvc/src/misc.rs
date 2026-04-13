@@ -1,14 +1,5 @@
 use skyline::patching::Patch;
 use crate::utils::mov_x0_xzr;
-
-/*
-pub fn view_value(offset: usize) {
-    let s = unsafe { (skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as usize + offset) as *mut [u8; 4] };
-    unsafe { println!("Offset at {:x}: {:x} {:x} {:x} {:x}", offset, (*s)[0], (*s)[1], (*s)[2], (*s)[3]); }
-}
-
- */
-
 pub fn code_patches() {
     disable_support_restriction();
     fx_patch();
@@ -80,4 +71,3 @@ pub fn hero_unit_pool_search_patch() {
     mov_x0_xzr(0x2dc8ed4);
     mov_x0_xzr(0x277ecdc); // ResolveMovieFileName
 }
-pub fn full_bullet_patch() {}
