@@ -124,7 +124,6 @@ pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
         crate::continuous::do_continious_mode();
         crate::continuous::update_next_chapter();
         crate::ironman::ironman_code_edits();
-        randomizer::emblem::emblem_gmap_spot_adjust();
         randomizer::terrain::adjust_miasma_tiles();
         randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.map_complete() ).unwrap();
         if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 { crate::script::adjust_person_map_inspectors(); }

@@ -83,14 +83,11 @@ pub fn tutorial_check() {
             if string == "G_解説_TUTID_クラスチェンジ" { return; }
         }
     }
-    GameVariableManager::find_starts_with("G_進化_").iter()
-        .for_each(|key| GameVariableManager::set_bool(key.to_string(), true));
-
+    GameVariableManager::find_starts_with("G_進化_").iter().for_each(|key| GameVariableManager::set_bool(key.to_string(), true));
     if dlc_check() && can_rand() {
         GameVariableManager::set_bool("G_CC_エンチャント", true);
         GameVariableManager::set_bool("G_CC_マージカノン", true);
     }
-
     /*
         if DeploymentConfig::get().debug {
         GameVariableManager::find_starts_with("G_Cleared_M0").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 0));
@@ -434,19 +431,14 @@ pub fn start_new_game(){
     DeploymentConfig::get().correct_rates();
     GameVariableManager::make_entry("G_DVC_Version", 5);
     let seed = DeploymentConfig::get().seed;
-    // Settings that does not get added
     GameVariableManager::make_entry_norewind(DVCVariables::DVC_STATUS, 0);
 
     let iron_man = DeploymentConfig::get().ironman;
     let randomized = DeploymentConfig::get().randomized;
-    let ran_seed =
-        if randomized {
-            if seed == 0 { utils::get_random_number_for_seed() } else { seed }
-        }
-        else { 0 };
+    let ran_seed = if randomized { if seed == 0 { utils::get_random_number_for_seed() } else { seed } } else { 0 };
 
     println!("Starting new game Seed: {} [{}]", ran_seed, randomized);
-    GameVariableManager::make_entry(DVCVariables::SEED, ran_seed as i32);
+    DVCVariables::Seed.init_var(ran_seed as i32, true);
     DeploymentConfig::get().create_game_variables(randomized);
     if iron_man { crate::ironman::ironman_code_edits(); }
     DVCFlags::Initialized.set_value(false);
@@ -495,7 +487,6 @@ pub fn reset_gamedata() {
         }
     );
     engage_count();
-
     // GodGrowthData::on_completed_end();
     HubDisposData::unload();
     HubDisposData::load();
@@ -541,41 +532,20 @@ pub fn reset_gamedata() {
 
     if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() {
         lock.reset();
-        println!("Randomizer Status is reset");
     }
 }
 fn upgrade() {
-    if !GameVariableManager::exist("G_DVC_Version") {
-        GameVariableManager::make_entry_norewind("G_DVC_Version", 1);
-    }
+    if !GameVariableManager::exist("G_DVC_Version") { GameVariableManager::make_entry_norewind("G_DVC_Version", 1); }
     let version = GameVariableManager::get_number("G_DVC_Version");
-    // if version < 2 { migrate_to_v2(); }
     if version < 3 { migrate_to_v3(); }
     if version < 5 { migrate_to_v5(); }
-
-}
-pub fn randomize_stuff() {
-
-    upgrade();
-    for x in 0..10 {    // ShopItems
-        GameVariableManager::make_entry_norewind(format!("G_DVC_I{}", x).as_str(), 0);
-        GameVariableManager::make_entry_norewind(format!("G_DVC_W{}", x).as_str(), 0);
-    }
-    println!("[DVC Randomization] {}", can_rand());
-    if !can_rand() {  return;  }
-    if RANDOMIZER_STATUS.read().unwrap().seed == 0 {
-        DeploymentConfig::get().correct_rates();
-        tutorial_check();
-    }
-    if DVCVariables::get_seed() != RANDOMIZER_STATUS.read().unwrap().seed {
-        println!("Randomized Stuff with Save File Seed {}", DVCVariables::get_seed());
-        randomize_gamedata(false);
-
-        if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() {
-            lock.enabled = true;
-            lock.seed =  DVCVariables::get_seed();
+    if version < 7 {
+        for x in 0..19 {
+            let s = DVCVariables::get_dvc_emblem_index(x, false);
+            DVCVariables::set_emblem_recruitment(x, s as i32);
         }
     }
+    GameVariableManager::set_number("G_DVC_Version", 7);
 }
 
 pub fn initialize_game_data() {

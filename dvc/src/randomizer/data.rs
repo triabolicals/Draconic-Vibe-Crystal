@@ -363,10 +363,9 @@ impl RandomizedGameData {
         self.engage_weapons.commit(data);
     }
     pub fn commit(&self, data: &GameData) {
-        let engrave_setting = DVCVariables::EngraveLevel.get_value();
         data.growth_data.set_job_caps(DVCFlags::MaxStatCaps.get_value());
         data.growth_data.personal_caps();
-        crate::randomizer::emblem::engrave::random_engrave_by_setting(engrave_setting, true);
+        crate::randomizer::emblem::engrave::random_engrave_by_setting(DVCVariables::EngraveLevel.get_value(), true);
         styles::randomize_job_styles();
         styles::randomize_job_attrs();
         interact::change_interaction_data(DVCVariables::InteractSetting.get_value(), true);

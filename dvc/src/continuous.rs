@@ -212,7 +212,6 @@ pub(crate) fn set_next_chapter(){
         GameVariableManager::set_bool("G_初回アクセス_錬成屋", true);
         next = random::set_next_random_chapter(current_chapter);
     }
-    emblem::emblem_gmap_spot_adjust();
     let dlc = continuous_mode_dlc_allowed();
     if next.is_none() && current_chapter.get_next_chapter().is_some() && current_chapter.flag & 64 != 0 {
         next = current_chapter.get_next_chapter();

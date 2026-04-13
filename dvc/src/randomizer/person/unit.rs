@@ -515,7 +515,7 @@ fn enemy_unit_randomization(unit: &mut Unit) {
         let job = unit.get_job();
         if MONSTERS.iter().any(|str| job.jid.contains(str)) {
             if random_map && m004_complete { auto_level_unit_for_random_map(unit, is_boss);  }
-            else { emblem_paralogue_level_adjustment(unit); }
+            // else { emblem_paralogue_level_adjustment(unit); }
             return;  
         }
         let mut has_master = unit.item_list.has_item_iid("IID_マスタープルフ");
@@ -569,9 +569,11 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                     }
                 }
             }
+            /*
             if GameUserData::get_chapter().cid.str_contains("CID_S0") && DVCVariables::EmblemRecruitment.get_value() != 0 {
                 emblem_paralogue_level_adjustment(unit);
             }
+            */
             if DVCVariables::EnemyItemDropGauge.get_value() > 0 { unit_items::random_items_drops(unit); }
             if !m004_complete { 
                 unit.auto_equip();

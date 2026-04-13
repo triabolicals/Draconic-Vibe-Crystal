@@ -95,8 +95,8 @@ fn set_seed_yes(item: &mut DVCConfigMenuItem, _: OptionalMethod) {
 }
 fn update_seed(new_seed: u32) {
     if new_seed == DVCVariables::Seed.get_value() as u32 { return; }
-    DVCVariables::Seed.set_value(new_seed as i32);
     if !DVCVariables::is_main_menu() {
+        DVCVariables::Seed.init_var(new_seed as i32, true);
         RandomizerStatus::set_init(false);
         GameVariableManager::find_starts_with("G_P_PID").iter()
             .for_each(|person_key| GameVariableManager::set_number(person_key.to_string().as_str(), 0));
@@ -106,12 +106,12 @@ fn update_seed(new_seed: u32) {
 
         let data = GameData::get();
         let mut rando = RandomizedGameData::get_write();
-        data.emblem_pool.reset_all();
+        data.emblem_pool.reset_all(data);
         rando.randomize(data);
         rando.commit(data);
-        println!("Seed updated: {}", new_seed);
-        let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.seed = GameVariableManager::get_number(DVCVariables::SEED));
+        let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.seed = new_seed as i32);
     }
+    else { DVCVariables::Seed.set_value(new_seed as i32); }
 }
 fn re_rand_job(item: &mut DVCConfigMenuItem, _: OptionalMethod) {
     let units = crate::randomizer::job::rerandomize_jobs();

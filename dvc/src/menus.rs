@@ -10,7 +10,7 @@ use engage::gamedata::Gamedata;
 use engage::menu::menu_item::config::{ConfigBasicMenuItem, ConfigBasicMenuItemCommandMethods};
 use engage::menu::menus::config::ConfigMenu;
 use engage::mess::Mess;
-use crate::{deployment, continuous, randomizer};
+use crate::{deployment, continuous, randomizer, get_nested_il2cpp_class};
 use crate::config::menu::create_dvc_bind;
 use crate::ironman::vtable_edit;
 use crate::utils::{get_nested_class, return_4};
@@ -100,6 +100,11 @@ pub fn menu_calls_install() {
             vtable_edit(item, "CustomCall", randomizer::skill::learn::class_change_job_menu_item_custom_call as _);
         }
     }
+    // vtable_edit(Il2CppClass::from_name("App", "GmapSequence").unwrap(), "OnCreate", crate::procs::gmap_sequence_on_create as _);
+    let enter_chapter = get_nested_il2cpp_class!("App", "GmapMenuSequence", "GmapMenu", "EnterChapterItem");
+    vtable_edit(enter_chapter, "BuildAttribute", crate::procs::enter_chapter_build_attribute as _);
+
+    vtable_edit( get_nested_il2cpp_class!("App", "GmapMenuSequence", "GmapMenu", "RankingItem"), "ACall", crate::procs::enter_chapter_build_attribute as _);
     randomizer::item::shop::random_shop_install();
     vtable_edit(Il2CppClass::from_name("", "ConfigMenu").unwrap(), "BCall", my_b_call as _);
     if let Some(cc) = get_nested_class(Il2CppClass::from_name("App", "MapItemMenu").unwrap(), "NextItem"){

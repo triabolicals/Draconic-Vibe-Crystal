@@ -1,11 +1,22 @@
+use std::iter::chain;
 use engage::gamedata::{god::GodGrowthData, item::ItemData, skill::SkillData, Gamedata, GodData, PersonData};
+use engage::gamedata::skill::SkillDataCategorys;
 use engage::mess::Mess;
+use crate::DVCVariables;
 use crate::enums::EMBLEM_ASSET;
 use crate::randomizer::data::{GameData, SkillsList};
 use crate::randomizer::data::enemy::EnemyEmblemData;
 use crate::randomizer::data::sync::get_lowest_priority;
 use crate::randomizer::EMBLEM_GIDS;
 
+const EMBLEM_HASHES: [i32; 24] = [
+    998659272, 1995155639, 1709540132, 462041932,
+    1981217683, 1289051445, -2116658132, -1964439889,
+    364445343, 1050116739, 1339715833, -1107657133,
+    52812801, 1978213856, -445657450, 1429549728,
+    -339120642, 1893352633, 1120993642, 374589614,
+    59738509, -1526367221, 2044088482, -682425036
+];
 pub mod item;
 pub mod engage_attacks;
 pub mod sync;
@@ -20,10 +31,10 @@ pub struct EmblemPool {
 }
 
 impl EmblemPool {
-    pub fn reset_all(&self) {
+    pub fn reset_all(&self, data: &GameData) {
         self.emblem_persons.iter().for_each(|p| {
-            p.reset_skill();
-            p.reset_engage_skill();
+            p.reset_skill(data);
+            p.reset_engage_skill(data);
         });
         self.enemy_emblem.iter().for_each(|e| { e.reset(); });
         self.emblem_data.iter().for_each(|e|{
@@ -150,7 +161,9 @@ impl EmblemData {
                 .collect()
         }).unwrap_or_default();
         let engage_skill_index =
-        god_data.get_level_data().and_then(|l| { l[0].engage_skills.iter().find(|s| !s.is_hidden() ).map(|s| s.get_index() ) });
+        god_data.get_level_data()
+            .and_then(|l| { l[0].engage_skills.iter()
+                .find(|s| !s.is_hidden() ).map(|s| s.get_index() ) });
         Self {
             is_enemy: god_data.force_type == 1, growth_apt, syncs,
             link_gid: god_data.link_gid.map(|gid| gid.to_string()),
@@ -216,15 +229,71 @@ impl EmblemPerson {
             engage_atk: person.get_engage_skill().map(|x| x.parent.hash).unwrap_or(0),
         }
     }
-    pub fn reset_skill(&self) {
-        if let Some(person) = PersonData::try_get_hash(self.hash) {
-            self.common_skill.set_skill_array(person.get_common_skills());
-            self.normal_skill.set_skill_array(person.get_normal_skills());
-            self.hard_skill.set_skill_array(person.get_hard_skills());
-            self.maddening_skill.set_skill_array(person.get_lunatic_skills());
-            person.set_engage_skill(SkillData::try_get_hash(self.engage_atk));
+    pub fn reset_skill(&self, game_data: &GameData){
+        if let Some(person) = PersonData::try_get_hash_mut(self.hash) {
+            if self.is_custom() && self.is_paralogue(){
+                if let Some(god) = DVCVariables::get_god_from_index(self.emblem_index as i32, true) {
+                    if let Some(data) = game_data.emblem_pool.emblem_data.iter().find(|d| d.hash == god.parent.hash){
+                        if let Some(level_data) = data.level_data.last() {
+                            let commons = person.get_common_skills();
+                            let normals = person.get_normal_skills();
+                            let lunatic = person.get_lunatic_skills();
+                            let hard = person.get_hard_skills();
+                            commons.clear();
+                            normals.clear();
+                            hard.clear();
+                            lunatic.clear();
+                            // level_data.engaged_skills.set_skill_array(commons);
+                            level_data.engage_skills.list.iter()
+                                .chain(level_data.engage_skills.list.iter())
+                                .chain(level_data.sync_skills.list.iter())
+                                .flat_map(|v| SkillData::try_index_get(v.index))
+                                .for_each(|skill|{
+                                    commons.add_skill(skill, SkillDataCategorys::Private, 0);
+                                    normals.add_skill(skill, SkillDataCategorys::Private, 0);
+                                    lunatic.add_skill(skill, SkillDataCategorys::Private, 0);
+                                    hard.add_skill(skill, SkillDataCategorys::Private, 0);
+                                });
+                            normals.add_sid("SID_命中回避－２０", SkillDataCategorys::Private, 0);
+                            lunatic.add_sid("SID_ブレイク無効", SkillDataCategorys::Private, 0);
+                        }
+                        person.set_engage_skill(SkillData::try_get_hash(data.engage_atk));
+                    }
+                    let arena_pid = god.gid.to_string().replace("GID_", "PID_闘技場_");
+                    if let Some(arena_person) = PersonData::get(arena_pid.as_str()) {
+                        if let Some(ascii_name) = arena_person.get_ascii_name() { person.set_ascii_name(ascii_name); }
+                        person.unit_icon_id = arena_person.unit_icon_id;
+                        person.gender = arena_person.gender;
+                        person.name = arena_person.name;
+                        person.aid = Some(god.gid);
+                        person.jid = arena_person.jid;
+                    }
+                }
+            }
+            else {
+                self.common_skill.set_skill_array(person.get_common_skills());
+                self.normal_skill.set_skill_array(person.get_normal_skills());
+                self.hard_skill.set_skill_array(person.get_hard_skills());
+                self.maddening_skill.set_skill_array(person.get_lunatic_skills());
+                person.set_engage_skill(SkillData::try_get_hash(self.engage_atk));
+            }
         }
     }
-    pub fn reset_engage_skill(&self) { self.get_person().set_engage_skill(SkillData::try_get_hash(self.engage_atk)); }
+    pub fn reset_engage_skill(&self, data: &GameData) {
+        if self.is_custom() && self.is_paralogue(){
+            if let Some(god) = DVCVariables::get_god_from_index(self.emblem_index as i32, true) {
+                if let Some(data) = data.emblem_pool.emblem_data.iter().find(|d| d.hash == god.parent.hash) {
+                    self.get_person().set_engage_skill(SkillData::try_get_hash(data.engage_atk));
+                }
+            }
+        }
+        else { self.get_person().set_engage_skill(SkillData::try_get_hash(self.engage_atk)); }
+    }
     pub fn get_person(&self) -> &'static mut PersonData { PersonData::try_get_hash_mut(self.hash).unwrap() }
+    pub fn is_custom(&self) -> bool {
+        DVCVariables::get_god_from_index(self.emblem_index as i32, true).filter(|god| !EMBLEM_HASHES.contains(&god.parent.hash)).is_some()
+    }
+    pub fn is_paralogue(&self) -> bool {
+        PersonData::try_get_hash(self.hash).is_some_and(|p| p.pid.str_contains("PID_S0"))
+    }
 }

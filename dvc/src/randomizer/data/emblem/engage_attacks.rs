@@ -16,7 +16,6 @@ pub struct EngageAttackRandomizer {
 impl EngageAttackRandomizer {
     pub fn new(n_emblems: usize) -> Self { Self { atks: vec![EngageAtk::default(); n_emblems], weapon_prohibit: vec![0; n_emblems], } }
     pub fn randomize(&mut self, data: &GameData) {
-        println!("Randomizing Emblem Attacks...");
         let emblem_list: Vec<_> = data.emblem_pool.emblem_list.iter().enumerate().filter(|x|  x.0 < 20 || x.0 >= 24).map(|(_, x)| *x).collect();
         let rng = Random::new(3*DVCVariables::get_seed() as u32);
         let engage_atks = &data.skill_pool.engage_attacks;
@@ -80,13 +79,21 @@ impl EngageAttackRandomizer {
                 if let Some(linked_atk) = SkillData::try_get_hash(y.linked_engage_atk) { x.change_data.iter().for_each(|g| g.set_engage_attack_link(linked_atk.sid)); }
                 if y.linked_emblem >= 0 && y.linked_emblem < emblem_list.len() as i32 { x.change_data.iter().for_each(|g| { g.set_link_gid(names[y.linked_emblem as usize]); }); }
             });
-            data.emblem_pool.emblem_persons.iter().filter(|x| x.engage_atk != 0).map(|p| (p.emblem_index, p.get_person()))
-                .for_each(|(i, p)| {
-                    if let Some(engage) = self.atks.get(i) { p.set_engage_skill(SkillData::try_index_get(engage.engage_atk)); }
+            data.emblem_pool.emblem_persons.iter().filter(|x| x.engage_atk != 0).map(|p| (p.emblem_index, p.get_person(), p.is_paralogue() && p.is_custom()))
+                .for_each(|(i, p, custom)| {
+                    if custom {
+                        let engage_atk = DVCVariables::get_god_from_index(i as i32, true)
+                            .and_then(|g| g.engage_attack.and_then(|sid| SkillData::get(sid)));
+                        
+                        p.set_engage_skill(engage_atk);
+                    }
+                    else if let Some(engage) = self.atks.get(i) { 
+                        p.set_engage_skill(SkillData::try_index_get(engage.engage_atk)); 
+                    }
                 });
         }
         else {
-            data.emblem_pool.emblem_persons.iter().for_each(|p|{ p.reset_engage_skill();});
+            data.emblem_pool.emblem_persons.iter().for_each(|p|{ p.reset_engage_skill(data);});
             data.emblem_pool.emblem_data.iter().for_each(|x|{
                 if let Some(god) = GodData::try_get_hash_mut(x.hash) {
                     if let Some(engage_atk) = SkillData::try_get_hash(x.engage_atk) {

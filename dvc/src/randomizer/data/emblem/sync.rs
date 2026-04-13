@@ -442,7 +442,7 @@ impl EmblemSkillRandomizer {
         let sync = DVCVariables::EmblemSyncSkill.get_value();
         let engage = DVCVariables::EmblemEngageSkill.get_value();
         data.emblem_pool.emblem_data.iter().for_each(|e|{ e.reset_all_skills(); });
-        data.emblem_pool.emblem_persons.iter().for_each(|e|{ e.reset_skill(); });
+        data.emblem_pool.emblem_persons.iter().for_each(|e|{ e.reset_skill(data); });
         data.skill_pool.reset_sp_cost();
         SkillData::try_get_hash_mut(GAMBITS_HASH[2]).unwrap().change_skills.iter_mut().enumerate()
             .for_each(|(i, s)|{ *s = SkillData::try_get_hash_mut(GAMBITS_HASH[3+i]).unwrap(); });
@@ -474,51 +474,22 @@ impl EmblemSkillRandomizer {
         else {
             if let Some(gambit) = SkillData::get_mut("SID_計略") {
                 let original_gambits = ["SID_計略_猛火計", "SID_計略_聖盾の備え", "SID_計略_毒矢"];
-                gambit.change_skills.iter_mut().zip(original_gambits.iter().flat_map(|&h| SkillData::get_mut(h)))
+                gambit.change_skills.iter_mut()
+                    .zip(original_gambits.iter().flat_map(|&h| SkillData::get_mut(h)))
                     .for_each(|(s, new_s)|{ *s = new_s; });
             }
         }
         if sync != 0 || engage != 0 {
-            data.emblem_pool.emblem_persons.iter().map(|e| e.get_person() ).for_each(|p| {
-                self.change_skill_array(p.get_common_skills());
-                self.change_skill_array(p.get_normal_skills());
-                self.change_skill_array(p.get_hard_skills());
-                self.change_skill_array(p.get_lunatic_skills());
+            data.emblem_pool.emblem_persons.iter()
+                .map(|e| e.get_person())
+                .for_each(|p|{
+                    self.change_skill_array(p.get_common_skills());
+                    self.change_skill_array(p.get_normal_skills());
+                    self.change_skill_array(p.get_hard_skills());
+                    self.change_skill_array(p.get_lunatic_skills());
             });
         }
     }
-    /*
-    pub fn print(&self) -> Result<bool, std::io::Error> {
-        let mut file = File::options().create(true).write(true).truncate(true).open("sd:/Draconic Vibe Crystal/emblem_skill.txt")?;
-        writeln!(&mut file, "Draconic Vibe Crystal: {} Emblem Skill Randomization", VERSION)?;
-        let skill_count = SkillData::get_count();
-        let mut skill_list = vec![-1; SkillData::get_count() as usize];
-        for skill_set in [
-            ("Random Skill List", &self.random_skill),
-            ("Chaos Skill List", &self.chaos_skill),
-            ("Random Inherit List", &self.random_inherit),
-            ("Chaos Inherit List", &self.chaos_inherit),
-        ]
-        {
-            skill_list.iter_mut().for_each(|x| *x = -1);
-            skill_set.1.iter().for_each(|s| if *s.0 < skill_count { skill_list[*s.0 as usize] = *s.1; });
-            writeln!(&mut file, "\n{} [{} Swaps]", skill_set.0, skill_set.1.len())?;
-            skill_list.iter().enumerate().filter(|x| *x.1 > 0)
-                .for_each(|(i,s)|{
-                    if let Some((s1, s2)) = SkillData::try_index_get(i as i32).zip(SkillData::try_index_get(*s)){
-                        let name1 = s1.name.map(|v| Mess::get(v)).filter(|n| n.to_string().len() > 2 )
-                            .map(|v| format!("{}: {}", s1.parent.index, v))
-                            .unwrap_or(format!("#{}: {}", s1.parent.index, s1.sid));
-                        let name2 = s2.name.map(|v| Mess::get(v)).filter(|n| n.to_string().len() > 2 )
-                            .map(|v| format!("{}: {}", s2.parent.index, v))
-                            .unwrap_or(format!("#{}: {}", s2.parent.index, s1.sid));
-                        writeln!(&mut file, "{} to {}", name1, name2).unwrap();
-                    }
-                });
-        }
-        Ok(true)
-    }
-    */
 }
 
 pub fn get_lowest_priority(skill: &'static SkillData) -> &'static SkillData {

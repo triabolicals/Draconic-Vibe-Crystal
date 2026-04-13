@@ -5,30 +5,19 @@ use engage::{
     god::{GodPool, GodUnit, GodBondHolder},
     force::{ForceType, *},
     gamedata::skill::SkillData,
-    gameuserdata::GameUserData,
 };
 use engage::dialog::yesno::TwoChoiceDialogMethods;
 use engage::god::GodBond;
 use engage::stream::Stream;
 use engage::unit::UnitPool;
 use crate::ironman::vtable_edit;
-use super::person::pid_to_index;
 use crate::utils::*;
 
 pub mod engrave;
 pub mod menu;
 pub static ENEMY_EMBLEM_LIST: OnceLock<Vec<i32>> = OnceLock::new();
-pub static RECOMMENED_LVL: OnceLock<Vec<u8>> = OnceLock::new();
 
 pub fn initialize_emblem_list() {
-    RECOMMENED_LVL.get_or_init(||{
-        let mut list: Vec<u8> = Vec::new();
-        for x in 0..12 {
-            let cid = format!("CID_{}", EMBELM_PARA[x]);
-            list.push(ChapterData::get(&cid).unwrap().recommended_level);
-        }
-        list
-    });
     ENEMY_EMBLEM_LIST.get_or_init(||{
         let mut list: Vec<i32> = Vec::new();
         for x in 0..20 {
@@ -43,83 +32,14 @@ pub fn initialize_emblem_list() {
     });
     println!("Number of Enemy Emblems: {}", ENEMY_EMBLEM_LIST.get().unwrap().len());
 }
-
-pub fn emblem_gmap_spot_adjust(){
-    if GameUserData::get_sequence() != 6 || !DVCVariables::random_enabled() { return; }
-    let edelgard_obtain = GameVariableManager::get_bool("G_拠点_神竜導入イベント再生済み");
-    if edelgard_obtain  {
-        for x in 1..7 {
-            let gmap_flag = format!("G_GmapSpot_G00{}", x);
-            let flag_value = GameVariableManager::get_number(gmap_flag.as_str());
-            if flag_value == 1 || flag_value == 2 {  GameVariableManager::set_number(gmap_flag.as_str(), 3);  }
-        }
-    }
-    if DVCVariables::EmblemRecruitment.get_value() == 0 || DVCFlags::CustomEmblemsRecruit.get_value() { return; }
-    for x in 0..19 {
-        let e_index = pid_to_index(&EMBLEM_GIDS[x as usize].to_string(), false);
-        let cid = EMBELM_PARA[ e_index as usize ];
-        let unlock_cid = UNLOCK_PARA[ x as usize]; 
-        if cid == "G007" { continue; }  //There's no Edelgard paralogue to unlock
-        if unlock_cid == "" {  // open tiki's divine paralogue if edelgard ring is obtained and unlock the emblem paralogue that replaces edelgard
-            let gmap_spot_flag = format!("G_GmapSpot_{}", cid);
-            if edelgard_obtain {
-                if GameVariableManager::get_number("G_GmapSpot_G001") & 3 != 0 { GameVariableManager::set_number("G_GmapSpot_G001", 3); }
-                if GameVariableManager::get_number(&gmap_spot_flag) == 1 {  GameVariableManager::set_number(&gmap_spot_flag, 3); }
-            }
-            else { 
-                GameVariableManager::set_number("G_GmapSpot_G001", 1); 
-                GameVariableManager::set_number(&gmap_spot_flag, 1); 
-            }
-            continue;
-        }
-        if cid.starts_with("G") {
-            if edelgard_obtain {
-                let gmap_spot_flag = format!("G_GmapSpot_{}", cid);
-                if GameVariableManager::get_number(&gmap_spot_flag) != 3 {  GameVariableManager::set_number(&gmap_spot_flag, 3);  }
-            }
-        }
-        else {
-            let unlock_flag = format!("G_Cleared_{}", unlock_cid);
-            let gmap_spot_flag = format!("G_GmapSpot_{}", cid);
-            if GameVariableManager::get_bool(&unlock_flag) {
-                if GameVariableManager::get_number(&gmap_spot_flag) <= 2 { GameVariableManager::set_number(&gmap_spot_flag, 3); }
-            }
-            else { GameVariableManager::set_number(&gmap_spot_flag, 1); }
-        }
-    }
-    //Calculating Recommended Level
-    let rec_level = RECOMMENED_LVL.get().unwrap();
-    for x in 0..12 {
-        let cid_index = pid_to_index(&EMBLEM_GIDS[x as usize].to_string(), false);
-        if let Some(chapter) = ChapterData::get_mut(&format!("CID_{}", EMBELM_PARA[cid_index as usize])) {
-            if cid_index < 12 { chapter.recommended_level = rec_level[x as usize]; }
-            else if let Some(chapter2) = ChapterData::get_mut(&format!("CID_{}", EMBELM_PARA[x as usize])){
-                let average = crate::autolevel::get_difficulty_adjusted_average_level() as u8;
-                if average >= rec_level[x as usize] { chapter2.recommended_level = rec_level[x as usize]; }
-                else {  chapter2.recommended_level = average; }
-            }
-        }
-    }
-    for x in 12..19 {
-        let cid_index = pid_to_index(&EMBLEM_GIDS[x as usize].to_string(), false);
-        if let Some(chapter) = ChapterData::get_mut(&format!("CID_{}", EMBELM_PARA[cid_index as usize])) {
-            if cid_index < 12 {
-                let average = crate::autolevel::get_difficulty_adjusted_average_level() as u8;
-                if average >= rec_level[cid_index as usize] { chapter.recommended_level = rec_level[cid_index as usize]; }
-                else { chapter.recommended_level = average; }
-            }
-        }
-    }
-}
 pub fn randomize_emblems() {
     if !DVCVariables::random_enabled() { DVCVariables::create_recruitment_variables(true); }
     if DVCVariables::is_recruitment_set(true) {
-        set_emblem_paralogue_unlock();
         set_m022_emblem_assets();
     }
     else {
         let rng = get_rng();
-        let no_dlc = !dlc_check() ||crate::DeploymentConfig::get().dlc & 2 != 0;
+        let no_dlc = !dlc_check() || DeploymentConfig::get().dlc & 2 != 0;
         let emblem_recruitment = DVCVariables::EmblemRecruitment.get_value();
         DVCVariables::create_recruitment_variables(true);
         match emblem_recruitment {
@@ -137,7 +57,6 @@ pub fn randomize_emblems() {
                     .collect::<Vec<_>>();
                     
                 let mut available = gen_list.clone();
-
                 gen_list.iter()
                     .for_each(|&(hash, gender)| {
                         let god = GodData::try_get_hash(hash).unwrap();
@@ -146,8 +65,9 @@ pub fn randomize_emblems() {
                             .or_else(|| available.get_remove(rng))
                             .and_then(|h| GodData::try_get_hash(h.0)) 
                         {
-                            if GameVariableManager::exist(key.as_str()) { GameVariableManager::set_string(key.as_str(), v.gid.to_string().as_str()); }
-                            else { GameVariableManager::make_entry_str(key.as_str(), v.gid.to_string().as_str()); }
+                            let key2 = format!("G_R2_{}", v.gid);
+                            DVCVariables::set_variable_key_string(key.as_str(), v.gid);
+                            DVCVariables::set_variable_key_string(key2.as_str(), god.gid);
                             println!("{} -> {}", Mess::get(god.mid), Mess::get(v.mid));
                         } else { println!("No Emblem Swaps for {}", Mess::get(god.mid)); }
                     });
@@ -156,28 +76,12 @@ pub fn randomize_emblems() {
                 for i in 0..12 { DVCVariables::set_emblem_recruitment(i, 11 - i); }
             },
             3 => {  // Custom
-                let order = crate::DeploymentConfig::get().get_custom_recruitment(true);
+                let order = DeploymentConfig::get().get_custom_recruitment(true);
                 order.iter().for_each(|&x| { DVCVariables::set_emblem_recruitment(x.0, x.1); });
             },
             _ => { DVCVariables::create_recruitment_variables(true); },
         }
         set_m022_emblem_assets();
-        set_emblem_paralogue_unlock();
-    }
-}
-fn set_emblem_paralogue_unlock() {
-    if DVCFlags::CustomEmblemsRecruit.get_value() { return; }
-    for x in 0..19 {
-        let index = pid_to_index(&EMBLEM_GIDS[x as usize].to_string(), false);
-        if index >= 0 {
-            let string2 = format!("CID_{}",EMBELM_PARA[index as usize]);
-            if let Some(emblem_chapter) = ChapterData::get_mut(&string2){
-                emblem_chapter.gmap_spot_open_condition = Some(UNLOCK_PARA[x as usize].into());
-                if UNLOCK_PARA[index as usize] == "" {
-                   // emblem_chapter.
-                }
-            }
-        }
     }
 }
 pub fn set_m022_emblem_assets() {
@@ -244,20 +148,15 @@ pub fn get_engage_attack_type(skill: Option<&SkillData>) -> i32 {
 
 #[unity::hook("App", "GodBondHolder", "Get")]
 pub fn god_bond_holder_get(this: &GodBondHolder, unit: Option<&mut Unit>, method_info: OptionalMethod) -> Option<&'static mut GodBond> {
-    if this.data.is_some_and(|f| f.force_type != 0 && !f.gid.str_contains("M0")) { call_original!(this, unit, method_info) }
-    else {
-        if unit.as_ref()
-            .is_some_and(|unit|{
-                let pid = unit.person.pid.to_string();
-                PIDS.contains(&pid.as_str()) || pid.contains("_E00")
-            })
-        {
-            call_original!(this, unit, method_info)
-        }
-        else { call_original!(this, UnitPool::get_hero(false), method_info) }
-    }
+    if this.data.is_some_and(|f| f.force_type == 1 && !f.gid.str_contains("M0")) { call_original!(this, unit, method_info) }
+    else if DVCVariables::is_random_map() || DVCVariables::Continuous.get_value() == 1 { call_original!(this, UnitPool::get_hero(false), method_info) }
+    else if unit.as_ref().is_some_and(|unit|{
+        let pid = unit.person.pid.to_string();
+        PIDS.contains(&pid.as_str()) || pid.contains("E00")
+    })
+    { call_original!(this, unit, method_info) }
+    else { call_original!(this, UnitPool::get_hero(false), method_info) }
 }
-
 pub fn god_unit_on_serialize(this: &mut GodUnit, stream: &Stream, _method_info: OptionalMethod){
     check_fix_god_bonds(this);
     this.on_serialize(stream);
@@ -270,9 +169,7 @@ fn check_fix_god_bonds(this: &mut GodUnit) {
     let hash = this.data.main_data.parent.hash;
     if let Some(bond) = this.get_god_bonds() {
         if bond.data.is_some_and(|g| g.main_data.parent.hash != hash && g.force_type == 0) {
-            if hash == 2044088482 || hash == 1120993642 {   // Chrom or Robin, use Chrom
-                bond.data = GodData::try_get_hash(1120993642);
-            }
+            if hash == 2044088482 || hash == 1120993642 { bond.data = GodData::try_get_hash(1120993642); }
             else { bond.data = GodData::try_get_hash(hash); }
         }
         else if bond.bonds.is_none(){

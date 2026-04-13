@@ -13,6 +13,18 @@ use skyline::patching::Patch;
 use crate::config::DVCVariables;
 use crate::enums::*;
 
+
+
+#[macro_export] macro_rules! get_nested_il2cpp_class {
+    ($namespace:expr, $class_name:expr, $($nested:expr),+) => {
+        {
+            let mut c = unity::il2cpp::class::Il2CppClass::from_name($namespace, $class_name).unwrap();
+            $( c = crate::utils::get_nested_class(c, $nested).expect(format!("Expecting Nested Class {} in {}", $nested, c.get_name()).as_str()); )*
+        c
+        }
+
+    }
+}
 /*
 pub fn offset_to_addr<T: ?Sized>(offset: usize) -> &'static T {
     let s = unsafe { (skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as usize + offset) as *mut &T };
@@ -126,25 +138,6 @@ pub fn remove_equip_emblems() {
         .chain( Force::get(ForceType::Dead).unwrap().iter() )
         .for_each(|unit| unit.clear_god_unit());
 }
-/*
-pub fn get_nested_virtual_methods_mut(namespace: &str, class_name: &str, nested_class: &str, method_name: &str) -> Option<&'static mut VirtualInvoke> {
-    if let Some(cc) = Il2CppClass::from_name(namespace, class_name).unwrap().get_nested_types().iter()
-        .find(|x| x.get_name() == nested_class) {
-        let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
-        menu_mut.get_virtual_method_mut(method_name)
-    }
-    else { None }
-}
-pub fn get_nested_nested_virtual_method_mut(namespace: &str, class_name: &str, nested_class: &str, nested_class2: &str, method_name: &str) -> Option<&'static mut VirtualInvoke> {
-    if let Some(cc) = Il2CppClass::from_name(namespace, class_name).unwrap().get_nested_types().iter()
-        .find(|x| x.get_name() == nested_class).unwrap().get_nested_types().iter()
-        .find(|x| x.get_name() == nested_class2) {
-        let menu_mut = Il2CppClass::from_il2cpptype(cc.get_type()).unwrap();
-        menu_mut.get_virtual_method_mut(method_name)
-    }
-    else { None }
-}
-*/
 pub fn get_random_number_for_seed() -> u32 {
     //Convert frame count to a random seed
     unsafe {
@@ -161,22 +154,6 @@ pub fn get_random_number_for_seed() -> u32 {
         return result;
     }
 }
-/*
-pub fn get_weapon_mask_str(value: i32) -> String {
-    let mut out = format!("");
-    if 2 & value != 0 { out = format!("{} Sword", out); }
-    if 4 & value != 0 { out = format!("{} Lance", out); }
-    if 8 & value != 0 { out = format!("{} Axe", out); }
-    if 16 & value != 0 { out = format!("{} Bow", out); }
-    if 32 & value != 0 { out = format!("{} Dagger", out); }
-    if 64 & value != 0 { out = format!("{} Magic", out); }
-    if 128 & value != 0 { out = format!("{} Rod", out); }
-    if 512 & value != 0 { out = format!("{} Fist", out); }
-    if 1024 & value != 0 { out = format!("{} Special", out); }
-
-    return out;
-}
-*/
 pub fn get_stat_label(index: usize) -> String {
     match index {
         0 => { return Mess::get("MID_SYS_HP").to_string();}
@@ -199,36 +176,6 @@ pub fn get_stat_label(index: usize) -> String {
         _ => { return "".to_string(); }
     }
 }
-/*
-pub fn get_person_growth_line(person: &PersonData) -> String {
-    let grow = person.get_grow();
-    return format!("{} ({})\n\t| {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% | {} {}% |",  Mess::get_name(person.pid), person.pid, 
-    Mess::get("MID_SYS_HP").to_string(), grow[0], Mess::get("MID_SYS_Str").to_string(), grow[1], Mess::get("MID_SYS_Mag").to_string(), grow[6], 
-    Mess::get("MID_SYS_Tec").to_string(), grow[2], Mess::get("MID_SYS_Spd").to_string(), grow[3], Mess::get("MID_SYS_Lck").to_string(), grow[4],
-    Mess::get("MID_SYS_Def").to_string(), grow[5], Mess::get("MID_SYS_Res").to_string(), grow[7], Mess::get("MID_SYS_Phy").to_string(), grow[8]);
-}
-pub fn help_stat(person: &PersonData, second: bool) -> String {
-    let grow = person.get_grow();
-    if second {
-        format!("{}: {}: {}% {}: {}% {}: {}% {}: {}%,", 
-                Mess::get("MID_GAMESTART_GROWMODE_SELECT_TITLE"),
-                Mess::get("MID_SYS_Spd"), grow[3],
-                Mess::get("MID_SYS_Lck"), grow[4],
-                Mess::get("MID_SYS_Def"), grow[5],
-                Mess::get("MID_SYS_Res"), grow[7],
-        )
-    }
-    else {
-        format!("{} {}: {}% {}: {}% {}: {}% {}: {}%,", 
-                Mess::get("MID_GAMESTART_GROWMODE_SELECT_TITLE"), 
-                Mess::get("MID_SYS_HP"), grow[0], 
-                Mess::get("MID_SYS_Str"), grow[1], 
-                Mess::get("MID_SYS_Mag"), grow[6], 
-                Mess::get("MID_SYS_Tec"), grow[2],
-        )
-    }
-}
- */
 pub fn mov_1(address: usize){
     let _ = Patch::in_text(address).bytes(&[0x20,0x00, 0x80, 0x52]).unwrap();
 }

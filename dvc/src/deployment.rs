@@ -38,7 +38,7 @@ pub fn get_emblem_paralogue_level() {
     let cid = GameUserData::get_chapter().prefixless_cid.to_string();
     GameVariableManager::make_entry(DVCVariables::EMBLEM_PARALOGUE_LEVEL, 0);
     GameVariableManager::set_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL, 0);
-    if let Some(pos) = EMBELM_PARA.iter().position(|&x| x == cid) {
+    if let Some(pos) = EMBLEM_PARA.iter().position(|&x| x == cid) {
         let found = randomizer::person::pid_to_index(&EMBLEM_GIDS[pos].to_string(), true);
         let new_emblem_index;
         if found != -1 { new_emblem_index = found as usize;  } else { return; }

@@ -138,6 +138,13 @@ impl DVCVariables {
             _ => None,
         }
     }
+    pub fn init_var(&self, value: i32, overwrite: bool) {
+        let key = self.get_key();
+        if GameVariableManager::exist(key) {
+            if overwrite { GameVariableManager::set_number(key, value); }
+        }
+        else { GameVariableManager::make_entry_norewind(key, value); }
+    }
     pub fn get_value(&self) -> i32 {
         if DVCVariables::is_main_menu() { DeploymentConfig::get().get_value(*self) }
         else if self.is_gauge() {
@@ -299,46 +306,15 @@ impl DVCVariables {
     pub const PLAYER_AVERAGE_CAP: &'static str = "G_Player_Rating_Average";
     pub const EMBLEM_PARALOGUE_LEVEL: &'static str = "G_Paralogue_Level";
     pub const SINGLE_CLASS: &'static str = "G_DVC_SingleJob";
-
-    // pub const GENERIC_APPEARANCE_KEY: &'static str =  "G_GenericMode";  //
-    // pub const ASSETS: &'static str = "G_RandAsset"; //
-
-    // pub const DEPLOYMENT_KEY: &'static str =  "G_DeploymentMode";
-    // pub const EMBLEM_DEPLOYMENT_KEY: &'static str =  "G_EmblemDeployMode";
-
-    // pub const HUB_ITEM_KEY: &'static str =  "G_ExplorationItems";
-    // pub const ITEM_GAUGE_KEY: &'static str =  "G_ItemGauge";
-    // pub const ITEM_KEY: &'static str =  "G_Random_Item";
-    // pub const ITEM_DROP_GAUGE_KEY: &'static str =  "G_ItemDropGauge";
-    // pub const PLAYER_INVENTORY: &'static str = "G_PRW";
-    // pub const SKILL_KEY: &'static str =  "G_Random_Skills";
-    // pub const ENEMY_SKILL_GAUGE_KEY: &'static str =  "G_EnemySkillGauge";
-    // pub const GIFTS_KEY: &'static str =  "G_RngGifts";
-
-    // pub const JOB_LEARN_SKILL_KEY: &'static str =  "G_LearnMode";
-    // pub const ENEMY_JOB_GAUGE_KEY: &'static str =  "G_EnemyJobGauge";
-    // pub const RECLASS_KEY: &'static str =  "G_RandomCC";
-
-    //Emblem Key
-    // pub const EMBLEM_SYNC_KEY: &'static str =  "G_Random_God_Sync";
-    // pub const EMBLEM_ENGAGE_SKILL_KEY: &'static str =  "G_EngageSkill";
-    // pub const EMBLEM_INHERIT_MODE: &'static str =  "G_EmblemInherit";
-    // pub const EMBLEM_APPEAR_KEY: &'static str =  "G_EmblemApp";
-    // pub const WEAPON_PROF_KEY: &'static str =  "G_EmblemWepProf";
-
-    // pub const REVIVAL_STONE_GAUGE_KEY: &'static str =  "G_EnemyRevivalStone";
-    // pub const ENEMY_EMBLEM_KEY: &'static str =  "G_EnemyEmblemGauge";
-
-    // pub const TERRAIN: &'static str = "G_RandomEnergy";
-
-    // pub const STYLES_KEY: &'static str =  "G_BattleStyles";
-    // pub const ENGRAVE_KEY: &'static str =  "G_EngraveSetting";
-    // pub const INTERACT_KEY: &'static str =  "G_InteractSetting";
-
     pub const RECRUITMENT_KEY: &'static str =  "G_Random_Recruitment";
     pub const EMBLEM_RECRUITMENT_KEY: &'static str =  "G_Emblem_Mode";
     pub const TILE_RNG: &'static str = "G_TileRNG";
-
+    
+    pub fn set_variable_key_string<'a>(key: impl Into<&'a Il2CppString>, value: impl Into<&'a Il2CppString>) {
+        let key = key.into();
+        if GameVariableManager::exist(key) { GameVariableManager::set_string(key, value.into()); }
+        else { GameVariableManager::set_string(key, value.into()); }
+    }
 
     // pub const RANDOM_CLASS_OUTFITS: &'static str = "G_RandomJobOutfit";
     pub fn init_tile_rng(init: bool) -> &'static Random {
@@ -439,28 +415,27 @@ impl DVCVariables {
         else { Some(god) }
         
     }
-    pub fn get_dvc_emblem_index(index: i32, reverse: bool) -> usize {
+    pub fn get_dvc_emblem_index(recruitment_index: i32, reverse: bool) -> usize {
         // for extra supporting emblems swapping
         let emblem_index =
-            match index {
+            match recruitment_index {
                 20|21 => { 12 }    // Dimitri, Claude to Edelgard Index
                 22 => { 18 }    // Robin -> Chrom
                 23 => { 11 }    // Ephiram  -> Eirika
-                _ => { index }
+                _ => { recruitment_index }
             };
         let key =
             if reverse {format!("G_R2_{}", EMBLEM_GIDS[emblem_index as usize]) }
             else { format!("G_R_{}", EMBLEM_GIDS[emblem_index as usize]) };
-
         if GameVariableManager::exist(key.as_str()) {
             let str = GameVariableManager::get_string(key.as_str()).to_string();
-            EMBLEM_GIDS.iter().position(|gid| gid == &str).unwrap_or(index as usize)
+            EMBLEM_GIDS.iter().position(|gid| gid == &str).unwrap_or(recruitment_index as usize)
         }
         else { emblem_index as usize }
     }
     /// Non-Custom Emblems Only
     pub fn set_emblem_recruitment(emblem_index: i32, replace_emblem_index: i32) {
-        if emblem_index > 18 || replace_emblem_index > 18 { return; }
+        if emblem_index > 18 || replace_emblem_index > 18 || emblem_index == replace_emblem_index { return; }
         GameVariableManager::set_string(&format!("G_R_{}",EMBLEM_GIDS[emblem_index as usize]), EMBLEM_GIDS[replace_emblem_index as usize]);
         GameVariableManager::set_string(&format!("G_R2_{}",EMBLEM_GIDS[replace_emblem_index as usize]), EMBLEM_GIDS[emblem_index as usize]);
     }
@@ -470,7 +445,6 @@ impl DVCVariables {
         GameVariableManager::set_string(&format!("G_R_{}",PIDS[pid_index as usize]), PIDS[replace_pid_index as usize]);
         GameVariableManager::set_string(&format!("G_R2_{}",PIDS[replace_pid_index as usize]), PIDS[pid_index as usize]);
     }
-
     pub fn get_god_from_index(index: i32, randomized: bool) -> Option<&'static mut GodData> {
         let list = GameData::get_playable_emblem_hashes();
         if index as usize >=  list.len() { return None; }
@@ -489,7 +463,8 @@ impl DVCVariables {
     pub fn create_recruitment_variables(emblem: bool) {
         if emblem {
             for i in 0..19 {
-                GameVariableManager::make_entry_str(&format!("G_R_{}",EMBLEM_GIDS[i as usize]), EMBLEM_GIDS[i as usize]);
+                let key = format!("G_R_{}",EMBLEM_GIDS[i as usize]);
+                GameVariableManager::make_entry_str(key.as_str(), EMBLEM_GIDS[i as usize]);
                 GameVariableManager::make_entry_str(&format!("G_R2_{}",EMBLEM_GIDS[i as usize]), EMBLEM_GIDS[i as usize]);
             }
         }

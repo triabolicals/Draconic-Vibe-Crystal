@@ -12,7 +12,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 skyline = { git = "https://github.com/ultimate-research/skyline-rs", version = "0.6.0" }
-outfit_core = { path = "/Users/trile/Project/outfit/outfit-core"}
+outfit_core = { path = "/Users/trile/Project/outfit/outfit-core" }
+#outfit_core = { git = "https://github.com/triabolicals/Outfit-Plugin"}
 unity = { version = "0.3.0", git = "https://github.com/triabolicals/unity", branch = "macro" }
 engage = { git = "https://github.com/triabolicals/engage", branch = "macro" }
 cobapi = { git = "https://github.com/triabolicals/cobapi", branch = "test" }
@@ -23,6 +24,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 
 [patch."https://github.com/triabolicals/engage"]
 engage = {path = "/Users/trile/Project/lib/engage"}
+
 
 [profile.dev]
 panic = "abort"

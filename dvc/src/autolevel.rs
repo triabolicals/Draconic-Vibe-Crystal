@@ -58,10 +58,7 @@ pub fn auto_level_unit(unit: &mut Unit, leader: bool){
         auto_level_unit_for_random_map(unit, leader);
         return;
     }
-    if !DVCFlags::Autolevel.get_value() {
-        if GameVariableManager::get_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL) != 0 { emblem_paralogue_level_adjustment(unit); }
-        return;
-    }
+    if !DVCFlags::Autolevel.get_value() { return; }
     let avg_level = get_difficulty_adjusted_average_level();
     let mut unit_level = unit.internal_level as i32 + unit.level as i32;
     let current_job = &unit.job;

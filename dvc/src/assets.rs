@@ -57,9 +57,13 @@ pub fn asset_table_result_setup_hook(
     method_info: OptionalMethod) -> &'static mut AssetTableResult
 {
     let result = call_original!(this, mode, unit, equipped, conditions, method_info);
+    if mode == 3 && unit.person.parent.index == 1 {
+        result.commit_mode(3);
+        return result;
+    }
     let conditions = dress::commit_for_unit_dress(result, mode, unit, equipped, conditions);  // Pre-set Conditions
     if unit.job.jid.str_contains("紋章士") { return result; }
-    if mode == 3 {
+    if mode == 3 && unit.person.parent.index == 1 {
         if unit.person.parent.index > 1 { result.scale_stuff[16] = 4.8; }
         return result;
     }

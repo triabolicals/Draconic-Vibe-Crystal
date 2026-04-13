@@ -6,6 +6,7 @@ use accessory::*;
 use transform::{has_enemy_tiki};
 use crate::assets::transform::is_dragonstone;
 use crate::config::DVCFlags;
+use crate::config::menu::DVCMenu::Asset;
 use crate::randomizer::data::RandomizedGameData;
 use crate::randomizer::names::get_emblem_person;
 use crate::randomizer::person::is_playable_person;
@@ -117,6 +118,22 @@ pub fn commit_for_unit_dress(
 ) -> AssetConditions
 {
     let mut conditionss = AssetConditions::new(Some(unit), mode, equipped);
+    if let Some(gid) = unit.person.aid.filter(|aid| aid.str_contains("GID_")) {
+        if let Some(god) = GodData::get(gid) {
+            let gender = if god.female == 1 { Gender::Female } else { Gender::Male };
+            conditionss.flags.set_gender(gender);
+            AssetFlags::set_condition_key(unit.person.pid, false);
+            if let Some(name) = unit.person.name {
+                AssetFlags::set_condition_key(name, false);
+            }
+            AssetFlags::set_condition_key(god.asset_id, true);
+            AssetFlags::set_condition_key(god.gid, true);
+            AssetFlags::set_condition_key(god.mid, true);
+            result.commit_mode(mode);
+            result.replace(mode);
+            return conditionss;
+        }
+    }
     if (unit.person.gender != 2 &&  unit.person.gender != 1) || unit.person.bmap_size > 1 {
         if conditionss.flags.contains(AssetFlags::Vision) {
             result.setup_for_person_job_item(mode, PersonData::get("PID_S004_リン"), JobData::get("JID_紋章士_リン"), equipped, con);
@@ -229,7 +246,7 @@ pub fn commit_for_unit_dress(
         }
         conditionss.profile_flag = 0;
     }
-    if conditionss.flags.contains(AssetFlags::CombatTranforming) { outfit_core::anim::AnimData::remove(result, true, true); }
+    if conditionss.flags.contains(AssetFlags::CombatTranforming) { AnimData::remove(result, true, true); }
     if DVCFlags::RandomUnitInfo.get_value() {}
 
     if mode == 2 {

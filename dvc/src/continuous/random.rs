@@ -40,7 +40,7 @@ pub fn escape_god(gid: &str , escape: bool) {
         }
     }
 }
-fn is_god_available(gid: &str, randomized: bool) -> bool {
+pub fn is_god_available(gid: &str, randomized: bool) -> bool {
     if let Some(god_data) = if DVCVariables::EmblemRecruitment.get_value() == 0 || !randomized { GodData::get(gid) }
         else { GodData::get( GameVariableManager::get_string(format!("G_R_{}", gid)))} {
         if let Some(god_unit) = GodPool::try_get(god_data, true) {
@@ -85,7 +85,7 @@ pub fn set_next_random_chapter(current_chapter: &ChapterData) -> Option<&'static
     if completed >= 15 {    // Paralogues
         for x in 0..12 {
             let e_index = crate::randomizer::person::pid_to_index(&EMBLEM_GIDS[x as usize].to_string(), false);
-            let para = EMBELM_PARA[ x as usize ];
+            let para = EMBLEM_PARA[ x as usize ];
             if e_index == 13 {
                 if is_god_available(EMBLEM_GIDS[x as usize], false) && m011_cleared {
                     if !GameVariableManager::get_bool(format!("G_Cleared_{}", para)) { available.push(para.to_string()); }

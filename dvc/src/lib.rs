@@ -25,7 +25,7 @@ pub use config::variables::*;
 use crate::utils::return_true;
 
 pub static mut CONFIG: DeploymentConfig = DeploymentConfig::default();
-pub const VERSION: &str = "2.16.0F";
+pub const VERSION: &str = "2.16.0H";
 
 extern "C" fn event_install(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
@@ -45,13 +45,6 @@ extern "C" fn event_install(event: &Event<SystemEvent>) {
             }
             SystemEvent::SaveLoaded { ty, slot_id: _ } => {
                 if *ty > 1 { randomizer::save_file_load(); }
-                else {
-                    /*
-                    let s = GameUserGlobalData::get_instance();
-                    s.flag.value |= 128;
-                    
-                     */
-                }
             }
             SystemEvent::ProcInstBind { proc, parent} => {
                 let mut proc = proc.borrow_mut();
@@ -79,8 +72,10 @@ pub fn main() {
     Patch::in_text(0x02517830).bytes(&[0xa0, 0x02, 0x80, 0x52]).unwrap();
     Patch::in_text(0x0251a9c0).bytes(&[0x01, 0x00, 0x84, 0x52]).unwrap();
     Patch::in_text(0x024cba50).bytes(&[0x01, 0x00, 0x85, 0x52]).unwrap();
+
+
+    // Patch::in_text(0x1ccd53c).bytes(&[0x68, 0, 0x80, 0x52]).unwrap();   // GmapSequence Jump to 3
     return_true(0x0203e1b0);    // Forging Item Display
-    // crate::deployment::fulldeploy::load_extras2();
     skyline::install_hooks!(
         // sprite::facethumbnail_getpath_god,
         // talk::get_cmd_info_from_cmd_lines_hook,
@@ -95,7 +90,7 @@ pub fn main() {
         // sprite::get_god_face,
         // randomizer::person_sound,
         assets::engage_attack::combat_record_post_process,
-
+        randomizer::emblem::god_bond_holder_get,
         randomizer::item::item_refine_data_try_get,
         randomizer::skill::learn::unit_learn_job_skill_hook,
         randomizer::item::shop::item_buy_item_create_menu_item,

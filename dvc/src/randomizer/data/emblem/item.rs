@@ -5,8 +5,8 @@ use engage::{
 };
 use std::collections::HashMap;
 use skyline::patching::Patch;
-use crate::{enums::*, utils};
-use crate::config::{DVCFlags, DVCVariables};
+use crate::utils;
+use crate::config::{DVCFlags};
 use crate::randomizer::data::engage_attacks::EngageAttackRandomizer;
 use crate::randomizer::data::GameData;
 use crate::randomizer::data::items::ItemPool;

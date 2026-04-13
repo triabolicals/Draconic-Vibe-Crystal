@@ -205,9 +205,10 @@ impl DVCCMenuItem for DVCMenu {
             _ => { true }
         };
         if enable {
-            if can_rand() { BasicMenuItemAttribute::Enable }
+            if can_rand() || DVCVariables::is_main_menu() { BasicMenuItemAttribute::Enable }
             else { BasicMenuItemAttribute::Disable }
-        } else { BasicMenuItemAttribute::Hide }
+        }
+        else { BasicMenuItemAttribute::Hide }
     }
 }
 pub extern "C" fn open_anime_all_ondispose_to_dvc_main(this: &mut ProcInst, _method_info: OptionalMethod) {

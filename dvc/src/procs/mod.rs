@@ -15,6 +15,7 @@ mod unitgrow;
 mod levelup;
 mod eventdemo;
 
+pub use gmapsequence::*;
 pub fn replace_desc_void_function(desc: &mut Array<&mut ProcDesc>, method_name: &str, function: *mut u8) {
     let method_name = method_name.to_string();
     if let Some(void_method) = desc.iter_mut()

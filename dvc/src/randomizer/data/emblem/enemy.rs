@@ -15,7 +15,6 @@ impl EnemyEmblemData {
         let mut syncho_stats = [0; 11];
         for x in 0..11 { syncho_stats[x] = god.syncho_enhance[x]; }
         let emblem_index = EMBLEM_ASSET.iter().position(|x| gid.contains(*x)).unwrap_or(100);
-        // println!("Enemy: {} Emblem: {}", god.parent.index, emblem_index);
         Self { emblem_data: EmblemData::new(god), syncho_stats, emblem_index}
     }
     pub fn get_replacement_index(&self) -> usize {
@@ -41,9 +40,7 @@ impl EnemyEmblemData {
                 let src_engage = replacement.get_engage_attack().map(|v| v.to_string()).unwrap_or(String::new());
                 if src_engage.contains("リンエンゲージ技") { enemy.set_engage_attack(Some("SID_リンエンゲージ技_威力減".into())); }
                 else if src_engage.contains("ベレトエンゲージ技") { enemy.set_engage_attack(Some("SID_ベレトエンゲージ技_闇".into())); }
-                else {
-                    enemy.set_engage_attack(replacement.get_engage_attack());
-                }
+                else { enemy.set_engage_attack(replacement.get_engage_attack()); }
             }
         }
     }
