@@ -107,16 +107,14 @@ pub struct MessageList {
     pub hero_jobs: Vec<MessDataString>,
     pub item_kinds: [Vec<MessDataString>; 10],
     pub honorifics: Vec<MessDataString>,
-    pub cmd_function_anim: MessDataString,
 }
 
 impl MessageList {
     pub fn init() -> Self {
-        let cmd_function_anim = MessDataString::from_str("キャラアニメーター切替");
         let mut item_kinds = [Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), ];
         let person_list: Vec<MessDataString> = MPIDS.iter().chain(NPC_MPIDS.iter())
             .map(|mpid| { MessDataString::from(Mess::get(mpid)) }).collect();
-        let emblem_list =
+        let emblem_list: Vec<MessDataString> =
             EMBLEM_GIDS.iter()
                 .flat_map(|gid| GodData::get(gid))
                 .map(|gd| MessDataString::from(Mess::get(gd.mid)))
@@ -162,8 +160,6 @@ impl MessageList {
                 }
             }
         });
-        
-        // emblem_alias.iter().enumerate().for_each(|(i, m)| { println!("Emblem Alias #{}: {}", i, m.to_str()); });
         let sf = Il2CppClass::from_name("App", "Mess").unwrap().get_static_fields_mut::<MessStaticFields>();
         sf.mess_data_dictionary.entries.iter().filter_map(|v| v.key.filter(|v| v.str_contains("MID_RULE")))
             .for_each(|rule|{
@@ -177,14 +173,18 @@ impl MessageList {
                         changed = true;
                     }
                 });
+                for x in 0..12 {
+                    if let Some((pos, len, _)) = emblem_list[x].find_position(&copy, false) {
+                        copy.splice(pos..pos + len, [14, 6, 530+x as u16, 0]);
+                        changed = true;
+                    }
+                }
                 if changed && copy.len() <= len {
-                    // println!("Edited {} in place", rule);
                     for x in 0..copy.len() { unsafe { *ptr.add(x) = copy[x]; } }
                 }
             });
         let list =       
-            Self { 
-                cmd_function_anim,
+            Self {
                 person_list, alias, gender, emblem_list, emblem_alias, 
                 hero_jobs, item_kinds, honorifics: vec![], 
             };

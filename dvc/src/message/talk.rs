@@ -6,10 +6,11 @@ use engage::sequence::talk::*;
 use engage::tmpro::TextMeshProUGUI;
 use crate::config::DVCFlags;
 use crate::DVCVariables;
-use crate::enums::RINGS;
+use crate::enums::{EMBLEM_GIDS, RINGS};
 use crate::message::{TextSwapper, MESSAGE_SWAPPER};
 use crate::randomizer::names::AppearanceRandomizer;
 use crate::randomizer::{item, RANDOMIZED_DATA};
+use crate::randomizer::data::{EmblemPool, GameData};
 
 #[unity::class("App.Talk3D", "TalkUI")]
 pub struct TalkUI {
@@ -140,13 +141,32 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
                 DVCVariables::get_dvc_person_data(recruitment_index as i32, false)
                     .map(|p| p.pid.to_string().into())
             }
-            500..522 => {
-                let recruitment_index = 
-                    match tag {
-                        520|521 => { 12 }
-                        _ => { tag - 500 }
-                    };
-                DVCVariables::get_current_god(recruitment_index as i32).map(|g| g.gid.to_string().into())
+            500..542 => {
+                if tag < 522 {
+                    let recruitment_index =
+                        match tag {
+                            520|521 => { 12 }
+                            _ => { tag - 500 }
+                        };
+                    DVCVariables::get_current_god(recruitment_index as i32).map(|g| g.gid.to_string().into())
+                }
+                else if tag >= 530 {    //
+                    let recruitment_index = tag - 530;
+                    //let data = GameData::get();
+                    if let Some(name) = EmblemPool::get_dvc_emblem_data(EMBLEM_GIDS[recruitment_index as usize])
+                        .filter(|g| EmblemPool::is_custom(g))
+                        //.and_then(|v| data.emblem_pool.custom_emblem_names.get(&v.parent.hash))
+                    {
+                        Some(Mess::get(name.mid))
+                        //Some(name.as_str().into())
+                    }
+                    else if DVCFlags::GodNames.get_value() {
+                        AppearanceRandomizer::get_emblem_app_person_index(recruitment_index as i32)
+                            .map(|v| v.1.get_name())
+                    }
+                    else { None }
+                }
+                else { None }
             }
             16 => { // Divine Dragon to New Alias
                 let offset = if args[0] == 1 { 41 } else { 0 };

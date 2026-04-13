@@ -5,7 +5,7 @@ use crate::{utils, DVCVariables};
 use accessory::change_accessory;
 use crate::assets::dress::*;
 use crate::config::DVCFlags;
-use crate::randomizer::data::{GameData, RandomizedGameData};
+use crate::randomizer::data::{EmblemPool, GameData, RandomizedGameData};
 use crate::randomizer::{Randomizer};
 use crate::randomizer::names::get_emblem_person;
 use crate::randomizer::person::is_playable_person;
@@ -55,11 +55,12 @@ pub fn asset_table_result_god_setup(
     method_info: OptionalMethod) -> &'static mut AssetTableResult
 {
     if god_data.is_none() { return call_original!(this, mode, god_data, is_darkness, conditions, method_info); }
-    let god = god_data.unwrap();
+    let mut god = god_data.unwrap();
     let is_lueur = god.gid.str_contains("リュール");
     let gid = god.gid.to_string();
+    let names = DVCFlags::GodNames.get_value();
     // Swapping Emblem appearance to Playable Characters appearance
-    if DVCFlags::GodNames.get_value() {
+    if names {
         if let Some(person) = get_emblem_person(god.mid){
             let rng = Random::get_system();
             let is_engaging = conditions.iter_mut().any(|str| str.str_contains("エンゲージ開始"));

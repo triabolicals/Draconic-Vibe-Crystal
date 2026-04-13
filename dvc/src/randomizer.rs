@@ -103,7 +103,6 @@ pub fn tutorial_check() {
         GameVariableManager::find_starts_with("G_Cleared_M02").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 0));
         GameVariableManager::find_starts_with("G_GmapSpot_").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
     }}
-
      */
 }
 pub fn write_seed_output_file() -> bool { false }

@@ -2,7 +2,6 @@ use engage::god::GodPool;
 use crate::randomizer::data::GameData;
 use super::*;
 
-pub struct EnemyEmblemGauge;
 pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
     if let Some(g_unit) = GameData::get_playable_god_list().get(emblem)
         .and_then(|god_data| GodPool::try_get(god_data, true))

@@ -4,7 +4,8 @@ use engage::gameuserdata::GameUserData;
 use engage::gamevariable::GameVariableManager;
 use crate::config::{DVCVariables};
 use crate::enums::EMBLEM_PARA;
-use crate::randomizer::data::GameData;
+use crate::randomizer::data::{EmblemPool, GameData};
+use crate::randomizer::EMBLEM_GIDS;
 use crate::utils::{can_rand, clamp_value};
 
 // Recommended Level, Emblem Level, Lowest Generic Level, Special Enemy Level
@@ -39,9 +40,7 @@ pub fn change_map_dispos() {
             if DVCVariables::EmblemRecruitment.get_value() != 0 {
                 if let Some(gid) = dispos.gid {
                     let key = format!("G_R_{}", gid);
-                    if GameVariableManager::exist(key.as_str()) {
-                        dispos.gid = Some(GameVariableManager::get_string(key.as_str()));
-                    }
+                    if GameVariableManager::exist(key.as_str()) { dispos.gid = Some(GameVariableManager::get_string(key.as_str())); }
                 }
             }
         });
@@ -54,7 +53,7 @@ pub fn change_map_dispos() {
                     levels[x-1] = (PARALOGUE_LEVELS[4*pos + x], PARALOGUE_LEVELS[4*recruit_idx + x]);
                 }
                 let thief_level = clamp_value((levels[1].1 - if pos == 6 { 3 } else { 5 }) as i32, 20, 40) as u8;
-
+                let mut custom = false;
                 dispos.iter_mut()
                     .flat_map(|array| array.iter_mut())
                     .filter(|dispos| {
@@ -63,28 +62,16 @@ pub fn change_map_dispos() {
                     .for_each(|dispos| {
                         if let Some(person) = dispos.get_person() {
                             if person.engage_skill.is_some() {
-                                if pos != recruit_idx { set_dispos_levels(dispos, levels[0].1); }
-                                else if GameData::get().emblem_pool.emblem_persons.iter()
-                                    .find(|x| x.hash == person.parent.hash).is_some_and(|v| v.is_custom())
-                                {
-                                    if let Some(items) = DVCVariables::get_god_from_index(pos as i32, true)
-                                        .and_then(|g| PersonData::get(g.gid.to_string().replace("GID_", "PID_闘技場_")))
-                                        .and_then(|p| p.items.as_ref())
-                                    {
-                                        let mut count = 0;
-                                        items.iter().for_each(|iid| {
-                                            dispos.items[count].iid = Some(iid.to_string().into());
-                                            dispos.items[count].drop = 0;
-                                            count += 1;
-                                        });
-                                        for x in count..6 {
-                                            dispos.items[x].iid = None;
-                                            dispos.items[x].drop = 0;
-                                        }
+                                if EmblemPool::get_dvc_emblem_data(EMBLEM_GIDS[pos]).filter(|v| EmblemPool::is_custom(v)).is_some() {
+                                    for x in 0..6 {
+                                        dispos.items[x].iid = None;
+                                        dispos.items[x].drop = 0;
                                     }
+                                    custom = true;
                                 }
-                            } 
-                            else if pos != recruit_idx {
+                                else if pos != recruit_idx && !custom { set_dispos_levels(dispos, levels[0].1); }
+                            }
+                            else if pos != recruit_idx && !custom {
                                 if let Some(job) = dispos.get_job().or(person.get_job()) {
                                     if job.parent.hash == -1001243599 &&
                                         dispos.ai_action_value.is_some_and(|ai| ai.str_contains("Treasure") || ai.str_contains("Terrain"))
@@ -115,5 +102,4 @@ fn set_dispos_levels(data: &mut DisposData, level: u8) {
     data.level_h = level;
     data.level_n = level;
     data.level_l = level;
-    println!("Level of {}, set to {}", data.get_person().unwrap().get_name(), level)
 }

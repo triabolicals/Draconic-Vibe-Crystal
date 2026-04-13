@@ -12,9 +12,11 @@ pub use engage::{
 };
 use engage::sequence::eventdemo::EventDemoSequence;
 use crate::config::DVCFlags;
+use crate::DVCVariables;
+use crate::enums::{EMBLEM_ASSET, EMBLEM_GIDS};
 use crate::utils::*;
 use crate::ironman::vtable_edit;
-use crate::randomizer::data::RandomizedGameData;
+use crate::randomizer::data::{EmblemPool, RandomizedGameData};
 
 pub const VEYRE: [&str; 7] = [
     "ヴェイル_黒_善_角折れ",
@@ -74,55 +76,51 @@ fn is_emblem_paralogue() -> bool {
     )
     || chapter.contains("CID_G00")
 }
+/*
 #[skyline::hook(offset=0x20c5440)]
 pub fn get_active_character_hook(this: &mut TalkPtr, method_info: OptionalMethod) -> &'static Il2CppString {
     let result = call_original!(this, method_info);
     let talk_pid = GameVariableManager::get_number("TalkPID");
     if talk_pid != 0 {
-        if let Some(p) = PersonData::try_get_hash(talk_pid) {
-            return il2_str_substring(p.pid, 4);
-        }
+        if let Some(p) = PersonData::try_get_hash(talk_pid) { return p.pid.to_string().trim_start_matches("PID_").into(); }
     }
     if is_character_specific() { return result; }
    //  if get_singleton_proc_instance::<EventDemoSequence>().is_none() && (sequence  == 4 || sequence == 5)  { return result; }
     let str1 = result.to_string();
     if GameVariableManager::exist(&format!("G_R_PID_{}", str1)) {
-        let pid = GameVariableManager::get_string(&format!("G_R_PID_{}", str1));
-        return il2_str_substring(pid, 4);
+        return GameVariableManager::get_string(&format!("G_R_PID_{}", str1)).to_string().trim_start_matches("PID_").into();
     }
     if result.contains("ジェーデ_兜あり") {
         if GameVariableManager::exist("G_R_PID_ジェーデ") {
-            let pid = GameVariableManager::get_string("G_R_PID_ジェーデ");
-            return il2_str_substring(pid, 4);
+            return GameVariableManager::get_string("G_R_PID_ジェーデ").to_string().trim_start_matches("PID_").into();
         }
     }
     if VEYRE.iter().any(|v| result.contains(v)) {
-        let pid = GameVariableManager::get_string("G_R_PID_ヴェイル");
-        return il2_str_substring(pid, 4);
+        return GameVariableManager::get_string("G_R_PID_ヴェイル").to_string().trim_start_matches("PID_").into();
     }
     if RAFALE.iter().any(|v| str1 == *v) {
-        let pid = GameVariableManager::get_string("G_R_PID_ラファール");
-        return il2_str_substring(pid, 4);
+        return GameVariableManager::get_string("G_R_PID_ラファール").to_string().trim_start_matches("PID_").into();
     }
-    if GameVariableManager::exist(&format!("G_R_GID_{}", str1)) && !is_emblem_paralogue()  {
-        let gid = GameVariableManager::get_string(&format!("G_R_GID_{}", str1));
-        if let Some(god) = GodPool::try_get_gid(gid, false) {
-            return il2_str_substring(god.data.gid, 4);
+    if let Some(emblem) = EMBLEM_ASSET.iter().position(|v| result.contains(v)) {
+        if is_emblem_paralogue() && emblem < 12 {
+            if let Some(god) = EmblemPool::get_dvc_emblem_data(EMBLEM_GIDS[emblem])
+                .filter(|g| EmblemPool::is_custom(g))
+            {
+                return god.gid.to_string().trim_start_matches("GID_").into();
+            }
         }
-        else { return il2_str_substring(gid, 4); }
-    }
-    if result.contains("ディミトリ") || result.contains("クロード") && GameVariableManager::exist("G_R_GID_エーデルガルト") {
-        let gid = GameVariableManager::get_string("G_R_GID_エーデルガルト");
-        return il2_str_substring(gid, 4);
-    }
-    if result.contains("M000_マルス") {
-        if GameVariableManager::exist("G_R_GID_マルス") && !is_emblem_paralogue()  {
-            let gid = GameVariableManager::get_string("G_R_GID_マルス");
-            return il2_str_substring(gid, 4);
+        else if !is_emblem_paralogue() {
+            if let Some(god_unit) = DVCVariables::get_current_god(emblem as i32) {
+                return god_unit.gid.to_string().trim_start_matches("GID_").into();
+            }
+            else if let Some(god) = DVCVariables::get_god_from_index(emblem as i32, true){
+                return god.gid.to_string().trim_start_matches("GID_").into();
+            }
         }
     }
     result
 }
+*/
 
 fn talk_tag_window(this: &mut TalkTagWindow, ptr: &TalkPtr, _optional_method: OptionalMethod) {
     this.initialize_(ptr);
@@ -162,38 +160,34 @@ fn get_pid_replacement(result: &'static Il2CppString) -> &'static Il2CppString {
 
     let str1 = result.to_string();
     if GameVariableManager::exist(&format!("G_R_PID_{}", str1)) {
-        let pid = GameVariableManager::get_string(&format!("G_R_PID_{}", str1));
-        return il2_str_substring(pid, 4);
+        return GameVariableManager::get_string(&format!("G_R_PID_{}", str1)).to_string().trim_start_matches("PID_").into();
     }
     if result.contains("ジェーデ_兜あり") {
         if GameVariableManager::exist("G_R_PID_ジェーデ") {
-            let pid = GameVariableManager::get_string("G_R_PID_ジェーデ");
-            return il2_str_substring(pid, 4);
+            return GameVariableManager::get_string("G_R_PID_ジェーデ").to_string().trim_start_matches("PID_").into();
         }
     }
     if VEYRE.iter().any(|v| result.contains(v)) {
-        let pid = GameVariableManager::get_string("G_R_PID_ヴェイル");
-        return il2_str_substring(pid, 4);
+        return GameVariableManager::get_string("G_R_PID_ヴェイル").to_string().trim_start_matches("PID_").into();
     }
     if RAFALE.iter().any(|v| str1 == *v) {
-        let pid = GameVariableManager::get_string("G_R_PID_ラファール");
-        return il2_str_substring(pid, 4);
+        return GameVariableManager::get_string("G_R_PID_ラファール").to_string().trim_start_matches("PID_").into();
     }
-    if GameVariableManager::exist(&format!("G_R_GID_{}", str1)) && !is_emblem_paralogue()  {
-        let gid = GameVariableManager::get_string(&format!("G_R_GID_{}", str1));
-        if let Some(god) = GodPool::try_get_gid(gid, false) {
-            return il2_str_substring(god.data.gid, 4);
+    if let Some(emblem) = EMBLEM_ASSET.iter().position(|v| result.contains(v)) {
+        if is_emblem_paralogue() && emblem < 12 {
+            if let Some(god) = EmblemPool::get_dvc_emblem_data(EMBLEM_GIDS[emblem])
+                .filter(|g| EmblemPool::is_custom(g))
+            {
+                return god.gid.to_string().trim_start_matches("GID_").into();
+            }
         }
-        else { return il2_str_substring(gid, 4); }
-    }
-    if (result.contains("ディミトリ") || result.contains("クロード")) && GameVariableManager::exist("G_R_GID_エーデルガルト") {
-        let gid = GameVariableManager::get_string("G_R_GID_エーデルガルト");
-        return il2_str_substring(gid, 4);
-    }
-    if result.contains("マルス") {
-        if GameVariableManager::exist("G_R_GID_マルス") && !is_emblem_paralogue()  {
-            let gid = GameVariableManager::get_string("G_R_GID_マルス");
-            return il2_str_substring(gid, 4);
+        else if !is_emblem_paralogue() {
+            if let Some(god_unit) = DVCVariables::get_current_god(emblem as i32) {
+                return god_unit.gid.to_string().trim_start_matches("GID_").into();
+            }
+            else if let Some(god) = DVCVariables::get_god_from_index(emblem as i32, true){
+                return god.gid.to_string().trim_start_matches("GID_").into();
+            }
         }
     }
     result

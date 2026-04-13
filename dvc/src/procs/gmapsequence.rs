@@ -8,6 +8,7 @@ use engage::menu::{BasicMenuItem, BasicMenuItemAttribute};
 use engage::proc::desc::ProcDesc;
 use engage::proc::{ProcInst, ProcVoidMethod};
 use engage::sequence::gmap_sequence::{GmapSequence, GmapSpotState};
+use engage::unityengine::UnityRenderer;
 use engage::util::try_get_instance;
 use unity::il2cpp::object::Array;
 use unity::prelude::OptionalMethod;
@@ -19,7 +20,7 @@ use crate::randomizer::map::dispos::PARALOGUE_LEVELS;
 
 pub fn gmap_sequence_desc_edit(descs: &mut Array<&mut ProcDesc>) {
     descs[5] = ProcDesc::call(ProcVoidMethod::new(None, gmap_sequence_load_actor));
-    if DVCVariables::EmblemRecruitment.get_value() == 0 || DVCVariables::Continuous.get_value() > 0 {
+    if DVCVariables::EmblemRecruitment.get_value() > 0 || DVCVariables::Continuous.get_value() > 0 {
         descs[11] = ProcDesc::call(ProcVoidMethod::new(None, attach_update_gmap_spots));
     }
 }
@@ -124,17 +125,21 @@ extern "C" fn attach_update_gmap_spots(proc: &mut ProcInst, _optional_method: Op
                 }
             }
         }
-    }
-    call_proc_original_method(proc, "AttachSpotModels");
-    [12, 13, 14, 16, 17, 20].iter().for_each(|x| {
-        if let Some(spot) = GmapSpotManager::find_spot_cid(format!("CID_M0{}",x).as_str()){
-            let previous_complete = GameVariableManager::get_bool(format!("G_Cleared_M0{}", x-1));
-            if spot.get_spot_state() != GmapSpotState::Hide && !previous_complete && !spot.obj.is_null() {
-                if let Some(controller) = spot.controller.as_ref() {
-                    controller.set_material(2);
-                    if !controller.effect.is_null() { controller.effect.set_active2(false); }
+    }    
+    if DVCVariables::EmblemRecruitment.get_value() != 0 {
+        call_proc_original_method(proc, "AttachSpotModels");
+        [12, 13, 14, 16, 17, 20].iter().for_each(|x| {
+            if let Some(spot) = GmapSpotManager::find_spot_cid(format!("CID_M0{}", x).as_str()) {
+                let previous_complete = GameVariableManager::get_bool(format!("G_Cleared_M0{}", x - 1));
+                if spot.get_spot_state() != GmapSpotState::Hide && !previous_complete && !spot.obj.is_null() {
+                    if let Some(controller) = spot.controller.as_ref() {
+                        controller.set_material(2);
+                        controller.render_mesh.set_material(controller.materials[2]);
+                        controller.render_mesh.set_enabled(false);
+                        if !controller.effect.is_null() { controller.effect.set_active2(false); }
+                    }
                 }
             }
-        }
-    });
+        });
+    }
 }

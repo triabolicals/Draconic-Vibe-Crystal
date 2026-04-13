@@ -1,6 +1,9 @@
+use std::collections::HashMap;
 use engage::gamedata::{god::GodGrowthData, item::ItemData, skill::SkillData, Gamedata, GodData, PersonData};
 use engage::gamedata::skill::SkillDataCategorys;
+use engage::gamevariable::GameVariableManager;
 use engage::mess::Mess;
+use unity::prelude::Il2CppString;
 use crate::DVCVariables;
 use crate::enums::EMBLEM_ASSET;
 use crate::randomizer::data::{GameData, SkillsList};
@@ -30,6 +33,14 @@ pub struct EmblemPool {
 }
 
 impl EmblemPool {
+    pub fn get_dvc_emblem_data<'a>(gid: impl Into<&'a Il2CppString>) -> Option<&'static GodData> {
+        GameVariableManager::try_get_string(format!("G_R_{}", gid.into()))
+            .and_then(|gid| GodData::get(gid))
+    }
+    pub fn is_custom(god_data: &GodData) -> bool {
+        let hash = god_data.parent.hash;
+        !EMBLEM_HASHES.contains(&hash)
+    }
     pub fn reset_all(&self, data: &GameData) {
         self.emblem_persons.iter().for_each(|p| {
             p.reset_skill(data);
@@ -68,7 +79,6 @@ impl EmblemPool {
                     if grow.len() >= 20 && ggids.iter().find(|&c_ggid| *c_ggid == ggid).is_none() {
                         ggids.push(ggid);
                         custom_count += 1;
-                        // println!("'{}' added as custom emblem #{}", Mess::get(god.mid), custom_count);
                         emblem_list.push(god.parent.hash);
                         emblem_data.push(EmblemData::new(god));
                     }
@@ -242,7 +252,6 @@ impl EmblemPerson {
                             normals.clear();
                             hard.clear();
                             lunatic.clear();
-                            // level_data.engaged_skills.set_skill_array(commons);
                             level_data.engage_skills.list.iter()
                                 .chain(level_data.engage_skills.list.iter())
                                 .chain(level_data.sync_skills.list.iter())
@@ -258,14 +267,14 @@ impl EmblemPerson {
                         }
                         person.set_engage_skill(SkillData::try_get_hash(data.engage_atk));
                     }
-                    let arena_pid = god.gid.to_string().replace("GID_", "PID_闘技場_");
-                    if let Some(arena_person) = PersonData::get(arena_pid.as_str()) {
-                        if let Some(ascii_name) = arena_person.get_ascii_name() { person.set_ascii_name(ascii_name); }
-                        person.unit_icon_id = arena_person.unit_icon_id;
-                        person.gender = arena_person.gender;
-                        person.name = arena_person.name;
-                        person.aid = Some(god.gid);
-                        person.jid = arena_person.jid;
+                    person.aid = Some(god.gid);
+                    let gid = god.gid.to_string();
+                    if let Some(summon) = PersonData::get_list().unwrap().iter().find(|p| p.summon_god.is_some_and(|god| god.str_contains(gid.as_str()))){
+                        set_emblem_person(person, summon);
+                    }
+                    else {
+                        let arena_pid = god.gid.to_string().replace("GID_", "PID_闘技場_");
+                        if let Some(arena_person) = PersonData::get(arena_pid.as_str()) { set_emblem_person(person, arena_person); }
                     }
                 }
             }
@@ -295,4 +304,13 @@ impl EmblemPerson {
     pub fn is_paralogue(&self) -> bool {
         PersonData::try_get_hash(self.hash).is_some_and(|p| p.pid.str_contains("PID_S0"))
     }
+}
+fn set_emblem_person(emblem_person: &mut PersonData, other: &'static PersonData) {
+    emblem_person.unit_icon_id = other.unit_icon_id;
+    if other.help.is_some() { emblem_person.help = other.help; }
+    emblem_person.gender = other.gender;
+    emblem_person.name = other.name;
+    if other.jid.is_some() { emblem_person.jid = other.jid; }
+    if let Some(ascii_name) = other.get_ascii_name() { emblem_person.set_ascii_name(ascii_name); }
+    if other.items.is_some() { emblem_person.items = other.items; }
 }

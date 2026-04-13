@@ -113,7 +113,7 @@ pub fn do_transformation(this: &mut CombatRecord, calc_side: BattleSideType) {
             return; 
         }
         if let Some(monster_data) = get_outfit_data().dress.transform.iter().find(|x|{
-            println!("{} = {}: {}", unit.job.parent.hash, x.hash, x.hash == unit.job.parent.hash);
+            // println!("{} = {}: {}", unit.job.parent.hash, x.hash, x.hash == unit.job.parent.hash);
             !x.is_transform && unit.job.parent.hash == x.hash
         }){
             this.combat_style |= 1 << 22;
@@ -149,7 +149,7 @@ fn get_transform_result(unit: &Unit) -> &'static mut AssetTableResult {
         .unwrap_or(
             AssetTableResult::get_from_pid(2,if unit.person.get_gender() == 2 { "PID_エル_竜化" } else { "PID_ラファール_竜化"}, CharacterAppearance::get_constions(None))
         );
-    outfit_core::print_asset_table_result(result, 2);
+    // print_asset_table_result(result, 2);
     result
 }
 pub fn is_dragonstone(equipped: Option<&ItemData>) -> bool {

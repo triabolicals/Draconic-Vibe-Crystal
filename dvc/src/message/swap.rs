@@ -3,10 +3,11 @@ use engage::mess::MessStaticFields;
 use unity::prelude::{Il2CppClass};
 use unity::system::Il2CppString;
 use crate::DVCVariables;
-use crate::enums::{EMBLEM_GIDS, PIDS};
+use crate::enums::{EMBLEM_GIDS, EMBLEM_PARA, PIDS};
 use crate::message::original::{MessDataString, MessageList};
 use crate::message::swap_kinds::MessSwapType;
 use crate::message::swap_command::*;
+use crate::randomizer::data::EmblemPool;
 use crate::talk::VEYRE;
 
 pub const RING_PICTURE: [&str; 21] = [
@@ -61,10 +62,15 @@ impl TextSwapper {
                     find_and_splice_for_pid("PID_ジェーデ_兜あり", 42, &mut message);
                     PIDS.iter().enumerate().for_each(|(i, &x)| { find_and_splice_for_pid(x, i, &mut message); })
                 }
-                if DVCVariables::EmblemRecruitment.get_value() != 0 && (mess.contains("M0") || mess.contains("S001") || mess.contains("S002")) {
-                    find_and_splice_for_gid("GID_ディミトリ", 20, &mut message);
-                    find_and_splice_for_gid("GID_クロード", 21, &mut message);
-                    for x in 0..19 { find_and_splice_for_gid(EMBLEM_GIDS[x], x, &mut message); }
+                if DVCVariables::EmblemRecruitment.get_value() != 0 {
+                    if mess.contains("M0") || mess.contains("S001") || mess.contains("S002") {
+                        find_and_splice_for_gid("GID_ディミトリ", 20, &mut message);
+                        find_and_splice_for_gid("GID_クロード", 21, &mut message);
+                        for x in 0..19 { find_and_splice_for_gid(EMBLEM_GIDS[x], x, &mut message); }
+                    }
+                    else if EMBLEM_PARA.contains(&mess) && mess.contains("S0") {
+                        for x in 0..12 { replace_for_custom_gid(x, &mut message); }
+                    }
                 }
                 if message.len() <= original_length {
                     for x in 0..message.len() { unsafe { *text_ptr.add(x) = message[x]; } }
@@ -439,6 +445,17 @@ fn find_and_splice_for_gid(gid: &str, index: usize, message: &mut Vec<u16>) {
         while let Some(pos) = message.windows(pid_slice.len()).position(|window| window == pid_slice) {
             message.splice(pos..pos + pid_slice.len(), [14, 6, 500 + index as u16, 0]);
             if message.len() < pid_slice.len() { return; }
+        }
+    }
+}
+fn replace_for_custom_gid(index: usize, message: &mut Vec<u16>) {
+    let gid = EMBLEM_GIDS[index];
+    let gid_slice = gid.encode_utf16().collect::<Vec<u16>>();
+    if message.len() < gid_slice.len() { return; }
+    if EmblemPool::get_dvc_emblem_data(EMBLEM_GIDS[index]).filter(|g| EmblemPool::is_custom(g)).is_some(){
+        while let Some(pos) = message.windows(gid_slice.len()).position(|window| window == gid_slice) {
+            message.splice(pos..pos + gid_slice.len(), [14, 6, 500 + index as u16, 0]);
+            if message.len() < gid_slice.len() { return; }
         }
     }
 }
