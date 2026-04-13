@@ -193,3 +193,9 @@ pub fn is_tiki_engage(this: &mut AssetTableResult) -> bool {
     else if !this.body_model.is_null() { this.body_model.to_string().contains("Tik1AT") }
     else { false }
 }
+
+#[unity::hook("Combat", "CharacterEffect", "CreateBreak")]
+pub fn dvc_create_break_effect_hook(this: &mut CharacterEffect, method_info: OptionalMethod) {
+    call_original!(this, method_info);
+    outfit_core::room::break_effect(this);
+}
