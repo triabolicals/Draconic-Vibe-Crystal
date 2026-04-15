@@ -10,6 +10,7 @@ use engage::gamedata::Gamedata;
 use engage::menu::menu_item::config::{ConfigBasicMenuItem, ConfigBasicMenuItemCommandMethods};
 use engage::menu::menus::config::ConfigMenu;
 use engage::mess::Mess;
+use engage::sequence::mainmenusequence::MainMenuSequence;
 use crate::{deployment, continuous, randomizer, get_nested_il2cpp_class};
 use crate::config::menu::create_dvc_bind;
 use crate::ironman::vtable_edit;
@@ -37,24 +38,10 @@ extern "C" fn vibe() -> &'static mut ConfigBasicMenuItem {
     let title = format!("{} {}", draconic_vibe_name(), super::VERSION);
     ConfigBasicMenuItem::new_command::<TriabolicalMenu>(title)
 }
-pub struct WriteOutputConfirm;
-impl TwoChoiceDialogMethods for WriteOutputConfirm {
-    extern "C" fn on_first_choice(_this: &mut BasicDialogItemYes, _method_info: OptionalMethod) -> BasicMenuResult {
-        randomizer::write_seed_output_file();
-        BasicMenuResult::se_cursor().with_close_this(true)
-    }
-}
-
 pub fn install_vibe() {
     cobapi::install_global_game_setting(vibe);
     cobapi::install_game_setting(ingame::vibe2);
 }
-
-pub fn save_config_settings(_this: &BasicMenu<BasicMenuItem>, _method_info: OptionalMethod) -> i32 {
-    if DVCVariables::is_main_menu() {crate::DeploymentConfig::get().save(); }
-    return 0x201;
-}
-
 pub fn menu_calls_install() {
     if let Some(cc) = get_nested_class(Il2CppClass::from_name("App", "HubPlayTalkAfter").unwrap(), "CookingMenu"){
         vtable_edit(cc, "BuildAttribute", crate::message::cooking_menu_build_attribute as _ );
@@ -68,7 +55,6 @@ pub fn menu_calls_install() {
             vtable_edit(item, "CustomCall", randomizer::skill::learn::class_change_job_menu_item_custom_call as _);
         }
     }
-    // vtable_edit(Il2CppClass::from_name("App", "GmapSequence").unwrap(), "OnCreate", crate::procs::gmap_sequence_on_create as _);
     let enter_chapter = get_nested_il2cpp_class!("App", "GmapMenuSequence", "GmapMenu", "EnterChapterItem");
     vtable_edit(enter_chapter, "BuildAttribute", crate::procs::enter_chapter_build_attribute as _);
 
@@ -92,5 +78,3 @@ pub fn my_b_call(this: &ConfigMenu<()>, _: OptionalMethod) -> BasicMenuResult {
 }
 pub fn show(_this: &BasicMenuItem, _optional_method: OptionalMethod) -> i32 { 1 }
 pub fn dvc_header_version() { TitleBar::open_header(draconic_vibe_name(), super::VERSION, ""); }
-
-

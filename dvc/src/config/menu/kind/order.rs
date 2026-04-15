@@ -1,7 +1,7 @@
 use super::*;
 use engage::gameuserdata::GameUserData;
 use engage::menu::{BasicMenuItemAttribute, BasicMenuResult};
-use crate::DeploymentConfig;
+use crate::DVCConfig;
 pub static mut CUSTOM_RECRUITMENT_ORDER: [u8; 42] = [255; 42];
 #[repr(C)]
 #[derive(Clone, PartialOrd, PartialEq, Copy)]
@@ -18,11 +18,11 @@ impl DVCCMenuItem for RecruitmentOrder {
         if GameUserData::get_sequence() != 0 { BasicMenuResult::new() }
         else if *self != RecruitmentOrder::UnitCustom {
             this.padding = index;
-            DeploymentConfig::get().set_custom_index(this.index, this.padding, emblem);
+            DVCConfig::get().set_custom_index(this.index, this.padding, emblem);
             this.menu.full_menu_item_list.iter_mut().for_each(|item|{
                 if item.index != index as i32 && item.padding == index {
                     item.padding = 50;
-                    DeploymentConfig::get().set_custom_index(item.index, 50, emblem);
+                    DVCConfig::get().set_custom_index(item.index, 50, emblem);
                     item.update_text();
                 }
             });
@@ -46,7 +46,7 @@ impl DVCCMenuItem for RecruitmentOrder {
     fn plus_call(&self, this: &mut DVCConfigMenuItem) -> BasicMenuResult {
         if GameUserData::get_sequence() != 0 { BasicMenuResult::new() }
         else if *self != RecruitmentOrder::UnitCustom {
-            DeploymentConfig::get().set_custom_index(this.index, 50, *self == RecruitmentOrder::Emblem);
+            DVCConfig::get().set_custom_index(this.index, 50, *self == RecruitmentOrder::Emblem);
             this.update_config_text();
             BasicMenuResult::se_cursor()
         }
@@ -68,8 +68,8 @@ impl DVCCMenuItem for RecruitmentOrder {
         if GameUserData::get_sequence() != 0 { return BasicMenuResult::new(); }
         if let Some(increase) = get_change(true){
             match self {
-                RecruitmentOrder::Unit => { item.padding = DeploymentConfig::get().get_next_unit(item.index, increase); }
-                RecruitmentOrder::Emblem => { item.padding = DeploymentConfig::get().get_next_emblem(item.index, increase); }
+                RecruitmentOrder::Unit => { item.padding = DVCConfig::get().get_next_unit(item.index, increase); }
+                RecruitmentOrder::Emblem => { item.padding = DVCConfig::get().get_next_emblem(item.index, increase); }
                 RecruitmentOrder::UnitCustom => {
                     let old_value = item.padding;
                     let max = unsafe { CUSTOM_RECRUITMENT_ORDER[41] };

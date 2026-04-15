@@ -7,12 +7,12 @@ use engage::{
         mapsequence::MapSequenceLabel
     }
 };
+use engage::force::ForceType;
 use num_traits::cast::FromPrimitive;
 use engage::gamevariable::GameVariableManager;
-
 use outfit_core::{install_outfit_plugin, UnitAssetMenuData};
 use skyline::patching::Patch;
-use crate::{config::DVCVariables, randomizer, DeploymentConfig};
+use crate::{config::DVCVariables, randomizer, DVCConfig};
 pub const TITLE_SEQUENCE: i32 = -988690862;
 pub const MAIN_SEQUENCE: i32 = -339912801;
 pub const MAINMENU_SEQUENCE: i32 = -1912552174;
@@ -62,17 +62,17 @@ pub fn main_menu_sequence_events(proc: &ProcInst, label: i32) {
     match sequence_label {
         MainMenuSequenceLabel::PlayerGenderSelect => { 
             randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock|lock.reset() ).unwrap();
-            if DeploymentConfig::get().randomized {
+            if DVCConfig::get().randomized {
                 crate::config::menu::dvc_ng_menu_create_bind(proc);
             }
         },
         MainMenuSequenceLabel::ToStartGame => {
-            DeploymentConfig::get().save();
+            DVCConfig::get().save();
             randomizer::start_new_game();
         },
         MainMenuSequenceLabel::Option => {
-            DeploymentConfig::get().correct_rates();
-            DeploymentConfig::get().save();
+            DVCConfig::get().correct_rates();
+            DVCConfig::get().save();
         },
         _ => {}
     }
@@ -102,6 +102,7 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
     match label {
         0 => {
             if !UnitAssetMenuData::get().init {
+
                 install_outfit_plugin(true);
                 Patch::in_text(0x01bb272c).nop().unwrap(); // AssetTableResult Setup Prevents Commit
                 skyline::install_hooks!(
@@ -118,7 +119,6 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
 
 pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
     if label == 0 {
-        // randomizer::randomize_stuff();
         randomizer::tutorial_check();
         randomizer::skill::learn::update_learn_skills(false);
         crate::continuous::do_continious_mode();
@@ -131,15 +131,16 @@ pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
         crate::menus::menu_calls_install();
         randomizer::job::adjust_missing_weapon_mask();
         randomizer::item::adjust_non_unit_items_inventory();
-        /*
-        if crate::DeploymentConfig::get().debug {
-            Force::get(ForceType::Player).unwrap().iter().for_each(|u|{
+        if DVCConfig::get().debug {
+            engage::force::Force::get(ForceType::Player).unwrap().iter().
+                chain(engage::force::Force::get(ForceType::Player).unwrap().iter())
+                .for_each(|u|{
+                for x in 0..10 { u.set_base_capability(x, 120); }
                 let move_stat = u.base_capability[10] as i32;
                 if move_stat < 20 { u.set_base_capability(10,move_stat + 20); }
                 u.set_hp(u.get_capability(0, true));
             });
         }
-         */
     }
 }
 

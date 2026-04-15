@@ -1,4 +1,3 @@
-use engage::gamedata::skill::SkillDataCategorys::Ring;
 use engage::menu::{BasicMenuItemAttribute, BasicMenuMethods};
 use engage::proc::ProcInst;
 use engage::titlebar::TitleBar;
@@ -134,7 +133,7 @@ impl DVCMenu {
             }
         }
     }
-    pub fn rebuild_menu(&self, item: &mut DVCConfigMenuItem, keep_index: bool) {
+    pub fn rebuild_menu(&self, item: &mut DVCConfigMenuItem, _keep_index: bool) {
         item.menu.full_menu_item_list.clear();
         self.get_items().into_iter().enumerate().for_each(|(idx, k)| {
             match k {

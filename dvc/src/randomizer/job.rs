@@ -26,7 +26,27 @@ pub const JOB_HASH: [i32; 111] = [
 pub mod reclass;
 pub mod single;
 pub mod chaos;
-
+pub mod lockout;
+/*
+#[derive(Clone, PartialEq)]
+pub enum ClassLevelRank {
+    Base,
+    Promoted,
+    Special,
+}
+impl ClassLevelRank {
+    pub fn from_job(job: &JobData) -> Self {
+        if job.is_high() { Self::Promoted }
+        else if job.max_level >= 40 { Self::Special}
+        else { Self::Base }
+    }
+    pub fn from_unit(unit: &Unit) -> Self { Self::from_job(unit.job) }
+    pub fn from_person(person: &PersonData) -> Self {
+        if let Some(job) = person.get_job() { Self::from_job(job) }
+        else { Self::Base }
+    }
+}
+*/
 pub struct UnitPoolStaticFieldsMut {
     pub s_unit: &'static mut Array<&'static mut Unit>,
     pub forces: &'static mut Array<&'static Force>,
@@ -123,11 +143,12 @@ pub fn unit_change_to_random_class(unit: &mut Unit, change_level: bool) {
     };
     let is_high = old_data.0 == 1 || (old_data.0 == 2 && old_data.1 > 15);
     let rng = Random::get_game();
+    let mode = DVCVariables::ClassMode.get_value();
     let unit_level = old_data.1;
     let internal_level = if old_data.0 == 1 && old_data.2 == 0 { 20 } else { old_data.2 };
     let mut is_female = if unit.edit.is_enabled() { unit.edit.gender == 2 } else { unit.person.get_dress_gender() == Gender::Female };
-
-    if let Some(class) = DVCVariables::get_single_class(!is_high, is_female).filter(|p| DVCFlags::SingleJobEnabled.get_value()){
+    let lockout = mode >= 3;
+    if let Some(class) = DVCVariables::get_single_class(!is_high, is_female).filter(|p| DVCFlags::SingleJobEnabled.get_value() && !lockout){
         if class.parent.hash != unit.job.parent.hash {
             let level = unit.person.get_level() as i32;
             let internal = unit.person.get_internal_level() as i32;
@@ -149,14 +170,34 @@ pub fn unit_change_to_random_class(unit: &mut Unit, change_level: bool) {
         }
         else { return; }
     }
-    else {
+    else{
         if unit.person.flag.value & 32 != 0 { is_female = !is_female };   // Reverse gender
-        let job_list = JobData::get_list().unwrap();
-        let class_list: Vec<_> = job_list.iter()
-            .filter(|&job| unit_random_can_reclass(job, is_female, is_high, true, false)).collect();
-        if class_list.len() == 0 { return; }
-        let new_job = class_list[rng.get_value(class_list.len() as i32) as usize];
-        unit.class_change(new_job);
+        let mut class_list: Vec<_> = vec![];
+        let mut new_class = None;
+        if lockout {
+            let current_classes = lockout::get_all_playable_unit_classes(unit.person);
+            class_list = JobData::get_list().unwrap().iter().filter(|&job| !(lockout && current_classes.contains(&job.parent.hash))).collect();
+            new_class = class_list.get_remove_filter(rng, |j| unit_random_can_reclass(j, is_female, is_high, true, false));
+            if new_class.is_none() {
+                new_class = class_list.get_remove_filter(rng, |j| unit_random_can_reclass(j, is_female, !is_high, true, false));
+            }
+            if new_class.is_none() {
+                if let Some(v) = JobData::get("JID_村人") {
+                    unit.class_change(v);
+                    unit.set_hp(unit.get_capability(0, true));
+                    randomize_selected_weapon_mask(unit, None);
+                    skill::learn::unit_update_learn_skill(unit);
+                    return;
+                }
+            }
+        }
+        else {
+            class_list = JobData::get_list().unwrap().iter().filter(|&job| unit_random_can_reclass(job, is_female, is_high, true, false)).collect();
+            new_class = class_list.get_remove_filter(rng, |j| unit_random_can_reclass(j, is_female, is_high, true, false));
+        }
+        if let Some(new_class) = new_class.filter(|s| s.parent.hash != unit.job.parent.hash){ unit.class_change(new_class); }
+        else { return; }
+
         match old_data.0 {
             2 => { //Special
                 if unit.job.is_high() {
@@ -216,27 +257,27 @@ pub fn unit_change_to_random_class(unit: &mut Unit, change_level: bool) {
         }
     }
     unit.set_hp(unit.get_capability(0, true));  // fix HP
-    unit.set_weapon_mask_from_parson();
-    
-    fixed_unit_weapon_mask(unit);
     randomize_selected_weapon_mask(unit, None);
-    let mut new_opt = 
-        if unit.job.get_weapon_mask2().value & (1 << 9) != 0 { 1 << ( rng.get_value(8) + 1 ) }
-        else if unit.selected_weapon_mask.value == 0 { unit.weapon_mask.value }
-        else { unit.selected_weapon_mask.value };
+    if change_level {
+        unit.set_weapon_mask_from_parson();
+        fixed_unit_weapon_mask(unit);
+        let mut new_opt =
+            if unit.job.get_weapon_mask2().value & (1 << 9) != 0 { 1 << ( rng.get_value(8) + 1 ) }
+            else if unit.selected_weapon_mask.value == 0 { unit.weapon_mask.value }
+            else { unit.selected_weapon_mask.value };
 
-    if rng.get_value(20) < 5 {
-        new_opt |= 1 << ( rng.get_value(8) + 1 );
-        if rng.get_value(50) < 5 {
+        if rng.get_value(20) < 5 {
             new_opt |= 1 << ( rng.get_value(8) + 1 );
+            if rng.get_value(50) < 5 {
+                new_opt |= 1 << ( rng.get_value(8) + 1 );
+            }
         }
+        unit.original_aptitude.value = new_opt;
+        unit.aptitude.value |= new_opt;
     }
-    unit.original_aptitude.value = new_opt;
-    unit.aptitude.value |= new_opt;
-    skill::learn::unit_update_learn_skill(unit);
     adaptive_growths(unit, true);
+    skill::learn::unit_update_learn_skill(unit);
 }
-
 pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
     let current_job = unit.get_job();
     let current_job_name = current_job.name.to_string();
@@ -253,7 +294,7 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
 
     let is_high = if current_job.is_low() { unit.level > 20 }
         else { current_job.is_high() };
-
+    let rank = if current_job.is_low() { if current_job.max_level > 20 { 2 } else { 0 }} else { 1 };
     let is_flying = unit.get_job().move_type == 3;
     let unit_level = unit.level as i32;
     let internal_level = unit.internal_level as i32;

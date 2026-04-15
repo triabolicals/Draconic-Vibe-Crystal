@@ -1,20 +1,19 @@
-use super::*;
 
-mod command;
-mod submenu;
-pub(crate) mod order;
 
 use engage::dialog::BasicDialog2;
 use engage::gamedata::JobData;
 use engage::gamemessage::GameMessage;
-use engage::gameuserdata::GameUserData;
 use engage::menu::{BasicMenuItemAttribute, BasicMenuResult};
 use engage::mess::Mess;
 use engage::pad::{NpadButton, Pad};
 use unity::prelude::OptionalMethod;
 use unity::system::action::Action;
 use crate::config::DVCFlags;
+use super::*;
 
+mod command;
+mod submenu;
+pub(crate) mod order;
 
 pub use command::*;
 pub use submenu::*;
@@ -40,7 +39,7 @@ impl DVCCMenuItem for DVCMenuItemKind {
     fn a_call(&self, item: &mut DVCConfigMenuItem) -> BasicMenuResult {
         match self {
             DVCMenuItemKind::Variable(variables) => {
-                if variables.can_a_call() && (variables.get_value() != item.dvc_value) {
+                if variables.can_a_call(item.dvc_value) && (variables.get_value() != item.dvc_value) {
                     let action = Action::new_method_mut(Some(item), change_variable);
                     let message = DVCConfigText::change_text(item.title.to_string().as_str(), item.command_text);
                     BasicDialog2::create_confirm_cancel_bind(item.menu, message, Some(action));
@@ -140,6 +139,10 @@ impl DVCCMenuItem for DVCMenuItemKind {
                                 let action = Action::new_method_mut(Some(item), oops_all_change);
                                 BasicDialog2::create_confirm_cancel_bind(item.menu, "Disable 'Opps All' mode?", Some(action));
                                 return BasicMenuResult::se_cursor()
+                            }
+                            else {
+                                let v = DVCVariables::ClassMode.get_value();
+                                item.is_command = (v > 2) != (current > 2);
                             }
                         }
                         let new_value = DVCVariables::ClassMode.increment(current, increase);

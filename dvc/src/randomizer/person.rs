@@ -123,7 +123,7 @@ pub fn randomize_person() {
                 for x in 0..41 { DVCVariables::set_person_recruitment(x, RR_ORDER[x as usize] as i32); }
             },
             3 => { // Custom
-                let order =crate::DeploymentConfig::get().get_custom_recruitment(false);
+                let order =crate::DVCConfig::get().get_custom_recruitment(false);
                 order.iter().for_each(|(p1, p2)|{
                     println!("{} -> {}", *p1, *p2);
                     println!("{} to {}", Mess::get_name(PIDS[*p1 as usize]), Mess::get_name(PIDS[*p2 as usize]));

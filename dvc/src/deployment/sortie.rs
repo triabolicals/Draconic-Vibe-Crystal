@@ -2,22 +2,25 @@ use engage::menu::{BasicMenuItem, BasicMenuItemAttribute};
 use engage::menu::menu_item::sortie::SortieUnitSelectUnitMenuItem;
 use engage::sortie::SortieSelectionUnitManager;
 use engage::unit::{Gender, UnitPool};
+use crate::get_nested_il2cpp_class;
 use crate::ironman::vtable_edit;
 use crate::utils::get_nested_class;
 use super::*;
 
 pub fn sortie_deployment_menu_install() {
-    let sortie_top_menu_class = Il2CppClass::from_name("App", "SortieTopMenu").unwrap();
-    if let Some(klass) = get_nested_class(sortie_top_menu_class, "SelectionUnitMenuItem") { 
-        vtable_edit(klass, "GetMapAttribute",  sortie_menu_selection_unit_map_attr as _);
-    }
-    if let Some(klass) = get_nested_class(sortie_top_menu_class, "GodMenuItem") {
-        vtable_edit(klass, "GetMapAttribute",  sortie_menu_god_menu_map_attr as _);
-    }
-    if let Some(klass) =  Il2CppClass::from_name("App", "SortieUnitSelect").ok()
-        .and_then(|klass| get_nested_class(klass, "UnitMenuItem"))
-    {
-        vtable_edit(klass, "BuildAttribute", sortie_unit_select_build_attr  as _);
+
+    vtable_edit(
+        get_nested_il2cpp_class!("App", "SortieUnitSelect", "UnitMenuItem"),
+        "BuildAttribute",
+        sortie_unit_select_build_attr as _
+    );
+    if let Some(sortie_top) = Il2CppClass::from_name("App", "SortieTopMenu").ok() {
+        if let Some(klass) = get_nested_class(sortie_top, "SelectionUnitMenuItem") {
+            vtable_edit(klass, "GetMapAttribute",  sortie_menu_selection_unit_map_attr as _);
+        }
+        if let Some(klass) = get_nested_class(sortie_top, "GodMenuItem") {
+            vtable_edit(klass, "GetMapAttribute",  sortie_menu_god_menu_map_attr as _);
+        }
     }
 }
 

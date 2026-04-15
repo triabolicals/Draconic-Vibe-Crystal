@@ -488,6 +488,7 @@ impl RandomizedGameData {
             DVCMenuItemKind::Variable(variables) => {
                 let value = variables.get_value();
                 match variables {
+                    DVCVariables::ClassMode => { if value > 2 { crate::randomizer::job::lockout::lockout_classes(); } }
                     DVCVariables::EmblemWepProf => { Self::get_read().emblem_aptitude_randomizer.commit(data); }
                     DVCVariables::EmblemSyncSkill|DVCVariables::EmblemEngageSkill => { RandomizedGameData::get_read().engage_skills.commit(data); }
                     DVCVariables::JobLearnMode => { crate::randomizer::skill::learn::update_learn_skills(true); }

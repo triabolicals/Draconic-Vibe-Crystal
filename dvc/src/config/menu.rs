@@ -1,18 +1,15 @@
 use unity::prelude::*;
 use engage::{
-    dialog::yesno::*,
     menu::{BasicMenuResult, *},
-    pad::Pad, proc::{Bindable, ProcInst},
+    proc::{Bindable, ProcInst},
     sequence::configsequence::ConfigSequence,
     titlebar::TitleBar,
 };
 use engage::game::GameUI;
 use engage::gamedata::Gamedata;
-use engage::menu::menu_item::config::{ConfigBasicMenuItem, ConfigBasicMenuItemCommandMethods};
 use engage::menu::menus::config::{ConfigMenuContent, ConfigRoot};
 use engage::resourcemanager::ResourceManager;
 use unity::system::List;
-use engage::unityengine::*;
 pub mod items;
 pub(crate) mod kind;
 mod text;

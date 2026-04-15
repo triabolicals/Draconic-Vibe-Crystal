@@ -4,8 +4,6 @@ use engage::force::{Force, ForceType};
 use engage::gamedata::dispos::DisposData;
 use engage::gamedata::GamedataArray;
 use engage::gameuserdata::GameUserData;
-use engage::gamevariable::GameVariableManager;
-use engage::god::GodPool;
 use engage::map::situation::MapSituation;
 use engage::proc::desc::ProcDesc;
 use engage::proc::{ProcInst, ProcVoidMethod};
@@ -14,10 +12,9 @@ use engage::util::{get_instance};
 use unity::il2cpp::object::Array;
 use unity::prelude::OptionalMethod;
 use crate::deployment::{fulldeploy, get_emblem_paralogue_level};
-use crate::{procs, randomizer, DVCVariables, DeploymentConfig};
+use crate::{procs, randomizer, DVCVariables};
 use crate::config::DVCFlags;
 use crate::message::{TextSwapper, MESSAGE_SWAPPER};
-use crate::randomizer::data::GameData;
 use crate::randomizer::map::shuffle::shuffle_deployment;
 use crate::script::adjust_person_map_inspectors;
 
@@ -27,11 +24,13 @@ pub fn map_sequence_desc_edit(descs: &mut Array<&mut ProcDesc>) {
     descs[21] = ProcDesc::call(ProcVoidMethod::new(None, map_sequence_dispos_unit));
     descs[45] = ProcDesc::call(ProcVoidMethod::new(None, map_sequence_map_opening));
     descs[0xCF] = ProcDesc::call(ProcVoidMethod::new(None, procs::hubsequence::hub_sequence_unload_script));
+    /*
     if !GameVariableManager::get_bool("G_Cleared_M001") && DeploymentConfig::get().debug {
         GameData::get_playable_god_list().iter().for_each(|g|{
             if let Some(g_unit) = GodPool::create(g) { g_unit.set_escape(false); }
         });
     }
+    */
 }
 /*
 pub fn map_sequence_mind_desc_edit(descs: &mut Array<&mut ProcDesc>) {

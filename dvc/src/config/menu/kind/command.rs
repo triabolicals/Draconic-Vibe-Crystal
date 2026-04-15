@@ -2,11 +2,11 @@ use engage::gamemessage::GameMessage;
 use engage::gamevariable::GameVariableManager;
 use engage::keyboard::SoftwareKeyboard;
 use unity::system::action::Action1;
-use crate::{DeploymentConfig, CONFIG};
+use crate::DVCConfig;
 use crate::randomizer::data::GameData;
 use crate::randomizer::RANDOMIZER_STATUS;
 use crate::randomizer::status::RandomizerStatus;
-use crate::utils::{can_rand, get_random_number_for_seed};
+use crate::utils::{get_random_number_for_seed};
 use super::*;
 
 #[repr(C)]
@@ -22,8 +22,8 @@ impl DVCCMenuItem for DVCCommand {
             DVCCommand::SetSeed => {
                 let action = Action1::<Il2CppString>::new_with_method_mut(Some(item), set_string_value);
                 let v =
-                    if DeploymentConfig::get().seed == 0 { get_random_number_for_seed() }
-                    else { DeploymentConfig::get().seed };
+                    if DVCConfig::get().seed == 0 { get_random_number_for_seed() }
+                    else { DVCConfig::get().seed };
                 
                 SoftwareKeyboard::create_bind(
                     item.menu,
@@ -88,7 +88,7 @@ fn set_seed_yes(item: &mut DVCConfigMenuItem, _: OptionalMethod) {
     let not_random = DVCVariables::Seed.get_value() == 0;
     update_seed(item.dvc_value as u32);
     if not_random {
-        DeploymentConfig::get().create_game_variables(false);
+        DVCConfig::get().create_game_variables(false);
         DVCMenu::Main.rebuild_menu(item, true);
     }
     else { item.update_config_text(); }

@@ -4,7 +4,7 @@ use engage::gameuserdata::GameUserData;
 use engage::gamevariable::GameVariableManager;
 use engage::menu::BasicMenuItemAttribute;
 use crate::config::DVCVariables;
-use crate::DeploymentConfig;
+use crate::DVCConfig;
 use crate::randomizer::data::GameData;
 use crate::randomizer::status::RandomizerStatus;
 use crate::utils::dlc_check;
@@ -231,7 +231,7 @@ impl DVCFlags {
     pub fn get_by_index(index: i32) -> bool { Self::from(index).map(|v| v.get_value()).unwrap_or(false) }
     pub fn set_by_index(index: i32, value: bool) { if let Some(v) = Self::from(index) { v.set_value(value); } }
     pub fn get_from_config(self) -> bool {
-        let config = DeploymentConfig::get();
+        let config = DVCConfig::get();
         match self {
             Self::Initialized | Self::LueurJobSet => { false }
             Self::RandomEventItems => { config.random_item }
@@ -282,7 +282,7 @@ impl DVCFlags {
         }
     }
     pub fn set_config(self, value: bool) {
-        let config = DeploymentConfig::get();
+        let config = DVCConfig::get();
         match self {
             // Self::Initialized|Self::LueurJobSet => {}
             Self::RandomEventItems => { config.random_item = value }

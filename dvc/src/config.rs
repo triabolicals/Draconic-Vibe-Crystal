@@ -1,22 +1,20 @@
-mod flags;
-pub(crate) mod variables;
-pub mod menu;
-
-pub use flags::*;
-pub use variables::*;
-use bitflags::{Flags};
 use serde::{Deserialize, Serialize};
-use unity::prelude::*;
 use super::CONFIG;
 use engage::{gamevariable::*, gamedata::*, };
 use engage::gamedata::accessory::AccessoryData;
-use num_traits::FromPrimitive;
 use crate::{*, utils};
+use crate::config::menu::CUSTOM_RECRUITMENT_ORDER;
 pub(crate) use crate::config::variables::DVCVariables;
+use crate::randomizer::data::GameData;
 use crate::utils::{clamp_value, dlc_check, get_rng};
 
+pub mod flags;
+pub mod variables;
+pub mod menu;
+pub use flags::*;
+
 #[derive(Default, Serialize, Deserialize)]
-pub struct DeploymentConfig {
+pub struct DVCConfig {
     pub randomized: bool,
     pub seed: u32,
     pub debug: bool,
@@ -111,7 +109,7 @@ pub struct DeploymentConfig {
     pub emblem: [u8; 25],
 }
 
-impl DeploymentConfig {
+impl DVCConfig {
     pub fn get() -> &'static mut Self { unsafe { &mut CONFIG } }
     pub fn new() -> Self {
         println!("Opening dvc.toml");
@@ -127,7 +125,7 @@ impl DeploymentConfig {
             } else {
                 // This is mostly intended to create a new file if more items are added to the struct
                 println!("DVC Config: Config file could not be parsed or new settings are added.\nNew default config file has been created.");
-                let config = DeploymentConfig::default();
+                let config = DVCConfig::default();
                 // config.save();
                 config
             }
@@ -135,13 +133,13 @@ impl DeploymentConfig {
         else {
             // If the file could not be read to a string then create a new file with default values.
             println!("DVC Config: The config file was either missing or unable to be read, creating new toml.");
-            let config = DeploymentConfig::default();
+            let config = DVCConfig::default();
             // config.save();
             config
         }
     }
     pub const fn default() -> Self {
-        let config = DeploymentConfig  {
+        let config = DVCConfig {
             body_scale: 0,
             unit1: [50; 32],
             unit2: [50; 10],
@@ -231,7 +229,7 @@ impl DeploymentConfig {
         }
     }
     pub fn get_next_unit(&mut self, index: i32, increase: bool) -> u8 {
-        let mut current = if index < 32 { self.unit1[index as usize] } else { self.unit2[index as usize - 32] };
+        let current = if index < 32 { self.unit1[index as usize] } else { self.unit2[index as usize - 32] };
         let range = if dlc_check() { 41 } else { 36 };
         let i = index as u8;
         let used: Vec<u8> = self.unit1.iter().chain(self.unit2.iter()).map(|u| *u).collect();
@@ -254,54 +252,62 @@ impl DeploymentConfig {
                 available.iter().find(|x| !used.contains(x)).map(|x| *x).unwrap_or(current)
             }
         };
-        if index < 32 { self.unit1[index as usize] = new; }
-        else { self.unit2[index as usize - 32] = new; }
+        if index < 32 { self.unit1[index as usize] = new; } else { self.unit2[index as usize - 32] = new; }
         new
     }
     pub fn get_next_emblem(&mut self, index: i32, increase: bool) -> u8 {
-        let mut current = self.emblem[index as usize];
-        let range = if dlc_check() { 19 } else { 12 };
-        let i = index as u8;
-        let used: Vec<u8> = self.emblem.iter().map(|u| *u).collect();
-        let new =
-        if increase {
-            let start = if current == 50 { i } else if current < range { current } else { 0 };
-            let available: Vec<u8> = (start..range).collect();
-            if let Some(pos) = available.iter().find(|x| !used.contains(x)) { *pos }
-            else {
-                let available: Vec<u8> = (0..start).collect();
-                available.iter().find(|x| !used.contains(x)).map(|x| *x).unwrap_or(current)
+        let count = GameData::get_playable_emblem_hashes().len() as u8;
+        let mut available: Vec<u8> = (0..12).collect();
+        if dlc_check() { available.extend(12..19); }    // Add DLC Emblems
+        if count > 20 { available.extend(20..count as u8); }    // Custom Emblems
+        self.emblem.iter_mut().enumerate().for_each(|(emblem_idx, i)|{
+            if emblem_idx >= 12 && emblem_idx < 19 && !dlc_check() { *i = 50; }
+            else if *i < count {
+                if !available.contains(&i) { *i = 50 }
+                else { available.retain(|&r| r != *i); }
             }
+        });
+        let current = self.emblem[index as usize];
+        if increase {
+            if current == 50 { self.emblem[index as usize] = available.iter().map(|x| *x).min().unwrap_or(50); }
+            else { self.emblem[index as usize] = available.iter().filter(|i| **i > current).map(|i| *i).min().unwrap_or(50); }
         }
         else {
-            let start = if current == 50 { i } else if current == 0 { range} else { current };
-            let available: Vec<u8> = (0..start).rev().collect();
-            if let Some(pos) = available.iter().find(|x| !used.contains(x)) { *pos }
-            else {
-                let available: Vec<u8> = (start..range).rev().collect();
-                available.iter().find(|x| !used.contains(x)).map(|x| *x).unwrap_or(current)
-            }
+            if current == 50 { self.emblem[index as usize] = available.iter().map(|x| *x).max().unwrap_or(50); }
+            else { self.emblem[index as usize] = available.iter().filter(|i| **i < current).map(|i| *i).max().unwrap_or(50); }
         };
-        self.emblem[index as usize] = new;
-        new
+        self.emblem[index as usize]
     }
     /// Output is Person Index, New Person Index
     pub fn get_custom_recruitment(&self, is_emblem: bool) -> Vec<(i32, i32)> {
         let mut output: Vec<(i32, i32)> = Vec::new();
         let table: Vec<u8> =
             if is_emblem { self.emblem.iter().map(|u| *u).collect() }
+            else if self.random_recruitment == 4 { unsafe { CUSTOM_RECRUITMENT_ORDER.iter().cloned().collect() } }
             else { self.unit1.iter().chain(self.unit2.iter()).map(|u| *u).collect() };
-
+        let mut available = vec![];
+        let count;
+        if is_emblem {
+            count = GameData::get_playable_emblem_hashes().len() as u8;
+            available = (0..12).collect();
+            if dlc_check() { available.extend(12..19); }    // Add DLC Emblems
+            if count > 20 { available.extend(20..count); }    // Custom Emblems
+        }
+        else {
+            count = if self.random_recruitment == 4 { GameData::get().playables.len() as u8 } else { 41 };
+            available = (0..count).collect();
+            if !dlc_check() { available.retain(|&r| r < 36 && r > 40) }
+        }
         let limit = utils::get_total_unit_emblems(is_emblem) as u8;
-        let mut available: Vec<u8> = (0..limit).collect();
         let mut pool: Vec<u8> = Vec::new();
         for x in 0..limit {
             let value = table[x as usize];
-            if table[x as usize] < limit {
-                output.push( (x as i32, value as i32) );
+            if value < count {
                 if let Some(pos) = available.iter().position(|&y| value == y) {
-                    available.remove(pos);
+                    let v = available.remove(pos);
+                    output.push( (x as i32, v as i32) );
                 }
+                else { pool.push(x); }
             }
             else { pool.push(x); }
         }
@@ -324,14 +330,17 @@ impl DeploymentConfig {
         self.bond_ring_skill_a_rate = clamp_value(self.bond_ring_skill_a_rate, 0, 100);
         self.bond_ring_skill_b_rate = clamp_value(self.bond_ring_skill_b_rate, 0, 100);
         self.bond_ring_skill_c_rate = clamp_value(self.bond_ring_skill_c_rate, 0, 100);
+        let count = GameData::get_playable_emblem_hashes().len() as u8;
+        for x in 0..19 {
+            let idx = self.emblem[x];
+            if idx == 19 || idx >= count { self.emblem[x] = 50; }
+        }
     }
     pub fn get_bond_ring_rates(&self) -> [i32; 4] {
         let mut rate: [i32; 4] = [self.bond_ring_skill_s_rate, self.bond_ring_skill_a_rate, self.bond_ring_skill_b_rate, self.bond_ring_skill_c_rate];
         let v = DVCVariables::BondRingSkillRate.get_value();
         if v != 0 {
-            for x in 0..4 {
-                rate[x] = (v >> (8*x)) & 255;
-            }
+            for x in 0..4 { rate[x] = (v >> (8*x)) & 255; }
         }
         else {
             let mut value = 0;
@@ -354,7 +363,7 @@ impl DeploymentConfig {
         let out_toml = toml::to_string(&self).unwrap(); // toml::to_string_pretty(&self).unwrap();
         std::fs::write("sd:/engage/config/dvc.toml", out_toml)
             .expect("should be able to write to write default configuration");
-        
+
         println!("Config Saved");
     }
     pub fn create_game_variables(&self, set_value: bool) {
@@ -384,9 +393,9 @@ impl DeploymentConfig {
             for x in 0..5 {
                 if let Some(var) = DVCVariables::from(30+x).map(|s| self.get_value(s)){
                     let v2 = clamp_value(var, 0, 100) / 10;
-                    println!("Gauge {}: {} -> {}", x, var, v2);
+                    // println!("Gauge {}: {} -> {}", x, var, v2);
                     v |= v2 << x*5;
-                    println!("Var: {}", v);
+                    // println!("Var: {}", v);
                 }
             }
             GameVariableManager::make_entry_norewind(DVCVariables::EnemySkillGauge.get_key(), v);
@@ -514,10 +523,6 @@ pub fn migrate_to_v5() {
     GameVariableManager::set_number(FLAGNAME, s);
     GameVariableManager::set_number("G_DVC_Version", 5);
 }
-pub fn set_flag_from_bool(other: DVCFlags, game_var: &str) {
-    other.set_value(GameVariableManager::get_bool(game_var));
-}
-
 pub fn remove_old_keys() {
     let mut count = 0;
     GameVariableManager::find_starts_with("G_L_JID").iter().for_each(|i|{

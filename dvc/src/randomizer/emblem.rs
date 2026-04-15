@@ -39,7 +39,7 @@ pub fn randomize_emblems() {
     }
     else {
         let rng = get_rng();
-        let no_dlc = !dlc_check() || DeploymentConfig::get().dlc & 2 != 0;
+        let no_dlc = !dlc_check() || DVCConfig::get().dlc & 2 != 0;
         let emblem_recruitment = DVCVariables::EmblemRecruitment.get_value();
         DVCVariables::create_recruitment_variables(true);
         match emblem_recruitment {
@@ -76,8 +76,17 @@ pub fn randomize_emblems() {
                 for i in 0..12 { DVCVariables::set_emblem_recruitment(i, 11 - i); }
             },
             3 => {  // Custom
-                let order = DeploymentConfig::get().get_custom_recruitment(true);
-                order.iter().for_each(|&x| { DVCVariables::set_emblem_recruitment(x.0, x.1); });
+                let order = DVCConfig::get().get_custom_recruitment(true);
+                let emblems = GameData::get_playable_god_list();
+                let list_size = emblems.len();
+                order.iter().for_each(|&x| {
+                    let idx = x.0 as usize;
+                    let new_idx = x.1 as usize;
+                    if idx < list_size && new_idx < list_size {
+                        DVCVariables::set_variable_key_string(format!( "G_R_{}",emblems[idx].gid), emblems[new_idx].gid);
+                        DVCVariables::set_variable_key_string(format!("G_R2_{}",emblems[new_idx].gid), emblems[idx].gid);
+                    }
+                });
             },
             _ => { DVCVariables::create_recruitment_variables(true); },
         }
@@ -112,7 +121,6 @@ pub fn update_lueur_bonds() {
             Force::get(ForceType::Absent).unwrap().iter().chain(  Force::get(ForceType::Player).unwrap().iter() )
                 .for_each(|unit|{
                     if let Some(g_bond) = g_unit.get_bond(unit){
-                        // println!("Lueur Bond with {} [{}]", unit.get_name(), g_bond.level);
                         if g_bond.level < 20 {
                             g_bond.set_level(20);
                             unit.inherit_apt(g_unit);

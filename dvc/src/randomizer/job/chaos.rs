@@ -2,7 +2,7 @@ use engage::{
     unit::{Gender, Unit},
     gamedata::{Gamedata, JobData},
     gameuserdata::GameUserData,
-    proc::{ProcInst, ProcInstFields},
+    proc::ProcInstFields,
     random::Random,
 };
 use engage::proc::Bindable;

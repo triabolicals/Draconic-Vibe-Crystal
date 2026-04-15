@@ -35,7 +35,7 @@ pub fn randomize_bond_ring_skills() {
     if DVCFlags::Initialized.get_value() { data.bond_ring.iter().for_each(|r| { r.reset(); }); }
     let ring_list = RingData::get_list_mut().unwrap();
     let ranks = [3, 2, 1, 0];
-    let ranks_rate = crate::DeploymentConfig::get().get_bond_ring_rates();
+    let ranks_rate = crate::DVCConfig::get().get_bond_ring_rates();
     let none = ranks_rate.iter().filter(|x| **x > 0).count() == 0;
     println!("Bond Rings Rates: S: {} A: {} B: {} C: {}: Bond Ring: {}", ranks_rate[0], ranks_rate[1], ranks_rate[2], ranks_rate[3], DVCFlags::BondRing.get_value());
     if DVCFlags::BondRing.get_value() && !none { 

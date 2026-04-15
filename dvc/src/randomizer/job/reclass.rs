@@ -7,7 +7,7 @@ use engage::menu::menus::class_change::{ChangeJobDataProofTypes, ClassChange, Cl
 
 pub fn class_change_job_menu_item_build_attr(this: &mut ClassChangeJobMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
     if !DVCVariables::random_enabled() { return this.attribute; }
-    if DeploymentConfig::get().debug { return BasicMenuItemAttribute::Enable; }
+    if DVCConfig::get().debug { return BasicMenuItemAttribute::Enable; }
     let job = &this.job_data.job;
     let job_flags = job.flag.value;
     let unit = SortieSelectionUnitManager::get_unit();
@@ -59,7 +59,7 @@ pub fn class_change_job_menu_item_build_attr(this: &mut ClassChangeJobMenuItem, 
         }
         else { BasicMenuItemAttribute::Hide }
     }
-    else if DeploymentConfig::get().debug {
+    else if DVCConfig::get().debug {
         this.attribute = BasicMenuItemAttribute::Enable;
         this.job_data.is_default_job = true;
         BasicMenuItemAttribute::Enable
@@ -76,7 +76,7 @@ pub fn class_change_job_menu_item_build_attr(this: &mut ClassChangeJobMenuItem, 
     }
 }
 pub fn class_change_a_call_random_cc(item: &ClassChangeJobMenuItem, _method_info: OptionalMethod) -> BasicMenuResult {
-    if DVCVariables::Reclassing.get_value() == 1 && item.attribute == BasicMenuItemAttribute::Enable {
+    if DVCVariables::ClassMode.get_value() < 3 && DVCVariables::Reclassing.get_value() == 1 && item.attribute == BasicMenuItemAttribute::Enable {
         let unit = ClassChangeJobMenu::get_selected_unit_copy();
         let change_job_list = ClassChange::get_job_list_all();
         let proof = if item.job_data.proof_type > ChangeJobDataProofTypes::Master { 1 } else { 0 };

@@ -139,7 +139,7 @@ impl DVCConfigText {
         var_str.windows(2).enumerate().for_each(|(i, s)|{
             if i % 2 == 0 {
                 let mut spilt_line_1 = s[0].split('|');
-                let mut spilt_line_2 = s[1].split('|');
+                let spilt_line_2 = s[1].split('|');
                 if let Some(title) = spilt_line_1.next() {
                     if title.starts_with("Var") {
                         var.push(DVCVariableText{title, commands: vec![], help: vec![]});
@@ -244,7 +244,7 @@ impl DVCConfigText {
                 }
             }
             DVCMenuItemKind::Gauge(var) => {
-                let mut index = var as usize;
+                let index = var as usize;
                 let s_index = if index > 35 { 35 } else { index };
                 if let Some(m) = self.var.get(s_index){
                     let help_index =
@@ -337,9 +337,11 @@ impl DVCConfigText {
                         }
                         RecruitmentOrder::Emblem => {
                             let new_index = item.padding as usize;
+                            let playable_gods = GameData::get_playable_emblem_hashes();
                             item.command_text =
-                                if new_index < 19 { Mess::get(format!("MPID_{}", RINGS[new_index])) }
-                                else { Mess::get("MID_MATCH_Random") }
+                                if new_index >= 50 { Mess::get("MID_MATCH_Random") }
+                                else if let Some(god) = playable_gods.get(new_index).and_then(|hash| GodData::try_get_hash(*hash)){ Mess::get(god.mid) }
+                                else { format!("#{} - ???", new_index).into() };
                         }
                     }
                 }

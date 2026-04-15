@@ -320,15 +320,7 @@ fn hair_adjustment(result: &mut AssetTableResult) {
         }
     }
 }
-fn eve_sforgia_correction(result: &mut AssetTableResult, mode: i32) {
-    if mode != 1 { return; }
-    if !result.body_model.is_null() {
-        let body = result.body_model.to_string();
-        if body.contains("c451") { result.body_model = body.replace("c451", "c000").into(); }
-        if body.contains("c151") { result.body_model = body.replace("c151", "c000").into(); }
-    }
-}
-pub(crate) fn random_body_scale(result: &mut AssetTableResult, hash: Option<i32>, is_unit_info: bool) {
+pub(crate) fn random_body_scale(result: &mut AssetTableResult, hash: Option<i32>, _is_unit_info: bool) {
     let scale_mode = DVCVariables::BodyScaling.get_value();
     if scale_mode == 0 { return; }
     let rng = 

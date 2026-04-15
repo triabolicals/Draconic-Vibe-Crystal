@@ -5,7 +5,7 @@ use crate::{utils, DVCVariables};
 use accessory::change_accessory;
 use crate::assets::dress::*;
 use crate::config::DVCFlags;
-use crate::randomizer::data::{EmblemPool, GameData, RandomizedGameData};
+use crate::randomizer::data::{GameData, RandomizedGameData};
 use crate::randomizer::{Randomizer};
 use crate::randomizer::names::get_emblem_person;
 use crate::randomizer::person::is_playable_person;
@@ -247,11 +247,11 @@ pub fn asset_table_robin_hook(
     if mode == 2 && person.gender != 0 && DVCFlags::RandomBossesNPCs.get_value() && GameUserData::get_sequence() > 0 {
         let db = get_outfit_data();
         let original_result = call_original!(this, mode, person, conditions, method_info);
-        outfit_core::print_asset_table_result(original_result, 2);
+        // print_asset_table_result(original_result, 2);
         if let Some(appearance) = RandomizedGameData::get_read().person_appearance.get_person_appearance(person).as_ref(){
             appearance.apply_appearance(original_result, 2, false, None, &db.hashes, true);
             random_body_scale(original_result, None, false);
-            outfit_core::print_asset_table_result(original_result, 2);
+            // print_asset_table_result(original_result, 2);
             return original_result;
         }
         else if person.flag.value & 128 == 0 && person.gender != 0 && ( person.get_job().is_none_or(|v| v.parent.hash == 499211320 || v.parent.index == 0)){

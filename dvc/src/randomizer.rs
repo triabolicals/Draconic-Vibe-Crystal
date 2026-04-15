@@ -47,6 +47,7 @@ use outfit_core::UnitAssetMenuData;
 use crate::assets::emblem::{get_random_engage_voice, has_engage_decide};
 use crate::randomizer::blacklist::DVCBlackLists;
 use crate::randomizer::data::{GameData, RandomizedGameData};
+use crate::VARIABLE_VERSION;
 pub use super::{CONFIG, VERSION};
 
 pub static RANDOMIZER_DATA: OnceLock<GameData> = OnceLock::new();
@@ -161,18 +162,18 @@ pub fn in_map_randomize() { person::unit::reload_all_actors(); }
 
 /// Routine after NG is started to randomize gamedata
 pub fn start_new_game(){
-    DeploymentConfig::get().correct_rates();
-    GameVariableManager::make_entry("G_DVC_Version", 5);
-    let seed = DeploymentConfig::get().seed;
+    DVCConfig::get().correct_rates();
+    GameVariableManager::make_entry("G_DVC_Version", VARIABLE_VERSION);
+    let seed = DVCConfig::get().seed;
     GameVariableManager::make_entry_norewind(DVCVariables::DVC_STATUS, 0);
 
-    let iron_man = DeploymentConfig::get().ironman;
-    let randomized = DeploymentConfig::get().randomized;
+    let iron_man = DVCConfig::get().ironman;
+    let randomized = DVCConfig::get().randomized;
     let ran_seed = if randomized { if seed == 0 { utils::get_random_number_for_seed() } else { seed } } else { 0 };
 
     println!("Starting new game Seed: {} [{}]", ran_seed, randomized);
     DVCVariables::Seed.init_var(ran_seed as i32, true);
-    DeploymentConfig::get().create_game_variables(randomized);
+    DVCConfig::get().create_game_variables(randomized);
     if iron_man { crate::ironman::ironman_code_edits(); }
     DVCFlags::Initialized.set_value(false);
     if randomized { randomize_gamedata(true); }
@@ -276,7 +277,7 @@ fn upgrade() {
             DVCVariables::set_emblem_recruitment(x, s as i32);
         }
     }
-    GameVariableManager::set_number("G_DVC_Version", 7);
+    GameVariableManager::set_number("G_DVC_Version", crate::VARIABLE_VERSION);
 }
 
 pub fn initialize_game_data() {
@@ -293,7 +294,7 @@ pub fn initialize_game_data() {
     crate::assets::data::initialize_search_list();
     crate::talk::fill_name_array();
     job::correct_job_base_stats();
-    DeploymentConfig::get().seed = 0;
+    DVCConfig::get().seed = 0;
     println!("Finished Initialization GameData");
 }
 

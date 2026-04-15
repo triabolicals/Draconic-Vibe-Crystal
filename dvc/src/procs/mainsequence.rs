@@ -49,7 +49,6 @@ extern "C" fn main_sequence_load_resource(main_sequence: &mut MainSequence, _opt
 
 extern "C" fn main_sequence_game_reset(main_sequence: &mut ProcInst, _optional_method: OptionalMethod) {
     if RANDOMIZER_STATUS.try_read().ok().map(|v| v.seed != 0 ).unwrap_or(false) {
-        // println!("GameReset");
         crate::randomizer::reset_gamedata();
     }
     call_proc_original_method(main_sequence, "GameReset");

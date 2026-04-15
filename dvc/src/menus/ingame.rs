@@ -43,6 +43,3 @@ pub fn draconic_vibe_name() -> &'static str {
         _ => "Draconic Vibe Crystal",
     }
 }
-
-#[skyline::from_offset(0x01bdbc80)]
-fn get_lang(method_info: OptionalMethod) -> i32;

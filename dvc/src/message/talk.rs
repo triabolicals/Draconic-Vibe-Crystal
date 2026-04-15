@@ -10,7 +10,7 @@ use crate::enums::{EMBLEM_GIDS, RINGS};
 use crate::message::{TextSwapper, MESSAGE_SWAPPER};
 use crate::randomizer::names::AppearanceRandomizer;
 use crate::randomizer::{item, RANDOMIZED_DATA};
-use crate::randomizer::data::{EmblemPool, GameData};
+use crate::randomizer::data::{EmblemPool};
 
 #[unity::class("App.Talk3D", "TalkUI")]
 pub struct TalkUI {
@@ -150,19 +150,15 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
                         };
                     DVCVariables::get_current_god(recruitment_index as i32).map(|g| g.gid.to_string().into())
                 }
-                else if tag >= 530 {    //
+                else if tag >= 530 {
                     let recruitment_index = tag - 530;
-                    //let data = GameData::get();
                     if let Some(name) = EmblemPool::get_dvc_emblem_data(EMBLEM_GIDS[recruitment_index as usize])
                         .filter(|g| EmblemPool::is_custom(g))
-                        //.and_then(|v| data.emblem_pool.custom_emblem_names.get(&v.parent.hash))
                     {
                         Some(Mess::get(name.mid))
-                        //Some(name.as_str().into())
                     }
                     else if DVCFlags::GodNames.get_value() {
-                        AppearanceRandomizer::get_emblem_app_person_index(recruitment_index as i32)
-                            .map(|v| v.1.get_name())
+                        AppearanceRandomizer::get_emblem_app_person_index(recruitment_index as i32).map(|v| v.1.get_name())
                     }
                     else { None }
                 }
@@ -226,7 +222,6 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
     // Convert Space into New Line if the replacement text new lines in the middle
     if let Some( (new_line_pos, new_mess))= args.last().filter(|v| **v > 0).map(|v| *v as usize).zip(mess.as_mut()){
         if let Some(space) = new_mess.to_u16_mut().iter_mut().enumerate().find(|(i, v)| *i >= new_line_pos && **v == 32) {
-            // println!("New Line added at {}", space.0);
             *space.1 = 10;
         }
         else {

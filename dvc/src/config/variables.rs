@@ -1,5 +1,4 @@
 use std::cmp::PartialEq;
-use std::fmt::Display;
 use engage::gamedata::{Gamedata, GodData, JobData, PersonData};
 use engage::{
     unit::{UnitPool, Unit},
@@ -12,47 +11,10 @@ use engage::random::Random;
 use unity::prelude::Il2CppString;
 use crate::enums::{EMBLEM_GIDS, PIDS};
 use crate::randomizer::data::GameData;
-use crate::{utils, DeploymentConfig};
+use crate::{utils, DVCConfig};
 use crate::config::DVCFlags;
 use crate::utils::{clamp_value, dlc_check};
-/*
-pub const VAR_NAME: [(&str, i32); 38] = [
-    ("G_Continuous", 5),
-    ("G_Random_Recruitment", 5),
-    ("G_Emblem_Mode", 4),
-    ("G_EmblemWepProf", 3),
-    ("G_Random_God_Sync", 3), //0
-    ("G_EngraveSetting", 5),
-    ("G_EngageSkill", 3),
-    ("G_EmblemInherit", 4),
-    ("G_EmblemApp", 3),
-    ("G_BodyScale", 3),
-    ("G_LearnMode", 3),
-    ("G_RandomCC", 4),
-    ("G_BattleStyles", 3),
-    ("G_DVC_SingleJob", -1),
-    ("G_InteractSetting", 7),
-    ("G_Random_Item", 3),   //12
-    ("G_RngGifts", 3),
-    ("G_ExplorationItems", 3),
-    ("G_ItemGauge", 100),
-    ("G_PRW", 3),
-    ("G_Random_Grow_Mode",3),
-    "G_EnemyRevivalStone", "G_EnemySkillGauge", "G_EnemyJobGauge", "G_EnemyEmblemGauge", "G_ItemDropGauge"
-    ("G_EnemySkillGauge",100),   //17
-    ("G_RandomJobOutfit", 3),
-    ("G_EnemyRevivalStone", 100),
-    ("G_EnemyJobGauge", 100),
-    ("G_EnemyEmblemGauge", 100),
-    ("G_ItemDropGauge", 100), //23
-    ("G_RandomEnergy", 3),
-    ("G_FOW", 5),
-    ("G_DeploymentMode", 8),
-    ("G_EmblemDeployMode", 4),
-    "G_GenericMode", //28
-    "G_BRS", "G_BRA", "G_BRB", "G_BRC", "G_BRRate",
-];
-*/
+
 /// Structure that contains and manages DVC-Related GameVariables
 #[repr(i32)]
 #[derive(Clone, Copy, PartialEq, Ord, PartialOrd, Eq)]
@@ -146,7 +108,7 @@ impl DVCVariables {
         else { GameVariableManager::make_entry_norewind(key, value); }
     }
     pub fn get_value(&self) -> i32 {
-        if DVCVariables::is_main_menu() { DeploymentConfig::get().get_value(*self) }
+        if DVCVariables::is_main_menu() { DVCConfig::get().get_value(*self) }
         else if self.is_gauge() {
             let v = (*self as i32) - 30;
             let value = Self::get_by_variable(self.get_key());
@@ -165,7 +127,7 @@ impl DVCVariables {
     pub fn set_by_variable(key: &str, value: i32) { GameVariableManager::set_number(key, value); }
     pub fn get_by_variable(key: &str) -> i32 { GameVariableManager::get_number(key) }
     pub fn set_value(&self, value: i32) {
-        if DVCVariables::is_main_menu() { DeploymentConfig::get().set_value(*self, value); }
+        if DVCVariables::is_main_menu() { DVCConfig::get().set_value(*self, value); }
         else if self.is_gauge() {
             let value = clamp_value(value, 0, 100);
             let v = (*self as i32) - 30;
@@ -230,10 +192,14 @@ impl DVCVariables {
             Self::Seed => "G_Random_Seed",
         }
     }
-    pub fn can_a_call(&self) -> bool {  // Require to ACall to Change Value
+    pub fn can_a_call(&self, menu_value: i32) -> bool {  // Require to ACall to Change Value
         if DVCVariables::is_main_menu() { false }
         else {
             match self {
+                Self::ClassMode => {
+                    let v = self.get_value();
+                    (v > 2 ) != (menu_value > 2)
+                }
                 Self::BattleStyles | Self::SingleJob | Self::JobLearnMode | Self::EmblemInherit | Self::EngraveLevel |
                 Self::EmblemSyncSkill | Self::EmblemWepProf | Self::InteractSetting | Self::PersonalGrowthMode |
                 Self::EmblemEngageSkill => true,
@@ -265,7 +231,7 @@ impl DVCVariables {
             Self::SingleJob => { JobData::get_count() }
             Self::UnitDeployment => 8,
             Self::InteractSetting => 7,
-            Self::Continuous|Self::UnitRecruitment|Self::FogOfWar|Self::EngraveLevel => 5,
+            Self::Continuous|Self::UnitRecruitment|Self::FogOfWar|Self::EngraveLevel|Self::ClassMode => 5,
             Self::Reclassing|Self::EmblemDeployment|Self::EmblemInherit|Self::EmblemRecruitment|
             Self::ExplorationItem|Self::UnitInventory|Self::EmblemAppearance|Self::GenericAppearance => 4,
             _ => { if self.is_gauge() { 100 } else { 3 } }
@@ -288,7 +254,7 @@ impl DVCVariables {
         else {
             let max = self.get_max();
             value = if increase { (value + 1) % max } else { (value + max - 1) % max };
-            if !self.can_a_call() { self.set_value(value); }
+            if !self.can_a_call(value) { self.set_value(value); }
         }
         value
     }

@@ -1,9 +1,9 @@
 use cobapi::{Event, SystemEvent};
 use skyline::patching::Patch;
 pub use outfit_core::*;
-pub use config::DeploymentConfig;
+pub use config::DVCConfig;
 
-#[allow(static_mut_refs, warnings)] pub mod config;
+#[allow(static_mut_refs)] pub mod config;
 #[allow(static_mut_refs, warnings)] pub mod randomizer;
 #[allow(static_mut_refs, warnings)] pub mod utils;
 #[allow(static_mut_refs)] pub mod autolevel;
@@ -24,9 +24,9 @@ mod procs;
 pub use config::variables::*;
 use crate::utils::return_true;
 
-pub static mut CONFIG: DeploymentConfig = DeploymentConfig::default();
-pub const VERSION: &str = "2.16.0I";
-
+pub static mut CONFIG: DVCConfig = DVCConfig::default();
+pub const VERSION: &str = "2.16.0J";
+pub const VARIABLE_VERSION: i32 = 7;
 extern "C" fn event_install(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
         match ev {
@@ -63,9 +63,9 @@ extern "C" fn event_install(event: &Event<SystemEvent>) {
 #[skyline::main(name = "vibe")]
 pub fn main() {
     println!("Draconic Vibe Crystal v{}", VERSION);
-    unsafe { CONFIG = DeploymentConfig::new(); }
+    unsafe { CONFIG = DVCConfig::new(); }
     UnitAssetMenuData::get().is_dvc = true;
-    DeploymentConfig::get().save();
+    DVCConfig::get().save();
     cobapi::register_system_event_handler(event_install);
     cobapi::install_lua_command_registerer(randomizer::map::register_script_commands);
     cobapi::install_lua_command_registerer(script::chapter::install_script_edits);
@@ -89,6 +89,7 @@ pub fn main() {
         // sprite::get_bond_face,
         // sprite::get_god_face,
         // randomizer::person_sound,
+        assets::dvc_create_break_effect_hook,
         assets::engage_attack::combat_record_post_process,
         randomizer::emblem::god_bond_holder_get,
         randomizer::item::item_refine_data_try_get,

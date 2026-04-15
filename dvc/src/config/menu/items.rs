@@ -2,12 +2,11 @@ use super::*;
 use std::sync::{OnceLock};
 use engage::gamedata::{Gamedata, JobData};
 use engage::gameuserdata::GameUserData;
-use engage::menu::{BasicMenuItemAttribute, BasicMenuMethods, BasicMenuResult};
-use engage::menu::menu_item::config::ConfigBasicMenuItem;
+use engage::menu::{BasicMenuItemAttribute, BasicMenuResult};
 use engage::mess::Mess;
 use unity::engine::Color;
 use unity::prelude::{Il2CppClass, Il2CppClassData, Il2CppString, OptionalMethod};
-use crate::{DVCVariables, DeploymentConfig};
+use crate::{DVCVariables, DVCConfig};
 use crate::enums::RINGS;
 use crate::randomizer::data::GameData;
 use crate::randomizer::job::single::get_next_class;
@@ -97,8 +96,8 @@ impl DVCConfigMenuItem {
         if GameUserData::get_sequence() != 0 { item.help_text = "View the set unit recruitment order.".into(); } else {
             match order {
                 RecruitmentOrder::Unit => {
-                    if index < 32 { item.padding = DeploymentConfig::get().unit1[index as usize]; }
-                    else { item.padding = DeploymentConfig::get().unit2[index as usize - 32]; }
+                    if index < 32 { item.padding = DVCConfig::get().unit1[index as usize]; }
+                    else { item.padding = DVCConfig::get().unit2[index as usize - 32]; }
                     item.help_text = "Assign an playable unit to swap recruitment positions.".into();
                     item.title = Mess::get(MPIDS[index as usize]);
                 }
@@ -109,7 +108,7 @@ impl DVCConfigMenuItem {
                     else { item.help_text = "Assign an playable unit to swap recruitment positions.".into(); }
                 }
                 RecruitmentOrder::Emblem => {
-                    item.padding = DeploymentConfig::get().emblem[index as usize];
+                    item.padding = DVCConfig::get().emblem[index as usize];
                     if GameUserData::get_sequence() == 0 { item.help_text = "Assign an emblem to swap recruitment position.".into(); }
                     item.title = Mess::get(format!("MGID_{}", RINGS[index as usize]));
                 }

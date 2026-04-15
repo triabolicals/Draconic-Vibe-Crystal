@@ -52,8 +52,8 @@ Opps all!
 Sets all playable units to the selected class line.
 Weapon Interaction (Break)|d|r|rv|Same|Fates|n|All
 Default weapon breaking behavior.|Randomized weapon break behavior.|Reverse weapon break behavior.|Only weapons of the same type will break.|Sword/Tome > Axe/Bow > Lance/Dagger > Sword/Tome|Weapons will not inflict breaks.|Weapons inflict break regardless of opposing type.
-Player Class Mode|d|r|Opps all!
-Playable units will start in their default classes.|Playable units will start in random class.|Playable units are restricted to a single class line.
+Player Class Mode|d|r|Opps! all|Lockout|Lockout (Random)
+Playable units will start in their default classes.|Playable units will start in random class.|Playable units are restricted to a single class line.|Units must be in different classes.|Lockout with random starting classes.
 Gift Item Setting|d|r|Rare
 Gift items are not changed.|Gift items are randomized without rare items.|Gift items are randomized with rare items.
 Exploration Items Exclusion|n|Gift|Food

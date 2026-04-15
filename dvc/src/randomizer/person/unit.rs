@@ -37,7 +37,11 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     if !can_rand()  || this.person.parent.hash == 1879825845 || this.status.value & 134217728 != 0 { return; }  // Doubles
     let single_class = DVCVariables::get_single_class(false, false).is_some();
     let changed_recruit_order = DVCVariables::UnitRecruitment.get_value() != 0;
-    let random_class = DVCVariables::ClassMode.get_value()== 1;
+    let class_mode = DVCVariables::ClassMode.get_value();
+    let random_class =
+        if class_mode == 3 { job::lockout::get_all_playable_unit_classes(this.person).contains(&this.job.parent.hash) }
+        else { class_mode == 1 || class_mode == 4 };
+
     let random_inventory = DVCVariables::UnitInventory.get_value() & 1 != 0;
     let adjust_items = changed_recruit_order || random_class || single_class;
     ai::adjust_person_unit_ai(this);

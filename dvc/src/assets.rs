@@ -26,6 +26,7 @@ use crate::assets::{transform::{has_fake_tiki, is_dragonstone}, data::search::se
 use crate::config::{DVCFlags};
 use std::io::Write;
 use outfit_core::anim::AnimData;
+use outfit_core::room::CharacterEffect;
 use crate::assets::engage_attack::{adjust_engage_attack_animation, lueur_engage_atk};
 
 #[unity::class("Combat", "AnimSetDB")]
@@ -92,9 +93,7 @@ pub fn asset_table_result_setup_hook(
             else {  result.body_anims.add( "Sds0AF-No2_c099_N".into()); }
         }
     }
-    else if conditions.emblem_unit {
-
-    }
+    else if conditions.emblem_unit {}
     else {  // anim correction
         if conditions.flags.contains(AssetFlags::EngageTiki) { return result; }
         get_outfit_data().correct_anims(result, unit, conditions.profile_flag, &conditions)
@@ -102,7 +101,7 @@ pub fn asset_table_result_setup_hook(
     if conditions.character_mode == CharacterAssetMode::Combat {  // weapon asset
         edit_asset_weapon(result, false, 2, equipped);
     }
-    if crate::DeploymentConfig::get().debug { print_asset_table_result(result, mode); }
+    if crate::DVCConfig::get().debug { print_asset_table_result(result, mode); }
     let pid = unit.person.pid.to_string();
     if ( mode == 2 && GameUserData::get_chapter().cid.str_contains("G00") && unit.force.is_some_and(|f| f.force_type != 0) ) || pid.contains("_チキ") {}
     result
