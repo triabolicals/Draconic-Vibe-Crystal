@@ -3,6 +3,7 @@ use outfit_core::{get_outfit_data, UnitAssetMenuData};
 use super::*;
 use crate::{utils, DVCVariables};
 use accessory::change_accessory;
+use crate::assets::accessory::add_accessory_to_list;
 use crate::assets::dress::*;
 use crate::config::DVCFlags;
 use crate::randomizer::data::{GameData, RandomizedGameData};
@@ -237,6 +238,24 @@ pub fn asset_table_robin_hook(
     method_info: OptionalMethod) -> &'static mut AssetTableResult 
 {
     let pid = person.pid.to_string();
+    if let Some(pos) = crate::talk::VEYRE.iter().position(|&x| pid.ends_with(&x)){
+        let idx = DVCVariables::get_dvc_recruitment_index(32);
+        if idx != 32 && idx >= 0 {
+            if idx == 0 {
+                let pid = if DVCVariables::is_lueur_female() { "PID_青リュール_女性" } else { "PID_青リュール_男性" };
+                let result = call_original!(this, mode, PersonData::get_mut(pid).unwrap(), conditions, method_info);
+                adjust_for_enemy_veyle(result, pos, DVCVariables::is_lueur_female(), true);
+                return result;
+            }
+            else {
+                if let Some(person) = DVCVariables::get_dvc_person_data(32, false) {
+                    let result = call_original!(this, mode, person, conditions, method_info);
+                    adjust_for_enemy_veyle(result, pos, person.get_dress_gender() == Gender::Female, false);
+                    return result;
+                }
+            }
+        }
+    }
     if is_playable_person(person) {
         let result = call_original!(this, mode, person, conditions, method_info);
         if let Some(data) = UnitAssetMenuData::get_by_person_data(person.parent.hash, true) {
@@ -247,11 +266,9 @@ pub fn asset_table_robin_hook(
     if mode == 2 && person.gender != 0 && DVCFlags::RandomBossesNPCs.get_value() && GameUserData::get_sequence() > 0 {
         let db = get_outfit_data();
         let original_result = call_original!(this, mode, person, conditions, method_info);
-        // print_asset_table_result(original_result, 2);
         if let Some(appearance) = RandomizedGameData::get_read().person_appearance.get_person_appearance(person).as_ref(){
             appearance.apply_appearance(original_result, 2, false, None, &db.hashes, true);
             random_body_scale(original_result, None, false);
-            // print_asset_table_result(original_result, 2);
             return original_result;
         }
         else if person.flag.value & 128 == 0 && person.gender != 0 && ( person.get_job().is_none_or(|v| v.parent.hash == 499211320 || v.parent.index == 0)){
@@ -348,4 +365,60 @@ pub fn get_random_engage_voice() -> &'static str {
         _ =>  { &MPIDS[index][5..] }
     }
 }
-
+fn adjust_for_enemy_veyle(result: &mut AssetTableResult, veyle_index: usize, female: bool, lueur: bool){
+    let mut dark = false;
+    let mut evil = false;
+    match veyle_index {
+        0 => { // Hood but Head Visible
+            if female { result.dress_model = "uBody_Sdp0AF_c559".into(); }
+            evil = true;
+        }
+        1 => {
+            dark = true;
+            add_accessory_to_list(result.accessory_list, "c_head_loc", "uAcc_head_Dress556b");
+        }
+        2 => {
+            if female {
+                result.dress_model = "uBody_Sdp0AF_c559".into();
+                result.hair_model = "uHair_null".into();
+                result.head_model = "uHead_c557".into();
+            }
+            else {
+                result.dress_model = "uBody_Dct0AM_c711".into();
+                result.head_model = "null".into();
+                result.hair_model = "null".into();
+            }
+            add_accessory_to_list(result.accessory_list, "null", "c_head_loc");
+            add_accessory_to_list(result.accessory_list, "null", "c_spine1_jnt");
+            add_accessory_to_list(result.accessory_list, "null", "c_spine2_jnt");
+        }
+        4 => {
+            evil = true;
+        }
+        5|6|7 => {
+            dark = true;
+            evil = veyle_index != 6;
+            add_accessory_to_list(result.accessory_list, "c_head_loc", "uAcc_head_Dress556");
+        }
+        _ => {}
+    }
+    if lueur {
+        if evil {
+            result.head_model = if female { "uHead_c052" } else { "uHead_c002" }.into();
+            lueur_fell_child_hair(result);
+            let db = get_outfit_data();
+            if let Some(data) = db.dress.get_personal_dress_by_name("MPID_PastLueur", female) {
+                for x in 0..8 {
+                    let color = data.color[x];
+                    result.unity_colors[x].r = (color & 255) as f32 / 255.0;
+                    result.unity_colors[x].g = ((color >> 8) & 255) as f32 / 255.0;
+                    result.unity_colors[x].b = ((color >> 16) & 255) as f32 / 255.0;
+                }
+            }
+        }
+        if dark {
+            if female { result.dress_model = "uBody_Drg0AF_c052".into(); }
+            else { result.dress_model = "uBody_Drg0AM_c002".into(); }
+        }
+    }
+}

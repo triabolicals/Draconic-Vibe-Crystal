@@ -18,10 +18,15 @@ use crate::utils::*;
 use crate::ironman::vtable_edit;
 use crate::randomizer::data::{EmblemPool, RandomizedGameData};
 
-pub const VEYRE: [&str; 7] = [
-    "ヴェイル_黒_善_角折れ",
-    "ヴェイル_フード", "ヴェイル_包帯", "ヴェイル_フード_顔出し", "ヴェイル_白_悪",
-    "ヴェイル_黒_悪", "ヴェイル_黒_善", 
+pub const VEYRE: [&str; 8] = [
+    "ヴェイル_フード_顔出し", // Hooded but with Face
+    "ヴェイル_黒_善_角折れ", // Broken Helm
+    "ヴェイル_フード", // Hooded no face
+    "ヴェイル_包帯",  // Normal
+    "ヴェイル_白_悪", // white evil
+    "ヴェイル_黒_悪", // black evil
+    "ヴェイル_黒_善", // black good
+    "M021_ヴェイル",    // Chapter 21 black evil
 ];
 /*
 const LUEUR: [&str; 6] = [
@@ -125,7 +130,17 @@ pub fn get_active_character_hook(this: &mut TalkPtr, method_info: OptionalMethod
 fn talk_tag_window(this: &mut TalkTagWindow, ptr: &TalkPtr, _optional_method: OptionalMethod) {
     this.initialize_(ptr);
     if this.tag_id < 8 {
-        if let Some(pid) = this.pid { this.pid = Some(get_pid_replacement(pid)); }
+        if let Some(pid) = this.pid {
+            let pid_str = pid.to_string();
+            if VEYRE.iter().position(|v| pid_str.ends_with(*v)).filter(|x| *x != 2).is_some() {
+                if let Some(person) = DVCVariables::get_dvc_person_data(32, false) {
+                    this.replacement_name = person.get_name();
+                    if let Some(talk) = TalkSequence::get_instance() { talk.add_replace_talker_name(pid, person.get_name()); }
+                    return;
+                }
+            }
+            else { this.pid = Some(get_pid_replacement(pid)); }
+        }
         if DVCFlags::RandomBossesNPCs.get_value() {
             if let Some(pidx) = this.pid.as_ref() {
                 let pidx = pidx.to_string().into();
@@ -166,9 +181,6 @@ fn get_pid_replacement(result: &'static Il2CppString) -> &'static Il2CppString {
         if GameVariableManager::exist("G_R_PID_ジェーデ") {
             return GameVariableManager::get_string("G_R_PID_ジェーデ").to_string().trim_start_matches("PID_").into();
         }
-    }
-    if VEYRE.iter().any(|v| result.contains(v)) {
-        return GameVariableManager::get_string("G_R_PID_ヴェイル").to_string().trim_start_matches("PID_").into();
     }
     if RAFALE.iter().any(|v| str1 == *v) {
         return GameVariableManager::get_string("G_R_PID_ラファール").to_string().trim_start_matches("PID_").into();

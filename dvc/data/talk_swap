@@ -1,9 +1,9 @@
 Section M001
 OP2
-	008  j
-	009  gu 1 1
-	015  j
-	018  j
+	008 j
+	009 gu 1 1
+	015 j
+	018 j
 	023 j
 	033 j
 OP3
@@ -122,6 +122,8 @@ OP2_2
     018 gu 17 18
 ED1
     026 gu 14 7
+EV1
+    010 ju 14 0
 EV3
     002 ge 6 4 ge 6 10
 EV7
@@ -205,12 +207,15 @@ BT13
     001 gu 26 10
 ED2
     014 gu 32 5
-    015 gu 32 2 gu 32 6
+    015 gu 32 2 gu 32 9
+    017 gu 32 2
 ED3
     037 ge 0 4
     036 br 0
     037 ge 0 18
 Section M011
+OP1
+    023 br 9
 EV10
     004 ge 0 10
 ED2
@@ -224,6 +229,7 @@ ED3
     017 gu 17 10
     022 gu 11 7 gu 11 4
     025 br 4
+    036 br 0
     044  ge 0 4
 ED6
     003 gu 32 11
@@ -285,6 +291,7 @@ Section M015
 emblem 10 17 1
 OP2
     004 ge 10 12
+
 OP4
     005 ge 10 2
 OP5
@@ -302,6 +309,8 @@ ED2
 Section M016
 char 33 0 1
 emblem 11 17 1
+OP2
+    015 br 11
 OP3
     004 gu 26 4
     007 gu 17 8
