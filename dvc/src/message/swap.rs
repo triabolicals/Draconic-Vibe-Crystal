@@ -54,13 +54,9 @@ impl TextSwapper {
                 let original_length = message.len();
                 if original_length == 0 { continue; }
                 if DVCVariables::UnitRecruitment.get_value() != 0 && !mess.contains("RELIANCE") {
-                    VEYRE.iter().enumerate().for_each(|(i, &x)| {
-                        let pid = format!("PID_{}", x);
-                        find_and_splice_for_pid(pid.as_str(), 50 + i, &mut message);
-                    });
+                    PIDS.iter().enumerate().for_each(|(i, &x)| { find_and_splice_for_pid(x, i, &mut message); });
                     find_and_splice_for_pid("PID_デモ用_竜石なし_ラファール", 43, &mut message);
                     find_and_splice_for_pid("PID_ジェーデ_兜あり", 42, &mut message);
-                    PIDS.iter().enumerate().for_each(|(i, &x)| { find_and_splice_for_pid(x, i, &mut message); })
                 }
                 if DVCVariables::EmblemRecruitment.get_value() != 0 {
                     if mess.contains("M0") || mess.contains("S001") || mess.contains("S002") {
@@ -167,6 +163,9 @@ impl TextSwapper {
                             args[5] = p.2 as u16;
                             p
                         })
+                }
+                MessSwapType::UnitJob(person, txt) => {
+                    self.original_data.text[*txt as usize].find_position(message, true)
                 }
                 _ => { None }
             };
@@ -412,20 +411,9 @@ fn find_and_splice_for_pid(pid: &str, index: usize, message: &mut Vec<u16>) {
         _ => { return; }
     };
     if DVCVariables::get_dvc_recruitment_index(recruitment_index as i32) != recruitment_index as i32 {
-        // find_function(message,"キャラアニメーター切替", pid);
-        while let Some(pos) = message.windows(pid_slice.len()).position(|window| window == pid_slice) {
-            /*
-            let unit_anim = "Unit/Anim/".encode_utf16().collect::<Vec<u16>>();
-            let x_start = pos + pid_slice.len();
-            if let Some(pos2) = message.windows(unit_anim.len()).enumerate().position(|x| (x.0 > x_start) && x.1 == unit_anim && (x.0 < x_start + 5)) {
-                let mut end = pos2 + unit_anim.len();
-                loop {
-                    if end == (message.len() - 1) || message[end] == 41 { break; }
-                    else { end += 1; }
-                }
-                println!("Anim: {}",  String::from_utf16(&message[pos2..end]).unwrap());
-            }
-            */
+        while let Some(pos) = message.windows(pid_slice.len()+1)
+            .position(|window| *window.last().unwrap() != 95 && pid_slice.iter().zip(window.iter()).all(|v| *v.0 == *v.1))
+        {
             message.splice(pos..pos + pid_slice.len(), [14, 6, 400 + index as u16, 0]);
             if message.len() < pid_slice.len() { return; }
         }
