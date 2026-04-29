@@ -198,19 +198,6 @@ pub fn ring_list_skill_menu_create_menu_items(
                 }
             }
         }
-        else if name.contains("WeaponTalent") && get_pos.is_some() && DVCVariables::EmblemWepProf.get_value() == 1 {
-            let apt = ran_data.emblem_aptitude_randomizer.apts[get_pos.unwrap()];
-            if let Some(get) = klass.get_methods().iter().find(|m| m.get_name() == Some(String::from("get_ItemKindTableIndex"))) {
-                let get_fn = unsafe { std::mem::transmute::<_, fn(&BasicMenuItem, &MethodInfo) -> i32>(get.method_ptr) };
-                let old_apt = get_fn(item, get) - 1;
-                if let Some(new_apt) = apt.get(old_apt as usize) {
-                    if let Some(method) = klass.get_methods().iter().find(|m| m.get_name() == Some(String::from("set_ItemKindTableIndex"))) {
-                        let set = unsafe { std::mem::transmute::<_, fn(&BasicMenuItem, i32, &MethodInfo)>(method.method_ptr) };
-                        set(item, *new_apt as i32, method);
-                    }
-                }
-            }
-        }
     });
 }
 
