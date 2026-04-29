@@ -6,7 +6,7 @@ use engage::gamedata::item::ItemData;
 pub enum MessSwapType {
     HeroAlias(bool),
     HeroJob,
-    UnitJob(u16),
+    UnitJob(u16, u16),
     UnitName(u16),
     EmblemName(u16),
     RingName(u16),
@@ -77,7 +77,8 @@ impl MessSwapType {
             }
             "ju" => {
                 let person_index = iter.next().and_then(|i| i.parse::<u16>().ok().filter(|i| *i < 41))?;
-                Some(MessSwapType::UnitJob(person_index))
+                let text_idx = iter.next().and_then(|i| i.parse::<u16>().ok())?;
+                Some(MessSwapType::UnitJob(person_index, text_idx))
             }
             _ => None,
         }
@@ -93,7 +94,7 @@ impl MessSwapType {
             MessSwapType::RingName(idx) => { return vec![14, 6, 300+*idx, 0]; }
             MessSwapType::EmblemAlias(idx) => { return vec![14, 6, 320+*idx, 0]; }
             MessSwapType::EmblemInvocation(idx) => { return vec![14, 6, 340+*idx, 0]; }
-            MessSwapType::UnitJob(idx) => { return vec![14, 6, self.get_id(), 2, *idx]; }
+            MessSwapType::UnitJob(person, _) => { return vec![14, 6, self.get_id(), 2, *person]; }
             MessSwapType::ItemKind(kind) => out.extend([*kind, 0]),
             MessSwapType::LiberationKind => out.push(1),
             MessSwapType::HeroAlias(alt) => out.push( *alt as u16),
@@ -122,7 +123,7 @@ impl MessSwapType {
             MessSwapType::ItemKind(_) => 21,
             MessSwapType::RingBracelet(_) => 22,
             MessSwapType::UnitAlias(_) => 23,
-            MessSwapType::UnitJob(_) => 24,
+            MessSwapType::UnitJob(_, _) => 24,
             MessSwapType::Skip => 0,
         }
     }
@@ -132,6 +133,7 @@ impl MessSwapType {
             MessSwapType::HeroJob => 0,
             MessSwapType::LiberationKind => 1,
             MessSwapType::UnitName(_) => 1,
+            MessSwapType::UnitJob(_, _) => 2, 
             MessSwapType::RingBracelet(_) => 2,
             MessSwapType::EmblemName(_)|MessSwapType::EmblemAlias(_) => 1,
             MessSwapType::RingName(_)|MessSwapType::EmblemInvocation(_) => 1,
