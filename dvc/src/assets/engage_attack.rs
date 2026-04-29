@@ -39,8 +39,10 @@ fn adjust_emblem_zone(this: &mut CharacterGameStatus) {
                             12|20 => { "Ede" },
                             16 => { "Sen"},
                             17 => { "Cam"},
+                            19 => { "Ler"},
                             _ => { ENGAGE_PREFIX[emblem_index] }
                         };
+                    println!("EMBLEM ID: {}", new_emblem_id);
                     this.emblem_identifier = Some(new_emblem_id.into());
                 }
             }
@@ -202,13 +204,24 @@ fn get_engage_attack_source(unit: &Unit) -> (Option<&'static GodData>, Option<&'
     (None, None)
 }
 pub fn lueur_engage_atk(result: &mut AssetTableResult, unit: &Unit, conditions: &AssetConditions) {
-    let mut gen_str = if get_outfit_data().get_dress_gender(result.dress_model) == Gender::Male { "M" } else { "F" };
-    if is_tiki_engage(result) { gen_str = "F"; }
+    let dress = get_outfit_data().get_dress_gender(result.dress_model) == Gender::Male && !is_tiki_engage(result);
+    let gen_str = if dress { "M-Sw1" } else { "F-Sw1" };
     if let Some(god) = unit.god_link.or(unit.god_unit) {
         result.body_anims.clear();
-        if god.child.is_none() { result.body_anims.add(format!("Ler1A{}-Sw1_c000_N", gen_str).into()); }
-        else if conditions.flags.contains(AssetFlags::EngAtkCoopMain) { result.body_anims.add(format!("Ler2A{}-Sw1_c000_N", gen_str).into()); }
-        else { result.body_anims.add(format!("Ler2A{}-Sw1_p000_N", gen_str).into()); }
+        let mut anim = "Ler".to_string();
+        if god.child.is_none(){
+            anim += "1A";
+            anim += gen_str;
+            anim += "_c000_N";
+            result.body_anims.add(anim.into());
+        }
+        else {
+            anim += "2A";
+            anim += gen_str;
+            anim += if conditions.flags.contains(AssetFlags::EngAtkCoopMain) { "_c" } else { "_p" };
+            anim += if unit.edit.gender != 0 { if dress { "001_N" } else { "051_N" } } else { "000_N" };
+            result.body_anims.add(anim.into());
+        }
     }
 }
 fn get_god_hash_from_index(index: usize) -> i32 { GodData::get(EMBLEM_GIDS[index]).map(|g|g.parent.hash).unwrap_or(0) }
