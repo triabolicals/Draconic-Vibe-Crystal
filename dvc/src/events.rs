@@ -102,7 +102,6 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
     match label {
         0 => {
             if !UnitAssetMenuData::get().init {
-
                 install_outfit_plugin(true);
                 Patch::in_text(0x01bb272c).nop().unwrap(); // AssetTableResult Setup Prevents Commit
                 skyline::install_hooks!(
@@ -111,6 +110,7 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
                     crate::assets::emblem::asset_table_robin_hook,
                 );
             }
+            else { outfit_core::reset_faces(true); }
             crate::ironman::map_save_menu_edits();
         }
         _ => { UnitAssetMenuData::get().is_loaded = false; }
@@ -133,7 +133,7 @@ pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
         randomizer::item::adjust_non_unit_items_inventory();
         if DVCConfig::get().debug {
             engage::force::Force::get(ForceType::Player).unwrap().iter().
-                chain(engage::force::Force::get(ForceType::Player).unwrap().iter())
+                chain(engage::force::Force::get(ForceType::Absent).unwrap().iter())
                 .for_each(|u|{
                 for x in 0..10 { u.set_base_capability(x, 120); }
                 let move_stat = u.base_capability[10] as i32;
