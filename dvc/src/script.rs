@@ -195,16 +195,6 @@ fn adjust_inspector(inspector: &mut MapInspector, free_deploy: bool) {
     }
 
     match kind {
-        MapInspectorKind::BreakdownEnemy => {
-            let inspector = inspector.cast_mut::<PokeInspector>();
-            if DVCFlags::RandomDeploySpot.get_value() && GameUserData::get_chapter().cid.str_contains("M008") {
-                inspector.x = -1;
-                inspector.z = -1;
-                inspector.h = -1;
-                inspector.w = -1;
-            }
-            person_index_convert(&mut inspector.person);
-        }
         MapInspectorKind::UnitCommandPrepare | MapInspectorKind::TargetSelect | MapInspectorKind::EngageAfter | MapInspectorKind::EngageBefore|
         MapInspectorKind::Pickup => {
             let inspector = inspector.cast_mut::<PersonInspector>();
