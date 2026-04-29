@@ -304,14 +304,6 @@ pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
     let current_level = person.get_level() as i32;
     let mut current_internal_level = person.get_internal_level() as i32;
     if current_internal_level == 0 && !is_low { current_internal_level = 20; }
-    let mut original_growth_rates: [u8; 11] = [0; 11];  // storing growth rates of the original person
-    let original_gr = person.get_grow();    // growth rate of the original person
-    let new_gr = new_person.get_grow(); // growth rate of the new person
-        // Switch Growths rates to calculate stats, store the previous person's growths to restore it at the end
-    for x in 0..11 { 
-        original_growth_rates[x as usize] = original_gr[x as usize];
-        original_gr[x as usize] = new_gr[x as usize];  
-    }
     unit.set_person(person);
     unit.class_change(person.get_job().unwrap());
     if is_low {
@@ -500,8 +492,8 @@ fn enemy_unit_randomization(unit: &mut Unit) {
         }
         if unit.person.parent.hash == 1879825845 || unit.status.value & 134217728 != 0 { return; }
         let job = unit.get_job();
-        if MONSTERS.iter().any(|str| job.jid.contains(str)) {
-            if random_map && m004_complete { auto_level_unit_for_random_map(unit, is_boss);  }
+        if MONSTERS.iter().any(|str| job.jid.contains(str)) &&  m004_complete {
+            if random_map { auto_level_unit_for_random_map(unit, is_boss); } else { auto_level_unit(unit, is_boss); }
             return;  
         }
         let mut has_master = unit.item_list.has_item_iid("IID_マスタープルフ");
@@ -542,7 +534,7 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                         changed_class = true;
                         fixed_unit_weapon_mask(unit);
                         adjust_unit_items(unit); 
-                        if unit.person.get_asset_force() == 2 { unit_items::add_generic_weapons(unit);  }
+                        if unit.person.get_asset_force() == 2 { add_generic_weapons(unit);  }
                         ai::adjust_unitai(unit);
                         if !unit.get_job().diff_grow_lunatic.is_zero() {
                             let level = if unit.get_job().get_max_level() == 40 { unit.level as i32 + unit.internal_level as i32 } else {  unit.level as i32 };
