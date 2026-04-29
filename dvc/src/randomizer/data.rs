@@ -249,10 +249,10 @@ impl GameData {
                 e.update_person();
                 let enemy_person = e.get_person_mut();
                 if let Some(person) = e.playable_slot.and_then(|s|Self::get_randomized_person(s)){
-                    if let Some(personal) = person.common_skills.iter().find(|s| !s.is_hidden()) {
-                        if let Some(skill) = enemy_person.get_common_skills().list.iter_mut().find(|x| !x.is_hidden() ) {
-                            skill.set_index(personal.get_index());
-                            // println!("{} -> enemy {}: Personal {}", Mess::get(MPIDS[e.playable_slot.unwrap()]), Mess::get_name(e.get_person_mut().pid), personal.get_skill().unwrap().name.unwrap());
+                    if let Some(personal) = person.get_common_skills().iter().find(|s| !s.is_hidden()) {
+                        let skills = enemy_person.get_mask_skill();
+                        if let Some((pos, skill)) = skills.list.iter().position(|x| !x.is_hidden() ).zip(personal.get_skill()) {
+                            skills.replace_index(pos as i32, skill, SkillDataCategorys::Person);
                         }
                     }
                 }
@@ -387,7 +387,7 @@ impl RandomizedGameData {
                     let enemy_god = enemy.emblem_data.get_god_mut();
                     if let Some(source_god) = enemy.get_replacement_source() {
                         let randomized_index = DVCVariables::get_dvc_emblem_index(enemy.emblem_index as i32, false);
-                        if randomized_index < 20 {
+                        if randomized_index != 19 {
                             enemy_god.link_gid = source_god.link_gid;
                             enemy_god.engage_attack_link = source_god.engage_attack_link;
                             enemy_god.ascii_name = source_god.ascii_name;
