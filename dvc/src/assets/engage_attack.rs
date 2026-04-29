@@ -1,21 +1,19 @@
-use engage::battle::BattleSideType;
-use engage::combat::{CharacterAppearance, CharacterGameStatus, CombatRecord};
-use engage::gamedata::{Gamedata, GodData};
-use engage::gamedata::assettable::{AssetTableConditionFlags, AssetTableResult, AssetTableStates, AssetTableStaticFields};
-use engage::gamedata::item::ItemData;
-use engage::gamedata::skill::SkillData;
-use engage::unit::{Gender, Unit};
-use engage::random::Random;
-use outfit_core::anim::AnimData;
-use outfit_core::{get_outfit_data, print_asset_table_result, AssetConditions, AssetFlags};
+use engage::{
+    combat::{CharacterAppearance, CharacterGameStatus, CombatRecord},
+    battle::BattleSideType, random::Random,
+    gamedata::{item::ItemData, skill::SkillData, Gamedata, GodData, assettable::*},
+    unit::{Gender, Unit},
+};
 use unity::prelude::OptionalMethod;
-use crate::assets::accessory::change_accessory;
-use crate::assets::emblem::random_engage_voice;
-use crate::assets::{accessory, is_tiki_engage};
-use crate::assets::transform::get_transformation2;
-use crate::DVCVariables;
-use crate::enums::{EMBLEM_ASSET, EMBLEM_GIDS, ENGAGE_PREFIX, RINGS};
-use crate::randomizer::Randomizer;
+use crate::{
+    DVCVariables, enums::{EMBLEM_ASSET, EMBLEM_GIDS, ENGAGE_PREFIX, RINGS},
+    assets::{
+        transform::get_transformation2,
+        accessory, emblem::random_engage_voice, is_tiki_engage
+    },
+    randomizer::Randomizer,
+};
+use outfit_core::{anim::AnimData, get_outfit_data, print_asset_table_result, AssetConditions, AssetFlags};
 
 const MALE_EMBLEMS: [usize; 9] = [0, 1, 4, 5, 8, 9, 14, 16, 18];
 const FEMALE_EMBLEMS: [usize; 10] = [2, 3, 6, 7, 10, 11, 12, 13, 15, 17];
@@ -71,9 +69,11 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
             }
         }
         else if r == 1 {
-            if flags.flags.contains(AssetFlags::ThreeStar) { change_accessory(result.accessory_list, "uAcc_Event_SummonStoneA", "reserve4_loc"); }
+            if flags.flags.contains(AssetFlags::ThreeStar) {
+                accessory::change_accessory(result.accessory_list, "uAcc_Event_SummonStoneA", "reserve4_loc");
+            }
             else if flags.flags.contains(AssetFlags::FiveStar) {
-                change_accessory(result.accessory_list, "uAcc_Event_SummonStoneB", "reserve4_loc");
+                accessory::change_accessory(result.accessory_list, "uAcc_Event_SummonStoneB", "reserve4_loc");
                 result.body_anims.iter_mut().for_each(|anim| {
                     let anims = anim.to_string();
                     if anims.contains("Ver1A") && anims.contains("Mg1_c000") { *anim = anims.replace("Ver1A", "Ver2A").into(); }

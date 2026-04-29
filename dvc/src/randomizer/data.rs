@@ -1,28 +1,28 @@
-use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
-use std::sync::{RwLockReadGuard, RwLockWriteGuard};
+use std::{collections::{HashMap, HashSet}, sync::{RwLockReadGuard, RwLockWriteGuard}};
 use engage::{
-    unit::Unit,
-    mess::Mess,
-    gamevariable::GameVariableManager,
-    random::Random,
+    mess::Mess, gamevariable::GameVariableManager, random::Random,
+    unit::{UnitPool, Unit},
     gamedata::{
-        GamedataArray, Gamedata,
-        item::ItemData, 
-        person::*, GodData, JobData, PersonData, job::BattleStyles, ring::RingData, 
-        skill::SkillData,
+        item::ItemData, person::*, GodData, JobData, PersonData, job::BattleStyles, 
+        ring::RingData, skill::SkillData, GamedataArray, Gamedata,
     }
 };
-use engage::unit::{UnitPool};
 use unity::system::Il2CppString;
-use crate::config::{DVCFlags, DVCVariables};
-use crate::enums::{EMBLEM_ASSET, PIDS};
-use crate::randomizer::data::{
-    aptitude::EmblemAptitudeRandomizer, engage_attacks::EngageAttackRandomizer, items::ItemPool,
-    sync::{get_lowest_priority, get_skill_level, EmblemSkillRandomizer, DARK_EMBLEM_SKILLS},
+use crate::{
+    config::menu::{DVCMenuItemKind, CUSTOM_RECRUITMENT_ORDER},
+    enums::{EMBLEM_ASSET, PIDS}, utils::{create_rng, get_rng}, config::{DVCFlags, DVCVariables},
+    randomizer::{
+        Randomizer, item::*, names::AppearanceRandomizer, *, status::RandomizerStatus,
+        data::{
+            emblem::item::EngageItemRandomizer,
+            aptitude::EmblemAptitudeRandomizer, 
+            engage_attacks::EngageAttackRandomizer, 
+            items::ItemPool,
+            sync::{get_lowest_priority, get_skill_level, EmblemSkillRandomizer, DARK_EMBLEM_SKILLS}
+        },
+    },
 };
-use crate::randomizer::{Randomizer, item::*, names::AppearanceRandomizer, *};
-use crate::utils::{create_rng, get_rng};
+
 mod skill;
 mod emblem;
 mod person;
@@ -34,9 +34,6 @@ pub use person::*;
 pub use emblem::*;
 pub use bondring::*;
 pub use items::*;
-use crate::config::menu::{DVCMenuItemKind, CUSTOM_RECRUITMENT_ORDER};
-use crate::randomizer::data::emblem::item::EngageItemRandomizer;
-use crate::randomizer::status::RandomizerStatus;
 
 pub struct GrowthData {
     person_stats: [Vec<u8>; 10],

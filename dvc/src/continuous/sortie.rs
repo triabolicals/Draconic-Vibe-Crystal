@@ -1,7 +1,8 @@
 use super::*;
-use engage::menu::{BasicMenuItem, BasicMenuItemAttribute, BasicMenuResult};
-use engage::sequence::hub::HubSequence;
-use engage::util::get_singleton_proc_instance;
+use engage::{
+    sequence::hub::HubSequence, util::get_singleton_proc_instance,
+    menu::{BasicMenuItem, BasicMenuItemAttribute, BasicMenuResult}
+};
 use crate::ironman::vtable_edit;
 
 #[unity::class("App", "HubMenuSequence")]

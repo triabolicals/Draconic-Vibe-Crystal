@@ -1,22 +1,18 @@
-mod swap;
-mod original;
-pub(crate) mod talk;
-mod swap_kinds;
-mod swap_command;
-
 use unity::prelude::*;
 use engage::{
     gamevariable::*, gameuserdata::*, mess::*,
     gamedata::{cook::CookData, *},
     hub::*,
 };
-use crate::{
-    enums::*, randomizer::*, utils::*,
-};
-use std::sync::OnceLock;
-use std::collections::HashMap;
-use crate::randomizer::data::GameData;
-use crate::randomizer::names::get_emblem_person;
+use crate::{enums::*, utils::*, randomizer::{data::GameData, names::get_emblem_person, *}, };
+use std::{sync::OnceLock, collections::HashMap, };
+
+mod swap;
+mod original;
+pub(crate) mod talk;
+mod swap_kinds;
+mod swap_command;
+
 pub use swap::TextSwapper;
 pub use talk::*;
 

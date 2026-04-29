@@ -1,14 +1,3 @@
-use unity::{engine::Sprite, prelude::*};
-use super::{person::*};
-use engage::{
-    dialog::yesno::*,
-    gameicon::GameIcon,
-    sortie::SortieSelectionUnitManager,
-    tmpro::TextMeshProUGUI
-};
-use super::DVCVariables;
-use crate::utils::*;
-use crate::config::DVCFlags;
 pub mod learn;
 
 pub const ORIGINAL_HASHS: [i32; 329] = [

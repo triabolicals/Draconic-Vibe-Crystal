@@ -1,7 +1,6 @@
 use super::*;
 use crate::randomizer::emblem;
-use engage::gamedata::ai::*;
-use engage::unit::{Unit, UnitAI};
+use engage::{gamedata::ai::*, unit::{Unit, UnitAI}};
 
 static mut AISET: bool = false;
 
@@ -99,7 +98,9 @@ pub fn adjust_unitai(unit: &mut Unit) {
     if unit.job.mask_skills.find_sid("SID_踊り").is_some() || unit.mask_skill.unwrap().find_sid("SID_踊り").is_some() { // has Dance
         unit.ai.set_sequence(1, "AI_MI_Irregular");
         if ac_every_time { unit.ai.set_sequence(0,  "AI_AC_AttackRange");  }
-        if DVCVariables::is_main_chapter_complete(19) { unit.private_skill.add_sid("SID_特別な踊り", SkillDataCategorys::Private, 0);   }
+        if DVCVariables::is_main_chapter_complete(19) { 
+            unit.private_skill.add_sid("SID_特別な踊り", SkillDataCategorys::Private, 0);
+        }
     }
     else if unit.job.mask_skills.find_sid("SID_エンチャント").is_some() || unit.mask_skill.unwrap().find_sid("SID_エンチャント").is_some() { //
         unit.ai.set_sequence(2, "AI_AT_Enchant");
@@ -136,7 +137,9 @@ pub fn adjust_unitai(unit: &mut Unit) {
         }
     }
     else {
-        if old_ai_names[0].contains("Guard") || old_ai_names[1].contains("Guard") { unit.private_skill.add_sid("SID_チェインガード許可",SkillDataCategorys::Private, 0);  }
+        if old_ai_names[0].contains("Guard") || old_ai_names[1].contains("Guard") {
+            unit.private_skill.add_sid("SID_チェインガード許可",SkillDataCategorys::Private, 0);
+        }
         // Healer turned non healer
         if old_ai_names[1].contains("Heal") && ac_every_time { unit.ai.set_sequence(0,  "AI_AC_AttackRange"); }
         if old_ai_names[2].contains("Heal") {  

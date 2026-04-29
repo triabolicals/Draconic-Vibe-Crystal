@@ -1,6 +1,5 @@
 use std::collections::HashSet;
-use engage::gamedata::{JobData, PersonData};
-use engage::unit::{Unit, UnitPool};
+use engage::{gamedata::{JobData, PersonData}, unit::{Unit, UnitPool}};
 use crate::randomizer::job::unit_change_to_random_class;
 
 pub fn get_all_playable_unit_classes(person: &PersonData) -> HashSet<i32> {

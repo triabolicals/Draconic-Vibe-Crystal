@@ -1,16 +1,14 @@
-use unity::prelude::*;
 use super::*;
-pub use engage::{
-    dialog::yesno::TwoChoiceDialogMethods,
-};
 pub use engrave::*;
-use engage::gamedata::GodData;
-use engage::gamedata::item::ItemData;
-use engage::gamedata::skill::SkillData;
-use engage::menu::{BasicMenu, BasicMenuContent, BasicMenuItem, BasicMenuItemAttribute, MenuItem};
-use engage::menu::menu_item::skill_inheritance::{SkillInheritanceMenuItem, SkillInheritanceMenuItemContent};
-use unity::prelude::*;
-use unity::system::List;
+use engage::{
+    dialog::yesno::TwoChoiceDialogMethods,
+    gamedata::{GodData, item::ItemData, skill::SkillData},
+    menu::{
+        BasicMenu, BasicMenuContent, BasicMenuItem, BasicMenuItemAttribute, MenuItem,
+        menu_item::skill_inheritance::{SkillInheritanceMenuItem, SkillInheritanceMenuItemContent},
+    },
+};
+use unity::{system::List, prelude::*};
 use crate::config::{DVCFlags, DVCVariables};
 
 #[unity::class("App", "RingListSkillMenu")]

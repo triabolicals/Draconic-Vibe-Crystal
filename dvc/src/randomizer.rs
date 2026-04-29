@@ -90,26 +90,18 @@ pub fn tutorial_check() {
         GameVariableManager::set_bool("G_CC_マージカノン", true);
     }
     /*
-        if DeploymentConfig::get().debug {
-        GameVariableManager::find_starts_with("G_Cleared_M0").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 0));
-        GameVariableManager::find_starts_with("G_GmapSpot_").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
+    if DVCConfig::get().debug {
+        GameVariableManager::find_starts_with("G_Cleared_M00").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 1));
+        // GameVariableManager::find_starts_with("G_Cleared_M01").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 0));
+        // GameVariableManager::find_starts_with("G_Cleared_M02").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 0));
+        // GameVariableManager::find_starts_with("G_GmapSpot_").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
         GameData::get_playable_god_list().iter().for_each(|g|{
             if let Some(g_unit) = GodPool::create(g) { g_unit.set_escape(false); }
         });
     }
-        GameData::get_playable_god_list().iter().for_each(|g|{
-            if let Some(g_unit) = GodPool::create(g) { g_unit.set_escape(false); }
-        });
-        GameVariableManager::find_starts_with("G_Cleared_M01").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 0));
-        GameVariableManager::find_starts_with("G_Cleared_M02").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 0));
-        GameVariableManager::find_starts_with("G_GmapSpot_").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
-    }}
+    
      */
 }
-pub fn write_seed_output_file() -> bool { false }
-
-
-
 /// SaveLoad Event Randomizing for Cobalt 1.21+
 pub fn save_file_load() {
     tutorial_check();
@@ -221,7 +213,6 @@ pub fn reset_gamedata() {
         }
     );
     engage_count();
-    // GodGrowthData::on_completed_end();
     HubDisposData::unload();
     HubDisposData::load();
 

@@ -1,8 +1,6 @@
+use engage::{battle::{BattleCalculator, BattleSideType}, combat::*, unit::{Unit, UnitItem}, };
 use super::*;
 use animation::MONSTERS;
-use engage::{battle::BattleCalculator, combat::*};
-use engage::battle::BattleSideType;
-use engage::unit::{Unit, UnitItem};
 
 pub const MONSTER_PERSONS: [&str; 8] = [
     "PID_G000_幻影飛竜", "PID_E004_異形兵_異形飛竜", "PID_G000_幻影狼", "PID_E001_異形兵_異形狼",

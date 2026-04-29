@@ -1,6 +1,4 @@
-use std::str::{SplitWhitespace};
-use engage::gamedata::Gamedata;
-use engage::gamedata::item::ItemData;
+use engage::gamedata::{item::ItemData, Gamedata};
 
 #[derive(Clone, PartialEq)]
 pub enum MessSwapType {
@@ -22,7 +20,7 @@ pub enum MessSwapType {
 }
 
 impl MessSwapType {
-    pub fn from_iter(iter: &mut SplitWhitespace) -> Option<Self> {
+    pub fn from_iter(iter: &mut std::str::SplitWhitespace) -> Option<Self> {
         let a = iter.next()?;
         let lower = a.to_lowercase();
         match lower.as_str() {

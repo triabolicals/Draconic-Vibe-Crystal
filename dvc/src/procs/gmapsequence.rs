@@ -1,23 +1,20 @@
-use engage::combat::CharacterAppearance;
-use engage::gamedata::assettable::AssetTableResult;
-use engage::gamedata::{ChapterData, Gamedata};
-use engage::gmapspotmanager::*;
-use engage::gamevariable::GameVariableManager;
-use engage::god::GodPool;
-use engage::menu::{BasicMenuItem, BasicMenuItemAttribute};
-use engage::proc::desc::ProcDesc;
-use engage::proc::{ProcInst, ProcVoidMethod};
-use engage::sequence::gmap_sequence::{GmapSequence, GmapSpotState};
-use engage::unityengine::UnityRenderer;
-use engage::util::try_get_instance;
-use unity::il2cpp::object::Array;
-use unity::prelude::OptionalMethod;
-use crate::assets::gmap::GmapPlayerUnit;
-use crate::DVCVariables;
-use crate::enums::{EMBLEM_PARA};
-use crate::procs::call_proc_original_method;
-use crate::randomizer::map::dispos::PARALOGUE_LEVELS;
-
+use engage::{
+    combat::CharacterAppearance, god::GodPool,
+    gamedata::{ChapterData, Gamedata, assettable::AssetTableResult},
+    gmapspotmanager::*,gamevariable::GameVariableManager,
+    menu::{BasicMenuItem, BasicMenuItemAttribute},
+    proc::{desc::ProcDesc, ProcInst, ProcVoidMethod},
+    sequence::gmap_sequence::{GmapSequence, GmapSpotState},
+    unityengine::UnityRenderer,
+    util::try_get_instance,
+};
+use unity::{prelude::OptionalMethod, il2cpp::object::Array};
+use crate::{
+    assets::gmap::GmapPlayerUnit, DVCVariables,
+    enums::EMBLEM_PARA,
+    procs::call_proc_original_method,
+    randomizer::map::dispos::PARALOGUE_LEVELS,
+};
 pub fn gmap_sequence_desc_edit(descs: &mut Array<&mut ProcDesc>) {
     descs[5] = ProcDesc::call(ProcVoidMethod::new(None, gmap_sequence_load_actor));
     if DVCVariables::EmblemRecruitment.get_value() > 0 || DVCVariables::Continuous.get_value() > 0 {

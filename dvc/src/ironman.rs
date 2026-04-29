@@ -1,10 +1,6 @@
 use unity::prelude::*;
-use engage::map::history::MapHistory;
-use engage::menu::{BasicMenuItem, BasicMenuItemAttribute};
-use engage::mess::Mess;
-use crate::config::{DVCFlags};
-use crate::utils::get_nested_class;
-
+use engage::{map::history::MapHistory, mess::Mess, menu::{BasicMenuItem, BasicMenuItemAttribute}};
+use crate::{utils::get_nested_class, config::DVCFlags};
 pub fn ironman_code_edits(){
     if DVCFlags::Ironman.get_value() { MapHistory::rewind_disable() } else { MapHistory::rewind_enable() }
 }

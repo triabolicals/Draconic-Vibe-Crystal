@@ -1,16 +1,21 @@
-use engage::gamedata::{Gamedata, JobData};
-use engage::gamedata::skill::SkillDataCategorys;
-use engage::map::mind::MapMind;
-use engage::unit::{Gender, UnitUtil, UnitStatusField};
-use engage::sequence::mapsequence::summon::MapSequenceEngageSummon;
-use engage::random::Random;
+use engage::{
+    gamedata::{Gamedata, JobData, skill::SkillDataCategorys},
+    map::mind::MapMind, random::Random,
+    unit::{Gender, UnitUtil, UnitStatusField},
+    sequence::mapsequence::summon::MapSequenceEngageSummon,
+    
+};
+use crate::{
+    config::DVCFlags,
+    randomizer::{
+        data::GameData,
+        item::unit_items::adjust_missing_weapons,
+        job::randomize_selected_weapon_mask,
+        Randomizer,
+    }
+};
 use outfit_core::clamp_value;
 use unity::prelude::OptionalMethod;
-use crate::config::DVCFlags;
-use crate::randomizer::data::GameData;
-use crate::randomizer::item::unit_items::adjust_missing_weapons;
-use crate::randomizer::job::randomize_selected_weapon_mask;
-use crate::randomizer::Randomizer;
 pub extern "C" fn commit_summon(proc: &mut MapSequenceEngageSummon, _optional_method: OptionalMethod) {
     if let Some((owner, person)) = MapMind::get_unit().zip(proc.person_data) {
         let rank = proc.rank;

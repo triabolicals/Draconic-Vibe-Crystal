@@ -1,10 +1,11 @@
 use std::collections::HashMap;
-use std::hash::Hash;
-use utils::{min};
 use bitflags::{bitflags, Flags};
 use engage::transporter::Transporter;
-use crate::continuous::get_story_chapters_completed;
-use crate::randomizer::Randomizer;
+use crate::{
+    utils::min,
+    randomizer::Randomizer,
+    continuous::get_story_chapters_completed
+};
 use super::*;
 
 const GENERICS: [&str; 36] = [

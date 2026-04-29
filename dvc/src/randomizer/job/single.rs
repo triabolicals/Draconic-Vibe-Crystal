@@ -1,7 +1,5 @@
-use engage::gamedata::{Gamedata, JobData};
-use engage::gamevariable::GameVariableManager;
-use crate::config::{DVCFlags, DVCVariables};
-use crate::utils::dlc_check;
+use engage::{gamedata::{Gamedata, JobData}, gamevariable::GameVariableManager, };
+use crate::{config::{DVCFlags, DVCVariables}, utils::dlc_check};
 
 pub fn get_next_class(current_hash_job: i32, increase: bool) -> i32 {
     let job_count = JobData::get_count();

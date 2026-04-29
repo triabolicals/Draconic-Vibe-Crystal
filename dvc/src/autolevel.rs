@@ -10,11 +10,12 @@ use engage::{
     util::get_instance
 };
 use crate::utils::*;
-use crate::randomizer;
+use crate::{randomizer, DVCConfig};
 use crate::DVCVariables;
 use crate::config::DVCFlags;
 use crate::continuous::get_continious_total_map_complete_count;
 use crate::randomizer::item::unit_items::adjust_missing_weapons;
+use crate::randomizer::person::unit::fixed_unit_weapon_mask;
 
 pub mod enemy;
 
@@ -59,31 +60,41 @@ pub fn auto_level_unit(unit: &mut Unit, leader: bool){
         return;
     }
     if !DVCFlags::Autolevel.get_value() { return; }
-    let avg_level = get_difficulty_adjusted_average_level();
-    let mut unit_level = unit.internal_level as i32 + unit.level as i32;
+    let mut avg_level = get_difficulty_adjusted_average_level();
+    let recommended = GameUserData::get_chapter().recommended_level as i32;
+    if avg_level < recommended { return; }
+    if leader { avg_level += 3; }
+    let unit_level = unit.internal_level as i32 + unit.level as i32;
+    if avg_level < unit_level { return; }
     let current_job = &unit.job;
-    if avg_level <= current_job.max_level as i32 {
-        let lows = get_base_classes(current_job);
-        if current_job.is_high() && lows.len() > 0 {
-            unit.class_change(lows[0]);
+    let is_base = current_job.is_low() && current_job.has_high_jobs();
+    let level_gains = avg_level - unit_level;
+    let mut promoted = false;
+    for x in 0..9 {
+        let increase = unit.get_capability(x, true) * (1 + avg_level - unit_level) / 100;
+        let new_stat = clamp_value(unit.base_capability[x as usize] as i32 + increase, 1, 120);
+        unit.set_base_capability(x, new_stat);
+    }
+    if (unit.level as i32 + level_gains) > unit.job.max_level as i32 {
+        let new_level = unit.level as i32 + level_gains - unit.job.max_level as i32;
+        if is_base {
+            let internal = unit.internal_level as i32 + unit.job.max_level as i32;
+            let selected_mask = unit.selected_weapon_mask.value;
+            unit.class_change(current_job.get_high_jobs()[0]);
+            unit.selected_weapon_mask.value = selected_mask;
+            fixed_unit_weapon_mask(unit);
+            unit.set_level(new_level);
+            unit.set_internal_level(internal);
+            promoted = true;
+        } else {
+            unit.set_level(unit.job.max_level as i32);
+            unit.set_internal_level(new_level);
         }
     }
-    else if current_job.is_low() && current_job.has_high_jobs() {
-        let old_weapon_mask = unit.weapon_mask.value;
-        unit.class_change(current_job.get_high_jobs()[0]);
-        unit.selected_weapon_mask.value = old_weapon_mask;
-        unit.update_weapon_mask();
-    }
-    while unit_level < avg_level {
-        if unit.level >= unit.job.max_level {
-            unit.level = unit.job.max_level - 1;
-            unit.internal_level += 1;
-        }
-        unit.level_up(3);
-        unit_level += 1;
-    }
+    else { unit.set_level(unit.level as i32 + level_gains); }
+
+    println!("Auto Level Unit: {} Gained {} levels [Promoted: {}]", unit.get_name(), level_gains, promoted);
     fix_unit_level(unit, avg_level);
-    
     unit.set_hp(unit.get_capability(0, true));
     adjust_missing_weapons(unit);
     randomizer::skill::learn::unit_update_learn_skill(unit);
@@ -201,33 +212,38 @@ pub fn autolevel_party() -> Option<(i32, i32)> {
     fixed_level();
     if !DVCFlags::PostChapterAutolevel.get_value() { None }
     else {
-        let player_average =  get_difficulty_adjusted_average_level() -  2*GameUserData::get_difficulty(false);
+        let player_average =
+            if DVCConfig::get().debug { GameUserData::get_chapter().recommended_level as i32 + 3 }
+            else { get_difficulty_adjusted_average_level() - 2 * GameUserData::get_difficulty(false) };
+
         println!("Autoleveling Bench to average of {}", player_average);
         let mut count = 0;
-        Force::get(ForceType::Absent).unwrap().iter()
-            .for_each(|unit|{
-                let total_level: i32 = unit.level as i32 + unit.internal_level as i32;
-                let number_of_level_ups = player_average - total_level;
-                let job_max_level = unit.get_job().get_max_level();
-                if number_of_level_ups >= 1 {
-                    for _ in 0..number_of_level_ups {
-                        if unit.level >= job_max_level {
-                            unit.set_level( (job_max_level - 1) as i32 );
-                            unit.set_internal_level( unit.internal_level as i32 + 1);
-                        }
-                        unit.level_up(3);
-                        unit.add_sp(100);
-                    }
-                    count += 1;
-                    println!("{} gained {} level [{}/{}]", Mess::get_name(unit.person.pid), number_of_level_ups, unit.level, unit.internal_level);
-                }
-                unit.set_hp(unit.get_capability(0, true));
-            }
-            );
+        Force::get(ForceType::Absent).unwrap().iter().for_each(|unit| { level_up_unit(unit, player_average); });
+        if DVCConfig::get().debug { Force::get(ForceType::Player).unwrap().iter().for_each(|unit| { level_up_unit(unit, player_average); }); }
         fixed_level();
         if count > 0 { Some((player_average, count)) }
         else { None }
     }
+}
+fn level_up_unit(unit: &Unit, target_level: i32) -> bool {
+    let total_level: i32 = unit.level as i32 + unit.internal_level as i32;
+    let number_of_level_ups = target_level - total_level;
+    let job_max_level = unit.get_job().get_max_level();
+    if number_of_level_ups >= 1 {
+        for _ in 0..number_of_level_ups {
+            if unit.level >= job_max_level {
+                unit.set_level( (job_max_level - 1) as i32 );
+                unit.set_internal_level( unit.internal_level as i32 + 1);
+            }
+            unit.level_up(3);
+            unit.add_sp(100);
+        }
+        println!("{} gained {} level [{}/{}]", Mess::get_name(unit.person.pid), number_of_level_ups, unit.level, unit.internal_level);
+        unit.set_hp(unit.get_capability(0, true));
+        true
+    }
+    else { false }
+
 }
 pub fn fixed_level() {
     for x in 1..250 {

@@ -1,8 +1,5 @@
 use super::*;
-use engage::{
-    gamedata::dispos::*,
-    map::terrain::MapTerrain,
-};
+use engage::{gamedata::dispos::*, map::terrain::MapTerrain};
 
 pub fn encounter_map_dispos() {
     if Force::get(ForceType::Absent).is_none() || DisposData::get_list_mut().is_none() { return; }

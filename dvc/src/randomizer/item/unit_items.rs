@@ -200,7 +200,6 @@ pub fn assign_staffs(unit: &Unit) {
     let mask = unit.weapon_mask.value;
     let is_player = unit.person.get_asset_force() == 0;
     let skill_staff =  unit.mask_skill.map(|m| m.weapon_levels.levels[7] as i32).unwrap_or(0);
-    // println!("Assiging Staffs for {}: Weapon Mask: {} [job Staff Level: {}]", unit.get_name(), mask, unit.job.get_max_weapon_level(7));
     if mask & 128 == 0 && skill_staff == 0 { replace_staves(unit.item_list); }
     else {
         let staff_level = max(unit.job.get_max_weapon_level(7), skill_staff);

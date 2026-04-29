@@ -1,10 +1,9 @@
 use super::*;
 use engage::{
+    force::ForceType,
     gamedata::{dispos::DisposData, terrain::TerrainData},
     map::{overlap::MapOverlap, terrain::MapTerrain},
 };
-use engage::force::ForceType;
-
 pub mod fow;
 
 const TERRAIN: [&str; 9] = ["TID_瘴気の領域", "TID_瘴気", "TID_氷の領域", "TID_霧", "TID_流砂", "TID_煙", "TID_アロマ", "TID_水溜まり", "TID_土柱", ];

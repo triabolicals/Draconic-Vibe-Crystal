@@ -1,14 +1,13 @@
-
-
-use engage::dialog::BasicDialog2;
-use engage::gamedata::JobData;
-use engage::gamemessage::GameMessage;
-use engage::menu::{BasicMenuItemAttribute, BasicMenuResult};
-use engage::mess::Mess;
-use engage::pad::{NpadButton, Pad};
-use unity::prelude::OptionalMethod;
-use unity::system::action::Action;
-use crate::config::DVCFlags;
+use engage::{
+    dialog::BasicDialog2, gamedata::JobData, gamemessage::GameMessage, mess::Mess,
+    menu::{BasicMenuItemAttribute, BasicMenuResult}, pad::{NpadButton, Pad},
+};
+use unity::{prelude::OptionalMethod, system::action::Action};
+use crate::{
+    DVCVariables, DVCVariables::SingleJob,
+    config::{DVCFlags, DVCFlags::PostChapterAutolevel},
+    randomizer::data::RandomizedGameData,
+};
 use super::*;
 
 mod command;
@@ -18,10 +17,6 @@ pub(crate) mod order;
 pub use command::*;
 pub use submenu::*;
 pub use order::*;
-use crate::config::DVCFlags::PostChapterAutolevel;
-use crate::DVCVariables;
-use crate::DVCVariables::SingleJob;
-use crate::randomizer::data::RandomizedGameData;
 
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq)]

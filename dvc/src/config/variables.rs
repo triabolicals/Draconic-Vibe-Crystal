@@ -1,19 +1,20 @@
-use std::cmp::PartialEq;
-use engage::gamedata::{Gamedata, GodData, JobData, PersonData};
 use engage::{
+    gameuserdata::GameUserData, gamevariable::GameVariableManager,
+    gamedata::{Gamedata, GodData, JobData, PersonData},
+    menu::BasicMenuItemAttribute, random::Random,
     unit::{UnitPool, Unit},
     god::{GodPool}
 };
-use engage::gameuserdata::GameUserData;
-use engage::gamevariable::GameVariableManager;
-use engage::menu::BasicMenuItemAttribute;
-use engage::random::Random;
+use crate::{
+    utils, DVCConfig, config::DVCFlags,
+    utils::{clamp_value, dlc_check},
+    randomizer::data::GameData,
+    enums::{EMBLEM_GIDS, PIDS}
+};
+use std::cmp::PartialEq;
 use unity::prelude::Il2CppString;
-use crate::enums::{EMBLEM_GIDS, PIDS};
-use crate::randomizer::data::GameData;
-use crate::{utils, DVCConfig};
-use crate::config::DVCFlags;
-use crate::utils::{clamp_value, dlc_check};
+
+
 
 /// Structure that contains and manages DVC-Related GameVariables
 #[repr(i32)]

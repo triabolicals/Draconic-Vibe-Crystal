@@ -1,14 +1,15 @@
-use engage::gamedata::skill::SkillDataCategorys;
-use engage::unit::{Unit, UnitPool};
-use super::{*, ai};
+use engage::{gamedata::skill::SkillDataCategorys, unit::{Unit, UnitPool}};
 use crate::{
-    assets::animation::MONSTERS, config::DVCVariables, randomizer::{emblem::ENEMY_EMBLEM_LIST, grow, item::unit_items, job}
+    assets::animation::MONSTERS, config::DVCVariables,
+    continuous::get_continious_total_map_complete_count,
+    randomizer::{
+        emblem::ENEMY_EMBLEM_LIST, grow, item::unit_items, job,
+        data::{GameData, RandomizedGameData},
+        item::{unit_items::add_generic_weapons, change_liberation_type},
+        job::{is_magic_class, randomize_selected_weapon_mask},
+    },
 };
-use crate::continuous::get_continious_total_map_complete_count;
-use crate::randomizer::data::{GameData, RandomizedGameData};
-use crate::randomizer::item::change_liberation_type;
-use crate::randomizer::item::unit_items::add_generic_weapons;
-use crate::randomizer::job::{is_magic_class, randomize_selected_weapon_mask};
+use super::{*, ai};
 
 const VANDER_MAX: [i8; 11] = [45, 12, 14, 11, 40, 12, 13, 12, 10, 5, 7];
 

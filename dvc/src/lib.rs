@@ -25,7 +25,7 @@ pub use config::variables::*;
 use crate::utils::return_true;
 
 pub static mut CONFIG: DVCConfig = DVCConfig::default();
-pub const VERSION: &str = "2.16.0J";
+pub const VERSION: &str = "2.16.0M";
 pub const VARIABLE_VERSION: i32 = 7;
 extern "C" fn event_install(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
@@ -72,13 +72,9 @@ pub fn main() {
     Patch::in_text(0x02517830).bytes(&[0xa0, 0x02, 0x80, 0x52]).unwrap();
     Patch::in_text(0x0251a9c0).bytes(&[0x01, 0x00, 0x84, 0x52]).unwrap();
     Patch::in_text(0x024cba50).bytes(&[0x01, 0x00, 0x85, 0x52]).unwrap();
-
-
-    // Patch::in_text(0x1ccd53c).bytes(&[0x68, 0, 0x80, 0x52]).unwrap();   // GmapSequence Jump to 3
+    
     return_true(0x0203e1b0);    // Forging Item Display
     skyline::install_hooks!(
-        // sprite::facethumbnail_getpath_god,
-        // talk::get_cmd_info_from_cmd_lines_hook,
         sprite::unit_icon_set_god_icon,
         script::script_get_string,
         randomizer::person::unit::unit_create_impl_2_hook,
@@ -86,9 +82,6 @@ pub fn main() {
         sprite::try_get_sprite,
         randomizer::item::calc_reward,
         randomizer::person::unit_pool_get_from_person,
-        // sprite::get_bond_face,
-        // sprite::get_god_face,
-        // randomizer::person_sound,
         assets::dvc_create_break_effect_hook,
         assets::engage_attack::combat_record_post_process,
         randomizer::emblem::god_bond_holder_get,
@@ -98,7 +91,6 @@ pub fn main() {
         randomizer::item::shop::weapon_buy_item_create_menu_item,
         randomizer::emblem::menu::ring_list_skill_menu_create_menu_items,
         randomizer::emblem::menu::skill_inheritance_menu_create_menu_item_list,
-
         message::mess_add_tag_to_string,
         message::talk::mess_load,
     );

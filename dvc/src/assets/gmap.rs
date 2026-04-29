@@ -1,9 +1,8 @@
-use engage::combat::CharacterAppearance;
-use engage::gamedata::assettable::AssetTableResult;
-use engage::unit::{UnitPool, Unit};
-use engage::gameuserdata::GameUserData;
-use engage::sequence::gmap_sequence::GmapSequence;
-use engage::util::try_get_instance;
+use engage::{
+    combat::CharacterAppearance, gamedata::assettable::AssetTableResult,
+    unit::{UnitPool, Unit}, gameuserdata::GameUserData, sequence::gmap_sequence::GmapSequence,
+    util::try_get_instance,
+};
 use unity::prelude::*;
 use crate::DVCVariables;
 

@@ -82,7 +82,6 @@ pub struct PersonTalkSwapData {
 impl PersonTalkSwapData {
     pub fn from_line(line: &str) -> Option<Self> {
         if line.is_empty() || (!line.starts_with("char") && !line.starts_with("emblem")) { return None; }
-        println!("Found Character/Emblem");
         let mut spilt = line.split_whitespace();
         let emblem = spilt.next()?.contains("emblem");   // char
         let person_index = spilt.next().and_then(|s| s.parse::<i32>().ok())?;

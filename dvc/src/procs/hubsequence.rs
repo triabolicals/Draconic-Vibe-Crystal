@@ -1,17 +1,18 @@
 use std::sync::RwLock;
-use engage::gameuserdata::GameUserData;
-use engage::gamevariable::GameVariableManager;
-use engage::proc::desc::ProcDesc;
-use engage::proc::{ProcInst, ProcVoidMethod};
-use engage::sequence::hub::HubSequence;
-use unity::il2cpp::object::Array;
-use unity::prelude::OptionalMethod;
-use crate::message::{TextSwapper, MESSAGE_SWAPPER};
-use crate::procs::call_proc_original_method;
-use crate::{randomizer, DVCVariables};
-use crate::randomizer::item;
-use crate::utils::dlc_check;
-
+use engage::{
+    gameuserdata::GameUserData, gamevariable::GameVariableManager,
+    proc::{ProcInst, ProcVoidMethod, desc::ProcDesc},
+    sequence::hub::HubSequence,
+    
+};
+use unity::{prelude::OptionalMethod, il2cpp::object::Array};
+use crate::{
+    message::{TextSwapper, MESSAGE_SWAPPER},
+    procs::call_proc_original_method,
+    randomizer, DVCVariables,
+    randomizer::item,
+    utils::dlc_check,
+};
 fn is_continuous_gift(key: &str) -> bool {
     !GameVariableManager::get_bool(key) && 
     DVCVariables::is_continuous() && GameUserData::get_sequence() == 5 && DVCVariables::is_main_chapter_complete(4)

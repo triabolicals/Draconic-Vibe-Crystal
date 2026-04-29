@@ -1,15 +1,17 @@
 use bitflags::Flags;
 use engage::gameuserdata::GameUserData;
-use outfit_core::{get_outfit_data, AssetConditions, AssetFlags, PersonalDressData, UnitAssetMenuData};
-use outfit_core::CharacterAssetMode::UnitInfo;
+use outfit_core::{
+    get_outfit_data, AssetConditions, AssetFlags, PersonalDressData, UnitAssetMenuData,
+    CharacterAssetMode::UnitInfo,
+};
+use crate::{
+    config::DVCFlags, utils::create_rng,
+    assets::transform::is_dragonstone,
+    randomizer::{names::get_emblem_person, person::is_playable_person, data::RandomizedGameData},
+};
 use accessory::*;
 use transform::{has_enemy_tiki};
-use crate::assets::transform::is_dragonstone;
-use crate::config::DVCFlags;
-use crate::randomizer::data::RandomizedGameData;
-use crate::randomizer::names::get_emblem_person;
-use crate::randomizer::person::is_playable_person;
-use crate::utils::create_rng;
+
 use super::*;
 
 fn is_preview_unit(unit: &Unit) -> bool { unit.force.is_some_and(|x| (1 << x.force_type) & 25 != 0) && unit.status.value & 35184372088832 == 0 }

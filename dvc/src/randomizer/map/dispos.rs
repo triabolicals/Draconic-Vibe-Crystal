@@ -1,13 +1,11 @@
-use engage::gamedata::dispos::DisposData;
-use engage::gamedata::{Gamedata, GamedataArray, ItemData, PersonData};
-use engage::gameuserdata::GameUserData;
-use engage::gamevariable::GameVariableManager;
-use crate::config::{DVCVariables};
-use crate::enums::EMBLEM_PARA;
-use crate::randomizer::data::{EmblemPool, GameData};
-use crate::randomizer::EMBLEM_GIDS;
-use crate::utils::{can_rand, clamp_value};
-
+use engage::{
+    gamedata::{dispos::DisposData, GamedataArray},
+    gameuserdata::GameUserData, gamevariable::GameVariableManager,
+};
+use crate::{
+    config::DVCVariables, enums::{EMBLEM_GIDS, EMBLEM_PARA},
+    randomizer::data::EmblemPool, utils::{can_rand, clamp_value},
+};
 // Recommended Level, Emblem Level, Lowest Generic Level, Special Enemy Level
 pub const PARALOGUE_LEVELS: [u8; 48] = [
     34, 40, 15, 20,

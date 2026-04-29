@@ -1,12 +1,10 @@
-use engage::menu::{BasicMenuItemAttribute, BasicMenuMethods};
-use engage::proc::ProcInst;
-use engage::titlebar::TitleBar;
+use engage::{proc::ProcInst, titlebar::TitleBar, menu::{BasicMenuItemAttribute, BasicMenuMethods}};
 use unity::prelude::MethodInfo;
-use crate::menus::ingame::draconic_vibe_name;
+use crate::{
+    menus::ingame::draconic_vibe_name, utils::{can_rand, dlc_check},
+    config::{DVCFlags::*, DVCVariables::*, menu::DVCMenuItemKind::Order},
+};
 use super::*;
-use crate::config::{DVCFlags::*, DVCVariables::*};
-use crate::config::menu::DVCMenuItemKind::Order;
-use crate::utils::{can_rand, dlc_check};
 use DVCMenuItemKind::*;
 
 pub static mut MENU_SELECT: [i32; 21] = [0; 21];

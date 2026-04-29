@@ -1,14 +1,9 @@
-use std::collections::HashSet;
-use std::fs::File;
-use std::io;
-use std::io::Write;
-use std::io::BufRead;
-use std::path::Path;
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use engage::gamedata::item::ItemData;
-use engage::gamedata::{Gamedata, PersonData};
-use engage::gamedata::skill::SkillData;
-use engage::mess::Mess;
+use std::{
+    collections::HashSet, fs::File, path::Path, 
+    io::{Write, BufRead}, io,
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard}
+};
+use engage::{gamedata::{Gamedata, skill::SkillData, PersonData, item::ItemData}, mess::Mess};
 use crate::randomizer::DVC_BLACK_LIST;
 
 pub const NO_INHERITS: &[&str] = &[

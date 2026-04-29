@@ -1,12 +1,9 @@
-use engage::gamemessage::GameMessage;
-use engage::gamevariable::GameVariableManager;
-use engage::keyboard::SoftwareKeyboard;
+use engage::{gamemessage::GameMessage,gamevariable::GameVariableManager,keyboard::SoftwareKeyboard};
 use unity::system::action::Action1;
-use crate::DVCConfig;
-use crate::randomizer::data::GameData;
-use crate::randomizer::RANDOMIZER_STATUS;
-use crate::randomizer::status::RandomizerStatus;
-use crate::utils::{get_random_number_for_seed};
+use crate::{
+    randomizer::{data::GameData, RANDOMIZER_STATUS, status::RandomizerStatus},
+    DVCConfig, utils::{get_random_number_for_seed},
+};
 use super::*;
 
 #[repr(C)]

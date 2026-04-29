@@ -1,17 +1,17 @@
-use engage::gamedata::{ChapterData, Gamedata};
-use engage::gameuserdata::GameUserData;
-use engage::gamevariable::GameVariableManager;
-use engage::proc::desc::ProcDesc;
-use engage::proc::{Bindable, ProcInst, ProcVoidMethod};
+use engage::{
+    gamedata::{ChapterData, Gamedata},
+    gameuserdata::GameUserData, gamevariable::GameVariableManager,
+    proc::{desc::ProcDesc, Bindable, ProcInst, ProcVoidMethod},
+    menu::menus::accessory::change::AccessoryShopChangeRoot,
+    sequence::mainsequence::MainSequence,
+};
+use crate::{
+    menus, message, DVCVariables, config::menu::DVCConfigText,
+    procs::{call_proc_original_method, replace_desc_void_function},
+    randomizer::RANDOMIZER_STATUS,
+};
 use outfit_core::UnitAssetMenuData;
-use unity::il2cpp::object::Array;
-use unity::prelude::OptionalMethod;
-use crate::{menus, message, DVCVariables};
-use crate::procs::{call_proc_original_method, replace_desc_void_function};
-use crate::randomizer::RANDOMIZER_STATUS;
-use engage::menu::menus::accessory::change::AccessoryShopChangeRoot;
-use engage::sequence::mainsequence::MainSequence;
-use crate::config::menu::DVCConfigText;
+use unity::{prelude::OptionalMethod, il2cpp::object::Array};
 
 pub fn main_sequence_desc_edit(descs: &mut Array<&mut ProcDesc>) {
     descs[18] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_initialize));

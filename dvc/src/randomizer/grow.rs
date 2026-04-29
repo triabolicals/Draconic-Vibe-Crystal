@@ -1,12 +1,5 @@
-use engage::{
-    unit::Unit,
-    force::{ForceType, *}, 
-    gamedata::*,
-    gamevariable::*,
-};
-use crate::config::DVCFlags;
-use crate::DVCVariables;
-use crate::randomizer::get_data_read;
+use engage::{unit::Unit, force::{ForceType, *}, gamedata::*, gamevariable::*, };
+use crate::{DVCVariables, config::DVCFlags, randomizer::get_data_read};
 
 pub fn randomize_person_grow(){
     let person_list = PersonData::get_list_mut().unwrap();

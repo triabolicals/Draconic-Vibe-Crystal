@@ -1,5 +1,4 @@
-use accessory::AccessoryData;
-use unity::{prelude::*, engine::Color, il2cpp::object::Array, system::List};
+use unity::{prelude::*, il2cpp::object::Array, system::List};
 use engage::{
     gameuserdata::GameUserData,
     gamedata::{item::*, shop::{ShopData, *}, *},
@@ -19,12 +18,11 @@ use engage::{
     transporter::Transporter,
     unit::Unit,
 };
-use crate::config::DVCFlags;
-use crate::{randomizer, DVCVariables};
-use crate::ironman::vtable_edit;
-use crate::randomizer::Randomizer;
-use crate::utils::dlc_check;
-
+use crate::{
+    randomizer::Randomizer,
+    config::DVCFlags, randomizer, DVCVariables,
+    ironman::vtable_edit, utils::dlc_check
+};
 pub fn random_shop_install() {
     if let Some(class)= Il2CppClass::from_name("App", "ItemShopBuyMenuItem").ok() {
         vtable_edit(class, "OnBuildMenuItemContent", shop_menu_item_on_build as _);
@@ -275,9 +273,7 @@ pub fn shop_menu_item_on_build(this: &mut ItemShopBuyMenuItem, _optional_method:
         if let Some(game_color) = engage::game::GameColor::get(){
             let disabled = (this.attribute) & 2 != 0;
             if disabled {
-                let mut a1 = Color::new();
-                a1.r = game_color.unselectable_color.r;
-                a1.b = game_color.unselectable_color.b;
+                let mut a1 = game_color.unselectable_color;
                 a1.g = 0.5;
                 this.cursor_color = a1;
                 this.active_text_color = a1;
@@ -303,9 +299,7 @@ pub fn weapon_but_item_on_build(this: &mut WeaponShopBuyMenuItem, _optional_meth
         if let Some(game_color) = engage::game::GameColor::get(){
             let disabled = (this.attribute) & 2 != 0;
             if disabled {
-                let mut a1 = Color::new();
-                a1.r = game_color.unselectable_color.r;
-                a1.b = game_color.unselectable_color.b;
+                let mut a1 = game_color.unselectable_color;
                 a1.g = 0.5;
                 this.cursor_color = a1;
                 this.active_text_color = a1;

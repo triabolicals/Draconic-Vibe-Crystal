@@ -1,15 +1,16 @@
-use super::*;
 use engage::{
     force::*, gamedata::terrain::TerrainData,
     gamemessage::GameMessage, gamesound::GameSound,
-    map::{mind::MapMind, overlap::MapOverlap, terrain::MapTerrain},
+    map::{
+        inspectors::{MapInspectorKind, MapInspectors},
+        mind::MapMind, overlap::MapOverlap, terrain::MapTerrain
+    },
     script::*, sequence::unitgrowsequence::UnitGrowSequence,
     unit::{Unit, UnitPool},
 };
 use std::sync::Mutex;
-use engage::map::inspectors::{MapInspectorKind, MapInspectors};
 use crate::randomizer::status::RandomizerStatus;
-
+use super::*;
 pub mod effects;
 pub(crate) mod dispos;
 pub mod shuffle;

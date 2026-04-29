@@ -1,10 +1,10 @@
-use engage::gamedata::{Gamedata, GodData};
-use engage::language::*;
-use engage::mess::{Mess, MessStaticFields};
+use engage::{
+    gamedata::{Gamedata, GodData},
+    language::*,
+    mess::{Mess, MessStaticFields},
+};
 use unity::prelude::*;
-use crate::enums::{EMBLEM_GIDS, MPIDS, RINGS};
-use crate::message::swap::copy_from_u16_ptr;
-use crate::message::swap_command::TalkLine;
+use crate::{message::swap::copy_from_u16_ptr, enums::{EMBLEM_GIDS, MPIDS, RINGS}};
 
 const NPC_MPIDS: [&str; 22] = [
     "MPID_Sepia", "MPID_Gris", "MPID_Marron", "MPID_Lumiere", "MPID_M003_Boss", "MPID_M004_Boss",
@@ -14,9 +14,7 @@ const NPC_MPIDS: [&str; 22] = [
 ];
 
 #[derive(Clone)]
-pub struct MessDataString{
-    pub string: String,
-}
+pub struct MessDataString{ pub string: String, }
 
 pub struct GenderConditionString {
     male: String,
@@ -106,6 +104,7 @@ pub struct MessageList {
     pub gender: Vec<GenderConditionString>,
     pub hero_jobs: Vec<MessDataString>,
     pub item_kinds: [Vec<MessDataString>; 10],
+    pub text: Vec<MessDataString>,
     pub honorifics: Vec<MessDataString>,
 }
 
@@ -129,7 +128,7 @@ impl MessageList {
         let mut alias: Vec<_> = MPIDS.iter().map(|m|{
             MessDataString::from(Mess::get(m.replace("MPID_", "MPID_alias_")))
         }).collect();
-        
+        let mut text = vec![];
         let lines =
         match Language::get_lang() {
             LanguageLangs::USFrench | LanguageLangs::EUFrench => { include_str!("../../data/text_swaps/fr.txt").lines() }
@@ -156,6 +155,7 @@ impl MessageList {
                         }
                     }
                     4 => { alias.push(MessDataString::from_str(line)); }
+                    5 => { text.push(MessDataString::from_str(line)); }
                     _ => {}
                 }
             }
@@ -186,9 +186,9 @@ impl MessageList {
         let list =       
             Self {
                 person_list, alias, gender, emblem_list, emblem_alias, 
-                hero_jobs, item_kinds, honorifics: vec![], 
+                hero_jobs, item_kinds, honorifics: vec![], text,
             };
-        include_str!("label_swap.txt").lines().flat_map(|l| TalkLine::new(l))
+        include_str!("label_swap.txt").lines().flat_map(|l| crate::message::swap_command::TalkLine::new(l))
             .for_each(|line|{
                 let ptr = Mess::get_int_ptr_mut(line.mid.as_str());
                 let mut s = copy_from_u16_ptr(ptr);

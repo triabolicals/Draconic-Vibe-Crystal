@@ -1,16 +1,22 @@
-use data::SEARCH_LIST;
 use unity::prelude::*;
 use engage::{
-    unit::*,
-    dialog::yesno::*, gamedata::{assettable::*, item::ItemData, skill::*, *}, 
-    gamevariable::GameVariableManager, random::Random 
+    gameuserdata::GameUserData, mess::Mess, random::Random,
+    gamevariable::GameVariableManager,
+    gamedata::{assettable::*, item::ItemData, skill::*, *},
+    unit::*, combat::*, dialog::yesno::*,
 };
-use engage::gameuserdata::GameUserData;
-use engage::mess::Mess;
-use crate::{config::DVCVariables, enums::*};
-pub use::outfit_core::Mount;
-use engage::combat::*;
-use outfit_core::{get_outfit_data, print_asset_table_result, AssetFlags, CharacterAssetMode, UnitAssetMenuData};
+use crate::{
+    config::{DVCFlags, DVCVariables}, enums::*,
+    assets::{
+        animation::*,
+        engage_attack::{adjust_engage_attack_animation, lueur_engage_atk},
+        transform::{has_fake_tiki, is_dragonstone},
+        data::{SEARCH_LIST, search::search_by_iid}},
+};
+pub use outfit_core::{
+    anim::AnimData, Mount, AssetFlags, CharacterAssetMode, UnitAssetMenuData,
+    get_outfit_data, print_asset_table_result,
+};
 
 pub mod accessory;
 pub mod data;
@@ -20,14 +26,6 @@ pub mod transform;
 pub mod dress;
 pub mod gmap;
 pub(crate) mod engage_attack;
-
-use animation::*;
-use crate::assets::{transform::{has_fake_tiki, is_dragonstone}, data::search::search_by_iid};
-use crate::config::{DVCFlags};
-use std::io::Write;
-use outfit_core::anim::AnimData;
-use outfit_core::room::CharacterEffect;
-use crate::assets::engage_attack::{adjust_engage_attack_animation, lueur_engage_atk};
 
 #[unity::class("Combat", "AnimSetDB")]
 pub struct AnimSetDB{
@@ -63,7 +61,7 @@ pub fn asset_table_result_setup_hook(
         return result;
     }
     let conditions = dress::commit_for_unit_dress(result, mode, unit, equipped, conditions);  // Pre-set Conditions
-    if unit.job.jid.str_contains("紋章士") { return result; }
+    if conditions.flags.contains(AssetFlags::EngageTiki) || unit.job.jid.str_contains("紋章士")  { return result; }
     if mode == 3 && unit.person.parent.index == 1 {
         if unit.person.parent.index > 1 { result.scale_stuff[16] = 4.8; }
         return result;
@@ -76,14 +74,15 @@ pub fn asset_table_result_setup_hook(
             if conditions.flags.contains(AssetFlags::Male) { result.body_anims.add("Tsf0AM-No1_c001_N".into()); }
             else { result.body_anims.add("Tsf0AF-No1_c051_N".into()); }
         }
-        else if unit.person.parent.index == 1 { // Alear is not hero so set default engaging 1/2 anims
+        else { // Alear is not hero so set default engaging 1/2 anims
             result.body_anims.clear();
             if conditions.flags.contains(AssetFlags::Male) { result.body_anims.add("Com0AM-No1_c000_N".into()); }
             else { result.body_anims.add("Com0AF-No1_c000_N".into()); }
         }
+        return result;
     }
     if (conditions.flags.contains(AssetFlags::MapTransform) && mode == 1) || conditions.flags.contains(AssetFlags::Monster) { return result; }
-    else if mode == 2 && (conditions.flags.contains(AssetFlags::EngAtkCoopMain) || conditions.flags.contains(AssetFlags::EngAtkCoopMain)) { // DragonBlast or BondBlast
+    else if mode == 2 && (conditions.flags.contains(AssetFlags::EngAtkCoopMain) || conditions.flags.contains(AssetFlags::EngAtkCoopSub)) { // DragonBlast or BondBlast
         lueur_engage_atk(result, unit, &conditions);
     }
     else if conditions.flags.contains(AssetFlags::EngageAttack){
@@ -194,7 +193,7 @@ pub fn is_tiki_engage(this: &mut AssetTableResult) -> bool {
 }
 
 #[unity::hook("Combat", "CharacterEffect", "CreateBreak")]
-pub fn dvc_create_break_effect_hook(this: &mut CharacterEffect, method_info: OptionalMethod) {
+pub fn dvc_create_break_effect_hook(this: &mut outfit_core::room::CharacterEffect, method_info: OptionalMethod) {
     call_original!(this, method_info);
     outfit_core::room::break_effect(this);
 }

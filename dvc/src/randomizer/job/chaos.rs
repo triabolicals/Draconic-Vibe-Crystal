@@ -1,16 +1,14 @@
 use engage::{
-    unit::{Gender, Unit},
-    gamedata::{Gamedata, JobData},
-    gameuserdata::GameUserData,
-    proc::ProcInstFields,
-    random::Random,
+    unit::{Gender, Unit}, gamedata::{Gamedata, JobData},
+    gameuserdata::GameUserData, proc::ProcInstFields,
+    random::Random, proc::Bindable,
 };
-use engage::proc::Bindable;
 use unity::prelude::*;
-use crate::assets::get_unit_dress;
-use crate::assets::gmap::GmapPlayerUnit;
-use crate::DVCVariables;
-use crate::randomizer::item::unit_items::{adjust_player_weapons, get_number_of_usable_weapons};
+use crate::{
+    DVCVariables,
+    assets::{gmap::GmapPlayerUnit, get_unit_dress},
+    randomizer::item::unit_items::{adjust_player_weapons, get_number_of_usable_weapons},
+};
 
 #[unity::class("App", "LevelUpSequnece")]
 pub struct LevelUpSequence{
@@ -24,8 +22,8 @@ pub struct LevelUpSequence{
 }
 impl Bindable for LevelUpSequence {}
 impl LevelUpSequence {
-    #[unity::class_method(5)] pub fn prepare(&self); // Offset: 0x1BE1260 Flags: 0
-    #[unity::class_method(6)] pub fn reflect(&self); // Offset: 0x1BE13A0 Flags: 0
+    #[unity::class_method(5)] pub fn prepare(&self);
+    #[unity::class_method(6)] pub fn reflect(&self);
 }
 pub extern "C" fn level_up_prepare(this: &mut LevelUpSequence, _optional_method: OptionalMethod) {
     this.prepare();
@@ -67,7 +65,6 @@ pub extern "C" fn level_up_prepare(this: &mut LevelUpSequence, _optional_method:
                 else if grow.job.rank == 0 { grow.set_internal_level(0); }
                 let required_kind = if kind != 0 { Some(kind as i32) } else { None };
                 crate::randomizer::job::randomize_selected_weapon_mask(grow, required_kind);
-                // println!("Chaos Reclassing New Weapon Mask: Selected: {} / {}", grow.selected_weapon_mask.value, grow.weapon_mask.value);
                 if grow.job.learn_skill.is_some() && ((current_level >= 5 && grow.job.max_level == 20) || (current_level >= 25 && grow.job.max_level == 40)) {
                     grow.learned_job_skill = None;
                 }

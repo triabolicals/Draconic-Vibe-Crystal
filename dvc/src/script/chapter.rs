@@ -1,18 +1,10 @@
-use engage::gamedata::Gamedata;
-use engage::gamemessage::GameMessage;
-use engage::gameuserdata::GameUserData;
-use engage::gamevariable::GameVariableManager;
-use engage::map::image::MapImage;
-use engage::mess::Mess;
-use engage::random::Random;
-use engage::script::{DynValue, EventScript, EventScriptCommand, ScriptMap, ScriptSystem, ScriptUnit, ScriptUtil, ScriptUtils};
-use engage::util::get_instance;
-use unity::il2cpp::object::Array;
-use unity::prelude::*;
-use crate::config::DVCFlags;
-use crate::DVCVariables;
-use crate::enums::{MPIDS, PIDS, RINGS};
-use crate::randomizer::Randomizer;
+use engage::{
+    gamedata::Gamedata, map::image::MapImage, mess::Mess, random::Random,
+    gamemessage::GameMessage, gameuserdata::GameUserData, gamevariable::GameVariableManager,
+    script::*, util::get_instance,
+};
+use unity::{prelude::*, il2cpp::object::Array};
+use crate::{randomizer::Randomizer, config::DVCFlags, DVCVariables, enums::{MPIDS, PIDS, RINGS}};
 
 pub extern "C" fn install_script_edits(script: &EventScript) {
     let chapter = GameUserData::get_chapter().cid.to_string();

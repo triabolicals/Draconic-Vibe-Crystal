@@ -1,14 +1,14 @@
 use engage::{
     force::*, gamedata::{Gamedata, PersonData}, 
     gameuserdata::GameUserData, gamevariable::GameVariableManager, 
-    god::GodPool, map::inspectors::*,
+    god::GodPool, map::inspectors::*, unit::UnitPool,
     random::Random, script::{DynValue, *},
-    unit::UnitPool,
 };
 use unity::prelude::*;
-use crate::{utils::*, enums::PIDS, randomizer::{*, RANDOMIZER_STATUS}, config::DVCVariables};
-use crate::randomizer::person::switch_person;
-
+use crate::{
+    randomizer::person::switch_person, utils::*, enums::PIDS, 
+    randomizer::{*, RANDOMIZER_STATUS}, config::DVCVariables
+};
 pub(crate) mod chapter;
 mod common;
 

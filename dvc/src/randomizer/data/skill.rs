@@ -1,17 +1,22 @@
-use engage::gamedata::{Gamedata, GodData, JobData, PersonData};
-use engage::gamedata::god::GodGrowthData;
-use engage::gamedata::skill::{SkillArray, SkillArrayEntity, SkillData, SkillDataCategorys};
-use engage::unit::Unit;
-use engage::gamevariable::GameVariableManager;
-use engage::random::Random;
+use engage::{
+
+    gamedata::{
+        skill::{SkillArray, SkillArrayEntity, SkillData, SkillDataCategorys},
+        Gamedata, GodData, JobData, PersonData, god::GodGrowthData
+    },
+    unit::Unit, gamevariable::GameVariableManager,random::Random,
+    
+};
 use num_traits::FromPrimitive;
-use crate::config::{DVCFlags, DVCVariables};
-use crate::randomizer::{get_dvc_black_list_read, Randomizer};
-use crate::randomizer::blacklist::{DVCBlackLists};
-use crate::randomizer::data::GameData;
-use crate::randomizer::data::sync::EmblemSkillPool;
-use crate::randomizer::person::unit;
-use crate::randomizer::skill::ORIGINAL_HASHS;
+use crate::{
+    config::{DVCFlags, DVCVariables},
+    randomizer::{
+        skill::ORIGINAL_HASHS,
+        get_dvc_black_list_read, Randomizer,
+        blacklist::DVCBlackLists, person::unit,
+    },
+};
+use super::{GameData, sync::EmblemSkillPool};
 
 pub struct SkillPool {
     pub emblem_stat_boost: [i32; 110],
@@ -226,7 +231,7 @@ impl SkillPool {
             }
         });
     }
-    pub fn get_random_skill(&self, difficulty: i32, rng: &Random) -> &'static SkillData {
+    pub fn get_random_skill(&self, _difficulty: i32, rng: &Random) -> &'static SkillData {
         loop {
             if let Some(skill) = self.pool.get_random_element(rng).and_then(|s| SkillData::try_get_hash_mut(*s).filter(|v| is_custom_allow(v))){
                 let chapter_completed = crate::continuous::get_story_chapters_completed() / 5;

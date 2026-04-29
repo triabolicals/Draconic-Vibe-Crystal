@@ -1,22 +1,10 @@
 use std::collections::{HashMap, HashSet};
-use engage::force::{Force, ForceType};
-use engage::gamedata::dispos::DisposData;
-use engage::gamedata::GamedataArray;
-use engage::gameuserdata::GameUserData;
-use engage::gamevariable::GameVariableManager;
-use engage::map::situation::MapSituation;
-use engage::map::terrain::MapTerrain;
-use engage::proc::ProcInst;
-use engage::random::Random;
-use engage::sequence::mapsequence::MapSequence;
-use engage::unit::{UnitFor, UnitPool};
-use engage::util::get_instance;
-use unity::prelude::OptionalMethod;
-use crate::config::{DVCFlags, DVCVariables};
-use crate::deployment::{fulldeploy, get_emblem_paralogue_level};
-use crate::randomizer::Randomizer;
-use crate::utils;
-
+use engage::{
+    map::terrain::MapTerrain, random::Random,
+    gamedata::{GamedataArray, dispos::DisposData},
+    gameuserdata::GameUserData, gamevariable::GameVariableManager,
+};
+use crate::{config::DVCFlags, randomizer::Randomizer, utils};
 
 pub struct MapRect {
     pub x1: i8,

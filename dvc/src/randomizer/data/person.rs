@@ -1,12 +1,12 @@
-use engage::gamedata::{Gamedata, PersonData};
-use engage::gamedata::skill::{SkillArray, SkillData};
-use engage::gamevariable::GameVariableManager;
-use engage::mess::Mess;
-use crate::config::DVCVariables;
-use crate::enums::PIDS;
-use crate::randomizer::person::switch_person;
-use crate::utils::get_base_classes;
-
+use engage::{
+    gamevariable::GameVariableManager, mess::Mess,
+    gamedata::{Gamedata, PersonData, skill::{SkillArray, SkillData}},
+};
+use crate::{
+    config::DVCVariables, enums::PIDS,
+    randomizer::person::switch_person,
+    utils::get_base_classes,
+};
 pub struct PlayableCharacter {
     pub hash: i32,
     pub playable_slot: i32,
@@ -31,7 +31,7 @@ impl PlayableCharacter {
     }
     pub fn get_person_data(&self) -> &'static PersonData { PersonData::try_get_hash(self.hash).unwrap() }
     pub fn get_person_data_mut(&self) -> &'static mut PersonData { PersonData::try_get_hash_mut(self.hash).unwrap() }
-    pub fn get_replacement(&self) -> Option<&'static PersonData> { DVCVariables::get_dvc_person_data(self.playable_slot, false) }
+    pub fn get_replacement(&self) -> Option<&'static mut PersonData> { DVCVariables::get_dvc_person_data(self.playable_slot, false) }
     pub fn get_current_personal(&self) -> Option<&'static SkillData> { 
         self.get_person_data().common_skills.iter().find(|x| !x.is_hidden() ).and_then(|s| s.get_skill())
     }
@@ -69,7 +69,9 @@ impl EnemyCharacter {
                             new_person.parent.index, Mess::get_name(new_person.pid), new_person.parent.index).as_str()
                 );
                 let jid =
-                    if old_job.is_high() && (new_job.is_high() || (new_job.is_low() && new_job.max_level == 40)) { new_job.jid } else if (old_job.is_high() || src_person.get_level() > 20) && (new_job.is_low() && new_job.has_high_jobs()) { new_job.get_high_jobs()[0].jid } else if old_job.is_low() && new_job.is_high() {
+                    if old_job.is_high() && (new_job.is_high() || (new_job.is_low() && new_job.max_level == 40)) { new_job.jid }
+                    else if (old_job.is_high() || src_person.get_level() > 20) && (new_job.is_low() && new_job.has_high_jobs()) { new_job.get_high_jobs()[0].jid } 
+                    else if old_job.is_low() && new_job.is_high() {
                         let lows = get_base_classes(new_job);
                         if lows.len() == 0 { "JID_ソードファイター".into() } else { lows[0].jid }
                     } else { new_job.jid };

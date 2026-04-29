@@ -1,16 +1,12 @@
 use std::sync::RwLock;
-use engage::gamevariable::GameVariableManager;
-use engage::mess::Mess;
-use unity::prelude::{Il2CppClass, Il2CppString, OptionalMethod};
-use engage::sequence::talk::*;
-use engage::tmpro::TextMeshProUGUI;
-use crate::config::DVCFlags;
-use crate::DVCVariables;
-use crate::enums::{EMBLEM_GIDS, RINGS};
-use crate::message::{TextSwapper, MESSAGE_SWAPPER};
-use crate::randomizer::names::AppearanceRandomizer;
-use crate::randomizer::{item, RANDOMIZED_DATA};
-use crate::randomizer::data::{EmblemPool};
+use engage::{gamevariable::GameVariableManager, mess::Mess, sequence::talk::*, tmpro::TextMeshProUGUI};
+use unity::prelude::*;
+use crate::{
+    config::DVCFlags, DVCVariables,
+    enums::{EMBLEM_GIDS, RINGS},
+    message::{TextSwapper, MESSAGE_SWAPPER},
+    randomizer::{data::EmblemPool, names::AppearanceRandomizer, item, RANDOMIZED_DATA}
+};
 
 #[unity::class("App.Talk3D", "TalkUI")]
 pub struct TalkUI {

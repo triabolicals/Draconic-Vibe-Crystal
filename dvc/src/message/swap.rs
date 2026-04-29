@@ -1,14 +1,18 @@
-use engage::gameuserdata::GameUserData;
-use engage::mess::MessStaticFields;
-use unity::prelude::{Il2CppClass};
-use unity::system::Il2CppString;
-use crate::DVCVariables;
-use crate::enums::{EMBLEM_GIDS, EMBLEM_PARA, PIDS};
-use crate::message::original::{MessDataString, MessageList};
-use crate::message::swap_kinds::MessSwapType;
-use crate::message::swap_command::*;
-use crate::randomizer::data::EmblemPool;
-use crate::talk::VEYRE;
+use engage::{
+    gameuserdata::GameUserData,
+    mess::MessStaticFields,
+};
+use unity::prelude::*;
+use crate::{
+    DVCVariables,
+    enums::{EMBLEM_GIDS, EMBLEM_PARA, PIDS},
+    message::{
+        original::{MessDataString, MessageList},
+        swap_kinds::MessSwapType,
+        swap_command::*,
+    },
+    randomizer::data::EmblemPool,
+};
 
 pub const RING_PICTURE: [&str; 21] = [
     "Tex_Event_ItemPicture_01", "Tex_Event_ItemPicture_02", "Tex_Event_ItemPicture_04", "Tex_Event_ItemPicture_05",
@@ -47,7 +51,6 @@ impl TextSwapper {
         let sf = Il2CppClass::from_name("App", "Mess").unwrap().get_static_fields_mut::<MessStaticFields>();
         if let Some(file) = sf.event_file_dictionary.get_item(Il2CppString::new(mess)) {
             let entry_count = file.get_text_num();
-            // println!("Found {} Labels for Event CMD {}", entry_count, mess);
             for x in 0..entry_count {
                 let text_ptr = file.get_text(x);
                 let mut message = copy_from_u16_ptr(text_ptr);
@@ -82,7 +85,6 @@ impl TextSwapper {
         let sf = Il2CppClass::from_name("App", "Mess").unwrap().get_static_fields_mut::<MessStaticFields>();
         if let Some(file) = sf.mess_file_dictionary.get_item(Il2CppString::new(mess)) {
             let entry_count = file.get_text_num();
-            // println!("Found {} Labels for {}", entry_count, mess);
             for x in 0..entry_count {
                 let label = file.get_label(x);
                 let label_str = label.to_string();
@@ -115,7 +117,6 @@ impl TextSwapper {
                  */
                 if changed {
                     if message.len() <= original_length {
-                        // println!("Label {} was replaced inline", label_str);
                         for x in 0..message.len() { unsafe { *text_ptr.add(x) = message[x]; } }
                     }
                     else {
@@ -127,7 +128,6 @@ impl TextSwapper {
                 }
             }
         }
-        else { println!("Cannot find MsgFile: {}", mess); }
     }
     pub fn apply_to_message(&self, message: &mut Vec<u16>, swap_type: &MessSwapType) -> bool {
         let mut args = swap_type.create_tag_arguments(false, 0);
@@ -151,7 +151,8 @@ impl TextSwapper {
                         })
                 }
                 MessSwapType::LiberationKind => {
-                    self.original_data.item_kinds[0].iter().enumerate().find_map(|(i, c)| c.find_position(message, true).zip(Some(i)))
+                    self.original_data.item_kinds[0].iter().enumerate()
+                        .find_map(|(i, c)| c.find_position(message, true).zip(Some(i)))
                         .map(|(p, i)|{
                             args[4] = i as u16;
                             p
@@ -208,7 +209,6 @@ impl TextSwapper {
                 init = pos + slice.len() - 1;
                 message[pos-1] = 2 * slice.len() as u16;
                 message[pos-4] += 2 * (slice.len() - len) as u16;
-
                 message.splice(pos..pos + len, slice);
                 count += 1;
             }
@@ -257,22 +257,6 @@ impl TextSwapper {
             demo.demo_person_swaps.iter().filter(|x| x.check_label(label))
                 .for_each(|x|{ if self.process_person_swaps(message, x) { change_count += 1; } });
         }
-        /*
-        if label.contains("ED2_#006") {
-            let s: Vec<u16> = self.original_data.alias[0].0.encode_utf16().collect();
-            message.windows(s.len())
-                .filter(|w| w[0] == s[0] && w[1] == s[1] && w[2] == s[2] && s[3] == w[3])
-                .for_each(|w|{
-                    w.iter().zip(s.iter())
-                        .for_each(|(x1, x2)|{
-                            if let Some((c1, c2)) = char::from_u32(*x1 as u32).zip(char::from_u32(*x2 as u32)) {
-                                println!("{}|{} ({}|{}) {}", c1, c2, c1.is_whitespace(), c2.is_whitespace(), c1 == c2);
-                            }
-                        });
-                });
-        }
-
-         */
         while let Some((pos, length, _)) = self.original_data.alias[0].find_position(message, false) {
             let mut new_line_pos = 0;
             for x in 0..length {
@@ -407,7 +391,6 @@ fn find_and_splice_for_pid(pid: &str, index: usize, message: &mut Vec<u16>) {
         41|42 => { 16 }
         43 => { 37 }
         50..60 => { 32 }
-
         _ => { return; }
     };
     if DVCVariables::get_dvc_recruitment_index(recruitment_index as i32) != recruitment_index as i32 {
@@ -447,20 +430,3 @@ fn replace_for_custom_gid(index: usize, message: &mut Vec<u16>) {
         }
     }
 }
-/*
-fn find_function(message: &mut Vec<u16>, function: &str, contains: &str) {
-    let function = function.encode_utf16().collect::<Vec<u16>>();
-    let contains = contains.encode_utf16().collect::<Vec<u16>>();
-    if let Some(pos) = message.windows(function.len()).position(|window| window == function){
-        let mut start = pos + function.len() - 1;
-        loop {
-            if start == (message.len() - 1) || message[start] == 41 { break; }
-            else { start += 1; }
-        }
-        let slice = &message[pos..start];
-        if slice.windows(contains.len()).any(|window| window == contains){
-            println!("Function: {}",  String::from_utf16(&message[pos..start]).unwrap());
-        }
-    }
-}
-*/

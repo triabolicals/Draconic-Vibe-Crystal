@@ -1,25 +1,20 @@
-use unity::prelude::*;
 use engage::{
-    menu::{BasicMenuResult, *},
-    proc::{Bindable, ProcInst},
+    menu::{BasicMenuResult, *}, game::GameUI, gamedata::Gamedata,
+    menu::menus::config::{ConfigMenuContent, ConfigRoot},
+    proc::{Bindable, ProcInst}, resourcemanager::ResourceManager,
     sequence::configsequence::ConfigSequence,
     titlebar::TitleBar,
 };
-use engage::game::GameUI;
-use engage::gamedata::Gamedata;
-use engage::menu::menus::config::{ConfigMenuContent, ConfigRoot};
-use engage::resourcemanager::ResourceManager;
-use unity::system::List;
+use crate::{DVCVariables, config::DVCFlags, menus::dvc_header_version};
+use unity::{prelude::*, system::List};
+use items::DVCConfigMenuItem;
+
 pub mod items;
 pub(crate) mod kind;
 mod text;
 
 pub use text::{DVCConfigText, CONFIG_TEXT};
 pub use kind::*;
-use crate::config::DVCFlags;
-use crate::config::menu::items::DVCConfigMenuItem;
-use crate::DVCVariables;
-use crate::menus::dvc_header_version;
 
 pub trait DVCCMenuItem {
     fn a_call(&self, _menu_item: &mut DVCConfigMenuItem) -> BasicMenuResult { BasicMenuResult::new() }
@@ -75,26 +70,21 @@ extern "C" fn create_dvc_config_menu_test(this: &mut ConfigSequence, _method_inf
 
 extern "C" fn config_sequence_end(this: &mut ConfigSequence, _method_info: OptionalMethod) {
     this.end_sequence();
-    // if parent of ConfigSequence is a Menu then re-open the menu. BasicMenus have virtual method OpenAnimeAll
     if let Some(parent) = this.get_parent() {
         parent.klass.get_virtual_method("OpenAnimeAll").map(|method| {
             let open_anime_all = unsafe { std::mem::transmute::<_, extern "C" fn(&ProcInst, &MethodInfo)>(method.method_info.method_ptr) };
             open_anime_all(parent, method.method_info);
         });
-        // Change header based on what the parent proc is
     }
 }
 pub fn dvc_ng_menu_create_bind<B: Bindable>(this: &B){
     ConfigSequence::create_bind(this);
-    // Replacing
     if let Some(descs) = this.get_child().map(|child| child.get_descs_mut()){
-        // Desc[4] Method for creating the ConfigMenu
         if let Some(create_menu) = descs.get_mut(4)
             .and_then(|d| d.cast_to_method_call_mut())
         {
             create_menu.function.method_ptr = create_dvc_config_menu_test as _;
         }
-        // Desc[5] Method ConfigSequence$$EndSequence
         if let Some(end_sequence) = descs.get_mut(5)
             .and_then(|d| d.cast_to_method_call_mut())
         {

@@ -1,19 +1,18 @@
-use engage::gamedata::{Gamedata, GodData, PersonData};
-use engage::unit::UnitPool;
-use engage::gameuserdata::GameUserData;
-use engage::gamevariable::GameVariableManager;
-use engage::spriteatlasmanager::SpriteAtlasManager;
-use unity::engine::Sprite;
-use unity::prelude::*;
-use crate::config::{DVCVariables};
-use crate::enums::PIDS; // {MPIDS, PIDS, RINGS};
-use crate::ironman::vtable_edit;
-use crate::randomizer::names::get_emblem_person;
+use unity::{prelude::*, engine::Sprite};
+use engage::{
+    unit::UnitPool,
+    gameuserdata::GameUserData,
+    gamevariable::GameVariableManager,
+    spriteatlasmanager::SpriteAtlasManager,
+    gamedata::{Gamedata, GodData, PersonData}
+};
 
+use crate::{
+    enums::PIDS, ironman::vtable_edit,
+    config::DVCVariables, randomizer::names::get_emblem_person,
+};
 mod ring_select;
 pub mod telop;
-
-
 
 pub fn install_sprite_menu_methods() {
     vtable_edit(

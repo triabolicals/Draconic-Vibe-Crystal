@@ -1,16 +1,12 @@
-use unity::{system::{Dictionary, List}, prelude::*};
+use unity::{system::{SystemDictionary, Dictionary, List}, prelude::*};
 use engage::{
-    proc::desc::ProcDesc,
-    unit::Unit,
-    force::*,
-    gamedata::{hub::HubFacilityData, chapter::ChapterData, item::ItemData, *}, gameuserdata::*,
-    gamevariable::*,
-    god::GodPool,
-    manager::NoticeManager, proc::{ProcInst, ProcVoidMethod}, random::*, sequence::{commonrewardsequence::CommonRewardSequence, wellsequence::WellSequence}
+    proc::desc::ProcDesc, gamevariable::*, force::*, unit::Unit, god::GodPool,
+    menu::BasicMenuItem, gameuserdata::*, sequence::wellsequence::WellSequenceUseFlags,
+    gamedata::{hub::HubFacilityData, chapter::ChapterData, item::ItemData, *},
+    manager::NoticeManager, proc::{ProcInst, ProcVoidMethod}, random::*, 
+    sequence::{commonrewardsequence::CommonRewardSequence, wellsequence::WellSequence}
 };
-use engage::menu::BasicMenuItem;
-use engage::sequence::wellsequence::WellSequenceUseFlags;
-use crate::{randomizer::*, utils::*};
+use crate::{randomizer::*, utils::*, procs::nothing_proc};
 const DLC_CIDS: [&str; 15] = ["M005", "S001", "M006", "G001", "S002", "G002", "M007", "G003", "M008", "G004", "M009", "G005", "G006", "M010", "M011"];
 
 pub mod random;
@@ -27,7 +23,6 @@ pub fn continuous_mode_data_edit() {
     }
     if c_mode == 2 { GameUserData::set_grow_mode(0); }
 }
-// Continious Mode Stuff
 pub fn do_continious_mode() {
     if DVCVariables::is_main_chapter_complete(26) { return; }
     let c_mode = DVCVariables::Continuous.get_value();
@@ -76,110 +71,98 @@ pub fn do_continious_mode() {
 }
 
 pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
-    if DVCVariables::Continuous.get_value() == 0 { return; }
-    if GameUserData::get_chapter().cid.to_string() == "CID_M026" || DVCVariables::is_main_chapter_complete(26) { return; }
-
+    if DVCVariables::Continuous.get_value() == 0 { return}
     GameVariableManager::set_bool(GameUserData::get_chapter().get_cleared_flag_name(), true);
+    if DVCVariables::is_main_chapter_complete(26)  { return; }
     do_continious_mode();
     postchapter::add_support_points();
     do_dlc();
     postchapter::update_bonds();
-    let item_list = generate_item_list(proc);
     WellSequence::set_use_flag(WellSequenceUseFlags::NotUse);
-    let common_rewards_sequence = CommonRewardSequence::instantiate().unwrap();
-    let methods = common_rewards_sequence.get_class().get_methods();
-    let ctor_parameters = methods[3].get_parameters();
-    let para = unity::prelude::Il2CppClass::from_il2cpptype( ctor_parameters[0].parameter_type ).unwrap();
-    if let Ok(e_list) = il2cpp::instantiate_class::<Dictionary<&Unit, i32>>(para) {
-        let dictionary_methods = e_list.get_class().get_methods();
-        unsafe { dictionary_ctor(e_list, Some(dictionary_methods[0])); }
-        let force_type: [ForceType; 2] = [ForceType::Player, ForceType::Absent];
-        let mut base_exp_gain = 10*(3 + 2*(2 - (GameUserData::get_difficulty(false))) );
-        let mut level_cap = get_recommended_level_main() as i32;
-        let random_map = DVCVariables::is_random_map();
-        if random_map { 
-            let map_completed = get_story_chapters_completed();
-            base_exp_gain = 50 - (GameUserData::get_difficulty(false) as i32)*10; 
-            level_cap = if map_completed < 7  {1 + map_completed    }
+    let e_list = get_generic_class!(SystemDictionary<Unit, i32>)
+        .and_then(|klass|{ klass.instantiate_as::<Dictionary<&Unit, i32>>() }).unwrap();
+    e_list.ctor();
+    let mut base_exp_gain = 30 + 20*(2 - (GameUserData::get_difficulty(false)));
+    let mut level_cap = get_recommended_level_main() as i32;
+    let random_map = DVCVariables::is_random_map();
+    if random_map {
+        let map_completed = get_story_chapters_completed();
+        base_exp_gain = 50 - (GameUserData::get_difficulty(false) as i32)*10;
+        level_cap = 
+            if map_completed < 7  { 1 + map_completed } 
             else { max( (get_story_chapters_completed()-6)*2, get_story_chapters_completed()+4) }
-        }
-        for ff in force_type {
-            let force_iter = Force::iter(Force::get(ff).unwrap());
-            for unit in force_iter {
-                if unit.status.value & 35184372088832 != 0 { continue; }    // Lyn doubles are a no-no
-                if unit.level == unit.job.max_level { 
-                    if random_map { unit.add_sp( base_exp_gain * 2 ); }
-                    else { unit.add_sp(base_exp_gain); }
+    }
+    Force::get(ForceType::Player).unwrap().iter().chain(Force::get(ForceType::Absent).unwrap().iter())
+        .for_each(|unit|{
+            if unit.status.value & 35184372088832 == 0 {
+                let exp = if unit.force.is_some_and(|f| f.force_type == 3) {
+                    base_exp_gain / 2 
+                }
+                else { base_exp_gain };
+                if unit.level == unit.job.max_level {
+                    let sp = if random_map { 2 } else { 1} * exp;
+                    unit.add_sp(sp);
                 }
                 else {
                     let total_level = unit.level as i32 + unit.internal_level as i32;
-                    if total_level < level_cap { 
+                    if total_level < level_cap {
                         if random_map {
-                            let scale_exp = clamp_value(base_exp_gain * ( level_cap - 1 ) / total_level, base_exp_gain, 99);
+                            let scale_exp = clamp_value(exp * ( level_cap - 1 ) / total_level, exp, 99);
                             e_list.add(unit, scale_exp );
                             unit.add_sp(scale_exp);
                         }
                         else {
-                            e_list.add(unit, base_exp_gain); 
+                            e_list.add(unit, base_exp_gain);
                             unit.add_sp(base_exp_gain);
                         }
                     }
                     else {
-                        let diff = total_level - level_cap;
-                        let exp_gain = base_exp_gain / (  2 + diff );
+                        let exp_gain = exp / ( 2 + total_level - level_cap);
                         e_list.add(unit, exp_gain);
                         unit.add_sp(exp_gain);
                     }
                 }
             }
-            base_exp_gain = clamp_value(base_exp_gain * 5 / 3 , base_exp_gain, 99);
-            level_cap -= 3; 
-            if base_exp_gain <= 0 { break; }
-        }
-        if !DVCFlags::ContinuousModeItems.get_value() {
-            item_list.clear();
-            if let Some(bond_frags) = ItemData::get("IID_絆のかけら500") { item_list.add(bond_frags); }
-        }
-        CommonRewardSequence::create_bind(proc, e_list, item_list, 0, false);
-        let desc = proc.child.as_ref().unwrap().descs.get();
-        unsafe {
-            (&mut *desc)[3] = ProcDesc::call(ProcVoidMethod::new(None, nothing_proc));
-            (&mut *desc)[0xc] = ProcDesc::call(ProcVoidMethod::new(None, nothing_proc));
-            (&mut *desc)[0xd] = ProcDesc::call(ProcVoidMethod::new(None, nothing_proc));
-        }
+        });
+    let item_list = generate_item_list(proc);
+    if !DVCFlags::ContinuousModeItems.get_value() {
+        item_list.clear();
+        if let Some(bond_frags) = ItemData::get("IID_絆のかけら500") { item_list.add(bond_frags); }
+    }
+    CommonRewardSequence::create_bind(proc, e_list, item_list, 0, false);
+    if let Some(child) = proc.get_child() { // Skips the blank fade
+        let descs = child.descs.get_mut();
+        descs[3] = ProcDesc::call(ProcVoidMethod::new(None, nothing_proc));
+        descs[0xc] = ProcDesc::call(ProcVoidMethod::new(None, nothing_proc));
+        descs[0xd] = ProcDesc::call(ProcVoidMethod::new(None, nothing_proc));
     }
 }
 // Item List for well drops and gifts
 fn generate_item_list(_proc: &ProcInst) -> &'static mut List<ItemData> {
     WellSequence::set_use_flag(WellSequenceUseFlags::ItemReturn);
-    let current_chapter = GameUserData::get_chapter();
-    let current_cid = current_chapter.cid.to_string(); 
-    let seed = Random::get_system().value() as u32;
-    let random = Random::instantiate().unwrap();
-    random.ctor(seed);
+    let current_cid = GameUserData::get_chapter().cid.to_string();
+    let random = Random::get_hub_item();
     let rand_map = DVCVariables::Continuous.get_value() == 2;
     let completed = get_continious_total_map_complete_count();
     WellSequence::set_evil_weapon_event_state(3);
-    if WellSequence::get_exchange_level() != 0 { return WellSequence::calc_item_exchange(WellSequence::get_exchange_level(), random); }
-    if completed < 8 {
-        let well_items = WellSequence::calc_item_exchange(1, random);
+    if WellSequence::get_exchange_level() != 0 { WellSequence::calc_item_exchange(WellSequence::get_exchange_level(), random) }
+    else {
+        let mut level = 1;
+        for c in [10, 17, 22]{
+            if (rand_map && completed >= (c-1)) || (!rand_map && !DVCVariables::is_main_chapter_complete(c)){ level += 1; }
+        }
+        if DVCVariables::is_main_chapter_complete(22) { level += 1; }
+        let items = WellSequence::calc_item_exchange(level, random);
         if (!rand_map && current_cid == "CID_M006") ||  (rand_map && completed == 7 ) {
-            well_items.add(ItemData::get_mut("IID_トライゾン").unwrap());
-            well_items.add(ItemData::get_mut("IID_ルヴァンシュ").unwrap());
+            items.add(ItemData::get_mut("IID_トライゾン").unwrap());
+            items.add(ItemData::get_mut("IID_ルヴァンシュ").unwrap());
         }
-        well_items
-    }
-    else if (!rand_map && !DVCVariables::is_main_chapter_complete(10) ) || (rand_map && completed < 9){
-        let well_items = WellSequence::calc_item_exchange(2, random);
-        if current_cid == "CID_M008" || ( current_cid == "CID_G002" || current_cid == "CID_G005" ){
-            well_items.add(ItemData::get_mut("IID_マスタープルフ").unwrap());
-            well_items.add(ItemData::get_mut("IID_チェンジプルフ").unwrap());
+        else if current_cid == "CID_M008" || ( current_cid == "CID_G002" || current_cid == "CID_G005" ){
+            items.add(ItemData::get_mut("IID_マスタープルフ").unwrap());
+            items.add(ItemData::get_mut("IID_チェンジプルフ").unwrap());
         }
-       well_items
+        items
     }
-    else if (!rand_map && !DVCVariables::is_main_chapter_complete(17)) || ( rand_map && completed < 16 ) { WellSequence::calc_item_exchange(3, random) }
-    else if (!rand_map && !DVCVariables::is_main_chapter_complete(22)) || ( rand_map && completed < 21 ) { WellSequence::calc_item_exchange(4, random) }
-    else { WellSequence::calc_item_exchange(5, random) }
 }
 
 pub fn update_next_chapter() {
@@ -240,7 +223,6 @@ pub(crate) fn set_next_chapter(){
             }
         }
     }
-    //switch or updated without DLC, moves back to main chapters from Divine Paralogue
     if next.is_none() {
         let emblem_paralogues = DVCVariables::is_main_chapter_complete(15);
         next =
@@ -287,10 +269,14 @@ fn do_dlc() {
 }
 
 pub fn get_continious_total_map_complete_count() -> i32 {
-    ChapterData::get_list().unwrap().iter().filter(|chapter| GameUserData::is_chapter_completed(chapter)).count() as i32
+    let main = get_story_chapters_completed();
+    let side = GameVariableManager::find_starts_with("G_Cleared_S0").iter()
+        .filter(|cleared| GameVariableManager::get_bool(cleared.to_string())).count() as i32;
+    main + side
 }
 pub fn get_story_chapters_completed() -> i32 {
-    GameVariableManager::find_starts_with("G_Cleared_M0").iter().filter(|cleared| GameVariableManager::get_bool(cleared.to_string())).count() as i32
+    GameVariableManager::find_starts_with("G_Cleared_M0").iter()
+        .filter(|cleared| GameVariableManager::get_bool(cleared.to_string())).count() as i32
 }
 
 fn get_recommended_level_main() -> u8 {
@@ -303,19 +289,12 @@ fn get_recommended_level_main() -> u8 {
     }
     GameUserData::get_chapter().recommended_level
 }
-
-#[skyline::from_offset(0x03cbca00)]
-fn dictionary_ctor(this: &Dictionary<&Unit, i32>, method_info: OptionalMethod);
-
 pub fn continuous_mode_next_chapter_notice(){
     if DVCVariables::is_random_map() && ( GameUserData::get_sequence() & 4 != 0) && GameUserData::get_chapter().get_next_chapter().is_some() {
         NoticeManager::add_facility_by_mid( "MID_Hub_Next_Go1");
     }
 }
-
 pub fn hub_menu_next_help_text(_this: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString {
     if DVCVariables::is_random_map() && GameUserData::get_chapter().get_next_chapter().is_some() {  Mess::get("MID_Hub_Next_Go1")  }
     else { Mess::get("MID_MENU_KIZUNA_DEPART_HELP") }
 }
-
-pub extern "C" fn nothing_proc(_proc: &mut ProcInst, _method_info: OptionalMethod) {}

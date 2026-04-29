@@ -1,5 +1,4 @@
-use engage::god::{GodPool, GodUnit};
-use engage::unit::UnitReliance;
+use engage::{god::{GodPool, GodUnit}, unit::UnitReliance};
 use crate::randomizer::data::GameData;
 use super::*;
 

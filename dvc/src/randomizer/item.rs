@@ -1,17 +1,13 @@
 use super::*;
 use data::WeaponDatabase;
 pub use engage::{
-    mess::*,
-    hub::access::*,
-    util::get_singleton_proc_instance,
+    mess::*, transporter::Transporter, unit::{Unit, UnitItem},
+    hub::access::*, util::get_singleton_proc_instance,
     gamevariable::*, gameuserdata::*, random::*,
     gamedata::{*, item::*},
 };
 use crate::{continuous::get_continious_total_map_complete_count, utils::*};
-use engage::transporter::Transporter;
-use engage::unit::{Unit, UnitItem};
-use crate::randomizer::item::unit_items::{add_generic_weapons, get_max_job_weapon_type, get_number_of_usable_weapons};
-use crate::utils::max;
+use unit_items::{add_generic_weapons, get_max_job_weapon_type, get_number_of_usable_weapons};
 
 pub mod unit_items;
 pub mod shop;
@@ -214,7 +210,6 @@ pub fn adjust_non_unit_items_inventory() {
             process_non_unit_inventory_item(convoy_item.item);
             Transporter::delete(x);
             count += 1;
-            // println!("Convoy Item #{}: {} was removed", x+1, Mess::get_name(convoy_item.item.item.iid));
         }
     }
     for x in 1..250 {
@@ -223,7 +218,6 @@ pub fn adjust_non_unit_items_inventory() {
             unit.item_list.unit_items.iter().filter_map(|item| item.as_ref().filter(|i| i.item.is_inventory() || i.item.kind > 13))
                 .for_each(|item| {
                     process_non_unit_inventory_item(item);
-                    // println!("Unit Item: {} was removed from {}", Mess::get_name(item.item.iid), unit.get_name());
                     item.dispose();
                     count += 1;
                     changed = true;
@@ -231,8 +225,6 @@ pub fn adjust_non_unit_items_inventory() {
             if changed { unit.item_list.put_engage_item(unit.god_link.or(unit.god_unit), unit.status.value & 8388608 != 0); }
         }
     }
-    // if count > 0 { println!("Total of {} items removed.", count); }
-
 }
 
 #[unity::hook("App", "ItemRefineData", "TryGetFromItem")]

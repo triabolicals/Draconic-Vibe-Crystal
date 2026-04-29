@@ -1,6 +1,4 @@
-use engage::map::effect::MapEffect;
-use engage::map::history::MapHistory;
-use engage::unit::UnitUtil;
+use engage::{unit::UnitUtil, map::{effect::MapEffect, history::MapHistory}};
 use super::*;
 use EffectType::*;
 

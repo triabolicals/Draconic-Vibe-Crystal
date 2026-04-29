@@ -11,8 +11,8 @@ use crate::randomizer::Randomizer;
 pub fn event_demo_function_edit() {
     if let Some(event) = EventDemoSequence::get_instance() {
         if DVCFlags::CutsceneBackground.get_value() {
-            if let Some(set_background) = event.get_func(EventDemoSequenceCmdFunc::SetBackground){
-                set_background.method_ptr = set_random_background as _;
+            if let Some(set_background) = event.get_func(EventDemoSequenceCmdFunc::SetBackground){ 
+                set_background.method_ptr = set_random_background as _; 
             }
         }
         if let Some(bgm) = event.get_func(EventDemoSequenceCmdFunc::SoundEvent){

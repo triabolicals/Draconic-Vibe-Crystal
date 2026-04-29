@@ -1,22 +1,17 @@
 use skyline::patching::Patch;
 pub use engage::{
-    unit::{Unit, UnitPool},
-    resourcemanager::ResourceManager,
-    mess::*,
-    gamevariable::*, gameuserdata::*, hub::access::*, random::*,
-    gamedata::{*, item::*, skill::SkillData, dispos::*},
-    spriteatlasmanager::SpriteAtlasManager,
+    unit::{Unit, UnitPool, Gender, UnitUtil},
+    force::ForceType, spriteatlasmanager::SpriteAtlasManager,
+    resourcemanager::ResourceManager, mess::*, 
+    gamevariable::*, gameuserdata::*, hub::access::*, random::*, 
+    gamedata::{
+        hub::{HubDisposData, HubFacilityData}, *, 
+        item::*, skill::{SkillDataCategorys, SkillData}, dispos::*
+    },
 };
-use engage::force::ForceType;
-use engage::gamedata::hub::{HubDisposData, HubFacilityData};
-use engage::gamedata::skill::SkillDataCategorys;
-use engage::unit::{Gender, UnitUtil};
 use unity::il2cpp::object::Array;
-use crate::{enums::*, utils::*, autolevel::*};
-use crate::config::DVCFlags;
-use crate::randomizer::data::GameData;
-use crate::randomizer::menu::CUSTOM_RECRUITMENT_ORDER;
-use super::{get_data_read, DVCVariables, Randomizer, RANDOMIZER_STATUS};
+use crate::{config::DVCFlags, enums::*, utils::*, autolevel::*, DVCVariables};
+use super::{data::GameData, menu::CUSTOM_RECRUITMENT_ORDER, get_data_read, Randomizer, RANDOMIZER_STATUS};
 
 pub mod ai;
 pub mod unit; 

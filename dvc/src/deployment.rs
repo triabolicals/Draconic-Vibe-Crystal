@@ -31,7 +31,6 @@ pub fn get_emblem_list() -> Vec<String> {
         .map(|g| g.main_data.gid.to_string()).collect()
 }
 pub fn unit_selection_menu_disable(enabled: bool) { GameVariableManager::set_bool("UnitDeploy", enabled); }
-//Hook to function that creates the sortie deploy positions to do deployment stuff
 
 pub fn get_emblem_paralogue_level() {
     if !DVCVariables::random_enabled() || DVCFlags::CustomEmblemsRecruit.get_value() { return; }

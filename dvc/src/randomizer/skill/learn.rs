@@ -1,12 +1,15 @@
-use super::*;
-use engage::force::*;
-use engage::menu::{BasicMenu, BasicMenuContent, BasicMenuMethods, BasicMenuResult, MenuItem};
-use engage::menu::menus::class_change::{ClassChangeJobData, ClassChangeJobMenu, ClassChangeJobMenuItem};
-use engage::unitinfo::{UnitInfo, UnitInfoSide};
-use engage::unityengine::GameObject;
-use crate::randomizer::data::GameData;
-use crate::randomizer::DVCFlags;
-
+use engage::{
+    force::*, unityengine::GameObject, unitinfo::{UnitInfo, UnitInfoSide},
+    gamedata::{Gamedata, JobData, skill::{SkillData}}, unit::Unit, random::Random,
+    gamevariable::GameVariableManager, mess::Mess, gameicon::GameIcon,
+    menu::{
+        BasicMenu, BasicMenuContent, BasicMenuMethods, BasicMenuResult, MenuItem,
+        menus::class_change::*
+    },
+    tmpro::TextMeshProUGUI, sortie::SortieSelectionUnitManager,
+};
+use unity::{engine::Sprite, prelude::*};
+use crate::{utils::can_rand, DVCVariables, randomizer::{DVCFlags, data::GameData}};
 
 pub fn update_learn_skills(forced: bool) {
     if forced || !crate::randomizer::RANDOMIZER_STATUS.read().unwrap().learn_skill {

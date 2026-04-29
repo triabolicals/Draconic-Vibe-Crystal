@@ -1,9 +1,9 @@
-use engage::menu::BasicMenuItemAttribute;
-use engage::sortie::SortieSelectionUnitManager;
-use engage::unit::Gender;
+use engage::{
+    sortie::SortieSelectionUnitManager, unit::Gender,
+    menu::{BasicMenuItemAttribute, menus::class_change::*}
+};
 use crate::utils::get_base_classes;
 use super::*;
-use engage::menu::menus::class_change::{ChangeJobDataProofTypes, ClassChange, ClassChangeJobMenu, ClassChangeJobMenuConfirmDialog, ClassChangeJobMenuItem};
 
 pub fn class_change_job_menu_item_build_attr(this: &mut ClassChangeJobMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
     if !DVCVariables::random_enabled() { return this.attribute; }

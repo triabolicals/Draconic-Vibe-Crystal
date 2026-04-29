@@ -1,12 +1,12 @@
 use serde::{Deserialize, Serialize};
-use super::CONFIG;
-use engage::{gamevariable::*, gamedata::*, };
-use engage::gamedata::accessory::AccessoryData;
-use crate::{*, utils};
-use crate::config::menu::CUSTOM_RECRUITMENT_ORDER;
-pub(crate) use crate::config::variables::DVCVariables;
-use crate::randomizer::data::GameData;
-use crate::utils::{clamp_value, dlc_check, get_rng};
+use engage::{gamevariable::*, gamedata::{accessory::AccessoryData, *}};
+use crate::{
+    *,
+    utils::{clamp_value, dlc_check, get_rng},
+    config::menu::CUSTOM_RECRUITMENT_ORDER,
+    randomizer::data::GameData,
+};
+pub use crate::{CONFIG, config::variables::DVCVariables};
 
 pub mod flags;
 pub mod variables;

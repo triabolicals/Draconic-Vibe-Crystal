@@ -1,10 +1,8 @@
-use engage::menu::{BasicMenuItem, BasicMenuItemAttribute};
-use engage::menu::menu_item::sortie::SortieUnitSelectUnitMenuItem;
-use engage::sortie::SortieSelectionUnitManager;
-use engage::unit::{Gender, UnitPool};
-use crate::get_nested_il2cpp_class;
-use crate::ironman::vtable_edit;
-use crate::utils::get_nested_class;
+use engage::{
+    menu::{BasicMenuItem, BasicMenuItemAttribute, menu_item::sortie::SortieUnitSelectUnitMenuItem},
+    sortie::SortieSelectionUnitManager, unit::{Gender, UnitPool},
+};
+use crate::{get_nested_il2cpp_class, ironman::vtable_edit, utils::get_nested_class};
 use super::*;
 
 pub fn sortie_deployment_menu_install() {

@@ -1,14 +1,13 @@
 use std::sync::OnceLock;
 use super::*;
-use engage::gamedata::{Gamedata, GodData, JobData, PersonData};
-use engage::gamevariable::GameVariableManager;
-use engage::language::*;
-use engage::mess::Mess;
-use crate::{DVCVariables, VERSION};
-use crate::enums::PIDS;
-use crate::menus::ingame::draconic_vibe_name;
-use crate::randomizer::data::GameData;
-use crate::randomizer::{EMBLEM_GIDS, MPIDS, RINGS};
+use engage::{
+    gamedata::{Gamedata, GodData, JobData, PersonData},
+    gamevariable::GameVariableManager, language::*, mess::Mess,
+};
+use crate::{
+    DVCVariables, VERSION, randomizer::data::GameData,
+    menus::ingame::draconic_vibe_name, enums::{EMBLEM_GIDS, MPIDS, RINGS, PIDS}
+};
 
 pub static CONFIG_TEXT: OnceLock<DVCConfigText> = OnceLock::new();
 pub static NONE: &'static str = "---";

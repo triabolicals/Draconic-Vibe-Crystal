@@ -1,9 +1,5 @@
-use engage::gamedata::{skill::SkillData, *};
-use engage::gamedata::job::BattleStyles;
-use engage::gamedata::skill::SkillDataCategorys;
-use crate::config::DVCFlags;
-use crate::randomizer::data::GameData;
-use super::{get_data_read, DVCVariables, Randomizer};
+use engage::{gamedata::{skill::{SkillDataCategorys, SkillData}, job::BattleStyles, *}};
+use super::{data::GameData, get_data_read, DVCVariables, DVCFlags, Randomizer};
 
 pub fn randomize_job_styles() {
     if !DVCVariables::random_enabled() { return; }

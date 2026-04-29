@@ -1,19 +1,12 @@
 use unity::prelude::*;
-use unity::il2cpp::class::VirtualInvoke;
 use engage::{
-    random::*,
-    force::*,
-    mess::*,
-    gameuserdata::GameUserData,
+    random::*, force::*, mess::*,
+    unit::UnitPool,
+    gamevariable::GameVariableManager,
     gamedata::{*, terrain::TerrainData, skill::*},
 };
-use engage::gamevariable::GameVariableManager;
-use engage::unit::UnitPool;
 use skyline::patching::Patch;
-use crate::config::DVCVariables;
-use crate::enums::*;
-
-
+use crate::{config::DVCVariables, enums::*};
 
 #[macro_export] macro_rules! get_nested_il2cpp_class {
     ($namespace:expr, $class_name:expr, $($nested:expr),+) => {

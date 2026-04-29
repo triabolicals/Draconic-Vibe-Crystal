@@ -1,9 +1,8 @@
-use engage::god::GodPool;
-use engage::map::history::MapHistory;
+use engage::{god::GodPool, map::history::MapHistory};
 use super::*;
 
 pub fn random_map_mode_level() -> i32 {
-    crate::utils::max( (crate::continuous::get_story_chapters_completed()-6)*2, crate::continuous::get_story_chapters_completed() + 4)
+    max( (get_story_chapters_completed()-6)*2, get_story_chapters_completed() + 4)
 }
 
 pub fn continous_rand_emblem_adjustment() {

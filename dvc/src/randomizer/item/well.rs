@@ -1,7 +1,8 @@
 use super::*;
-use engage::sequence::commonrewardsequence::CommonRewardSequence;
-use engage::sequence::wellsequence::{WellSequence, WellSequenceUseFlags};
-
+use engage::sequence::{
+    commonrewardsequence::CommonRewardSequence,
+    wellsequence::{WellSequence, WellSequenceUseFlags},
+};
 pub extern "C" fn well_get_item_rng(proc: &mut WellSequence, _method_info: OptionalMethod) {
     let item_flag = DVCFlags::RandomEventItems.get_value();
     let use_flag = WellSequence::get_use_flag();

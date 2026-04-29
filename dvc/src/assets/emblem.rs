@@ -1,15 +1,17 @@
 use engage::unit::UnitPool;
 use outfit_core::{get_outfit_data, UnitAssetMenuData};
 use super::*;
-use crate::{utils, DVCVariables};
 use accessory::change_accessory;
-use crate::assets::accessory::add_accessory_to_list;
-use crate::assets::dress::*;
-use crate::config::DVCFlags;
-use crate::randomizer::data::{GameData, RandomizedGameData};
-use crate::randomizer::{Randomizer};
-use crate::randomizer::names::get_emblem_person;
-use crate::randomizer::person::is_playable_person;
+use crate::{
+    config::DVCFlags, utils, DVCVariables,
+    assets::{accessory::add_accessory_to_list, dress::*},
+    randomizer::{
+        Randomizer,
+        names::get_emblem_person, person::is_playable_person,
+        data::{GameData, RandomizedGameData}
+    }
+};
+
 
 const LUEUR_DEMO_PIDS: [&str; 5] = ["M024_リュール", "PID_青リュール_女性", "PID_青リュール_男性", "PID_デモ用_神竜王リュール_女性", "PID_デモ用_神竜王リュール_男性"];
 fn emblem_asset_rand(result: &mut AssetTableResult, mode: i32, god: &GodData, is_dark: bool) {

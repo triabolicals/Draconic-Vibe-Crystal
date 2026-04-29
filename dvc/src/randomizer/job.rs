@@ -1,10 +1,9 @@
+use engage::{
+    unit::*, force::*,
+    menu::{menus::class_change::ClassChangeJobData, BasicMenuItemAttribute},
+};
 use super::*;
-use crate::randomizer::person::unit::fixed_unit_weapon_mask;
-use engage::force::*;
-use engage::menu::BasicMenuItemAttribute;
-use engage::menu::menus::class_change::ClassChangeJobData;
-use engage::unit::{Gender, Unit, UnitFor, UnitPool, UnitStatusField};
-use crate::randomizer::grow::adaptive_growths;
+use crate::randomizer::{person::unit::fixed_unit_weapon_mask, grow::adaptive_growths};
 
 pub const JOB_HASH: [i32; 111] = [ 
     1367578960, -1369632991, 689554073, -1369626630, 185671037, 1499787884, 185670709, -1998645787, 
@@ -27,26 +26,7 @@ pub mod reclass;
 pub mod single;
 pub mod chaos;
 pub mod lockout;
-/*
-#[derive(Clone, PartialEq)]
-pub enum ClassLevelRank {
-    Base,
-    Promoted,
-    Special,
-}
-impl ClassLevelRank {
-    pub fn from_job(job: &JobData) -> Self {
-        if job.is_high() { Self::Promoted }
-        else if job.max_level >= 40 { Self::Special}
-        else { Self::Base }
-    }
-    pub fn from_unit(unit: &Unit) -> Self { Self::from_job(unit.job) }
-    pub fn from_person(person: &PersonData) -> Self {
-        if let Some(job) = person.get_job() { Self::from_job(job) }
-        else { Self::Base }
-    }
-}
-*/
+
 pub struct UnitPoolStaticFieldsMut {
     pub s_unit: &'static mut Array<&'static mut Unit>,
     pub forces: &'static mut Array<&'static Force>,

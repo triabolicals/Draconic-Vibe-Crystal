@@ -1,13 +1,11 @@
-use engage::gamedata::Gamedata;
-use engage::gamedata::skill::SkillData;
-use engage::gameuserdata::GameUserData;
-use engage::gamevariable::GameVariableManager;
-use engage::menu::BasicMenuItemAttribute;
-use crate::config::DVCVariables;
-use crate::DVCConfig;
-use crate::randomizer::data::GameData;
-use crate::randomizer::status::RandomizerStatus;
-use crate::utils::dlc_check;
+use engage::{
+    gameuserdata::GameUserData, gamevariable::GameVariableManager, menu::BasicMenuItemAttribute,
+    gamedata::{Gamedata, skill::SkillData},
+};
+use crate::{
+    DVCVariables, DVCConfig, utils::dlc_check,
+    randomizer::{status::RandomizerStatus, data::GameData},
+};
 
 pub const FLAGNAME: &'static str = "G_DVC_Status";
 pub const FLAGNAME2: &'static str = "G_DVC_Status2";

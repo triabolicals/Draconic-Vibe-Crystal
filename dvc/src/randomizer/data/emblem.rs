@@ -1,15 +1,15 @@
 use std::collections::HashMap;
-use engage::gamedata::{god::GodGrowthData, item::ItemData, skill::SkillData, Gamedata, GodData, PersonData};
-use engage::gamedata::skill::SkillDataCategorys;
-use engage::gamevariable::GameVariableManager;
-use engage::mess::Mess;
+use engage::{
+    gamevariable::GameVariableManager, mess::Mess,
+    gamedata::{
+        god::GodGrowthData, item::ItemData,  GodData, PersonData,
+        skill::{SkillData, SkillDataCategorys}, Gamedata,
+    },
+
+};
 use unity::prelude::Il2CppString;
-use crate::DVCVariables;
-use crate::enums::EMBLEM_ASSET;
-use crate::randomizer::data::{GameData, SkillsList};
-use crate::randomizer::data::enemy::EnemyEmblemData;
-use crate::randomizer::data::sync::get_lowest_priority;
-use crate::randomizer::EMBLEM_GIDS;
+use crate::{DVCVariables, enums::EMBLEM_ASSET, randomizer::EMBLEM_GIDS};
+use super::{GameData, SkillsList, enemy::EnemyEmblemData, sync::get_lowest_priority};
 
 const EMBLEM_HASHES: [i32; 24] = [
     998659272, 1995155639, 1709540132, 462041932,

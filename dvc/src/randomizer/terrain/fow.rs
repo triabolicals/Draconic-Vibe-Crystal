@@ -1,9 +1,5 @@
+use engage::{map::{sight::MapSight, situation::MapSituation}, util::get_instance};
 use super::*;
-use engage::{
-    map::{sight::MapSight, situation::MapSituation},
-    util::get_instance,
-};
-
 pub fn rando_fow() {
     let sit = get_instance::<MapSituation>();
     if DVCVariables::FogOfWar.get_value() == 3 && sit.current_force == 2 {

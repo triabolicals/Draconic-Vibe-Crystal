@@ -1,17 +1,15 @@
 use super::*;
 use std::sync::{OnceLock};
-use engage::gamedata::{Gamedata, JobData};
-use engage::gameuserdata::GameUserData;
-use engage::menu::{BasicMenuItemAttribute, BasicMenuResult};
-use engage::mess::Mess;
-use unity::engine::Color;
-use unity::prelude::{Il2CppClass, Il2CppClassData, Il2CppString, OptionalMethod};
-use crate::{DVCVariables, DVCConfig};
-use crate::enums::RINGS;
-use crate::randomizer::data::GameData;
-use crate::randomizer::job::single::get_next_class;
-use crate::randomizer::MPIDS;
-
+use engage::{
+    mess::Mess, gameuserdata::GameUserData,
+    gamedata::{Gamedata, JobData},
+    menu::{BasicMenuItemAttribute, BasicMenuResult},
+};
+use unity::{prelude::*, engine::Color};
+use crate::{
+    DVCVariables, DVCConfig, enums::{MPIDS, RINGS},
+    randomizer::{data::GameData, job::single::get_next_class},
+};
 pub static DVC_CONFIG_MENU_ITEM_CLASS: OnceLock<&'static Il2CppClass> = OnceLock::new();
 
 #[unity::class("", "ConfigBasicMenuItem")]

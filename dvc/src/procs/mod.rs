@@ -1,9 +1,8 @@
-use std::fs::File;
 use engage::gameuserdata::GameUserData;
 use engage::gamevariable::GameVariableManager;
 use engage::proc::{*, desc::*};
 use unity::il2cpp::object::Array;
-use unity::prelude::MethodInfo;
+use unity::prelude::{MethodInfo, OptionalMethod};
 use crate::{continuous, ironman, randomizer, DVCVariables, DVCConfig};
 use std::io::Write;
 mod hubsequence;
@@ -31,10 +30,6 @@ pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
     let name = proc.name.map(|v| v.to_string());
     let descs = proc.descs.get_mut();
     if let Some(name) = name {
-        if DVCConfig::get().debug {
-            print_desc(descs, name.as_str(), hashcode);
-            println!("Finished outputing {}", name.as_str());
-        }
         if name.contains("TelopManager") {
             if name.contains("ProcBondLevelUp") {
                 replace_desc_void_function(descs, "LoadFace", crate::sprite::telop::proc_bond_level_up_load_face as _);
@@ -90,9 +85,11 @@ pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
             descs[1] = ProcDesc::call(ProcVoidFunction::new(None, unitgrow::unit_grow_gain_exp));
         }
         1918405982 => { randomizer::latertalk::edit_later_talk_data(); }
+        UNIT_SELECT_SUB_MENU => { outfit_core::add_sub_unit_menu_item(proc); }
         _ => {} 
     }
 }
+/*
 pub fn print_desc(desc: &mut Array<&mut ProcDesc>, proc_name: &str, hash: i32){
     if let Ok(mut file) = File::options().create(true).write(true).truncate(true).open(format!("sd:/Classes/ProcDescs/{}.txt", proc_name)) {
         writeln!(file, "{}: {}", proc_name, hash).unwrap();
@@ -129,6 +126,7 @@ pub fn print_desc(desc: &mut Array<&mut ProcDesc>, proc_name: &str, hash: i32){
         });
     }
 }
+*/
 pub fn call_proc_original_method(proc: &ProcInst, method_name: &str) {
     if let Some(method) = proc.klass.get_method_from_name(method_name, 0).ok() {
         let method_call = unsafe { std::mem::transmute::<_, fn(&ProcInst, &MethodInfo)>(method.method_ptr) };
@@ -136,3 +134,4 @@ pub fn call_proc_original_method(proc: &ProcInst, method_name: &str) {
     }
     else { println!("Unable to call method '{}' for {}", method_name, proc.klass.get_name()); }
 }
+pub extern "C" fn nothing_proc(_proc: &mut ProcInst, _method_info: OptionalMethod) {}

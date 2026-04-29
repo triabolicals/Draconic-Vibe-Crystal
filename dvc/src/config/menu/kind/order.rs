@@ -1,6 +1,5 @@
 use super::*;
-use engage::gameuserdata::GameUserData;
-use engage::menu::{BasicMenuItemAttribute, BasicMenuResult};
+use engage::{gameuserdata::GameUserData, menu::{BasicMenuItemAttribute, BasicMenuResult}};
 use crate::DVCConfig;
 pub static mut CUSTOM_RECRUITMENT_ORDER: [u8; 42] = [255; 42];
 #[repr(C)]

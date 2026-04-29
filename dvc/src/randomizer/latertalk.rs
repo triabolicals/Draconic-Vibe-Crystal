@@ -1,15 +1,9 @@
-use engage::gamedata::{Gamedata, GamedataArray, PersonData, StructBaseFields};
-use engage::unit::Unit;
-use engage::gamevariable::GameVariableManager;
-use engage::proc::ProcInstFields;
-use engage::random::Random;
-use unity::macro_context::Il2CppClassData;
-use unity::prelude::Il2CppString;
-use unity::system::List;
-use crate::assets::data::SEARCH_LIST;
-use crate::DVCVariables;
-use crate::randomizer::data::GameData;
-use crate::randomizer::Randomizer;
+use unity::{prelude::*, system::List};
+use engage::{
+    unit::Unit, gamevariable::GameVariableManager, random::Random, proc::ProcInstFields,
+    gamedata::{Gamedata, GamedataArray, PersonData, StructBaseFields},
+};
+use crate::{DVCVariables, assets::data::SEARCH_LIST, randomizer::{Randomizer, data::GameData}};
 
 pub struct LaterTalkSetterUnitData {
     pub unit: &'static Unit,
