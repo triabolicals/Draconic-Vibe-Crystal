@@ -47,7 +47,7 @@ pub fn change_map_dispos() {
         if DVCVariables::EmblemRecruitment.get_value() != 0 {
             if let Some(pos) = EMBLEM_PARA.iter().position(|x| cid.ends_with(*x)) {
                 let recruit_idx = DVCVariables::get_dvc_emblem_index(pos as i32, true);
-                if pos >= 12 { return; }
+                if recruit_idx >= 12 { return; }
                 let mut levels = [(0, 0); 3];
                 for x in 1..4 {
                     levels[x-1] = (PARALOGUE_LEVELS[4*pos + x], PARALOGUE_LEVELS[4*recruit_idx + x]);
