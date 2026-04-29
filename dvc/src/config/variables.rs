@@ -318,14 +318,14 @@ impl DVCVariables {
         }
         else { None }.unwrap_or(-1)
     }
-    pub fn get_dvc_person_data(pid_index: i32, reverse: bool) -> Option<&'static PersonData> {
+    pub fn get_dvc_person_data(pid_index: i32, reverse: bool) -> Option<&'static mut PersonData> {
         if pid_index < 41 {
-            PersonData::get(Self::get_dvc_person(pid_index, reverse))
+            PersonData::get_mut(Self::get_dvc_person(pid_index, reverse))
         }
         else {
             GameData::get().units.iter()
                 .filter(|x| *x.1 == pid_index)
-                .find_map(|x| PersonData::try_get_hash(*x.0).filter(|x| x.name.is_some_and(|x| !x.str_contains("Hide") && !x.str_contains("Unknown"))))
+                .find_map(|x| PersonData::try_get_hash_mut(*x.0).filter(|x| x.name.is_some_and(|x| !x.str_contains("Hide") && !x.str_contains("Unknown"))))
         }
 
     }
@@ -395,7 +395,10 @@ impl DVCVariables {
             else { format!("G_R_{}", EMBLEM_GIDS[emblem_index as usize]) };
         if GameVariableManager::exist(key.as_str()) {
             let str = GameVariableManager::get_string(key.as_str()).to_string();
-            EMBLEM_GIDS.iter().position(|gid| gid == &str).unwrap_or(recruitment_index as usize)
+           GodData::get(str.as_str()).map(|v| v.parent.hash).and_then(|hash|{
+                GameData::get_playable_emblem_hashes().iter().position(|v| *v == hash)
+            }).unwrap_or( emblem_index as usize)
+            // EMBLEM_GIDS.iter().position(|gid| gid == &str).unwrap_or(recruitment_index as usize)
         }
         else { emblem_index as usize }
     }

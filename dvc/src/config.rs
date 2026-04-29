@@ -363,10 +363,8 @@ impl DVCConfig {
         let out_toml = toml::to_string(&self).unwrap(); // toml::to_string_pretty(&self).unwrap();
         std::fs::write("sd:/engage/config/dvc.toml", out_toml)
             .expect("should be able to write to write default configuration");
-
-        println!("Config Saved");
     }
-    pub fn create_game_variables(&self, set_value: bool) {
+    pub fn create_game_variables(&mut self, set_value: bool) {
         GameVariableManager::make_entry_norewind(FLAGNAME, 0);
         GameVariableManager::make_entry_norewind(FLAGNAME2, 0);
 
@@ -379,6 +377,7 @@ impl DVCConfig {
             GameVariableManager::make_entry_norewind(format!("G_DVC_I{}", x).as_str(), 0);
             GameVariableManager::make_entry_norewind(format!("G_DVC_W{}", x).as_str(), 0);
         }
+        if self.random_job != 2 { self.single_class = 0; }
         for x in 0..30 {
             if x == 26  { continue; }
             if let Some(v) = DVCVariables::from(x) {
@@ -393,9 +392,7 @@ impl DVCConfig {
             for x in 0..5 {
                 if let Some(var) = DVCVariables::from(30+x).map(|s| self.get_value(s)){
                     let v2 = clamp_value(var, 0, 100) / 10;
-                    // println!("Gauge {}: {} -> {}", x, var, v2);
                     v |= v2 << x*5;
-                    // println!("Var: {}", v);
                 }
             }
             GameVariableManager::make_entry_norewind(DVCVariables::EnemySkillGauge.get_key(), v);
