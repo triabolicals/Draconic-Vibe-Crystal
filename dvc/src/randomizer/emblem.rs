@@ -52,7 +52,8 @@ pub fn randomize_emblems() {
                 }
                 else { list.remove(19); }
                 if no_dlc { list.drain(12..19); }
-                let gen_list: Vec<(i32, i32)> = list.iter().zip(list.iter().flat_map(|x| GodData::try_get_hash(*x)).map(|g| g.female + 1))
+                let gen_list: Vec<(i32, i32)> = list.iter()
+                    .zip(list.iter().flat_map(|x| GodData::try_get_hash(*x)).map(|g| g.female + 1))
                     .map(|x| (*x.0, x.1))
                     .collect::<Vec<_>>();
                     
@@ -155,15 +156,26 @@ pub fn get_engage_attack_type(skill: Option<&SkillData>) -> i32 {
 }
 
 #[unity::hook("App", "GodBondHolder", "Get")]
-pub fn god_bond_holder_get(this: &GodBondHolder, unit: Option<&mut Unit>, method_info: OptionalMethod) -> Option<&'static mut GodBond> {
+pub fn god_bond_holder_get(this: &GodBondHolder, mut unit: Option<&mut Unit>, method_info: OptionalMethod) -> Option<&'static mut GodBond> {
     if this.data.is_some_and(|f| f.force_type == 1 && !f.gid.str_contains("M0")) { call_original!(this, unit, method_info) }
-    else if DVCVariables::is_random_map() || DVCVariables::Continuous.get_value() == 1 { call_original!(this, UnitPool::get_hero(false), method_info) }
+    else if DVCVariables::is_random_map() || DVCVariables::Continuous.get_value() == 1 {
+        let bond: Option<&'static mut GodBond> = call_original!(this, UnitPool::get_hero(false), method_info);
+        if let Some((bond, unit)) = bond.as_ref().zip(unit.as_mut()) {
+            unit.aptitude.value |= bond.level_data.aptitude.value;
+        }
+        bond
+    }
     else if unit.as_ref().is_some_and(|unit|{
         let pid = unit.person.pid.to_string();
         PIDS.contains(&pid.as_str()) || pid.contains("E00")
-    })
-    { call_original!(this, unit, method_info) }
-    else { call_original!(this, UnitPool::get_hero(false), method_info) }
+    }) { call_original!(this, unit, method_info) }
+    else {
+        let bond: Option<&'static mut GodBond> = call_original!(this, UnitPool::get_hero(false), method_info);
+        if let Some((bond, unit)) = bond.as_ref().zip(unit.as_mut()) {
+            unit.aptitude.value |= bond.level_data.aptitude.value;
+        }
+        bond
+    }
 }
 pub fn god_unit_on_serialize(this: &mut GodUnit, stream: &Stream, _method_info: OptionalMethod){
     check_fix_god_bonds(this);
