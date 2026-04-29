@@ -30,7 +30,12 @@ fn tiki_engage(result: &mut AssetTableResult, condition_unit: &Unit, mode: i32, 
                 result.body_anims.add("End0AF-No2_c099_N".into());
             }
         }
-        else { result.commit(mode, Some(condition_unit.person), Some(condition_unit.get_job()), equipped); }
+        else { 
+            result.commit(mode, Some(condition_unit.person), Some(condition_unit.get_job()), equipped);
+            result.commit_mode(condition.mode);
+            result.replace(condition.mode);
+            condition.flags.set(AssetFlags::EngageTiki, true);
+        }
         true
     }
     else { false }
@@ -242,7 +247,6 @@ pub fn commit_for_unit_dress(
     }
     if conditionss.flags.contains(AssetFlags::CombatTranforming) { AnimData::remove(result, true, true); }
     if DVCFlags::RandomUnitInfo.get_value() {}
-
     if mode == 2 {
         if DVCVariables::BodyScaling.get_value() != 0 {  random_body_scale(result, Some(unit.grow_seed), false); }
         if condition_unit.person.get_job().map(|j| j.parent.hash).unwrap_or(condition_unit.job.parent.hash) == 185671037 { lueur_fell_child_hair(result); }
