@@ -70,7 +70,7 @@ impl ItemPool {
                     let kind = random_item.kind;
                     let use_type = random_item.use_type;
                     let use_type_flag = 1 << use_type as i64;
-                    let mut exclude_use = 0xF88800FFFFi64;
+                    let mut exclude_use = 0xC88800FFFFi64;
                     if exploration & 1 != 0 { exclude_use |= 1 << 33; }
                     if exploration & 2 != 0 { exclude_use |= (1 << 32)| (1 << 17); }
                     if !dlc_check() { exclude_use |= (1 << 40) | (1 << 41); }
