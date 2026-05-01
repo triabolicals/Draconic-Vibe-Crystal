@@ -120,6 +120,7 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
 pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
     if label == 0 {
         randomizer::tutorial_check();
+        randomizer::emblem::correct_god_bond_holders();
         randomizer::skill::learn::update_learn_skills(false);
         crate::continuous::do_continious_mode();
         crate::continuous::update_next_chapter();

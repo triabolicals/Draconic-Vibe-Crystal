@@ -332,6 +332,8 @@ impl DVCVariables {
     }
     pub fn get_dvc_unit(dvc_person_index: i32, reverse: bool) -> Option<&'static mut Unit> {
         if dvc_person_index < 41 {
+            let pid = Self::get_dvc_person(dvc_person_index, reverse);
+            println!("PID: {} [{}]", engage::mess::Mess::get_name(pid), dvc_person_index);
             UnitPool::get_from_pid(Self::get_dvc_person(dvc_person_index, reverse), false)
         }
         else {

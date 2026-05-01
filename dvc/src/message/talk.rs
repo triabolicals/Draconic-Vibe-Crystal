@@ -209,7 +209,11 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
                 text.original_data.gender.get(17).map(|v| v.get(if r & 32 != 0 { 2 } else { 1 }, args[1] != 0))
             }
             24 => {
-                DVCVariables::get_dvc_unit(args[0] as i32, false).map(|u| Mess::get_name(u.job.jid))
+                println!("DVC Unit: {} / {}", args[0], args.len());
+                DVCVariables::get_dvc_unit(args[0] as i32, false).map(|u|{
+                    println!("Unit: {}, Class: {}", u.get_name(), u.job.get_name());
+                    Mess::get(u.job.name)
+                })
             }
             _ => { None }
         }

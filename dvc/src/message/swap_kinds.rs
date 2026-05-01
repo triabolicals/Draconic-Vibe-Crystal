@@ -92,7 +92,7 @@ impl MessSwapType {
             MessSwapType::RingName(idx) => { return vec![14, 6, 300+*idx, 0]; }
             MessSwapType::EmblemAlias(idx) => { return vec![14, 6, 320+*idx, 0]; }
             MessSwapType::EmblemInvocation(idx) => { return vec![14, 6, 340+*idx, 0]; }
-            MessSwapType::UnitJob(person, _) => { return vec![14, 6, self.get_id(), 2, *person]; }
+            MessSwapType::UnitJob(person, _) => { return vec![14, 6, 24, 2, *person]; }
             MessSwapType::ItemKind(kind) => out.extend([*kind, 0]),
             MessSwapType::LiberationKind => out.push(1),
             MessSwapType::HeroAlias(alt) => out.push( *alt as u16),

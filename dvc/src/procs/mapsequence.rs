@@ -1,4 +1,3 @@
-
 use engage::{
     eventsequence::EventSequence,
     force::{Force, ForceType},god::GodPool,
@@ -39,7 +38,6 @@ extern "C" fn map_sequence_setup_chapter(map_sequence: &mut MapSequence, _option
     map_sequence.setup_chapter();
     let swap = MESSAGE_SWAPPER.get_or_init(||RwLock::new(TextSwapper::init()));
     if let Ok(mut lock) = swap.try_write() { lock.get_chapter_talk(); }
-
 }
 
 pub extern "C" fn map_sequence_dispos_event(this: &mut MapSequence, _method_info: OptionalMethod) {

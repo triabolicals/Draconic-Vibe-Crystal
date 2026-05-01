@@ -18,12 +18,10 @@ use crate::{config::DVCVariables, enums::*};
 
     }
 }
-/*
 pub fn offset_to_addr<T: ?Sized>(offset: usize) -> &'static T {
     let s = unsafe { (skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as usize + offset) as *mut &T };
     unsafe { *s }
 }
-*/
 pub fn get_nested_class(class: &Il2CppClass, class_name: &str) -> Option<&'static mut Il2CppClass> {
     class.get_nested_types().iter().find(|ty| ty.get_name().contains(class_name)).and_then(|ty| {
         Il2CppClass::from_il2cpptype(ty.get_type()).ok()

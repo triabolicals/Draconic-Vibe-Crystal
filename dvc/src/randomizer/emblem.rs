@@ -229,6 +229,21 @@ fn set_bond_levels(this: &mut GodUnit) {
         }
     });
 }
+pub fn correct_god_bond_holders() {
+    let god_bond_holders = GodBondHolderPool::get_instance();
+    GodPool::get_instance().sort.iter_mut().for_each(|v|{
+        let god_hash = v.data.main_data.parent.hash;
+        if v.bonds.is_none_or(|b| b.data.is_some_and(|d| d.main_data.parent.hash != god_hash)){
+            if v.bonds.is_none() { println!("{} is missing Bonds.", Mess::get(v.data.main_data.mid)); }
+            else { println!("{} has wrong bonds.", Mess::get(v.data.main_data.mid)); }
+            let bonds = god_bond_holders.create_or_get(v.data.main_data);
+            if bonds.is_some() {
+                v.bonds = bonds;
+                set_bond_levels(v);
+            }
+        }
+    });
+}
 pub fn god_pool() {
     if let Some(klass) = Il2CppClass::from_name("App", "GodUnit").ok() {
         vtable_edit(klass, "OnDeserialize", god_unit_on_deserialize as _);

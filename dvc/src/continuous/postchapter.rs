@@ -1,5 +1,4 @@
-use engage::{god::{GodPool, GodUnit}, unit::UnitReliance};
-use crate::randomizer::data::GameData;
+use engage::unit::UnitReliance;
 use super::*;
 
 pub fn update_ignots(){
@@ -52,66 +51,5 @@ pub fn add_support_points() {
         }
     }
 }
-
-pub fn update_bonds() {
-    if DVCVariables::Continuous.get_value() == 0 {
-        for x in 0..19 {
-            if let Some(g_unit) = GodPool::try_get_gid(EMBLEM_GIDS[x], true) {
-                if g_unit.bonds == 0 { reset_bonds(g_unit); }
-            }
-        }
-        return; 
-    }
-    let units: Vec<_> = Force::get(ForceType::Player).unwrap().iter().chain(Force::get(ForceType::Absent).unwrap().iter()).collect();
-    GameData::get_playable_emblem_hashes().into_iter()
-        .flat_map(|index| GodData::try_get_hash(index))
-        .flat_map(|god| GodPool::try_get(god, false))
-        .for_each(|god_unit|{
-            if god_unit.data.force_type == 0 {
-                if god_unit.bonds == 0 { reset_bonds(god_unit); }
-                else {
-                    let mut max_level = 1;
-                    let mut bond_exp: u16 = 0;
-                // Get highest bond level 
-                    units.iter().flat_map(|unit| god_unit.get_bond(unit)).for_each(|g_bond|{
-                        if g_bond.level == 4 || g_bond.level == 19 { g_bond.level_up(); }
-                        if max_level < g_bond.level { 
-                            max_level = g_bond.level;
-                            bond_exp = g_bond.exp;
-                        }
-                    });
-                    units.iter().for_each(|unit|{
-                        if let Some(g_bond) = god_unit.get_bond(unit) {
-                            while g_bond.level < max_level { 
-                                g_bond.level_up(); 
-                                g_bond.exp = bond_exp;
-                                unit.inherit_apt(god_unit);
-                            }
-                        }
-                    });
-                }
-            }
-        }
-    );
-}
-
-fn reset_bonds(g_unit: &GodUnit) {
-    let escape = g_unit.get_escape();
-    // println!("Emblem {} has broken bonds and will be reset.", Mess::get(g_unit.data.mid));
-    let data = g_unit.data;
-    GodPool::delete(g_unit);
-    if let Some(god_unit2) = GodPool::create(data) {
-        god_unit2.set_escape(escape); 
-        Force::get(ForceType::Absent).unwrap().iter()
-            .for_each(|unit|{
-                if let Some(g_bond) = g_unit.get_bond(unit){
-                    for _x in 0..9 { g_bond.level_up(); }
-                    unit.inherit_apt(g_unit);  
-                }
-            }  
-        );
-    }
-}
-
 #[unity::from_offset("App", "MyRoomRelianceSelect","GetUnitList")]
 pub fn my_room_reliance_select_get_unit_list(method_info: OptionalMethod) -> &'static List<Unit>;

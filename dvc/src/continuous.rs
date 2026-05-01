@@ -77,7 +77,6 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
     do_continious_mode();
     postchapter::add_support_points();
     do_dlc();
-    postchapter::update_bonds();
     WellSequence::set_use_flag(WellSequenceUseFlags::NotUse);
     let e_list = get_generic_class!(SystemDictionary<Unit, i32>)
         .and_then(|klass|{ klass.instantiate_as::<Dictionary<&Unit, i32>>() }).unwrap();

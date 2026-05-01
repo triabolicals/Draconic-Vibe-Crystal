@@ -140,3 +140,5 @@ Fading One
 Healing One
 Strange One
 END
+archer
+END

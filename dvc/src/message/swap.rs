@@ -165,8 +165,8 @@ impl TextSwapper {
                             p
                         })
                 }
-                MessSwapType::UnitJob(person, txt) => {
-                    self.original_data.text[*txt as usize].find_position(message, true)
+                MessSwapType::UnitJob(_person, txt) => {
+                    self.original_data.text.get(*txt as usize).and_then(|v| v.find_position(message, true))
                 }
                 _ => { None }
             };

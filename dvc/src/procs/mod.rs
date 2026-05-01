@@ -64,7 +64,6 @@ pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
             ironman::map_save_menu_edits();
             continuous::update_next_chapter();  // For Chapter 11/22 Continue Flag
             ironman::ironman_code_edits();
-            continuous::postchapter::update_bonds();
             randomizer::bgm::randomize_bgm_map();
             continuous::random::continous_rand_emblem_adjustment();
         }
