@@ -1,5 +1,5 @@
+use std::io::{Cursor, Read};
 use engage::{
-
     gamedata::{
         skill::{SkillArray, SkillArrayEntity, SkillData, SkillDataCategorys},
         Gamedata, GodData, JobData, PersonData, god::GodGrowthData
@@ -28,43 +28,39 @@ pub struct SkillPool {
     pub emblem_skill: EmblemSkillPool,
     pub job_restrictions: SkillRestriction,
 }
-pub struct SkillWeaponRestrictions {
-    pub hash: i32,
-    pub mask: i32,
-}
+pub struct SkillWeaponRestrictions { pub hash: i32, pub mask: i32, }
+pub struct SkillRestriction { pub list: Vec<SkillWeaponRestrictions>}
 
-pub struct SkillRestriction {
-    pub list: Vec<SkillWeaponRestrictions>,
-}
 impl SkillRestriction {
     pub fn is_valid_for_weapon_mask(&self, skill: &SkillData, job_mask: i32) -> bool {
         !self.list.iter().any(|restriction| restriction.hash == skill.parent.hash && restriction.mask & job_mask == 0)
     }
     pub fn init() -> Self {
         let mut list: Vec<SkillWeaponRestrictions>  = Vec::new();
-        SkillData::get_list().unwrap().iter().for_each(|skill|{
-            let weapon_restrict = skill.weapon_prohibit.value;
-            if weapon_restrict != 0 && skill.flag & 63 == 0 {
-                let hash1 =  skill.parent.hash;
-                if !list.iter().any(|s| s.hash == hash1) { list.push( SkillWeaponRestrictions { hash: hash1, mask: 1024 - weapon_restrict }); }
-            }
-        });
-        include_str!("restrict.txt").lines()
-            .into_iter()
-            .for_each(|line|{
-                let new_line: Vec<_> = line.split_whitespace().collect();
-                if new_line.len() >= 2 {
-                    if let Some((skill, mask)) = SkillData::get(new_line[0]).zip(new_line[1].parse::<i32>().ok()) {
-                        list.push( SkillWeaponRestrictions { hash: skill.parent.hash, mask});
-                    }
+        let data = include_bytes!("SkillRestrictions.bin");
+        let size = data.len() as u64;
+        let mut skill = Cursor::new(data);
+        let mut skill_hash: [u8; 4] = [0; 4];
+        let mut skill_mask: [u8; 2] = [0; 2];
+        let mut hashes = vec![];
+        while skill.position() < size {
+            if skill.read_exact(&mut skill_hash).is_ok() {
+                if skill.read_exact(&mut skill_mask).is_ok() {
+                    let hash = i32::from_be_bytes(skill_hash);
+                    let mask = u16::from_be_bytes(skill_mask) as i32;
+                    hashes.push(hash);
+                    list.push(SkillWeaponRestrictions { hash, mask });
                 }
-            });
-        // println!("{} skills in the restrict skills list.", list.len());
+            }
+        }
+        list.extend(
+            SkillData::get_list().unwrap().iter()
+                .filter(|s| !hashes.contains(&s.parent.hash) && s.weapon_prohibit.value != 0 && s.flag & 63 == 0 )
+                .map(|skill| SkillWeaponRestrictions { hash: skill.parent.hash, mask: 1024 - skill.weapon_prohibit.value })
+        );
         SkillRestriction{ list }
     }
 }
-
-
 
 pub struct SkillsList { pub list: Vec<SkillArrayElement>, }
 
@@ -93,8 +89,6 @@ impl From<&SkillArrayEntity> for SkillArrayElement {
 
 impl SkillPool {
     pub fn init() -> Self {
-       // println!("Initializing Skill Pool");
-        // fix_priority_data();
         let mut emblem_stat_boost: [i32; 110] = [-1; 110];
         SkillData::get_list().unwrap().iter()
             .filter(|skill|
@@ -147,12 +141,9 @@ impl SkillPool {
                     if skill.root_command_skill.is_none() {
                         if !skill.can_override_skill() { non_upgrades.push(skill.parent.hash); }
                         pool.push(skill.parent.hash);
-                        // println!("Added Skill #{}", skill.parent.index);
                     }
                 }
             });
-        println!("Skill Pool: {}", pool.len());
-        println!("Non-Upgrades: {}", non_upgrades.len());
         Self {
             job_restrictions: SkillRestriction::init(),
             emblem_skill: EmblemSkillPool::init(),
@@ -173,9 +164,7 @@ impl SkillPool {
             .for_each(|(skill, sp)| { skill.inheritance_cost = sp; });
     }
     pub fn randomize(&self, data: &GameData) {
-        // if crate::randomizer::RANDOMIZER_STATUS.read().unwrap().skill_randomized { return; }
         let personal_bl = DVCBlackLists::get_read();
-        // crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.skill_randomized = true).unwrap();
         let rng = Random::new(2 * DVCVariables::get_seed() as u32);
 
         let mut skill_pool: Vec<_> = self.non_upgrades.iter().filter(|x| !personal_bl.personal_skill.indexes.contains(*x)).map(|x| *x).collect();
@@ -196,7 +185,6 @@ impl SkillPool {
         need_personal.iter().for_each(|p| {
             if let Some(skill_hash) = skill_pool.get_remove(rng) {
                 GameVariableManager::set_number(&format!("G_P_{}", p.pid), skill_hash);
-                // println!("{} Personal Skill: {}", Mess::get_name(p.pid), Mess::get( SkillData::try_get_hash(skill_hash).unwrap().name.unwrap()));
             }
         });
         let mut jobs = Vec::new();
