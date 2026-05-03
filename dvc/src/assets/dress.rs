@@ -1,5 +1,7 @@
+use std::collections::HashSet;
 use bitflags::Flags;
 use engage::gameuserdata::GameUserData;
+use engage::unit::Gender::{Female, Male};
 use outfit_core::{
     get_outfit_data, AssetConditions, AssetFlags, PersonalDressData, UnitAssetMenuData,
     CharacterAssetMode::UnitInfo,
@@ -11,7 +13,7 @@ use crate::{
 };
 use accessory::*;
 use transform::{has_enemy_tiki};
-
+use crate::randomizer::Randomizer;
 use super::*;
 
 fn is_preview_unit(unit: &Unit) -> bool { unit.force.is_some_and(|x| (1 << x.force_type) & 25 != 0) && unit.status.value & 35184372088832 == 0 }
@@ -248,7 +250,17 @@ pub fn commit_for_unit_dress(
         conditionss.profile_flag = 0;
     }
     if conditionss.flags.contains(AssetFlags::CombatTranforming) { AnimData::remove(result, true, true); }
-    if DVCFlags::RandomUnitInfo.get_value() {}
+    println!("RandomUnitInfo: {}", DVCFlags::RandomUnitInfo.get_value());
+    if DVCFlags::RandomUnitInfo.get_value() {
+        let rng = Random::new(unit.get_grow_seed());
+        let gender = db.get_dress_gender(result.dress_model);
+        if gender == Female || gender == Male {
+            let set = if gender == Female { &db.hashes.info_f } else { &db.hashes.info_m };
+            if let Some(aoc) = set.get_random_element(rng).and_then(|i| db.hashes.aoc.get(i)) {
+                result.info_anims = Some(aoc.into());
+            }
+        }
+    }
     if mode == 2 {
         if DVCVariables::BodyScaling.get_value() != 0 {  random_body_scale(result, Some(unit.grow_seed), false); }
         if condition_unit.person.get_job().map(|j| j.parent.hash).unwrap_or(condition_unit.job.parent.hash) == 185671037 { lueur_fell_child_hair(result); }
@@ -375,4 +387,9 @@ pub fn lueur_god_hair(result: &mut AssetTableResult) {
     result.unity_colors[1].g = 0.1764705882;
     result.unity_colors[1].b = 0.3490196078;
     replace_with_engage_hair(result, 2);
+}
+fn get_random_value_from_set(v: &HashSet<i32>, random: &Random) -> i32 {
+    let len = v.len();
+    let idx = random.get_value(len as i32) as usize;
+    *v.iter().nth(idx).unwrap()
 }
