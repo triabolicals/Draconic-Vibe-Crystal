@@ -129,7 +129,6 @@ pub fn combat_record_post_process(this: &mut CombatRecord, method_info: Optional
         let is_enemy = (this.phase_array.parent[0].attack_side & 1 != 0) as usize;
         adjust_emblem_zone(this.game_status[is_enemy]);
         if let Some(engage_atk) = engage_attack_index {
-            // println!("Found Engage Attack: #{}", engage_atk);
             if let Some((Some(god), god1)) = this.game_status[is_enemy].unit.map(|x| get_engage_attack_source(x)) {
                 match engage_atk {
                     11 => {

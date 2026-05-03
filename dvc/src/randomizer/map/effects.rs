@@ -1,6 +1,7 @@
 use engage::{unit::UnitUtil, map::{effect::MapEffect, history::MapHistory}};
 use super::*;
 use EffectType::*;
+use crate::utils::min;
 
 pub fn install_tilebolical_effects(script: &EventScript) {
     GameVariableManager::make_entry("DVC", 1);
@@ -77,7 +78,7 @@ fn added_skill_message(mut affected_units: i32, index: i32) {
         2..12 => { if affected_units % 2 == 0 { affected_units = 1; } else { affected_units = 0;} }
         _ => {}
     }
-    let sid = super::SKILL_SIDS[index as usize];
+    let sid = SKILL_SIDS[index as usize];
     if let Some(skill) = SkillData::get(sid).and_then(|skill| skill.help)
         .or_else(||SkillData::get(sid).and_then(|skill| skill.name))
     {
@@ -420,7 +421,10 @@ extern "C" fn enemy_level_up(_args: &Array<&DynValue>, _method_info: OptionalMet
 
 extern "C" fn enemy_level_down(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
     Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit|{
+        let hp = unit.get_display_hp();
         unit.level_down();
+        let new_hp = min(unit.get_capability(0, true), hp);
+        unit.set_hp(new_hp);
         MapEffect::play_on_unit("ステータス下降".into(), unit);
     });
     GameMessage::create_key_wait(ScriptUtil::get_sequence(), "Enemies: Level Down");

@@ -9,6 +9,7 @@ use crate::{
     assets::{gmap::GmapPlayerUnit, get_unit_dress},
     randomizer::item::unit_items::{adjust_player_weapons, get_number_of_usable_weapons},
 };
+use crate::utils::min;
 
 #[unity::class("App", "LevelUpSequnece")]
 pub struct LevelUpSequence{
@@ -49,6 +50,7 @@ pub extern "C" fn level_up_prepare(this: &mut LevelUpSequence, _optional_method:
                 let selection = rng.get_value(jobs.len() as i32);
                 let current_level = grow.level as i32;
                 let mut current_internal = grow.internal_level as i32;
+                let display_hp = grow.get_display_hp();
                 grow.set_job(jobs[selection as usize]);
                 if previous_max == 40 && grow.job.max_level == 20 {
                     if current_level >= 20 {
@@ -69,6 +71,8 @@ pub extern "C" fn level_up_prepare(this: &mut LevelUpSequence, _optional_method:
                     grow.learned_job_skill = None;
                 }
                 if grow.level == grow.job.max_level { grow.level -= 1; }
+                let max_hp = grow.get_capability(0, true);
+                grow.set_hp(min(max_hp, display_hp));
                 return;
             }
         }
