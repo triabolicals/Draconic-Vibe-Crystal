@@ -1,28 +1,19 @@
 pub use unity::prelude::*;
 use skyline::patching::Patch;
 pub use engage::{
-    dialog::yesno::*,
-    unit::Unit,
+    dialog::yesno::*, unit::Unit,
     gamedata::{dispos::*, god::*, item::RewardData, item::*, ring::RingData, skill::*, *},
-    gameuserdata::*,
-    gamevariable::*,
-    hub::access::*,
-    mess::*,
-    pad::Pad,
-    proc::ProcInst,
-    proc::*, random::*,
-    script::DynValue,
+    gameuserdata::*, gamevariable::*, hub::access::*,
+    mess::*, pad::Pad, proc::ProcInst, proc::*, random::*, script::DynValue,
 };
-pub use super::enums::*;
-pub use super::config::*;
+pub use super::{enums::*, config::*, CONFIG, VERSION};
 pub use std::sync::{OnceLock, RwLock};
-
-use std::io::Write;
-use std::sync::{Mutex, RwLockReadGuard, RwLockWriteGuard};
-use engage::gamedata::hub::{HubDisposData, HubFacilityData};
-use engage::god::GodPool;
-use engage::menu::BasicMenuResult;
-use engage::menu::menu_item::config::{ConfigBasicMenuItemCommandMethods};
+use std::{io::Write, sync::{Mutex, RwLockReadGuard, RwLockWriteGuard}};
+use engage::{
+    gamedata::hub::{HubDisposData, HubFacilityData},
+    god::GodPool, menu::BasicMenuResult,
+    menu::menu_item::config::{ConfigBasicMenuItemCommandMethods}
+};
 use crate::utils::{self, can_rand, dlc_check};
 
 pub mod status;
@@ -44,11 +35,10 @@ pub(crate) mod latertalk;
 
 use num_traits::FromPrimitive;
 use outfit_core::UnitAssetMenuData;
-use crate::assets::emblem::{get_random_engage_voice, has_engage_decide};
 use crate::randomizer::blacklist::DVCBlackLists;
 use crate::randomizer::data::{GameData, RandomizedGameData};
+use crate::randomizer::status::RandomizerStatus;
 use crate::VARIABLE_VERSION;
-pub use super::{CONFIG, VERSION};
 
 pub static RANDOMIZER_DATA: OnceLock<GameData> = OnceLock::new();
 pub static DVC_BLACK_LIST: OnceLock<RwLock<DVCBlackLists>> = OnceLock::new();
@@ -58,22 +48,8 @@ pub fn get_dvc_black_list_read() ->  RwLockReadGuard<'static, DVCBlackLists> { D
 pub fn get_data_read() ->&'static GameData { RANDOMIZER_DATA.get_or_init(||GameData::init()) }
 pub fn get_rand_data_read() -> RwLockReadGuard<'static, RandomizedGameData> { RANDOMIZED_DATA.get().unwrap().read().unwrap() }
 pub fn get_rand_data_write() -> RwLockWriteGuard<'static, RandomizedGameData> { RANDOMIZED_DATA.get().unwrap().write().unwrap() }
+pub static mut STATUS: RandomizerStatus = RandomizerStatus::new();
 
-pub static RANDOMIZER_STATUS: RwLock<status::RandomizerStatus> =
-    RwLock::new(
-    status::RandomizerStatus{
-        alear_person_set: false,
-        well_randomized: false,
-        enabled: false,
-        kizuna_replacements: false,
-        map_tile: false,
-        learn_skill: false,
-        seed: 0,
-        inspectors_set: false,
-        init: false,
-        tilabolical: [0; 1024],
-    }
-);
 /// Tutorial clear and provide DLC seal usages
 pub fn tutorial_check() {
     let list = GameVariableManager::find_starts_with("G_解説_");
@@ -111,21 +87,21 @@ pub fn save_file_load() {
     if !GameVariableManager::exist(seed_key) { GameVariableManager::make_entry_norewind(seed_key, 0); }
     if !DVCVariables::random_enabled() {  return;  }
     upgrade();
-    remove_old_keys();
-    if DVCVariables::get_seed() != RANDOMIZER_STATUS.read().unwrap().seed {
-        println!("[SaveLoad Event] Randomized Save File Seed {}", DVCVariables::get_seed());
-        person::change_lueur_for_recruitment(false);
-        if GameUserData::get_sequence() == 5 { person::hub::change_kizuna_dispos(); }
-        DVCFlags::Initialized.set_value(false);
-        randomize_gamedata(false);
-    }
+    println!("[SaveLoad Event] Randomized Save File Seed {}", DVCVariables::get_seed());
+    person::change_lueur_for_recruitment(false);
+    skill::learn::update_learn_skills();
+    if GameUserData::get_sequence() == 5 { person::hub::change_kizuna_dispos(); }
+    DVCFlags::Initialized.set_value(false);
+    randomize_gamedata(false);
 }
 
 /// Main Randomizing Event and after starting NG (include SaveLoad Event if not using Cobalt 1.21)
-pub(crate) fn randomize_gamedata(is_new_game: bool) {
+pub fn randomize_gamedata(is_new_game: bool) {
+    let status = RandomizerStatus::get();
+    status.init = true;
+    status.enabled = true;
     job::single::single_class_exists();
     let sequence = GameUserData::get_sequence();
-    println!("[RandomizeGameData] Is New Game {}", is_new_game);
     emblem::randomize_emblems();
     utils::get_lueur_name_gender();
     person::randomize_person();
@@ -138,11 +114,8 @@ pub(crate) fn randomize_gamedata(is_new_game: bool) {
         random.commit(data);
     }
     if sequence == 5 { person::hub::change_kizuna_dispos(); }
-    if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() {
-        lock.seed = DVCVariables::get_seed();
-        lock.enabled = true;
-    }
-    if GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE) != 0  { item::change_liberation_type(); }
+
+    if GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE)!= 0  { item::change_liberation_type(); }
     if GameVariableManager::get_number(DVCVariables::MISERCODE_TYPE) != 0 { item::change_misercode_type(); }
     for x in 0..33 {
         if let Some(key) = DVCVariables::from(x).map(|v| v.get_key()) { DVCVariables::log_variable(key); }
@@ -154,22 +127,28 @@ pub fn in_map_randomize() { person::unit::reload_all_actors(); }
 
 /// Routine after NG is started to randomize gamedata
 pub fn start_new_game(){
-    DVCConfig::get().correct_rates();
+    let config = DVCConfig::get();
+    config.correct_rates();
     GameVariableManager::make_entry("G_DVC_Version", VARIABLE_VERSION);
-    let seed = DVCConfig::get().seed;
-    GameVariableManager::make_entry_norewind(DVCVariables::DVC_STATUS, 0);
+    let seed = config.seed;
+    let iron_man = config.ironman;
+    let randomized = config.randomized;
+    let ran_seed =
+        if randomized {
+            if seed == 0 { utils::get_random_number_for_seed() }
+            else { seed }
+        }
+        else { 0 };
 
-    let iron_man = DVCConfig::get().ironman;
-    let randomized = DVCConfig::get().randomized;
-    let ran_seed = if randomized { if seed == 0 { utils::get_random_number_for_seed() } else { seed } } else { 0 };
-
-    println!("Starting new game Seed: {} [{}]", ran_seed, randomized);
     DVCVariables::Seed.init_var(ran_seed as i32, true);
-    DVCConfig::get().create_game_variables(randomized);
+    config.create_game_variables(randomized);
     if iron_man { crate::ironman::ironman_code_edits(); }
     DVCFlags::Initialized.set_value(false);
-    if randomized { randomize_gamedata(true); }
 
+    if randomized {
+        println!("Starting new game Seed: {} [{}]", ran_seed, randomized);
+        randomize_gamedata(true);
+    }
     let asset_data = UnitAssetMenuData::get();
     asset_data.data.clear();
     let random_appearance = if DVCFlags::PlayerAppearance.get_value() { 8 } else { 0 };
@@ -191,7 +170,8 @@ pub fn reload<T: Gamedata>() {
 }
 /// Resets all gamedata to normal when returning to the title screen
 pub fn reset_gamedata() {
-    if RANDOMIZER_STATUS.try_write().map(|v| v.seed == 0 ).unwrap_or(false) { return; }
+    let status = RandomizerStatus::get();
+    if !status.enabled { return; }
     println!("Resetting GameData");
     reload::<ItemData>();
     ItemData::get_list_mut().unwrap().iter().for_each(|x| x.on_completed());
@@ -209,7 +189,9 @@ pub fn reset_gamedata() {
     GodData::get_list_mut().unwrap().iter()
         .for_each(|god|{
             god.on_completed();
-            if let Some(growth) = GodGrowthData::try_get_from_god_data(god) { growth.iter().for_each(|level| level.on_completed()); }
+            if let Some(growth) = GodGrowthData::try_get_from_god_data(god) {
+                growth.iter().for_each(|level| level.on_completed());
+            }
         }
     );
     engage_count();
@@ -254,11 +236,12 @@ pub fn reset_gamedata() {
     Patch::in_text(0x027049c8).bytes(&[0xee, 0x58, 0x0d, 0x94]).unwrap();
     Patch::in_text(0x01c77620).bytes(&[0xfd, 0x7b, 0xbc, 0xa9]).unwrap();   // Summon Delete Impl
     Patch::in_text(0x01dee3a8).bytes(&[0x42, 0x00, 0x80, 0x52]).unwrap();
-
-    if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() { lock.reset(); }
+    status.reset();
 }
 fn upgrade() {
-    if !GameVariableManager::exist("G_DVC_Version") { GameVariableManager::make_entry_norewind("G_DVC_Version", 1); }
+    if !GameVariableManager::exist("G_DVC_Version") {
+        GameVariableManager::make_entry_norewind("G_DVC_Version", 1);
+    }
     let version = GameVariableManager::get_number("G_DVC_Version");
     if version < 3 { migrate_to_v3(); }
     if version < 5 { migrate_to_v5(); }
@@ -268,7 +251,7 @@ fn upgrade() {
             DVCVariables::set_emblem_recruitment(x, s as i32);
         }
     }
-    GameVariableManager::set_number("G_DVC_Version", crate::VARIABLE_VERSION);
+    GameVariableManager::set_number("G_DVC_Version", VARIABLE_VERSION);
 }
 
 pub fn initialize_game_data() {
@@ -286,7 +269,6 @@ pub fn initialize_game_data() {
     crate::talk::fill_name_array();
     job::correct_job_base_stats();
     DVCConfig::get().seed = 0;
-    println!("Finished Initialization GameData");
 }
 
 pub fn engage_count() {

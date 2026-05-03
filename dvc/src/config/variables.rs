@@ -2,8 +2,7 @@ use engage::{
     gameuserdata::GameUserData, gamevariable::GameVariableManager,
     gamedata::{Gamedata, GodData, JobData, PersonData},
     menu::BasicMenuItemAttribute, random::Random,
-    unit::{UnitPool, Unit},
-    god::{GodPool}
+    unit::{UnitPool, Unit}, god::{GodPool}
 };
 use crate::{
     utils, DVCConfig, config::DVCFlags,
@@ -13,8 +12,6 @@ use crate::{
 };
 use std::cmp::PartialEq;
 use unity::prelude::Il2CppString;
-
-
 
 /// Structure that contains and manages DVC-Related GameVariables
 #[repr(i32)]
@@ -103,9 +100,7 @@ impl DVCVariables {
     }
     pub fn init_var(&self, value: i32, overwrite: bool) {
         let key = self.get_key();
-        if GameVariableManager::exist(key) {
-            if overwrite { GameVariableManager::set_number(key, value); }
-        }
+        if GameVariableManager::exist(key) { if overwrite { GameVariableManager::set_number(key, value); } }
         else { GameVariableManager::make_entry_norewind(key, value); }
     }
     pub fn get_value(&self) -> i32 {
@@ -144,7 +139,7 @@ impl DVCVariables {
             }
         }
         else {
-            println!("Set Value #{}: {}", self.get_key(), value);
+            // println!("Set Value #{}: {}", self.get_key(), value);
             match self {
                 Self::Seed => { Self::set_by_variable(self.get_key(), value); }
                 Self::SingleJob => {
@@ -268,13 +263,10 @@ impl DVCVariables {
     pub const LUEUR_GENDER: &'static str = "G_Lueur_Gender2";   //
     pub const MISERCODE_TYPE: &'static str = "G_Misercode_Type";
     pub const LIBERATION_TYPE: &'static str = "G_Liberation_Type";
-    pub const CONTINUOUS: &'static str = "G_Continuous";
 
     pub const PLAYER_AVERAGE_CAP: &'static str = "G_Player_Rating_Average";
     pub const EMBLEM_PARALOGUE_LEVEL: &'static str = "G_Paralogue_Level";
     pub const SINGLE_CLASS: &'static str = "G_DVC_SingleJob";
-    pub const RECRUITMENT_KEY: &'static str =  "G_Random_Recruitment";
-    pub const EMBLEM_RECRUITMENT_KEY: &'static str =  "G_Emblem_Mode";
     pub const TILE_RNG: &'static str = "G_TileRNG";
     
     pub fn set_variable_key_string<'a>(key: impl Into<&'a Il2CppString>, value: impl Into<&'a Il2CppString>) {

@@ -1,20 +1,14 @@
 use unity::prelude::*;
 pub use engage::{
-    force::*,
-    gamedata::{GodData, *},
-    gameuserdata::*,
-    gamevariable::*,
-    god::*,
-    random::Random,
-    script::*,
+    force::*, gamedata::{GodData, *},
+    gameuserdata::*, gamevariable::*,
+    god::*, random::Random, script::*,
     singleton::SingletonClass,
     unit::{Unit, UnitPool},
 };
 use engage::unit::Gender;
 use super::{randomizer, DVCVariables};
-use crate::enums::*;
-use crate::config::DVCFlags;
-use crate::randomizer::data::GameData;
+use crate::{enums::*, config::DVCFlags, randomizer::data::GameData};
 
 pub mod fulldeploy;
 pub mod sortie;
@@ -30,8 +24,6 @@ pub fn get_emblem_list() -> Vec<String> {
         .is_some_and(|g| !g.get_escape() && g.data.force_type == 0))
         .map(|g| g.main_data.gid.to_string()).collect()
 }
-pub fn unit_selection_menu_disable(enabled: bool) { GameVariableManager::set_bool("UnitDeploy", enabled); }
-
 pub fn get_emblem_paralogue_level() {
     if !DVCVariables::random_enabled() || DVCFlags::CustomEmblemsRecruit.get_value() { return; }
     let cid = GameUserData::get_chapter().prefixless_cid.to_string();
@@ -77,15 +69,13 @@ pub fn deployment_modes(){
                     if let Some(god_unit) = GodPool::try_get(x, false) { god_unit.set_escape(false); }
                 }
             });
-        } else if DVCVariables::EmblemDeployment.get_value() > 0 { crate::utils::remove_equip_emblems(); }
+        }
         // Free deployment
         if unit_deployment_mode == 3 && !GameUserData::is_encount_map() && !GameUserData::get_chapter().cid.str_contains("CID_M022") {
             if hero_unit.status.value & 20 != 0 { hero_unit.status.value &= !20; }
             return;
-        } else if absent_count == 0 || GameUserData::is_evil_map() || unit_deployment_mode == 0 {
-            unit_selection_menu_disable(false);
-            return;
         }
+        else if absent_count == 0 || GameUserData::is_evil_map() || unit_deployment_mode == 0 { return; }
         //Transfer Dead
         if unit_deployment_mode == 1 || unit_deployment_mode == 2 || unit_deployment_mode > 5 {
             Force::get(ForceType::Dead).unwrap().transfer(ForceType::Absent, true);

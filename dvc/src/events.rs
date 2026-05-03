@@ -13,6 +13,8 @@ use skyline::patching::Patch;
 use num_traits::cast::FromPrimitive;
 use outfit_core::{install_outfit_plugin, UnitAssetMenuData};
 use crate::{config::DVCVariables, randomizer, DVCConfig};
+use crate::randomizer::status::RandomizerStatus;
+
 pub const TITLE_SEQUENCE: i32 = -988690862;
 pub const MAIN_SEQUENCE: i32 = -339912801;
 pub const MAINMENU_SEQUENCE: i32 = -1912552174;
@@ -41,8 +43,10 @@ pub fn map_sequence_events(proc: &ProcInst, label: i32) {
         MapSequenceLabel::TurnEnd => { randomizer::terrain::fow::rando_fow();  }
         MapSequenceLabel::Complete => {
             GameVariableManager::set_number(DVCVariables::TILE_RNG, 0);
-            randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.map_complete() ).unwrap();
-            if GameUserData::get_chapter().cid.str_contains("M002") { randomizer::item::change_liberation_type(); }
+            RandomizerStatus::get().map_complete();
+            if GameUserData::get_chapter().cid.str_contains("M002") {
+                randomizer::item::change_liberation_type();
+            }
             randomizer::person::hub::change_kizuna_dispos();
             randomizer::person::m011_ivy_recruitment_check();
             randomizer::person::lueur_recruitment_check();
@@ -60,11 +64,9 @@ pub fn map_sequence_events(proc: &ProcInst, label: i32) {
 pub fn main_menu_sequence_events(proc: &ProcInst, label: i32) {
     let sequence_label: MainMenuSequenceLabel = MainMenuSequenceLabel::from_i32(label).unwrap_or(MainMenuSequenceLabel::None);
     match sequence_label {
-        MainMenuSequenceLabel::PlayerGenderSelect => { 
-            randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock|lock.reset() ).unwrap();
-            if DVCConfig::get().randomized {
-                crate::config::menu::dvc_ng_menu_create_bind(proc);
-            }
+        MainMenuSequenceLabel::PlayerGenderSelect => {
+            RandomizerStatus::get().reset();
+            if DVCConfig::get().randomized { crate::config::menu::dvc_ng_menu_create_bind(proc); }
         },
         MainMenuSequenceLabel::ToStartGame => {
             DVCConfig::get().save();
@@ -81,16 +83,15 @@ pub fn main_menu_sequence_events(proc: &ProcInst, label: i32) {
 pub fn main_sequence_events(_proc: &ProcInst, label: i32) {
     let sequence_label: MainSequenceLabel = MainSequenceLabel::from_i32(label).unwrap();
     match sequence_label {
-        MainSequenceLabel::TitleLoop | MainSequenceLabel::GameOver => { randomizer::reset_gamedata(); },
-        MainSequenceLabel::Gmap | MainSequenceLabel::Kizuna | MainSequenceLabel::NextChapter => { // Switching Lueur with replacement 
-            randomizer::person::change_lueur_for_recruitment(false);
+        MainSequenceLabel::TitleLoop | MainSequenceLabel::GameOver => {
+            randomizer::reset_gamedata();
+            RandomizerStatus::get().reset();
         },
         MainSequenceLabel::Hub => { 
-            randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.kizuna_replacements = false).unwrap(); 
+            RandomizerStatus::get().kizuna_replacements = false;
         },
         MainSequenceLabel::Map => {},
         MainSequenceLabel::AfterChapterSave => {
-            randomizer::person::change_lueur_for_recruitment(false);
             crate::continuous::do_continious_mode();
             crate::continuous::update_next_chapter();
         },
@@ -121,13 +122,14 @@ pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
     if label == 0 {
         randomizer::tutorial_check();
         randomizer::emblem::correct_god_bond_holders();
-        randomizer::skill::learn::update_learn_skills(false);
         crate::continuous::do_continious_mode();
         crate::continuous::update_next_chapter();
         crate::ironman::ironman_code_edits();
         randomizer::terrain::adjust_miasma_tiles();
-        randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.map_complete() ).unwrap();
-        if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 { crate::script::adjust_person_map_inspectors(); }
+        if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 {
+            RandomizerStatus::get().map_complete();
+            crate::script::adjust_person_map_inspectors();
+        }
         randomizer::item::shop::update_added_shop_items(false);
         crate::menus::menu_calls_install();
         randomizer::job::adjust_missing_weapon_mask();

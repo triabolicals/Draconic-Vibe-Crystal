@@ -76,57 +76,54 @@ fn register_action(script: &EventScript, name: &str, action: extern "C" fn(&Il2C
 
 pub fn tilabolical() {
     if !DVCFlags::Tile.get_value() { return; }
-
     if let Some(mut ran) = RANDOMIZED_DATA.get().and_then(|v| v.write().ok()) { ran.person_appearance.randomize(true); }
-    if let Some(mut status) = RANDOMIZER_STATUS.try_write().ok() {
-        if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 || GameUserData::get_sequence() == 7 {
-            if !GameVariableManager::exist("TileSkills") { GameVariableManager::make_entry("TileSkills", 0); }
-            if let Some(terrain) = MapTerrain::get_instance() {
-                status.map_tile = true;
-                let start_x = terrain.x;
-                let end_x = terrain.width;
-                let start_z = terrain.z;
-                let end_z = terrain.height;
-                let pillars = TerrainData::get("TID_ブロック").unwrap();
-                let rng = DVCVariables::init_tile_rng(false);
-                let array = Array::<&DynValue>::new_from_element_class(DynValue::class(), 3).unwrap();
-                for x in 0..3 { array[x] = DynValue::new_number(0.0); }
-                if let Ok(script_commands) = SCRIPT_COMMANDS.try_lock() {
-                    let n_commands = script_commands.len();
-                    let mut selection: Vec<_> = (0..n_commands).collect();
-                    let skill_len = SKILL_SIDS.len();
-                    let mut skill_count = 0;
-                    let mut count = 0;
-                    for z in start_z..end_z {
-                        for x in start_x..end_x {
-                            if rng.get_value(100) < 5 && can_add_inspector(x, z) && MapOverlap::can_create(None, x, z, pillars) && count < 32 {
-                                let index = (z as usize * 32) + x as usize;
-                                array[1].assign_number(x as f64);
-                                array[2].assign_number(z as f64);
-                                let slen = 3*selection.len() + skill_len;
-                                let i = rng.get_value(slen as i32) as usize;
-                                if i < skill_len && skill_count < skill_len {
-                                    if let Some(func) = EventScript::get_func("RandomSkill"){
-                                        status.tilabolical[index] = EffectType::Skill as u8;
+    let status = RandomizerStatus::get();
+    if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 || GameUserData::get_sequence() == 7 {
+        if !GameVariableManager::exist("TileSkills") { GameVariableManager::make_entry("TileSkills", 0); }
+        if let Some(terrain) = MapTerrain::get_instance() {
+            status.map_tile = true;
+            let start_x = terrain.x;
+            let end_x = terrain.width;
+            let start_z = terrain.z;
+            let end_z = terrain.height;
+            let pillars = TerrainData::get("TID_ブロック").unwrap();
+            let rng = DVCVariables::init_tile_rng(false);
+            let array = Array::<&DynValue>::new_from_element_class(DynValue::class(), 3).unwrap();
+            for x in 0..3 { array[x] = DynValue::new_number(0.0); }
+            if let Ok(script_commands) = SCRIPT_COMMANDS.try_lock() {
+                let n_commands = script_commands.len();
+                let mut selection: Vec<_> = (0..n_commands).collect();
+                let skill_len = SKILL_SIDS.len();
+                let mut skill_count = 0;
+                let mut count = 0;
+                for z in start_z..end_z {
+                    for x in start_x..end_x {
+                        if rng.get_value(100) < 5 && can_add_inspector(x, z) && MapOverlap::can_create(None, x, z, pillars) && count < 32 {
+                            let index = (z as usize * 32) + x as usize;
+                            array[1].assign_number(x as f64);
+                            array[2].assign_number(z as f64);
+                            let slen = 3*selection.len() + skill_len;
+                            let i = rng.get_value(slen as i32) as usize;
+                            if i < skill_len && skill_count < skill_len {
+                                if let Some(func) = EventScript::get_func("RandomSkill"){
+                                    status.tilabolical[index] = EffectType::Skill as u8;
+                                    array[0] = func;
+                                    ScriptMap::event_entry_visit(array);
+                                    skill_count += 1;
+                                }
+                            }
+                            else {
+                                if let Some(s_index) = selection.get_remove(rng) {
+                                    let name = &script_commands[s_index];
+                                    if let Some(func) = EventScript::get_func(name.0.as_str()) {
+                                        let ty = name.1.to_u8();
+                                        status.tilabolical[index] = ty;
                                         array[0] = func;
                                         ScriptMap::event_entry_visit(array);
-                                        skill_count += 1;
                                     }
                                 }
-                                else {
-                                    if let Some(s_index) = selection.get_remove(rng) {
-                                        let name = &script_commands[s_index];
-                                        if let Some(func) = EventScript::get_func(name.0.as_str()) {
-                                            let ty = name.1.to_u8();
-                                            // println!("Effect Added: {}, at {}, {} ({})", name.0.as_str(), x, z, ty);
-                                            status.tilabolical[index] = ty;
-                                            array[0] = func;
-                                            ScriptMap::event_entry_visit(array);
-                                        }
-                                    }
-                                }
-                                count += 1;
                             }
+                            count += 1;
                         }
                     }
                 }

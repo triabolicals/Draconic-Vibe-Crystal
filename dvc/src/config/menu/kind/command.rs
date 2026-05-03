@@ -1,7 +1,7 @@
 use engage::{gamemessage::GameMessage,gamevariable::GameVariableManager,keyboard::SoftwareKeyboard};
 use unity::system::action::Action1;
 use crate::{
-    randomizer::{data::GameData, RANDOMIZER_STATUS, status::RandomizerStatus},
+    randomizer::{data::GameData, status::RandomizerStatus},
     DVCConfig, utils::{get_random_number_for_seed},
 };
 use super::*;
@@ -106,7 +106,6 @@ fn update_seed(new_seed: u32) {
         data.emblem_pool.reset_all(data);
         rando.randomize(data);
         rando.commit(data);
-        let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.seed = new_seed as i32);
     }
     else { DVCVariables::Seed.set_value(new_seed as i32); }
 }

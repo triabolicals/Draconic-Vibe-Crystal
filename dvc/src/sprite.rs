@@ -1,16 +1,11 @@
 use unity::{prelude::*, engine::Sprite};
 use engage::{
-    unit::UnitPool,
-    gameuserdata::GameUserData,
-    gamevariable::GameVariableManager,
-    spriteatlasmanager::SpriteAtlasManager,
+    unit::UnitPool, gameuserdata::GameUserData,
+    gamevariable::GameVariableManager, spriteatlasmanager::SpriteAtlasManager,
     gamedata::{Gamedata, GodData, PersonData}
 };
 
-use crate::{
-    enums::PIDS, ironman::vtable_edit,
-    config::DVCVariables, randomizer::names::get_emblem_person,
-};
+use crate::{enums::PIDS, ironman::vtable_edit, config::DVCVariables, randomizer::names::get_emblem_person};
 mod ring_select;
 pub mod telop;
 

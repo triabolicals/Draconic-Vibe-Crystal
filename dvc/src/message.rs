@@ -17,6 +17,8 @@ pub use swap::TextSwapper;
 pub use talk::*;
 
 pub use swap::RING_PICTURE;
+use crate::randomizer::status::RandomizerStatus;
+
 static MID_SWAPS: OnceLock<HashMap<String, (i32, i32)>> = OnceLock::new();
 pub static MESSAGE_SWAPPER: OnceLock<RwLock<TextSwapper>> = OnceLock::new();
 const LUEUR_MIDS: &[&str] = &["MPID_Lueur", "MGID_Lueur", "MID_SELECTRING_LUEUR_NOTES", "MPID_H_Veyre"];
@@ -75,7 +77,7 @@ pub fn mess_add_tag_to_string(tag_group: u16, tag_id: u16, params: Option<&Array
 #[unity::hook("App", "Mess", "GetImpl")]
 pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: bool, method_info: OptionalMethod) -> &'static Il2CppString {
     let mut result = call_original!(label, is_replaced, method_info);
-    if !RANDOMIZER_STATUS.read().unwrap().enabled || !DVCVariables::random_enabled() { return result; }
+    if !RandomizerStatus::get().init || !DVCVariables::random_enabled() { return result; }
     if let Some(mess_il2cp) = label {
         if mess_il2cp.str_contains("MIID_PieceOfBond") { return call_original!(Some("MID_TUT_KR_KIZUNAPIECE_TITLE".into()), is_replaced, method_info);}
         if mess_il2cp.str_contains("MIID_H_PieceOfBond") { return call_original!(Some("MID_TUT_KR_KIZUNAPIECE_1".into()), is_replaced, method_info);}

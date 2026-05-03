@@ -140,5 +140,6 @@ Fading One
 Healing One
 Strange One
 END
-archer
+an archer
+wyvern rider
 END

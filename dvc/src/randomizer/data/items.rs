@@ -1,13 +1,11 @@
-use engage::{
-    mess::Mess, random::Random,
-    gamedata::{Gamedata, GamedataArray, item::*, skill::SkillData, }
-};
+use engage::{mess::Mess, random::Random, gamedata::{Gamedata, GamedataArray, item::*, skill::SkillData}};
 use crate::{
     config::DVCVariables, utils::{dlc_check, max},
     continuous::get_continious_total_map_complete_count,
     randomizer::{item::data::WeaponDatabase, Randomizer, blacklist::DVCBlackLists},
 };
 use unity::prelude::Il2CppString;
+use crate::continuous::get_story_chapters_completed;
 
 pub struct ItemPool {
     pub engage_items: EngageItems,
@@ -24,7 +22,6 @@ impl ItemPool {
         let has_well = ["アイテム交換_期待度１", "アイテム交換_期待度２", "アイテム交換_期待度３", "アイテム交換_期待度４", "アイテム交換_期待度５"].iter().all(|&x| RewardData::try_get_mut(x).is_some());
         let has_reward = ["DLC購入特典0", "DLC購入特典1", "Patch0特典", "Patch3特典"].iter().all(|&x| RewardData::try_get_mut(x).is_some());
         let bl = DVCBlackLists::get_read();
-        println!("Getting Item Refined Data");
         let refine_iid =
         ItemRefineData::get_list()
             .map(|v|
@@ -48,17 +45,26 @@ impl ItemPool {
                 .map(|x| x.parent.hash).collect(),
         }
     }
+    pub fn get_weapon_level_drop() -> i32 {
+        let completed = get_story_chapters_completed();
+        if completed < 4 { 1 }
+        else if completed < 10 { 2 }
+        else if completed < 17 { 3 }
+        else if completed < 23 { 4 }
+        else { 6 }
+    }
     pub fn random_item(&self, item_type: i32, allow_rare: bool) -> &'static Il2CppString {
         let rng = Random::get_system();
         let chapters = get_continious_total_map_complete_count();
-        let extra_rate = 5 + 2*(chapters / 5);
+        let weapon_level = Self::get_weapon_level_drop();
+        let extra_rate = 5 + 2*(chapters / 6);
         if rng.get_value(100) <= extra_rate && item_type != 1 && item_type != 2 {
             if let Some(v) = self.weapon_db.extra_items.get_random_element(rng).and_then(|&h| ItemData::try_get_hash(h)) {
                 return v.iid;
             }
         }
         let mut price = if chapters < 5 { 1000 } else { 400 * (chapters + 1) };
-        if item_type == 4 { price = max(price >> 2, 501); }
+        if item_type == 4 { price = max(price >> 2, 500); }
         let mut low_price = price / 10;
         let mut count = 0;
         let exploration = DVCVariables::ExplorationItem.get_value();
@@ -90,6 +96,9 @@ impl ItemPool {
                 }
                 if random_item.flag.value & 130 != 0 { continue; }
                 if random_item.flag.value & 1 != 0 && !allow_rare { continue; }
+                if random_item.is_weapon() {
+                    if random_item.get_weapon_level() > weapon_level && random_item.flag.value & 1 == 0 { continue; }
+                }
                 return random_item.iid;
             }
             if (count % 20) == 19 {
@@ -141,13 +150,6 @@ impl EngageItems {
                     _ => { non_weapons.push(item.parent.hash); }
                 }
             });
-        /*
-        println!("Engage Weapon Pool: {}", weapons.len());
-        println!("Enemy Weapons: {}", enemy.len());
-        println!("Engage Bow Pool: {}", bows.len());
-        println!("Engage Non Weapons: {}", non_weapons.len());
-        
-         */
         Self { weapons, bows, non_weapons, enemy }
     }
 }

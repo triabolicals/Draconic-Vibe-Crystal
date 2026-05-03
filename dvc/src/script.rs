@@ -7,8 +7,9 @@ use engage::{
 use unity::prelude::*;
 use crate::{
     randomizer::person::switch_person, utils::*, enums::PIDS, 
-    randomizer::{*, RANDOMIZER_STATUS}, config::DVCVariables
+    randomizer::*, config::DVCVariables
 };
+use crate::randomizer::status::RandomizerStatus;
 pub(crate) mod chapter;
 mod common;
 
@@ -120,17 +121,17 @@ pub fn post_sortie_script_adjustment() {
         if DVCVariables::UnitRecruitment.get_value()  != 0 || lueur_on_map() { change_g_pid_lueur(); }
     }
     let emblem_deploy_mode = DVCVariables::EmblemDeployment.get_value();
-    if emblem_deploy_mode == 2  { remove_equip_emblems();  }
-    else if emblem_deploy_mode == 1 {
+    if emblem_deploy_mode == 1 || emblem_deploy_mode == 2 { remove_equip_emblems(); }
+    if emblem_deploy_mode == 1 {
         let mut emblem_list =  crate::deployment::get_emblem_list();
         if emblem_list.len() < 2 { return; }
-        remove_equip_emblems();
         let rng = Random::get_game();
-        while let Some(unit) = Force::get(ForceType::Player).unwrap().iter().next() {
+        let mut iter = Force::get(ForceType::Player).unwrap().iter();
+        while let Some(unit) = iter.next() {
             if emblem_list.len() > 0 {
                 let value = rng.get_value(emblem_list.len() as i32) as usize;
                 let god_unit = GodPool::try_get_gid(emblem_list[value].as_str(), false).unwrap();
-                unit.set_god_unit(god_unit);
+                unit.try_connect_god_unit(god_unit);
                 emblem_list.remove(value);
             }
             else { break; }
@@ -162,12 +163,11 @@ pub fn adjust_person_map_inspectors() {
     }
     let inspectors = MapInspectors::get_instance();
     let free_deploy = DVCVariables::UnitDeployment.get_value() == 3;
-    let is_set = RANDOMIZER_STATUS.read().unwrap().inspectors_set;
-    if !is_set{
+    let status = RandomizerStatus::get();
+    if !status.inspectors_set {
         inspectors.inspectors.iter_mut()
             .for_each(|inspector| adjust_inspector(inspector, free_deploy));
-        RANDOMIZER_STATUS.try_write()
-            .map(|mut status| status.inspectors_set = true).unwrap();
+        status.inspectors_set = true;
     }
 }
 

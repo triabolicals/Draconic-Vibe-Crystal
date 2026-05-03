@@ -1,6 +1,7 @@
 use engage::gamedata::hub::{HubDisposData, HubRandomSet};
 pub use super::*;
 use crate::config::DVCVariables;
+use crate::randomizer::status::RandomizerStatus;
 
 pub fn change_somniel_hub_dispos() {
     let hub_list = HubDisposData::try_get_mut("Hub_Solanel").unwrap();
@@ -27,7 +28,8 @@ pub fn change_kizuna_dispos() {
     let emblem_order_changed = DVCVariables::EmblemRecruitment.get_value() != 0;
     let generics = DVCFlags::RandomBossesNPCs.get_value();
     if !unit_order_changed && !emblem_order_changed && !generics{ return; }
-    if RANDOMIZER_STATUS.read().unwrap().kizuna_replacements {return; }
+    let status = RandomizerStatus::get();
+    if status.kizuna_replacements { return; }
     let chapter =  GameUserData::get_chapter();
     let cid = chapter.field;
     if let Some(hub_list) = HubDisposData::try_get_mut(cid) {
@@ -55,5 +57,5 @@ pub fn change_kizuna_dispos() {
             }
         }
     }
-    RANDOMIZER_STATUS.try_write().map(|mut lock| lock.kizuna_replacements = true).unwrap();
+    status.kizuna_replacements = true;
 }

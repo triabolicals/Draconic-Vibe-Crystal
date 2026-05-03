@@ -168,7 +168,6 @@ pub fn update_next_chapter() {
     if DVCVariables::Continuous.get_value() != 0 && GameUserData::get_sequence() != 0 {
         set_next_chapter(); 
         random::continous_rand_emblem_adjustment();
-        continuous_mode_next_chapter_notice();
     }
 }
 // DLC Check for continous mode
@@ -287,11 +286,6 @@ fn get_recommended_level_main() -> u8 {
         if !GameUserData::is_chapter_completed(chapters[x]) {  return chapters[x].recommended_level;  }
     }
     GameUserData::get_chapter().recommended_level
-}
-pub fn continuous_mode_next_chapter_notice(){
-    if DVCVariables::is_random_map() && ( GameUserData::get_sequence() & 4 != 0) && GameUserData::get_chapter().get_next_chapter().is_some() {
-        NoticeManager::add_facility_by_mid( "MID_Hub_Next_Go1");
-    }
 }
 pub fn hub_menu_next_help_text(_this: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString {
     if DVCVariables::is_random_map() && GameUserData::get_chapter().get_next_chapter().is_some() {  Mess::get("MID_Hub_Next_Go1")  }

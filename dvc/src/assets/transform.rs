@@ -147,7 +147,6 @@ fn get_transform_result(unit: &Unit) -> &'static mut AssetTableResult {
         .unwrap_or(
             AssetTableResult::get_from_pid(2,if unit.person.get_gender() == 2 { "PID_エル_竜化" } else { "PID_ラファール_竜化"}, CharacterAppearance::get_constions(None))
         );
-    // print_asset_table_result(result, 2);
     result
 }
 pub fn is_dragonstone(equipped: Option<&ItemData>) -> bool {

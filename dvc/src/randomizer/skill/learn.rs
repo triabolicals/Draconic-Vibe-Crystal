@@ -11,13 +11,9 @@ use engage::{
 use unity::{engine::Sprite, prelude::*};
 use crate::{utils::can_rand, DVCVariables, randomizer::{DVCFlags, data::GameData}};
 
-pub fn update_learn_skills(forced: bool) {
-    if forced || !crate::randomizer::RANDOMIZER_STATUS.read().unwrap().learn_skill {
-        let force_type = [ForceType::Player, ForceType::Absent, ForceType::Dead, ForceType::Lost, ForceType::Enemy, ForceType::Ally];
-        for ff in force_type { Force::get(ff).unwrap().iter().for_each(|unit| unit_update_learn_skill(unit) ); }
-        let _ = crate::randomizer::RANDOMIZER_STATUS.try_write().map(|mut lock| lock.learn_skill = true);
-        return;
-    }
+pub fn update_learn_skills() {
+    let force_type = [ForceType::Player, ForceType::Absent, ForceType::Dead, ForceType::Lost, ForceType::Enemy, ForceType::Ally];
+    for ff in force_type { Force::get(ff).unwrap().iter().for_each(|unit| unit_update_learn_skill(unit) ); }
 }
 
 pub fn unit_update_learn_skill(unit: &Unit) { 

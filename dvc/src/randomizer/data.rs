@@ -488,7 +488,7 @@ impl RandomizedGameData {
                     DVCVariables::ClassMode => { if value > 2 { crate::randomizer::job::lockout::lockout_classes(); } }
                     DVCVariables::EmblemWepProf => { Self::get_read().emblem_aptitude_randomizer.commit(data); }
                     DVCVariables::EmblemSyncSkill|DVCVariables::EmblemEngageSkill => { RandomizedGameData::get_read().engage_skills.commit(data); }
-                    DVCVariables::JobLearnMode => { crate::randomizer::skill::learn::update_learn_skills(true); }
+                    DVCVariables::JobLearnMode => { crate::randomizer::skill::learn::update_learn_skills(); }
                     DVCVariables::BattleStyles => { styles::randomize_job_styles(); }
                     DVCVariables::InteractSetting => { interact::change_interaction_data(value, false);  }
                     DVCVariables::PersonalGrowthMode => { grow::random_grow(); }

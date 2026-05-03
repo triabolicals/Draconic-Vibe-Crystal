@@ -1,12 +1,16 @@
-use engage::gamesound::{GameSound, GameSoundFadeSpeedType};
-use engage::random::Random;
-use engage::sequence::eventdemo::*;
+use engage::{
+    gamesound::{GameSound, GameSoundFadeSpeedType},
+    random::Random,
+    sequence::eventdemo::*
+};
 use unity::prelude::OptionalMethod;
-use crate::assets::data::SEARCH_LIST;
-use crate::config::DVCFlags;
-use crate::DVCVariables;
-use crate::message::RING_PICTURE;
-use crate::randomizer::Randomizer;
+use crate::{
+    assets::data::SEARCH_LIST,
+    config::DVCFlags,
+    DVCVariables,
+    message::RING_PICTURE,
+    randomizer::Randomizer
+};
 
 pub fn event_demo_function_edit() {
     if let Some(event) = EventDemoSequence::get_instance() {

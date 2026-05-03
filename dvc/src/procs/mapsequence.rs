@@ -18,8 +18,10 @@ use crate::{
 };
 use std::sync::RwLock;
 use unity::{il2cpp::object::Array, prelude::OptionalMethod};
+use crate::utils::remove_equip_emblems;
 
 pub fn map_sequence_desc_edit(descs: &mut Array<&mut ProcDesc>) {
+
     descs[4] = ProcDesc::call(ProcVoidMethod::new(None, map_sequence_setup_chapter));
     descs[19] = ProcDesc::call(ProcVoidMethod::new(None, map_sequence_dispos_event));
     descs[21] = ProcDesc::call(ProcVoidMethod::new(None, map_sequence_dispos_unit));
@@ -52,6 +54,10 @@ pub extern "C" fn map_sequence_dispos_event(this: &mut MapSequence, _method_info
     randomizer::map::dispos::change_map_dispos();
     
     if !this.is_resume {
+        let emblem = DVCVariables::EmblemDeployment.get_value();
+        println!("Emblem Deployment: {}", emblem);
+        if (emblem == 1 || emblem == 2) { remove_equip_emblems(); }
+
         let count = DisposData::try_get_mut("Player").map(|v| v.len()).unwrap_or(10) as i32;
         let mut levels = vec![];
         let vander_unit = DVCVariables::get_dvc_person_data(1, false).map(|v| v.parent.hash).unwrap_or(0);

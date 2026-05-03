@@ -1,21 +1,15 @@
 use unity::prelude::*;
 use engage::{
-    unit::{UnitPool, Unit},
-    force::*, gamedata::*,
-    gameuserdata::*, 
-    gamevariable::*, 
-    map::situation::MapSituation,
-    mess::*, 
-    random::Random,
-    util::get_instance
+    unit::{UnitPool, Unit}, force::*, gamedata::*,
+    gameuserdata::*, gamevariable::*, map::situation::MapSituation,
+    mess::*, random::Random, util::get_instance
 };
-use crate::utils::*;
-use crate::{randomizer, DVCConfig};
-use crate::DVCVariables;
-use crate::config::DVCFlags;
-use crate::continuous::get_continious_total_map_complete_count;
-use crate::randomizer::item::unit_items::adjust_missing_weapons;
-use crate::randomizer::person::unit::fixed_unit_weapon_mask;
+use crate::{
+    config::DVCFlags, DVCVariables, randomizer, DVCConfig, utils::*,
+    continuous::get_continious_total_map_complete_count,
+    randomizer::item::unit_items::adjust_missing_weapons,
+    randomizer::person::unit::fixed_unit_weapon_mask
+};
 
 pub mod enemy;
 
@@ -129,7 +123,7 @@ pub fn fix_unit_level(unit: &Unit, total_level: i32) {
 }
 pub fn auto_level_unit_for_random_map(unit: &mut Unit, leader: bool){
     if !DVCVariables::is_main_chapter_complete(4) || GameUserData::is_evil_map() { return; }
-    if DVCVariables::Continuous.get_value() != 4 && GameVariableManager::get_number(DVCVariables::CONTINUOUS) != 2 { return; }
+    if DVCVariables::Continuous.get_value() != 4 && DVCVariables::Continuous.get_value() != 2 { return; }
     let rng = Random::get_game();
     let is_player = unit.person.get_asset_force() == 0;
     let diff = GameUserData::get_difficulty(false);

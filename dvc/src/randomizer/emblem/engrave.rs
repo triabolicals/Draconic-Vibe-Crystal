@@ -57,13 +57,6 @@ pub fn randomize_engrave(data: &GameData, low: i32, high: i32) {
                     x.engrave_avoid = 5*engrave_stats[3] as i8;
                     x.engrave_critical = 5*engrave_stats[4] as i8;
                     x.engrave_secure = 5*engrave_stats[5] as i8;
-                    /*
-                    println!("Score: {}: Pwr: {}, Wt: {}, Hit: {}, Avo: {}, Crit: {}, Dod: {}", 
-                        total, engrave_stats[0], engrave_stats[1], 5*engrave_stats[2],
-                             5*engrave_stats[3], 5*engrave_stats[4], 5*engrave_stats[5],
-                    );
-                    
-                     */
                     break;
                 }
                 count+= 1;

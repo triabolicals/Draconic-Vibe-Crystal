@@ -2,8 +2,7 @@ use engage::{
     menu::{BasicMenuResult, *}, game::GameUI, gamedata::Gamedata,
     menu::menus::config::{ConfigMenuContent, ConfigRoot},
     proc::{Bindable, ProcInst}, resourcemanager::ResourceManager,
-    sequence::configsequence::ConfigSequence,
-    titlebar::TitleBar,
+    sequence::configsequence::ConfigSequence, titlebar::TitleBar,
 };
 use crate::{DVCVariables, config::DVCFlags, menus::dvc_header_version};
 use unity::{prelude::*, system::List};

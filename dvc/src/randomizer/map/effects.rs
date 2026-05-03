@@ -385,7 +385,6 @@ extern "C" fn unit_get_sp(_args: &Array<&DynValue>, _method_info: OptionalMethod
         let grow_sequence = UnitGrowSequence::create_bind(proc);
         grow_sequence.set_unit_grow_data(unit, 0, 100, false);
     }
-
 }
 
 extern "C" fn unit_get_sp_500(_args: &Array<&DynValue>, _method_info: OptionalMethod) {

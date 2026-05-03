@@ -141,4 +141,5 @@ Healing One
 Strange One
 END
 archer
+wyvern rider
 END

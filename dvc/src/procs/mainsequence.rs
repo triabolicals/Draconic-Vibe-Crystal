@@ -8,10 +8,10 @@ use engage::{
 use crate::{
     menus, message, DVCVariables, config::menu::DVCConfigText,
     procs::{call_proc_original_method, replace_desc_void_function},
-    randomizer::RANDOMIZER_STATUS,
 };
 use outfit_core::UnitAssetMenuData;
 use unity::{prelude::OptionalMethod, il2cpp::object::Array};
+use crate::randomizer::status::RandomizerStatus;
 
 pub fn main_sequence_desc_edit(descs: &mut Array<&mut ProcDesc>) {
     descs[18] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_initialize));
@@ -48,9 +48,7 @@ extern "C" fn main_sequence_load_resource(main_sequence: &mut MainSequence, _opt
 }
 
 extern "C" fn main_sequence_game_reset(main_sequence: &mut ProcInst, _optional_method: OptionalMethod) {
-    if RANDOMIZER_STATUS.try_read().ok().map(|v| v.seed != 0 ).unwrap_or(false) {
-        crate::randomizer::reset_gamedata();
-    }
+    if RandomizerStatus::get().enabled { crate::randomizer::reset_gamedata(); }
     call_proc_original_method(main_sequence, "GameReset");
 }
 extern "C" fn main_sequence_jump_to_continue_map(main_sequence: &mut ProcInst, _optional_method: OptionalMethod) {

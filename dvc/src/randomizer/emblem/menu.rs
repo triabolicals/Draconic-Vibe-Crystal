@@ -163,7 +163,6 @@ pub fn ring_list_skill_menu_create_menu_items(
     method_info: OptionalMethod
 ){
     call_original!(god, menu, from_lv, to_lv, max_bond, out, ring_select, method_info);
-    let get_pos = GameData::get_playable_god_list().iter().position(|x| x.parent.hash == god.main_data.parent.hash);
     let inherit_mode = DVCVariables::EmblemInherit.get_value();
     let mut ran_data = get_rand_data_write();
     out.iter_mut().enumerate().for_each(|(index, item)|{

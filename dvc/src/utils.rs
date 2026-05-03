@@ -1,9 +1,7 @@
 use unity::prelude::*;
 use engage::{
-    random::*, force::*, mess::*,
-    unit::UnitPool,
-    gamevariable::GameVariableManager,
-    gamedata::{*, terrain::TerrainData, skill::*},
+    random::*, force::*, mess::*, unit::UnitPool, gamevariable::GameVariableManager,
+    gamedata::{*, terrain::TerrainData, skill::*}, god::GodPool
 };
 use skyline::patching::Patch;
 use crate::{config::DVCVariables, enums::*};
@@ -15,7 +13,6 @@ use crate::{config::DVCVariables, enums::*};
             $( c = crate::utils::get_nested_class(c, $nested).expect(format!("Expecting Nested Class {} in {}", $nested, c.get_name()).as_str()); )*
         c
         }
-
     }
 }
 pub fn offset_to_addr<T: ?Sized>(offset: usize) -> &'static T {
@@ -122,15 +119,20 @@ pub fn get_lueur_name_gender(){
         }
     }
 }
-
 pub fn remove_equip_emblems() {
-    Force::get(ForceType::Player).unwrap().iter()
-        .chain( Force::get(ForceType::Absent).unwrap().iter() )
-        .chain( Force::get(ForceType::Dead).unwrap().iter() )
-        .for_each(|unit| unit.clear_god_unit());
+    [ForceType::Player, ForceType::Absent, ForceType::Ally].iter().for_each(|f| {
+        Force::get(*f).unwrap().iter().for_each(|f| {
+            if f.person.asset_force == 0 {
+                if let Some(god) = f.god_unit.as_ref() {
+                    god.clear_parent();
+                    god.clear_child();
+                    f.clear_god_unit();
+                }
+            }
+        });
+    });
 }
 pub fn get_random_number_for_seed() -> u32 {
-    //Convert frame count to a random seed
     unsafe {
         let seed = get_frame_count(None);
         let rng = Random::get_system();

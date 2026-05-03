@@ -9,6 +9,7 @@ use crate::{
         job::{is_magic_class, randomize_selected_weapon_mask},
     },
 };
+use crate::randomizer::status::RandomizerStatus;
 use super::{*, ai};
 
 const VANDER_MAX: [i8; 11] = [45, 12, 14, 11, 40, 12, 13, 12, 10, 5, 7];
@@ -27,14 +28,8 @@ fn calc_max_recruit_stat(total_level: i32) -> [i32; 11] {
 
 #[unity::hook("App", "Unit", "CreateImpl2")]
 pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
-    let can_lueur_change = RANDOMIZER_STATUS.read().unwrap().enabled;
     call_original!(this, method_info);
-    if !can_lueur_change {
-        if this.person.pid.str_contains(PIDS[ALEAR]) {
-            let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.enabled = true);
-        }
-        return;
-    }
+    if !RandomizerStatus::get().init { return; }
     if !can_rand()  || this.person.parent.hash == 1879825845 || this.status.value & 134217728 != 0 { return; }  // Doubles
     let single_class = DVCVariables::get_single_class(false, false).is_some();
     let changed_recruit_order = DVCVariables::UnitRecruitment.get_value() != 0;

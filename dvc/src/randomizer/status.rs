@@ -1,4 +1,4 @@
-use crate::randomizer::RANDOMIZER_STATUS;
+use crate::randomizer::STATUS;
 
 pub struct RandomizerStatus {
     pub alear_person_set: bool,
@@ -14,7 +14,7 @@ pub struct RandomizerStatus {
 }
 
 impl RandomizerStatus {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         RandomizerStatus{
             alear_person_set: false,
             well_randomized: false,
@@ -41,24 +41,13 @@ impl RandomizerStatus {
         self.tilabolical = [0; 1024];
     }
     pub fn get_tile(x: u8, z: u8) -> i32 {
-        if let Some(v) = RANDOMIZER_STATUS.try_read().ok() {
-            let index = z as usize * 32 + x as usize;
-            v.tilabolical[index] as i32
-        }
-        else { 0 } 
+        let index = z as usize * 32 + x as usize;
+        Self::get().tilabolical[index] as i32
     }
     pub fn set_enable(&mut self) { self.enabled = true; }
-    pub fn is_init() -> bool {
-        if let Some(v) = RANDOMIZER_STATUS.try_read().ok() {
-            v.init
-        }
-        else { false }
-    }
-    pub fn set_init(init: bool) {
-        if let Some(mut v) = RANDOMIZER_STATUS.try_write().ok() {
-            v.init = init;
-        }
-    }
+    pub fn is_init() -> bool { Self::get().init }
+    pub fn set_init(init: bool) { Self::get().init = init; }
+    pub fn get() -> &'static mut RandomizerStatus { unsafe { &mut STATUS } }
     pub fn map_complete(&mut self) {
         self.inspectors_set = false;
         self.map_tile = false;

@@ -11,7 +11,7 @@ pub use engage::{
 };
 use unity::il2cpp::object::Array;
 use crate::{config::DVCFlags, enums::*, utils::*, autolevel::*, DVCVariables};
-use super::{data::GameData, menu::CUSTOM_RECRUITMENT_ORDER, get_data_read, Randomizer, RANDOMIZER_STATUS};
+use super::{data::GameData, menu::CUSTOM_RECRUITMENT_ORDER, get_data_read, Randomizer};
 
 pub mod ai;
 pub mod unit; 
@@ -175,9 +175,9 @@ pub fn find_pid_replacement(pid: &String, reverse: bool) -> Option<String>{
 }
 
 pub fn change_lueur_for_recruitment(is_start: bool) {
-    if !can_rand() || RANDOMIZER_STATUS.read().unwrap().alear_person_set  { return; }
+    if !can_rand()  { return; }
     if DVCVariables::get_dvc_person(0, false).to_string() == PIDS[0] {
-        let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.alear_person_set = true);
+        // let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.alear_person_set = true);
         if let Some(lueur) = UnitPool::get_from_pid("PID_リュール".into(), false) {
             if DVCVariables::ClassMode.get_value()== 1 && is_start && can_rand() {
                 crate::randomizer::job::unit_change_to_random_class(lueur, false);
@@ -262,10 +262,13 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
             if new_hero_gender == 1 {  mov_x0_0(x); }
             else { mov_1(x); }
         }
+        /*
         if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() {
             lock.alear_person_set = true;
             lock.set_enable();
         }
+        
+         */
     }
 }
 

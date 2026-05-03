@@ -17,9 +17,7 @@ use outfit_core::{anim::AnimData, get_outfit_data, print_asset_table_result, Ass
 
 const MALE_EMBLEMS: [usize; 9] = [0, 1, 4, 5, 8, 9, 14, 16, 18];
 const FEMALE_EMBLEMS: [usize; 10] = [2, 3, 6, 7, 10, 11, 12, 13, 15, 17];
-
 const THREE_HOUSE_ACTS: [&str; 4] = ["Thr2AF-Ax1_c563_N", "Thr2AM-Lc1_c514_N", "Thr2AM-Bw1_c515_N", "Thr2AM-Sw1_c535_N"];
-
 const THREE_HOUSES_RIGHT: [&str; 4] = ["uWep_Ax20", "uWep_Lc21", "uWep_Bw14-Ar", "null"];
 
 fn adjust_emblem_zone(this: &mut CharacterGameStatus) {
@@ -40,7 +38,6 @@ fn adjust_emblem_zone(this: &mut CharacterGameStatus) {
                             19 => { "Ler"},
                             _ => { ENGAGE_PREFIX[emblem_index] }
                         };
-                    println!("EMBLEM ID: {}", new_emblem_id);
                     this.emblem_identifier = Some(new_emblem_id.into());
                 }
             }
@@ -326,9 +323,7 @@ fn houses_unite_partners(god_data: &GodData, linked: Option<&GodData>, rng: &Ran
                 if !set[0] { hashes[0] = get_god_hash_from_index(13); }
                 for x in 1..4 { if !set[x] { hashes[x] = get_god_hash_from_index(23); break; } }
             }
-            15 => {
-                hashes[0] =  get_god_hash_from_index(emblem_index);
-            }
+            15 => { hashes[0] =  get_god_hash_from_index(emblem_index); }
             _ => {}
         }
         Some(hashes)

@@ -384,7 +384,7 @@ impl DVCConfig {
                 let value = if set_value { self.get_value(v) } else { 0 };
                 let key = v.get_key();
                 GameVariableManager::make_entry_norewind(key, value);
-                println!("{} Set to {}", key, value);
+                // println!("{} Set to {}", key, value);
             }
         }
         if set_value {
@@ -519,26 +519,4 @@ pub fn migrate_to_v5() {
     GameVariableManager::make_entry_norewind(DVCVariables::ClassMode.get_key(), class_mode);
     GameVariableManager::set_number(FLAGNAME, s);
     GameVariableManager::set_number("G_DVC_Version", 5);
-}
-pub fn remove_old_keys() {
-    let mut count = 0;
-    GameVariableManager::find_starts_with("G_L_JID").iter().for_each(|i|{
-        let i = i.to_string();
-        let jid = i.trim_start_matches("G_L_");
-        if JobData::get(jid).is_none() {
-            count += 1;
-            GameVariableManager::remove(jid);
-        }
-    });
-    if count > 0 { println!("Removed #{} learn jobs", count); }
-    count = 0;
-    GameVariableManager::find_starts_with("G_所持_AID").iter().for_each(|i|{
-        let i = i.to_string();
-        let jid = i.trim_start_matches("G_所持_");
-        if AccessoryData::get(jid).is_none() {
-            count += 1;
-            GameVariableManager::remove(jid);
-        }
-    });
-    if count > 0 { println!("Removed #{} learn accessories", count); }
 }
