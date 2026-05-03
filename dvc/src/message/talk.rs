@@ -1,10 +1,11 @@
 use std::sync::RwLock;
-use engage::{gamevariable::GameVariableManager, mess::Mess, sequence::talk::*, tmpro::TextMeshProUGUI};
+use engage::{
+    gamevariable::GameVariableManager, mess::Mess, sequence::talk::*, tmpro::TextMeshProUGUI,
+    language::{Language, LanguageLangs::*},
+};
 use unity::prelude::*;
 use crate::{
-    config::DVCFlags, DVCVariables,
-    enums::{EMBLEM_GIDS, RINGS},
-    message::{TextSwapper, MESSAGE_SWAPPER},
+    config::DVCFlags, DVCVariables, enums::{EMBLEM_GIDS, RINGS}, message::{TextSwapper, MESSAGE_SWAPPER},
     randomizer::{data::EmblemPool, names::AppearanceRandomizer, item, RANDOMIZED_DATA}
 };
 
@@ -67,22 +68,11 @@ pub fn talk_tag_add_letter_execute_edit(this: &mut TalkTagAddLetter, _optional_m
             if last_new_line < current_size {
                 let size = current_size - last_new_line;
                 if next_char == 10 {
-                    if size < 40 {
-                        this.add_letter = 32;
-                        // println!("TalkTagAddLetter Original: {} at {}", next_char, current_size);
-                        // println!("TalkTagAddLetter New: {} at {} [Line Size: {}]", this.add_letter, current_size, size);
-                    }
+                    if size < 40 { this.add_letter = 32; }
                 }
-                else{
-                    if size > 44 {
-                        this.add_letter = 10;
-                        // println!("TalkTagAddLetter Original: {} at {}", next_char, current_size);
-                        // println!("TalkTagAddLetter New: {} at {} [Line Size: {}]", this.add_letter, current_size, size);
-                    }
-                }
+                else if size > 44 { this.add_letter = 10; }
             }
         }
-       // else { println!("Unable to get TalkUI"); }
     }
     this.execute_();
 }
@@ -94,10 +84,7 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
                 let person = tag as i32 - 100;
                 if person < 41 {
                     DVCVariables::get_dvc_unit(person, false).map(|u| u.get_name())
-                        .or_else(||
-                            DVCVariables::get_dvc_person_data(person, false)
-                                .map(|p| p.get_name())
-                        )
+                        .or_else(||DVCVariables::get_dvc_person_data(person, false).map(|p| p.get_name()))
                 }
                 else {
                     if DVCFlags::RandomBossesNPCs.get_value() {
@@ -162,7 +149,6 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
             }
             16 => { // Divine Dragon to New Alias
                 let offset = if args[0] == 1 { 41 } else { 0 };
-
                 let person_index = DVCVariables::get_dvc_recruitment_index(0);
                 if person_index == -1 { Some(text.original_data.alias[82].to_str()) }
                 else { Some(text.original_data.alias[offset+person_index as usize].to_str()) }
@@ -209,11 +195,18 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
                 text.original_data.gender.get(17).map(|v| v.get(if r & 32 != 0 { 2 } else { 1 }, args[1] != 0))
             }
             24 => {
-                println!("DVC Unit: {} / {}", args[0], args.len());
-                DVCVariables::get_dvc_unit(args[0] as i32, false).map(|u|{
-                    println!("Unit: {}, Class: {}", u.get_name(), u.job.get_name());
-                    Mess::get(u.job.name)
-                })
+                DVCVariables::get_dvc_unit(args[0] as i32, false)
+                    .map(|u| u.job.jid)
+                    .or_else(||
+                        DVCVariables::get_dvc_person_data(args[0] as i32, false)
+                            .and_then(|p| p.get_job())
+                            .map(|j| j.jid)
+                    )
+                    .map(|j| {
+                        let job_name = Mess::get_name(j).to_string().to_lowercase();
+                        if args[1] == 1 { apply_article(job_name.as_str(), true).into() }
+                        else { job_name.into() }
+                    })
             }
             _ => { None }
         }
@@ -224,9 +217,19 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
         if let Some(space) = new_mess.to_u16_mut().iter_mut().enumerate().find(|(i, v)| *i >= new_line_pos && **v == 32) {
             *space.1 = 10;
         }
-        else {
-            return Some(format!("{}\n", new_mess).into());
-        }
+        else { return Some(format!("{}\n", new_mess).into()); }
     }
     mess
+}
+fn apply_article(name: &str, lower: bool) -> String {
+    let lang = Language::get_lang();
+    if lang == USEnglish || lang == EUEnglish {
+        let start = if lower { name.to_lowercase() }
+        else { name.to_string() };
+        if start.starts_with(|c| c == 'A' || c == 'a' || c == 'e' || c == 'E' || c == 'I' || c == 'i' || c == 'o' || c == 'O') {
+            format!("an {}", start)
+        }
+        else { format!("a {}", start) }
+    }
+    else { name.to_string() }
 }
