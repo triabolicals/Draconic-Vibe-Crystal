@@ -6,10 +6,9 @@ use engage::{
 };
 use unity::prelude::*;
 use crate::{
-    randomizer::person::switch_person, utils::*, enums::PIDS, 
-    randomizer::*, config::DVCVariables
+    randomizer::{person::switch_person, *, status::RandomizerStatus},
+    utils::*, enums::PIDS, config::DVCVariables,
 };
-use crate::randomizer::status::RandomizerStatus;
 pub(crate) mod chapter;
 mod common;
 
@@ -121,7 +120,7 @@ pub fn post_sortie_script_adjustment() {
         if DVCVariables::UnitRecruitment.get_value()  != 0 || lueur_on_map() { change_g_pid_lueur(); }
     }
     let emblem_deploy_mode = DVCVariables::EmblemDeployment.get_value();
-    if emblem_deploy_mode == 1 || emblem_deploy_mode == 2 { remove_equip_emblems(); }
+    if emblem_deploy_mode & 3 != 0 { remove_equip_emblems(); }
     if emblem_deploy_mode == 1 {
         let mut emblem_list =  crate::deployment::get_emblem_list();
         if emblem_list.len() < 2 { return; }

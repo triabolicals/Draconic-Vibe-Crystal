@@ -26,36 +26,36 @@ const STATS: &[&str] = &[
     "_Hp", "_Str", "_Tec", "_Spd", "_Lck", "_Def", "_Mag", "_Res", "_Phy", "_Vis", "_Mov",
     "_H_Hp", "_H_Str", "_H_Tec", "_H_Spd", "_H_Lck", "H_Def", "_H_Mag", "_H_Res", "_H_Phy", "_H_Vis", "_H_Mov"];
 const STATS_REPLACE: [i32; 11] = [5, 1, 1, 1, 1, 1, 3, 3, 3, 0, 1];
+pub fn mid_swaps_init() -> HashMap<String, (i32, i32)> {
+    let mut vec: HashMap<String, (i32, i32)> = HashMap::new();
+    for x in 0..LUEUR_MIDS.len() {
+        if x < 2 { vec.insert(LUEUR_MIDS[x].to_string(), ( 1, 0) ); }  // Lueur Name Swap
+        else { vec.insert(LUEUR_MIDS[x].to_string(), ( 2, x as i32) ); }  // Lueur Name Replacement
+    }
+    vec.insert("MSID_H_EirikEngage".to_string(), ( 9, 0) );
+    vec.insert("MID_RULE_M006_LOSE".to_string(), ( 3, 10) );
+    vec.insert("MID_RULE_M015_LOSE".to_string(), ( 3, 27) );
+    vec.insert("MID_RULE_M015_WIN".to_string(), ( 3, 27) );
+    vec.insert("MID_TUT_NAVI_M015_ESCAPE".to_string(), ( 3, 27) );
+    vec.insert("MID_TUT_NAVI_VANDRE_FUNDS".to_string(), ( 3, 1) );
+    vec.insert("MID_RULE_M007_WIN".to_string(), ( 3, 26) );
+    vec.insert("MID_RULE_M008_WIN".to_string(), ( 3, 17) );
+    vec.insert("MID_RULE_M009_WIN".to_string(), ( 3, 17) );
+    vec.insert("MID_RULE_M014_WIN".to_string(), ( 4, 26) ); //Mauvier Name Swap
+    vec.insert("MID_RULE_M016_WIN".to_string(), ( 4, -1) );
+    vec.insert("MID_RULE_M017_WIN".to_string(), ( 4, -1) );
+    for x in 1..12 {
+        vec.insert(format!("MTID_Ring_{}",  RINGS[ x as usize ]), ( 5, x)); // Tile Replacement
+    }
+    vec.insert("MID_Hub_Next_Go".to_string(), (8, 0));  // Continious Mode
+    vec.insert("MID_Hub_Next_Go1".to_string(), (8, 1));  // Continious Mode
+    vec.insert("MPID_Il_E006".to_string(), (10, 0));
+    GameData::get_playable_god_list().iter().enumerate().for_each(|(index, god)|{ vec.insert(god.mid.to_string(), (11, index as i32)); });
+    vec
+}
 pub fn initialize_mess_hashs() {
     MESSAGE_SWAPPER.get_or_init(|| RwLock::new(TextSwapper::init()));
-    MID_SWAPS.get_or_init(||{
-        let mut vec: HashMap<String, (i32, i32)> = HashMap::new();
-        for x in 0..LUEUR_MIDS.len() {
-            if x < 2 { vec.insert(LUEUR_MIDS[x].to_string(), ( 1, 0) ); }  // Lueur Name Swap
-            else { vec.insert(LUEUR_MIDS[x].to_string(), ( 2, x as i32) ); }  // Lueur Name Replacement
-        }
-        vec.insert("MSID_H_EirikEngage".to_string(), ( 9, 0) );
-        vec.insert("MID_RULE_M006_LOSE".to_string(), ( 3, 10) );
-        vec.insert("MID_RULE_M015_LOSE".to_string(), ( 3, 27) );
-        vec.insert("MID_RULE_M015_WIN".to_string(), ( 3, 27) );
-        vec.insert("MID_TUT_NAVI_M015_ESCAPE".to_string(), ( 3, 27) );
-        vec.insert("MID_TUT_NAVI_VANDRE_FUNDS".to_string(), ( 3, 1) );
-        vec.insert("MID_RULE_M007_WIN".to_string(), ( 3, 26) ); 
-        vec.insert("MID_RULE_M008_WIN".to_string(), ( 3, 17) );
-        vec.insert("MID_RULE_M009_WIN".to_string(), ( 3, 17) );
-        vec.insert("MID_RULE_M014_WIN".to_string(), ( 4, 26) ); //Mauvier Name Swap
-        vec.insert("MID_RULE_M016_WIN".to_string(), ( 4, -1) );
-        vec.insert("MID_RULE_M017_WIN".to_string(), ( 4, -1) );
-        for x in 1..12 {
-            vec.insert(format!("MTID_Ring_{}",  RINGS[ x as usize ]), ( 5, x)); // Tile Replacement
-        }
-        vec.insert("MID_Hub_Next_Go".to_string(), (8, 0));  // Continious Mode
-        vec.insert("MID_Hub_Next_Go1".to_string(), (8, 1));  // Continious Mode
-        vec.insert("MPID_Il_E006".to_string(), (10, 0));
-        GameData::get_playable_god_list().iter().enumerate().for_each(|(index, god)|{ vec.insert(god.mid.to_string(), (11, index as i32)); });
-        vec
-    });
-
+    MID_SWAPS.get_or_init(|| mid_swaps_init() );
 }
 #[unity::hook("App", "Mess", "AddTagString")]
 pub fn mess_add_tag_to_string(tag_group: u16, tag_id: u16, params: Option<&Array<u8>>, method_info: OptionalMethod) {
@@ -110,35 +110,7 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
             }
         }
         if result.is_null() { return result; }
-        
-        let hash_map = MID_SWAPS.get_or_init(||{
-        let mut vec: HashMap<String, (i32, i32)> = HashMap::new();
-        for x in 0..LUEUR_MIDS.len() {
-            if x < 2 { vec.insert(LUEUR_MIDS[x].to_string(), ( 1, 0) ); }  // Lueur Name Swap
-            else { vec.insert(LUEUR_MIDS[x].to_string(), ( 2, x as i32) ); }  // Lueur Name Replacement
-        }
-        vec.insert("MSID_H_EirikEngage".to_string(), ( 9, 0) );
-        vec.insert("MID_RULE_M006_LOSE".to_string(), ( 3, 10) );
-        vec.insert("MID_RULE_M015_LOSE".to_string(), ( 3, 27) );
-        vec.insert("MID_RULE_M015_WIN".to_string(), ( 3, 27) );
-        vec.insert("MID_TUT_NAVI_M015_ESCAPE".to_string(), ( 3, 27) );
-        vec.insert("MID_TUT_NAVI_VANDRE_FUNDS".to_string(), ( 3, 1) );
-        vec.insert("MID_RULE_M007_WIN".to_string(), ( 3, 26) );
-        vec.insert("MID_RULE_M008_WIN".to_string(), ( 3, 17) );
-        vec.insert("MID_RULE_M009_WIN".to_string(), ( 3, 17) );
-        vec.insert("MID_RULE_M014_WIN".to_string(), ( 4, 26) ); //Mauvier Name Swap
-        vec.insert("MID_RULE_M016_WIN".to_string(), ( 4, -1) );
-        vec.insert("MID_RULE_M017_WIN".to_string(), ( 4, -1) );
-        for x in 1..12 {
-            vec.insert(format!("MTID_Ring_{}",  RINGS[ x as usize ]), ( 5, x)); // Tile Replacement
-        }
-        vec.insert("MID_Hub_Next_Go".to_string(), (8, 0));  // Continious Mode
-        vec.insert("MID_Hub_Next_Go1".to_string(), (8, 1));  // Continious Mode
-        vec.insert("MPID_Il_E006".to_string(), (10, 0));
-        GameData::get_playable_god_list().iter().enumerate().for_each(|(index, god)|{ vec.insert(god.mid.to_string(), (11, index as i32)); });
-        vec
-        });
-
+        let hash_map = MID_SWAPS.get_or_init(|| mid_swaps_init() );
         if let Some(v) = hash_map.get(&mess_label) {
             match v.0 {
                 1 => {
@@ -162,6 +134,7 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
 
                      */
                 }
+                /*
                 3 => {  //Enemy Person Name Swap
                     if DVCVariables::UnitRecruitment.get_value() != 0 {
                         return replace_string(
@@ -177,6 +150,8 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                         result = name_replace(result, 33);
                     }
                 }
+
+                 */
                 5 => {  // Ring/bracelet of XXXX Swaps
                     if DVCVariables::EmblemRecruitment.get_value() != 0 {
                         let new_index = crate::randomizer::person::pid_to_index(&EMBLEM_GIDS[v.1 as usize].to_string(), false);

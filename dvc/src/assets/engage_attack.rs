@@ -13,7 +13,7 @@ use crate::{
     },
     randomizer::Randomizer,
 };
-use outfit_core::{anim::AnimData, get_outfit_data, print_asset_table_result, AssetConditions, AssetFlags};
+use outfit_core::{anim::AnimData, get_outfit_data, AssetConditions, AssetFlags};
 
 const MALE_EMBLEMS: [usize; 9] = [0, 1, 4, 5, 8, 9, 14, 16, 18];
 const FEMALE_EMBLEMS: [usize; 10] = [2, 3, 6, 7, 10, 11, 12, 13, 15, 17];
@@ -91,7 +91,6 @@ pub fn adjust_engage_attack_animation(result: &mut AssetTableResult, unit: &Unit
                 result.ride_dress_model = Some(format!("uBody_Cmi0DR_c56{}", v).into());
             }
         }
-        print_asset_table_result(result, 2);
     }
 }
 #[unity::hook("Combat", "CombatRecord", "PostProcess")]

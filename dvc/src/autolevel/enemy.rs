@@ -17,7 +17,6 @@ pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
             let valid = unit.try_connect_god_unit(god_unit).is_some();
             god_unit.set_escape(true);
             if valid && emblem < 31 {
-                println!("Setting enemy god {} to {}", god_unit.data.mid, unit.get_name());
                 emblem_set_flag |= 1 << emblem;
                 GameVariableManager::set_number("EnemyEmblemSet", emblem_set_flag);
             }

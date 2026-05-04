@@ -212,7 +212,7 @@ pub fn autolevel_party() -> Option<(i32, i32)> {
 
         println!("Autoleveling Bench to average of {}", player_average);
         let mut count = 0;
-        Force::get(ForceType::Absent).unwrap().iter().for_each(|unit| { level_up_unit(unit, player_average); });
+        Force::get(ForceType::Absent).unwrap().iter().for_each(|unit| { count += level_up_unit(unit, player_average) as i32; });
         if DVCConfig::get().debug { Force::get(ForceType::Player).unwrap().iter().for_each(|unit| { level_up_unit(unit, player_average); }); }
         fixed_level();
         if count > 0 { Some((player_average, count)) }

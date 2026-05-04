@@ -1,5 +1,4 @@
 use engage::{
-    force::ForceType,
     gamevariable::GameVariableManager,
     gameuserdata::GameUserData, proc::ProcInst,
     sequence::{
@@ -47,7 +46,6 @@ pub fn map_sequence_events(proc: &ProcInst, label: i32) {
             if GameUserData::get_chapter().cid.str_contains("M002") {
                 randomizer::item::change_liberation_type();
             }
-            randomizer::person::hub::change_kizuna_dispos();
             randomizer::person::m011_ivy_recruitment_check();
             randomizer::person::lueur_recruitment_check();
             crate::continuous::postchapter::update_ignots();
@@ -134,18 +132,6 @@ pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
         crate::menus::menu_calls_install();
         randomizer::job::adjust_missing_weapon_mask();
         randomizer::item::adjust_non_unit_items_inventory();
-        #[cfg(test)]{
-            if DVCConfig::get().debug {
-                engage::force::Force::get(ForceType::Player).unwrap().iter().
-                    chain(engage::force::Force::get(ForceType::Absent).unwrap().iter())
-                    .for_each(|u|{
-                        for x in 0..10 { u.set_base_capability(x, 120); }
-                        let move_stat = u.base_capability[10] as i32;
-                        if move_stat < 20 { u.set_base_capability(10,move_stat + 20); }
-                        u.set_hp(u.get_capability(0, true));
-                    });
-            }
-        }
     }
 }
 

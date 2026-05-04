@@ -1,13 +1,11 @@
 use std::collections::{HashMap};
-use engage::gamedata::ring::RingData;
-use engage::gamedata::skill::SkillArray;
-use engage::random::Random;
-use crate::config::DVCVariables;
-use crate::enums::EIRIKA_TWIN_SKILLS;
-use crate::randomizer::data::GameData;
-use crate::randomizer::{DVCFlags, Randomizer};
-use crate::randomizer::blacklist::DVCBlackLists;
-use crate::utils::{create_rng, get_rng};
+use engage::{gamedata::{ring::RingData, skill::SkillArray}, random::Random};
+use crate::{
+    config::DVCVariables,
+    enums::EIRIKA_TWIN_SKILLS,
+    randomizer::{data::GameData, DVCFlags, Randomizer, blacklist::DVCBlackLists},
+    utils::{create_rng, get_rng}
+};
 use super::*;
 
 const EIRIKA_HASH: [i32; 12] = [ 1166279381, 1203307432, 244739392, 446418448, 933063973, -1323396701, 	1137740356, -1874837901, 919405771, -213541829, -1311625676, 1981791378];

@@ -5,12 +5,14 @@ use engage::{
 };
 use std::collections::HashMap;
 use skyline::patching::Patch;
-use crate::utils;
-use crate::config::{DVCFlags};
-use crate::randomizer::data::engage_attacks::EngageAttackRandomizer;
-use crate::randomizer::data::GameData;
-use crate::randomizer::data::items::ItemPool;
-use crate::randomizer::Randomizer;
+use crate::{
+    config::{DVCFlags},
+    utils,
+    randomizer::{
+        data::{engage_attacks::EngageAttackRandomizer, GameData, items::ItemPool},
+        Randomizer
+    }
+};
 
 
 #[derive(PartialEq, Clone)]

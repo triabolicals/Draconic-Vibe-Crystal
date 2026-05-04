@@ -3,9 +3,7 @@ use engage::{
     gamedata::{Gamedata, GodData, skill::SkillData}
 };
 use skyline::patching::Patch;
-use crate::config::{DVCFlags, DVCVariables};
-use crate::randomizer::data::{EngageAtk, GameData};
-use crate::randomizer::Randomizer;
+use crate::{config::{DVCFlags, DVCVariables}, randomizer::data::{EngageAtk, GameData}, randomizer::Randomizer};
 
 #[derive(Clone)]
 pub struct EngageAttackRandomizer {

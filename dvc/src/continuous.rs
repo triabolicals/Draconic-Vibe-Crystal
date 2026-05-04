@@ -3,7 +3,7 @@ use engage::{
     proc::desc::ProcDesc, gamevariable::*, force::*, unit::Unit, god::GodPool,
     menu::BasicMenuItem, gameuserdata::*, sequence::wellsequence::WellSequenceUseFlags,
     gamedata::{hub::HubFacilityData, chapter::ChapterData, item::ItemData, *},
-    manager::NoticeManager, proc::{ProcInst, ProcVoidMethod}, random::*, 
+    proc::{ProcInst, ProcVoidMethod}, random::*,
     sequence::{commonrewardsequence::CommonRewardSequence, wellsequence::WellSequence}
 };
 use crate::{randomizer::*, utils::*, procs::nothing_proc};

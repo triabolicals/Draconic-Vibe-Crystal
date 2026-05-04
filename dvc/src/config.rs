@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use engage::{gamevariable::*, gamedata::{accessory::AccessoryData, *}};
+use engage::{gamevariable::*, gamedata::*};
 use crate::{
     *,
     utils::{clamp_value, dlc_check, get_rng},

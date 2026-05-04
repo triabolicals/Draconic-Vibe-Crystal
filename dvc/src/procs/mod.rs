@@ -1,10 +1,8 @@
-use engage::gameuserdata::GameUserData;
-use engage::gamevariable::GameVariableManager;
-use engage::proc::{*, desc::*};
-use unity::il2cpp::object::Array;
-use unity::prelude::{MethodInfo, OptionalMethod};
-use crate::{continuous, ironman, randomizer, DVCVariables, DVCConfig};
-use std::io::Write;
+use engage::{
+    gameuserdata::GameUserData, gamevariable::GameVariableManager, proc::{*, desc::*}
+};
+use unity::{il2cpp::object::Array, prelude::{MethodInfo, OptionalMethod}};
+use crate::{continuous, ironman, randomizer, DVCVariables};
 mod hubsequence;
 mod mapsequence;
 mod gmapsequence;
@@ -88,44 +86,6 @@ pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
         _ => {} 
     }
 }
-/*
-pub fn print_desc(desc: &mut Array<&mut ProcDesc>, proc_name: &str, hash: i32){
-    if let Ok(mut file) = File::options().create(true).write(true).truncate(true).open(format!("sd:/Classes/ProcDescs/{}.txt", proc_name)) {
-        writeln!(file, "{}: {}", proc_name, hash).unwrap();
-        desc.iter().enumerate().for_each(|(i, p)| {
-            let ty = p.ty as i32;
-            let class = p.get_class().get_name();
-            let s = format!("{}\t{} ({})", i, class, ty);
-
-            match ty {
-                0 | 1 | 4 | 5 | 7 | 9 | 15 | 6 => { writeln!(&mut file, "{}", s).unwrap(); }
-                2 => {
-                    let jump = p.cast::<ProcDescLabel>().label;
-                    writeln!(&mut file, "{}: {}", s, jump).unwrap();
-                }
-                3 => {
-                    let label = p.cast::<ProcDescLabel>().label;
-                    writeln!(&mut file, "{} Label: {}", i, label).unwrap();
-                }
-                _ => {
-                    if class.contains("sync") || class.contains("Log") || class.contains("Sound") {
-                        writeln!(&mut file, "{}", s).unwrap();
-                    }
-                    else {
-                        let call = p.cast::<ProcDescCallEdit>();
-                        if let Some(method) = call.function.method.as_ref().and_then(|m| m.get_name()) {
-                            writeln!(&mut file, "{}: {}", s, method).unwrap();
-                        }
-                        else {
-                            writeln!(&mut file, "{}: unknown method", s).unwrap();
-                        }
-                    }
-                }
-            }
-        });
-    }
-}
-*/
 pub fn call_proc_original_method(proc: &ProcInst, method_name: &str) {
     if let Some(method) = proc.klass.get_method_from_name(method_name, 0).ok() {
         let method_call = unsafe { std::mem::transmute::<_, fn(&ProcInst, &MethodInfo)>(method.method_ptr) };

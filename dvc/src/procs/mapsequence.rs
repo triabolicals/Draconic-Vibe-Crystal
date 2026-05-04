@@ -1,6 +1,6 @@
 use engage::{
     eventsequence::EventSequence,
-    force::{Force, ForceType},god::GodPool,
+    force::{Force, ForceType},
     gamedata::{GamedataArray, dispos::DisposData},
     map::situation::MapSituation,
     gameuserdata::GameUserData,
@@ -10,30 +10,22 @@ use engage::{
 };
 use crate::{
     config::DVCFlags,
-    procs, randomizer, DVCConfig, DVCVariables,
+    procs, randomizer, DVCVariables,
     message::{TextSwapper, MESSAGE_SWAPPER},
     deployment::{fulldeploy, get_emblem_paralogue_level},
     script::adjust_person_map_inspectors,
-    randomizer::{map::shuffle::shuffle_deployment, data::GameData},
+    randomizer::{map::shuffle::shuffle_deployment},
 };
 use std::sync::RwLock;
 use unity::{il2cpp::object::Array, prelude::OptionalMethod};
 use crate::utils::remove_equip_emblems;
 
 pub fn map_sequence_desc_edit(descs: &mut Array<&mut ProcDesc>) {
-
     descs[4] = ProcDesc::call(ProcVoidMethod::new(None, map_sequence_setup_chapter));
     descs[19] = ProcDesc::call(ProcVoidMethod::new(None, map_sequence_dispos_event));
     descs[21] = ProcDesc::call(ProcVoidMethod::new(None, map_sequence_dispos_unit));
     descs[45] = ProcDesc::call(ProcVoidMethod::new(None, map_sequence_map_opening));
     descs[0xCF] = ProcDesc::call(ProcVoidMethod::new(None, procs::hubsequence::hub_sequence_unload_script));
-    #[cfg (test)]{
-        if !engage::gamevariable::GameVariableManager::get_bool("G_Cleared_M001") && DVCConfig::get().debug {
-            GameData::get_playable_god_list().iter().for_each(|g| {
-                if let Some(g_unit) = GodPool::create(g) { g_unit.set_escape(false); }
-            });
-        }
-    }
 }
 
 extern "C" fn map_sequence_setup_chapter(map_sequence: &mut MapSequence, _optional_method: OptionalMethod) {
@@ -55,9 +47,7 @@ pub extern "C" fn map_sequence_dispos_event(this: &mut MapSequence, _method_info
     
     if !this.is_resume {
         let emblem = DVCVariables::EmblemDeployment.get_value();
-        println!("Emblem Deployment: {}", emblem);
-        if (emblem == 1 || emblem == 2) { remove_equip_emblems(); }
-
+        if emblem == 1 || emblem == 2 { remove_equip_emblems(); }
         let count = DisposData::try_get_mut("Player").map(|v| v.len()).unwrap_or(10) as i32;
         let mut levels = vec![];
         let vander_unit = DVCVariables::get_dvc_person_data(1, false).map(|v| v.parent.hash).unwrap_or(0);

@@ -1,8 +1,5 @@
 use engage::gamedata::god::GodGrowthData;
-use crate::config::DVCVariables;
-use crate::randomizer::{Randomizer};
-use crate::randomizer::data::GameData;
-use crate::utils::get_rng;
+use crate::{config::DVCVariables, randomizer::{Randomizer, data::GameData}, utils::get_rng};
 pub struct EmblemAptitudeRandomizer {
     pub apts: Vec<[u8; 8]>,
 }

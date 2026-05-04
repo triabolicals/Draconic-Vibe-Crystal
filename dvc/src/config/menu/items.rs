@@ -5,7 +5,7 @@ use engage::{
     gamedata::{Gamedata, JobData},
     menu::{BasicMenuItemAttribute, BasicMenuResult},
 };
-use unity::{prelude::*, engine::Color};
+use unity::engine::Color;
 use crate::{
     DVCVariables, DVCConfig, enums::{MPIDS, RINGS},
     randomizer::{data::GameData, job::single::get_next_class},

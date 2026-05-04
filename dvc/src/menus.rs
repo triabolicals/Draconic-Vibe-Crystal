@@ -75,7 +75,6 @@ pub fn menu_calls_install() {
     }
     if let Some(cc) = get_nested_class(Il2CppClass::from_name("App", "RingListSkillMenu").unwrap(), "MenuItem_WeaponTalent") {
        vtable_edit(cc, "BuildAttribute", randomizer::emblem::menu::weapon_talent_build_attr as _);
-        // vtable_edit(cc, "BuildAttribute", randomizer::job::reclass::class_change_a_call_random_cc as _);
     }
     deployment::sortie::sortie_deployment_menu_install();
     continuous::sortie::sortie_continious_menu_install();

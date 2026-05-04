@@ -18,8 +18,8 @@ fn is_continuous_gift(key: &str) -> bool {
     DVCVariables::is_continuous() && GameUserData::get_sequence() == 5 && DVCVariables::is_main_chapter_complete(4)
 }
 pub fn hub_sequence_desc_edit(descs: &mut Array<&'static mut ProcDesc>) {
-    randomizer::emblem::update_lueur_bonds();
     if GameUserData::get_sequence() == 5 { randomizer::person::hub::change_kizuna_dispos(); }
+    randomizer::emblem::update_lueur_bonds();
     // Edit Message Scripts after loading
     descs[6] = ProcDesc::call(ProcVoidMethod::new(None, hub_sequence_load_script));
     // Randomized Exploration Items here

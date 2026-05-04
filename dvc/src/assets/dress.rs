@@ -250,7 +250,6 @@ pub fn commit_for_unit_dress(
         conditionss.profile_flag = 0;
     }
     if conditionss.flags.contains(AssetFlags::CombatTranforming) { AnimData::remove(result, true, true); }
-    println!("RandomUnitInfo: {}", DVCFlags::RandomUnitInfo.get_value());
     if DVCFlags::RandomUnitInfo.get_value() {
         let rng = Random::new(unit.get_grow_seed());
         let gender = db.get_dress_gender(result.dress_model);

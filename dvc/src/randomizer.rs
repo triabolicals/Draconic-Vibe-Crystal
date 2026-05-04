@@ -90,7 +90,6 @@ pub fn save_file_load() {
     println!("[SaveLoad Event] Randomized Save File Seed {}", DVCVariables::get_seed());
     person::change_lueur_for_recruitment(false);
     skill::learn::update_learn_skills();
-    if GameUserData::get_sequence() == 5 { person::hub::change_kizuna_dispos(); }
     DVCFlags::Initialized.set_value(false);
     randomize_gamedata(false);
 }
@@ -101,7 +100,6 @@ pub fn randomize_gamedata(is_new_game: bool) {
     status.init = true;
     status.enabled = true;
     job::single::single_class_exists();
-    let sequence = GameUserData::get_sequence();
     emblem::randomize_emblems();
     utils::get_lueur_name_gender();
     person::randomize_person();
@@ -113,8 +111,6 @@ pub fn randomize_gamedata(is_new_game: bool) {
         random.randomize(data);
         random.commit(data);
     }
-    if sequence == 5 { person::hub::change_kizuna_dispos(); }
-
     if GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE)!= 0  { item::change_liberation_type(); }
     if GameVariableManager::get_number(DVCVariables::MISERCODE_TYPE) != 0 { item::change_misercode_type(); }
     for x in 0..33 {

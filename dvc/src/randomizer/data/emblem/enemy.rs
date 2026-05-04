@@ -1,7 +1,5 @@
 use engage::gamedata::GodData;
-use crate::config::DVCVariables;
-use crate::enums::{EMBLEM_ASSET, EMBLEM_GIDS};
-use crate::randomizer::data::EmblemData;
+use crate::{config::DVCVariables, enums::{EMBLEM_ASSET, EMBLEM_GIDS}, randomizer::data::EmblemData};
 
 pub struct EnemyEmblemData {
     pub emblem_data: EmblemData,

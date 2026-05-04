@@ -1,7 +1,7 @@
 use unity::prelude::*;
 use engage::{
     random::*, force::*, mess::*, unit::UnitPool, gamevariable::GameVariableManager,
-    gamedata::{*, terrain::TerrainData, skill::*}, god::GodPool
+    gamedata::{*, terrain::TerrainData, skill::*},
 };
 use skyline::patching::Patch;
 use crate::{config::DVCVariables, enums::*};
@@ -96,7 +96,7 @@ pub fn get_player_name() -> String {
             }
         }
     }
-    return "randomized".to_string();
+    "randomized".to_string()
 }
 pub fn get_lueur_name_gender(){
     GameVariableManager::make_entry(DVCVariables::LUEUR_GENDER, 0);
@@ -120,54 +120,34 @@ pub fn get_lueur_name_gender(){
     }
 }
 pub fn remove_equip_emblems() {
-    [ForceType::Player, ForceType::Absent, ForceType::Ally].iter().for_each(|f| {
-        Force::get(*f).unwrap().iter().for_each(|f| {
-            if f.person.asset_force == 0 {
-                if let Some(god) = f.god_unit.as_ref() {
-                    god.clear_parent();
-                    god.clear_child();
-                    f.clear_god_unit();
+    for x in 1..250 {
+        if let Some(unit) = UnitPool::get(x).filter(|u| u.force.is_some() && u.god_unit.is_some()){
+            if unit.person.asset_force == 0 {
+                if let Some(g_unit) = unit.god_unit {
+                    g_unit.clear_child();
+                    g_unit.clear_parent();
+                    unit.clear_god_unit();
                 }
             }
-        });
-    });
+        }
+    }
 }
 pub fn get_random_number_for_seed() -> u32 {
-    unsafe {
-        let seed = get_frame_count(None);
-        let rng = Random::get_system();
-        rng.initialize(seed as u32);
-        let loop_n = 5 + rng.get_value(10);
-        let mut count = 0;
-        let mut result = rng.value() as u32;
-        while count != loop_n {
-            result = rng.value() as u32;
-            count += 1;
-        }
-        return result;
+    let seed = unsafe { get_frame_count(None) };
+    let rng = Random::get_system();
+    rng.initialize(seed as u32);
+    let loop_n = 5 + rng.get_value(10);
+    let mut count = 0;
+    let mut result = rng.value() as u32;
+    while count != loop_n {
+        result = rng.value() as u32;
+        count += 1;
     }
+    result
 }
+const STATS: [&str; 17] = ["HP", "Str", "Tec", "Spd", "Lck", "Def", "Mag", "Res", "Phy", "Vis", "Mov", "Avo", "Crit", "Hit", "Mt", "Secure", "Weight"];
 pub fn get_stat_label(index: usize) -> String {
-    match index {
-        0 => { return Mess::get("MID_SYS_HP").to_string();}
-        1 => { return Mess::get("MID_SYS_Str").to_string();}
-        2 => { return Mess::get("MID_SYS_Tec").to_string();}
-        3 => { return Mess::get("MID_SYS_Spd").to_string();}
-        4 => { return Mess::get("MID_SYS_Lck").to_string();}
-        5 => { return Mess::get("MID_SYS_Def").to_string();}
-        6 => { return Mess::get("MID_SYS_Mag").to_string();}
-        7 => { return Mess::get("MID_SYS_Res").to_string();}
-        8 => { return Mess::get("MID_SYS_Phy").to_string();}
-        9 => { return Mess::get("MID_SYS_Vis").to_string();}
-        10 => { return Mess::get("MID_SYS_Mov").to_string();}
-        11 => { return Mess::get("MID_SYS_Avo").to_string(); }
-        12 => { return Mess::get("MID_SYS_Crit").to_string();}
-        13 => { return Mess::get("MID_SYS_Hit").to_string();}
-        14 => { return  Mess::get("MID_SYS_Mt").to_string(); }
-        15 => { return Mess::get("MID_SYS_Secure").to_string(); }
-        16 => { return Mess::get("MID_SYS_Weight").to_string(); } 
-        _ => { return "".to_string(); }
-    }
+    STATS.get(index).map(|s| Mess::get(format!("MID_SYS_{}", s)).to_string()).unwrap_or(String::new())
 }
 pub fn mov_1(address: usize){
     let _ = Patch::in_text(address).bytes(&[0x20,0x00, 0x80, 0x52]).unwrap();

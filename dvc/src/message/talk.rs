@@ -3,7 +3,6 @@ use engage::{
     gamevariable::GameVariableManager, mess::Mess, sequence::talk::*, tmpro::TextMeshProUGUI,
     language::{Language, LanguageLangs::*},
 };
-use unity::prelude::*;
 use crate::{
     config::DVCFlags, DVCVariables, enums::{EMBLEM_GIDS, RINGS}, message::{TextSwapper, MESSAGE_SWAPPER},
     randomizer::{data::EmblemPool, names::AppearanceRandomizer, item, RANDOMIZED_DATA}

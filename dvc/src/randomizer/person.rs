@@ -262,13 +262,6 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
             if new_hero_gender == 1 {  mov_x0_0(x); }
             else { mov_1(x); }
         }
-        /*
-        if let Ok(mut lock) = RANDOMIZER_STATUS.try_write() {
-            lock.alear_person_set = true;
-            lock.set_enable();
-        }
-        
-         */
     }
 }
 

@@ -80,6 +80,7 @@ pub fn main() {
         randomizer::person::unit::unit_create_impl_2_hook,
         message::mess_get_impl_hook,
         sprite::try_get_sprite,
+        sprite::unit_icon_set_icon,
         randomizer::item::calc_reward,
         randomizer::person::unit_pool_get_from_person,
         assets::dvc_create_break_effect_hook,
