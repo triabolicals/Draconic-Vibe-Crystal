@@ -85,7 +85,7 @@ pub fn asset_table_result_setup_hook(
     else if mode == 2 && (conditions.flags.contains(AssetFlags::EngAtkCoopMain) || conditions.flags.contains(AssetFlags::EngAtkCoopSub)) { // DragonBlast or BondBlast
         lueur_engage_atk(result, unit, &conditions);
     }
-    else if conditions.flags.contains(AssetFlags::EngageAttack){
+    else if conditions.flags.contains(AssetFlags::EngageAttack) && mode == 2 {
         adjust_engage_attack_animation(this, unit, equipped, &conditions);
         if has_fake_tiki(unit) {
             if unit_dress_gender(unit) == 1 { result.body_anims.add( "Sds0AM-No2_c049_N".into()); }
