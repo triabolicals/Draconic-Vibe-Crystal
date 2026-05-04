@@ -1,10 +1,16 @@
 use unity::{prelude::*, engine::Sprite};
 use engage::{
-    unit::UnitPool, gameuserdata::GameUserData,
-    gamevariable::GameVariableManager, spriteatlasmanager::SpriteAtlasManager,
-    gamedata::{Gamedata, GodData, PersonData}
+    bit::BitField64Methods,
+    unit::UnitPool,
+    gameuserdata::GameUserData,
+    gamevariable::GameVariableManager,
+    spriteatlasmanager::SpriteAtlasManager,
+    gamedata::{Gamedata, GodData, PersonData},
+    gameicon::GameIcon,
+    unit::{Unit, UnitStatusField},
+    uniticon::UnitIcon
 };
-
+use engage::unit::Gender;
 use crate::{enums::PIDS, ironman::vtable_edit, config::DVCVariables, randomizer::names::get_emblem_person};
 mod ring_select;
 pub mod telop;
@@ -41,7 +47,37 @@ pub fn get_gender_lueur_ascii(god: bool, _female: bool) -> String {
         (false, false) => {"Lueur"}
     }.to_string()
 }
-
+#[skyline::hook(offset=0x1f807b0)]
+pub fn unit_icon_set_icon(this: &UnitIcon, unit: Option<&Unit>, _: OptionalMethod) {
+    if let Some(u) = unit {
+        if u.person.aid.is_some_and(|v| v.to_string().contains("Person_チキ")) {
+            call_original!(this, unit, None);
+            return;
+        }
+        if u.person.unit_icon_id.is_some_and(|v|{ let id = v.to_string(); id.starts_with(|c| c == '7' || c == '8') }){
+            if u.status.test(UnitStatusField::Engaging as i32) && u.god_unit.is_some_and(|v| v.data.unit_icon_id.is_some()) {
+                let god_icon = u.god_unit.unwrap().data.unit_icon_id.unwrap();
+                let sprite = format!("{}E_{}_NoWeapon", u.person.unit_icon_id.unwrap(), 1);
+                if GameIcon::try_get_unit_icon_index(sprite).is_some() { return call_original!(this, unit, None); } else {
+                    let index = format!("{}_{}_NoWeapon", god_icon, god_icon);
+                    this.try_set(index.into(), god_icon);
+                    return;
+                }
+            }
+            else {
+                let job_icon = if u.get_gender() == Gender::Female { u.job.unit_icon_id_f } else { u.job.unit_icon_id_m };
+                if let Some(job) = job_icon{
+                    if let Some(person) = get_unit_icon_from_unique(job.to_string().as_str()) {
+                        let index = format!("{}_{}_NoWeapon", person, job);
+                        this.try_set(index.into(), person.into());
+                        return;
+                    }
+                }
+            }
+        }
+    }
+    call_original!(this, unit, None);
+}
 #[unity::hook("App", "SpriteAtlasManager", "TryGet")]
 pub fn try_get_sprite(this: &SpriteAtlasManager, name: &Il2CppString, method_info: OptionalMethod) -> Option<&'static Sprite> {
     if name.is_null() || GameUserData::get_sequence() == 0 { return call_original!(this, name, method_info); }
@@ -59,7 +95,6 @@ pub fn try_get_sprite(this: &SpriteAtlasManager, name: &Il2CppString, method_inf
             let person_index = if ascii_name.contains("El") { 36 }
             else if ascii_name.contains("Il") { 37 }
             else { 0 };
-
             if person_index != 0 {
                 if let Some(person) = PersonData::get(DVCVariables::get_dvc_person(person_index, false)){
                     if person.pid.to_string() != PIDS[person_index as usize] {
@@ -70,25 +105,29 @@ pub fn try_get_sprite(this: &SpriteAtlasManager, name: &Il2CppString, method_inf
         }
         return call_original!(this, ascii_name.into(), method_info).or_else(|| call_original!(this, "Phantom".into(), method_info));
     }
-    if path.contains("Unit/UnitIndexes") && GameUserData::get_sequence() != 0 {
+    if path.contains("Unit/UnitPall") {
+
+    }
+    else if path.contains("Unit/UnitIndexes") {
+        let sprite = call_original!(this, name, None);
+        if sprite.is_some() { return sprite; }
         let parts = name.to_string().split("_").map(|str| str.to_string()).collect::<Vec<String>>();
         if parts.len() >= 2 && parts[0].len() > 3 {
-            if parts[0].starts_with("70") || parts[0].starts_with("71") {   // Generic
-                if let Some(unit_icon) = get_unit_icon_from_unique(parts[1].as_str()) {
-                    return call_original!(this, format!("{}_{}_NoWeapon", unit_icon, parts[1]).into(), None);
-                }
+            if parts[0].ends_with("E") {    // Engage
+                let emblem = format!("{}_{}_NoWeapon", parts[1], parts[1]);
+                return call_original!(this, emblem.into(), None);
             }
-            if call_original!(this, name, None).is_none() {
-                if let Some(unit_icon) = is_player_with_default_weapon(parts[0].as_str()) {
-                    return call_original!(this, unit_icon.into(), None);
+            else if let Some(unique) = get_unit_icon_from_unique(parts[1].as_str()) {
+                return
+                if parts[0].starts_with("7") || parts[0].starts_with("8") {
+                    call_original!(this, format!("{}_{}_NoWeapon", unique, parts[1]).into(), None)
                 }
+                else {
+                    call_original!(this, format!("{}_{}_NoWeapon", parts[0], parts[0]).into(), None)
+                };
             }
-            if parts[0].ends_with("E") {
-                if call_original!(this, name, None).is_none() {
-                    let no_e = parts[0].trim_end_matches("E");
-                    let s = call_original!(this, format!("{}_{}", no_e, no_e).into(), None);
-                    if s.is_some() { return s; }
-                }
+            else if let Some(unit_icon) = is_player_with_default_weapon(parts[0].as_str()) {
+                return call_original!(this, unit_icon.into(), None);
             }
         }
     }
