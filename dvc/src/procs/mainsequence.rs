@@ -43,7 +43,6 @@ extern "C" fn main_sequence_load_resource(main_sequence: &mut MainSequence, _opt
     main_sequence.load_resource();
     main_sequence.pad = 1;
     message::initialize_mess_hashs();
-    crate::randomizer::emblem::god_pool();
     AccessoryShopChangeRoot::load_prefab_async();
 }
 

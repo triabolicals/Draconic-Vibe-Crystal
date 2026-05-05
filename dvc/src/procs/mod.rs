@@ -60,7 +60,6 @@ pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
             if GameUserData::get_sequence() > 3 && !GameUserData::is_evil_map() { GameUserData::get_status().value &= !8192; }
             mapsequence::map_sequence_desc_edit(descs);
             ironman::map_save_menu_edits();
-            continuous::update_next_chapter();  // For Chapter 11/22 Continue Flag
             ironman::ironman_code_edits();
             randomizer::bgm::randomize_bgm_map();
             continuous::random::continous_rand_emblem_adjustment();
@@ -91,6 +90,5 @@ pub fn call_proc_original_method(proc: &ProcInst, method_name: &str) {
         let method_call = unsafe { std::mem::transmute::<_, fn(&ProcInst, &MethodInfo)>(method.method_ptr) };
         method_call(proc, method);
     }
-    else { println!("Unable to call method '{}' for {}", method_name, proc.klass.get_name()); }
 }
 pub extern "C" fn nothing_proc(_proc: &mut ProcInst, _method_info: OptionalMethod) {}

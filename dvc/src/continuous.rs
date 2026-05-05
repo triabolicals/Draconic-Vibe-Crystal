@@ -176,10 +176,17 @@ fn continuous_mode_dlc_allowed() -> bool { dlc_check() && DVCFlags::ContinuousDL
 pub(crate) fn set_next_chapter(){
     let mode = DVCVariables::Continuous.get_value();
     if mode == 0 || !DVCVariables::is_main_chapter_complete(4) { return; }
-    if !GameVariableManager::exist("G_DVC_Next") {
-        GameVariableManager::make_entry("G_DVC_Next", 0);
-    }
+    if !GameVariableManager::exist("G_DVC_Next") { GameVariableManager::make_entry("G_DVC_Next", 0); }
     let current_chapter = GameUserData::get_chapter();
+    let mut next = None;
+    if mode == 2 && DVCVariables::is_main_chapter_complete(4) {
+        GameVariableManager::set_bool("G_初回アクセス_錬成屋", true);
+        next = random::set_next_random_chapter(current_chapter);
+        if let Some(next) = next {
+            DVCVariables::NextChapter.set_value(next.parent.hash);
+            return;
+        }
+    }
     if GameVariableManager::get_number("G_DVC_Next") == current_chapter.parent.hash {
         GameVariableManager::set_number("G_DVC_Next", 0);
     }
@@ -188,7 +195,7 @@ pub(crate) fn set_next_chapter(){
     }
     let current_cid = current_chapter.cid.to_string();
     if current_cid == "CID_M026" { return; }
-    let mut next = None;
+
     if mode == 2 && DVCVariables::is_main_chapter_complete(4) {
         GameVariableManager::set_bool("G_初回アクセス_錬成屋", true);
         next = random::set_next_random_chapter(current_chapter);
@@ -235,7 +242,7 @@ pub(crate) fn set_next_chapter(){
             .min_by(|chapter1, chapter2| chapter1.1.cmp(&chapter2.1))
             .and_then(|x| ChapterData::try_get_hash(x.0));
     }
-    if let Some(next_chapter) = next { GameVariableManager::set_number("G_DVC_Next", next_chapter.parent.hash); }
+    if let Some(next_chapter) = next { DVCVariables::NextChapter.set_value(next_chapter.parent.hash); }
 }
 
 fn do_dlc() {
@@ -250,10 +257,10 @@ fn do_dlc() {
         GodPool::create(god);
     }
     if (!random && current_cid == "CID_M017" ) || ( random && completed == 16 ) {
-        GameVariableManager::set_bool("G_CC_エンチャント", true);   // enable dlc seals
-        GameVariableManager::set_bool("G_CC_マージカノン", true);
-        GameVariableManager::set_number("G_所持_IID_マージカノン専用プルフ", GameVariableManager::get_number("G_所持_IID_マージカノン専用プルフ") + 1); // add dlc deals
-        GameVariableManager::set_number("G_所持_IID_エンチャント専用プルフ", GameVariableManager::get_number("G_所持_IID_エンチャント専用プルフ") + 1);
+        let dlc1 = "G_所持_IID_マージカノン専用プルフ";
+        let dlc2 = "G_所持_IID_エンチャント専用プルフ";
+        GameVariableManager::set_number(dlc1, GameVariableManager::get_number(dlc1) + 1); // add dlc deals
+        GameVariableManager::set_number(dlc2, GameVariableManager::get_number(dlc2) + 1);
         GameVariableManager::make_entry("MapRecruit", 1);
         GameVariableManager::set_bool("MapRecruit", true);
         for x in 36..41 {

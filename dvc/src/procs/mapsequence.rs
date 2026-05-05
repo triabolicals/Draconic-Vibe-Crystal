@@ -12,7 +12,7 @@ use crate::{
     config::DVCFlags,
     procs, randomizer, DVCVariables,
     message::{TextSwapper, MESSAGE_SWAPPER},
-    deployment::{fulldeploy, get_emblem_paralogue_level},
+    deployment::fulldeploy,
     script::adjust_person_map_inspectors,
     randomizer::{map::shuffle::shuffle_deployment},
 };
@@ -41,7 +41,6 @@ pub extern "C" fn map_sequence_dispos_event(this: &mut MapSequence, _method_info
     }
     if DVCFlags::RandomDeploySpot.get_value() { shuffle_deployment(); }
     randomizer::terrain::randomized_emblem_power_spots();
-    if DVCVariables::EmblemRecruitment.get_value() != 0 { get_emblem_paralogue_level(); }
     randomizer::terrain::fow::map_start_fow();
     randomizer::map::dispos::change_map_dispos();
     
