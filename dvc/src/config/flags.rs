@@ -6,10 +6,6 @@ use crate::{
     DVCVariables, DVCConfig, utils::dlc_check,
     randomizer::{status::RandomizerStatus, data::GameData},
 };
-
-pub const FLAGNAME: &'static str = "G_DVC_Status";
-pub const FLAGNAME2: &'static str = "G_DVC_Status2";
-
 #[repr(i32)]
 #[derive(Clone, Copy, PartialEq, Eq,Ord, PartialOrd)]
 pub enum DVCFlags {
@@ -125,8 +121,10 @@ impl DVCFlags {
         }
     }
 }
-
+#[allow(non_upper_case_globals)]
 impl DVCFlags {
+    pub const FlagSet1:  &'static str = "G_DVC_Status";
+    pub const FlagSet2: &'static str = "G_DVC_Status2";
     pub fn from(v: i32) -> Option<Self> {
         match v {
             // 0 => Some(Self::Initialized),
@@ -186,10 +184,10 @@ impl DVCFlags {
         if DVCVariables::is_main_menu() || v >= 50 { self.get_from_config() }
         else {
             if self == DVCFlags::Initialized { RandomizerStatus::is_init() }
-            else if v < 32 { GameVariableManager::get_number(FLAGNAME) & (1 << v) != 0 }
             else {
-                let num = GameVariableManager::get_number(FLAGNAME2);
-                num & (1 << (v - 32)) != 0
+                let set = if v < 32 { Self::FlagSet1 } else { Self::FlagSet2 };
+                let v = v % 32;
+                GameVariableManager::get_number(set) & (1 << v) != 0
             }
         }
     }
@@ -198,15 +196,11 @@ impl DVCFlags {
         else {
             let v = self as i32;
             if v < 50 {
-                let mut flag_value =
-                    if v < 32 { GameVariableManager::get_number(FLAGNAME) }
-                    else { GameVariableManager::get_number(FLAGNAME2) };
-
-                let bit = if v < 32 { 1 << v } else { 1 << (v-32) };
+                let set = if v < 32 { Self::FlagSet1 } else { Self::FlagSet2 };
+                let bit = 1 << (v % 32);
+                let mut flag_value =  GameVariableManager::get_number(set);
                 if value { flag_value |= bit; } else { flag_value &= !bit; }
-
-                if v < 32 { GameVariableManager::set_number(FLAGNAME, flag_value); }
-                else { GameVariableManager::set_number(FLAGNAME2, flag_value); }
+                GameVariableManager::set_number(set, flag_value);
             }
         }
     }
@@ -214,15 +208,11 @@ impl DVCFlags {
         for x in 1..50 {
             if let Some(flag) = Self::from(x) {
                 let v = flag.get_from_config();
-                let mut flag_value =
-                    if x < 32 { GameVariableManager::get_number(FLAGNAME) }
-                    else { GameVariableManager::get_number(FLAGNAME2) };
-
-                let bit = if x < 32 { 1 << x } else { 1 << (x-32) };
+                let set = if x < 32 { Self::FlagSet1 } else { Self::FlagSet2 };
+                let bit = 1 << (x % 32);
+                let mut flag_value =  GameVariableManager::get_number(set);
                 if v { flag_value |= bit; } else { flag_value &= !bit; }
-
-                if x < 32 { GameVariableManager::set_number(FLAGNAME, flag_value); }
-                else { GameVariableManager::set_number(FLAGNAME2, flag_value); }
+                GameVariableManager::set_number(set, flag_value);
             }
         }
     }

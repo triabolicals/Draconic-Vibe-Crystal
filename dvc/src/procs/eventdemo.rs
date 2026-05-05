@@ -1,15 +1,8 @@
-use engage::{
-    gamesound::{GameSound, GameSoundFadeSpeedType},
-    random::Random,
-    sequence::eventdemo::*
-};
+use engage::{gamesound::{GameSound, GameSoundFadeSpeedType}, random::Random, sequence::eventdemo::*};
 use unity::prelude::OptionalMethod;
 use crate::{
-    assets::data::SEARCH_LIST,
-    config::DVCFlags,
-    DVCVariables,
-    message::RING_PICTURE,
-    randomizer::Randomizer
+    assets::data::SEARCH_LIST, config::DVCFlags, DVCVariables,
+    message::RING_PICTURE, randomizer::Randomizer
 };
 
 pub fn event_demo_function_edit() {

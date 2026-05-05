@@ -363,16 +363,15 @@ pub fn random_items_drops(unit: &Unit){
 fn magic_dagger_weapon_change(veyle_job: &JobData){
     let hash = veyle_job.parent.hash;
     if (hash == 185670709 ||  hash == -1998645787) || (veyle_job.is_high() && DVCVariables::get_single_class(false, true).is_none()) {
-        GameVariableManager::make_entry(DVCVariables::MISERCODE_TYPE, 5); 
-        GameVariableManager::set_number(DVCVariables::MISERCODE_TYPE, 5);
-        return; 
+        DVCVariables::MisercodeKind.set_value(5);
     }
-    let mut misercode_type = 5; //Dagger
-    let kind = get_max_job_weapon_type(veyle_job);
-    if kind != 0 { misercode_type = kind; }
-    GameVariableManager::make_entry(DVCVariables::MISERCODE_TYPE, misercode_type);
-    GameVariableManager::set_number(DVCVariables::MISERCODE_TYPE, misercode_type);
-    change_misercode_type();
+    else {
+        let mut misercode_type = 5; //Dagger
+        let kind = get_max_job_weapon_type(veyle_job);
+        if kind != 0 { misercode_type = kind; }
+        DVCVariables::MisercodeKind.set_value(misercode_type);
+        change_misercode_type();
+    }
 }
 
 pub fn get_max_job_weapon_type(job: &JobData) -> i32 {

@@ -182,8 +182,9 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
                     })
             }
             20 => { // Liberation
-                if GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE) == 0  { item::change_liberation_type(); }
-                let k = GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE);
+                let lib_type = DVCVariables::LiberationKind.get_value();
+                if lib_type == 0  { item::change_liberation_type(); }
+                let k = DVCVariables::LiberationKind.get_value();
                 let kind = if k == 0 { 0 } else { k - 1 } as usize;
                 text.original_data.item_kinds[kind].get(args[0] as usize)
                     .or_else(|| text.original_data.item_kinds[kind].last()).map(|w| w.to_str())

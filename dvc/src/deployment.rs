@@ -24,29 +24,6 @@ pub fn get_emblem_list() -> Vec<String> {
         .is_some_and(|g| !g.get_escape() && g.data.force_type == 0))
         .map(|g| g.main_data.gid.to_string()).collect()
 }
-pub fn get_emblem_paralogue_level() {
-    if !DVCVariables::random_enabled() || DVCFlags::CustomEmblemsRecruit.get_value() { return; }
-    let cid = GameUserData::get_chapter().prefixless_cid.to_string();
-    GameVariableManager::make_entry(DVCVariables::EMBLEM_PARALOGUE_LEVEL, 0);
-    GameVariableManager::set_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL, 0);
-    if let Some(pos) = EMBLEM_PARA.iter().position(|&x| x == cid) {
-        let found = randomizer::person::pid_to_index(&EMBLEM_GIDS[pos].to_string(), true);
-        let new_emblem_index;
-        if found != -1 { new_emblem_index = found as usize;  } else { return; }
-        let level_difference;
-        if new_emblem_index >= 12 {
-            let party_average = crate::autolevel::get_difficulty_adjusted_average_level();
-            level_difference = party_average - 2 - PARA_LEVEL[pos];
-            if level_difference >= 0 { GameVariableManager::set_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL, 0); }
-            else { GameVariableManager::set_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL, level_difference); }
-        }
-        else {
-            level_difference = PARA_LEVEL[ new_emblem_index] - PARA_LEVEL[pos];
-            GameVariableManager::set_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL, level_difference);
-        }
-    }
-}
-
 pub fn deployment_modes(){
     if let Some(hero_unit) = UnitPool::get_hero(false) {
         let absent_force = Force::get(ForceType::Absent).unwrap();
@@ -61,15 +38,6 @@ pub fn deployment_modes(){
         let absent_count = absent_force.get_count();
         let rng = Random::get_game();
         let unit_deployment_mode = DVCVariables::UnitDeployment.get_value();
-        if DVCVariables::EmblemDeployment.get_value() == 3 {
-            let dlc_check = crate::utils::dlc_check();
-            GameData::get_playable_god_list().iter().enumerate().for_each(|(i, x)| {
-                if i < 12 || (i > 12 && i < 19 && dlc_check) {
-                    GodPool::create(x);
-                    if let Some(god_unit) = GodPool::try_get(x, false) { god_unit.set_escape(false); }
-                }
-            });
-        }
         // Free deployment
         if unit_deployment_mode == 3 && !GameUserData::is_encount_map() && !GameUserData::get_chapter().cid.str_contains("CID_M022") {
             if hero_unit.status.value & 20 != 0 { hero_unit.status.value &= !20; }

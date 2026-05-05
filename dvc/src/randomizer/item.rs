@@ -35,16 +35,16 @@ pub fn change_liberation_type() -> i32 {
     for x in ["IID_リベラシオン", "IID_リベラシオン改_ノーマル", "IID_リベラシオン改"]  {
         if let Some(liberation) = ItemData::get_mut(x){
             let l_type =
-                if GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE) != 0 { GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE) }
+                if DVCVariables::LiberationKind.get_value() != 0 { DVCVariables::LiberationKind.get_value() }
                 else if let Some(hero_unit) = engage::unit::UnitPool::get_hero(false) {
                     let mut liberation_type = 1;
                     let kind = get_max_job_weapon_type(hero_unit.job);
                     if kind != 0 { liberation_type = kind; }
-                    GameVariableManager::set_number(DVCVariables::LIBERATION_TYPE, liberation_type);
+                    DVCVariables::LiberationKind.set_value(liberation_type);
                     liberation_type
                 }
                 else {
-                    GameVariableManager::set_number(DVCVariables::LIBERATION_TYPE, 1);
+                    DVCVariables::LiberationKind.set_value(1);
                     1
                 } as u32;
             liberation.kind = l_type;
@@ -85,15 +85,15 @@ pub fn change_liberation_type() -> i32 {
             liberation.on_completed();
         }
     }
-    GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE)
+    DVCVariables::LiberationKind.get_value()
 }
 
 pub fn change_misercode_type(){
-    let value = GameVariableManager::get_number(DVCVariables::MISERCODE_TYPE);
+    let value = DVCVariables::MisercodeKind.get_value();
     let veyle_class = GameVariableManager::get_number("G_JG_PID_ヴェイル");
     if veyle_class == 185670709 || veyle_class == -1998645787 { return; }
     let misercode_type = if value == 0 ||  value == 7 || value > 9 {
-        GameVariableManager::set_number(DVCVariables::MISERCODE_TYPE, 5);  
+        DVCVariables::MisercodeKind.set_value(5);
         5
     }
     else { value };

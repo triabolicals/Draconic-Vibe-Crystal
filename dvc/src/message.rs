@@ -4,7 +4,7 @@ use engage::{
     gamedata::{cook::CookData, *},
     hub::*,
 };
-use crate::{enums::*, utils::*, randomizer::{data::GameData, names::get_emblem_person, *}, };
+use crate::{enums::*, utils::*, randomizer::{data::GameData, names::get_emblem_person, *}};
 use std::{sync::OnceLock, collections::HashMap, };
 
 mod swap;
@@ -28,6 +28,7 @@ const STATS: &[&str] = &[
 const STATS_REPLACE: [i32; 11] = [5, 1, 1, 1, 1, 1, 3, 3, 3, 0, 1];
 pub fn mid_swaps_init() -> HashMap<String, (i32, i32)> {
     let mut vec: HashMap<String, (i32, i32)> = HashMap::new();
+    /*
     for x in 0..LUEUR_MIDS.len() {
         if x < 2 { vec.insert(LUEUR_MIDS[x].to_string(), ( 1, 0) ); }  // Lueur Name Swap
         else { vec.insert(LUEUR_MIDS[x].to_string(), ( 2, x as i32) ); }  // Lueur Name Replacement
@@ -44,6 +45,7 @@ pub fn mid_swaps_init() -> HashMap<String, (i32, i32)> {
     vec.insert("MID_RULE_M014_WIN".to_string(), ( 4, 26) ); //Mauvier Name Swap
     vec.insert("MID_RULE_M016_WIN".to_string(), ( 4, -1) );
     vec.insert("MID_RULE_M017_WIN".to_string(), ( 4, -1) );
+    */
     for x in 1..12 {
         vec.insert(format!("MTID_Ring_{}",  RINGS[ x as usize ]), ( 5, x)); // Tile Replacement
     }
@@ -224,4 +226,3 @@ pub fn cooking_menu_build_attribute(_this: u64, _method_info: OptionalMethod) ->
     }
     if GameVariableManager::get_bool("G_拠点_料理済み") { 2 } else { 1 }
 }
-pub fn lol_map_attribute(_this: u64, _method_info: OptionalMethod) -> i32 { 1 }

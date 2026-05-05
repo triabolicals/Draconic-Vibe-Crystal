@@ -13,33 +13,6 @@ use crate::{
 
 pub mod enemy;
 
-pub fn emblem_paralogue_level_adjustment(unit: &Unit){
-    if !DVCVariables::random_enabled() || DVCVariables::is_random_map() { return; }
-    let level_difference = GameVariableManager::get_number(DVCVariables::EMBLEM_PARALOGUE_LEVEL);
-    if level_difference == 0 { return; }
-    let total_level = unit.level as i32 + if unit.job.is_high() { 20 } else { unit.internal_level as i32 };
-    let new_level = total_level + level_difference;
-    if GameUserData::get_chapter().cid.str_contains("S0") {
-        if new_level <= 20 {
-            if unit.job.rank == 0 { unit.auto_grow_capability(new_level, 19); }
-            else { unit.auto_grow_capability(1, new_level); }
-        }
-        else {
-            if unit.job.rank == 0 {
-                if unit.job.max_level > 20 { unit.auto_grow_capability(new_level, new_level); }
-                else { unit.auto_grow_capability(20, new_level); }
-            }
-            else { unit.auto_grow_capability(new_level-20, new_level); }
-        }
-    }
-    else {
-        unit.auto_grow_capability(new_level, new_level);
-        fix_unit_level(unit, new_level);
-    }
-    unit.set_hp(unit.get_capability(0, true));
-    randomizer::skill::learn::unit_update_learn_skill(unit);
-}
-
 pub fn auto_level_unit(unit: &mut Unit, leader: bool){
     if GameUserData::is_evil_map() && unit.person.flag.value & 512 != 0 {
         let level = unit.person.get_level() as i32;
@@ -210,7 +183,6 @@ pub fn autolevel_party() -> Option<(i32, i32)> {
             if DVCConfig::get().debug { GameUserData::get_chapter().recommended_level as i32 + 3 }
             else { get_difficulty_adjusted_average_level() - 2 * GameUserData::get_difficulty(false) };
 
-        println!("Autoleveling Bench to average of {}", player_average);
         let mut count = 0;
         Force::get(ForceType::Absent).unwrap().iter().for_each(|unit| { count += level_up_unit(unit, player_average) as i32; });
         if DVCConfig::get().debug { Force::get(ForceType::Player).unwrap().iter().for_each(|unit| { level_up_unit(unit, player_average); }); }
@@ -232,7 +204,7 @@ fn level_up_unit(unit: &Unit, target_level: i32) -> bool {
             unit.level_up(3);
             unit.add_sp(100);
         }
-        println!("{} gained {} level [{}/{}]", Mess::get_name(unit.person.pid), number_of_level_ups, unit.level, unit.internal_level);
+        // println!("{} gained {} level [{}/{}]", Mess::get_name(unit.person.pid), number_of_level_ups, unit.level, unit.internal_level);
         unit.set_hp(unit.get_capability(0, true));
         true
     }

@@ -266,8 +266,7 @@ pub fn enemy_unit_change_to_random_class(unit: &mut Unit) -> bool {
     let rng = Random::get_game();
 
     let mut is_female = 
-        if ( unit.person.pid.to_string() == PIDS[0] || unit.person.flag.value & 128 != 0 ) &&
-            GameVariableManager::exist(DVCVariables::LUEUR_GENDER) { GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) == 2 }
+        if ( unit.person.pid.to_string() == PIDS[0] || unit.person.flag.value & 128 != 0 ) { DVCVariables::LueurGender.get_value() == 2 }
         else if unit.edit.is_enabled() { unit.edit.gender == 2 }
         else { unit.person.get_gender() == 2 };
     if unit.person.flag.value & 32 != 0 { is_female = !is_female };   // Reverse gender

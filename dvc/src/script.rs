@@ -13,10 +13,10 @@ pub(crate) mod chapter;
 mod common;
 
 pub extern "C" fn dvc_alear_is_female(_args: &Il2CppArray<&DynValue>, _method_info: OptionalMethod) -> &'static DynValue{
-    DynValue::new_number(GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) as f64)
+    DynValue::new_number(DVCVariables::LueurGender.get_value() as f64)
 }
 pub extern "C" fn is_alear_female(_args: &Il2CppArray<&DynValue>, _method_info: OptionalMethod) -> &'static DynValue {
-    let r = GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) == 2;
+    let r = DVCVariables::LueurGender.get_value() == 2;
     DynValue::new_boolean(r)
 }
 
@@ -92,10 +92,9 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
     }
     else if str1.contains("TUTID_紋章士") {
         if DVCVariables::EmblemRecruitment.get_value() == 0 { return result; }
-        let key = replace_strs(result_string, "TUTID_紋章士", "G_R_GID_");
-        let new_gid = GameVariableManager::get_string(key);
-        let new_tut = replace_strs(new_gid, "GID_", "TUTID_紋章士");
-        return Some(new_tut);
+        let key = str1.replace("TUTID_紋章士", "G_R_GID_");
+        let new_gid = GameVariableManager::get_string(key).to_string();
+        return Some(new_gid.replace("GID_", "TUTID_紋章士").into());
     }
     else { result }
 }

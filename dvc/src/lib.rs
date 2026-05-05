@@ -26,7 +26,7 @@ use crate::utils::return_true;
 
 pub static mut CONFIG: DVCConfig = DVCConfig::default();
 pub const VERSION: &str = "2.16.0N";
-pub const VARIABLE_VERSION: i32 = 7;
+pub const VARIABLE_VERSION: i32 = 8;
 extern "C" fn event_install(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
         match ev {

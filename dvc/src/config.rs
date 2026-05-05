@@ -365,13 +365,9 @@ impl DVCConfig {
             .expect("should be able to write to write default configuration");
     }
     pub fn create_game_variables(&mut self, set_value: bool) {
-        GameVariableManager::make_entry_norewind(FLAGNAME, 0);
-        GameVariableManager::make_entry_norewind(FLAGNAME2, 0);
-
+        GameVariableManager::make_entry_norewind(DVCFlags::FlagSet1, 0);
+        GameVariableManager::make_entry_norewind(DVCFlags::FlagSet2, 0);
         if set_value { DVCFlags::set_value_from_config(); }
-        GameVariableManager::make_entry_norewind(DVCVariables::MISERCODE_TYPE, 0);
-        GameVariableManager::make_entry_norewind(DVCVariables::LIBERATION_TYPE, 0);
-        GameVariableManager::make_entry_norewind(DVCVariables::PLAYER_AVERAGE_CAP, 0);
         self.get_bond_ring_rates();
         for x in 0..10 {    // ShopItems
             GameVariableManager::make_entry_norewind(format!("G_DVC_I{}", x).as_str(), 0);
@@ -379,12 +375,15 @@ impl DVCConfig {
         }
         if self.random_job != 2 { self.single_class = 0; }
         for x in 0..30 {
-            if x == 26  { continue; }
             if let Some(v) = DVCVariables::from(x) {
                 let value = if set_value { self.get_value(v) } else { 0 };
                 let key = v.get_key();
                 GameVariableManager::make_entry_norewind(key, value);
-                // println!("{} Set to {}", key, value);
+            }
+        }
+        for x in 50..60 {
+            if let Some(v) = DVCVariables::from(x) {
+                GameVariableManager::make_entry_norewind(v.get_key(), 0);
             }
         }
         if set_value {
@@ -489,7 +488,6 @@ impl DVCConfig {
     }
 }
 pub fn migrate_to_v3() {
-    println!("Migrating Save to Version 3");
     let gauges = ["G_EnemyRevivalStone", "G_EnemySkillGauge", "G_EnemyJobGauge", "G_EnemyEmblemGauge", "G_ItemDropGauge"];
     GameVariableManager::make_entry_norewind(DVCVariables::EnemyItemDropGauge.get_key(), 0);
     for x in 0..5 {
@@ -502,10 +500,11 @@ pub fn migrate_to_v3() {
     GameVariableManager::set_number("G_DVC_Version", 3);
 }
 pub fn migrate_to_v5() {
-    GameVariableManager::make_entry_norewind(FLAGNAME2, 0);
-    let mut s = GameVariableManager::get_number(FLAGNAME) & !(1 << 20);
+    let key = DVCFlags::FlagSet1;
+    GameVariableManager::make_entry_norewind(key, 0);
+    let mut s = GameVariableManager::get_number(key) & !(1 << 20);
     let random_class = s & (1 << 27) != 0;
-    GameVariableManager::set_number(FLAGNAME, s);
+    GameVariableManager::set_number(key, s);
     if GameVariableManager::get_number("G_Random_Item") == 1 {
         s |= 1 << 20;
         GameVariableManager::remove("G_Random_Item");
@@ -517,6 +516,6 @@ pub fn migrate_to_v5() {
     }
     else if random_class { 1 } else { 0 };
     GameVariableManager::make_entry_norewind(DVCVariables::ClassMode.get_key(), class_mode);
-    GameVariableManager::set_number(FLAGNAME, s);
+    GameVariableManager::set_number(key, s);
     GameVariableManager::set_number("G_DVC_Version", 5);
 }

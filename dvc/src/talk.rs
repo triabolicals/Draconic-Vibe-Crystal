@@ -113,7 +113,7 @@ fn get_pid_replacement(result: &'static Il2CppString) -> &'static Il2CppString {
     let talk_pid = GameVariableManager::get_number("TalkPID");
     if talk_pid != 0 {
         if let Some(p) = PersonData::try_get_hash(talk_pid) {
-            return il2_str_substring(p.pid, 4);
+            return p.pid.to_string().trim_start_matches("PID_").into();
         }
     }
     let sequence = GameUserData::get_sequence();

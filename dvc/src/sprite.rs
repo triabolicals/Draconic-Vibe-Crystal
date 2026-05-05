@@ -3,7 +3,6 @@ use engage::{
     bit::BitField64Methods,
     unit::UnitPool,
     gameuserdata::GameUserData,
-    gamevariable::GameVariableManager,
     spriteatlasmanager::SpriteAtlasManager,
     gamedata::{Gamedata, GodData, PersonData},
     gameicon::GameIcon,
@@ -34,8 +33,7 @@ pub fn install_sprite_menu_methods() {
 }
 pub fn get_gender_lueur_ascii(god: bool, _female: bool) -> String {
     let is_female =
-        if GameVariableManager::exist(DVCVariables::LUEUR_GENDER) {  GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) == 2  }
-        else if let Some(lueur_unit) = UnitPool::get_from_pid(PIDS[0].into(), false) {
+        if let Some(lueur_unit) = UnitPool::get_from_pid(PIDS[0].into(), false) {
             if lueur_unit.edit.is_enabled() { lueur_unit.edit.gender == 2  } else { false }
         }
         else { false };

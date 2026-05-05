@@ -75,15 +75,14 @@ pub fn tutorial_check() {
             if let Some(g_unit) = GodPool::create(g) { g_unit.set_escape(false); }
         });
     }
-    
      */
 }
 /// SaveLoad Event Randomizing for Cobalt 1.21+
 pub fn save_file_load() {
     tutorial_check();
     let seed_key = DVCVariables::Seed.get_key();
-    GameVariableManager::make_entry_norewind(FLAGNAME2, 0);
-    GameVariableManager::make_entry_norewind(FLAGNAME, 0);
+    GameVariableManager::make_entry_norewind(DVCFlags::FlagSet1, 0);
+    GameVariableManager::make_entry_norewind(DVCFlags::FlagSet2, 0);
     if !GameVariableManager::exist(seed_key) { GameVariableManager::make_entry_norewind(seed_key, 0); }
     if !DVCVariables::random_enabled() {  return;  }
     upgrade();
@@ -111,8 +110,8 @@ pub fn randomize_gamedata(is_new_game: bool) {
         random.randomize(data);
         random.commit(data);
     }
-    if GameVariableManager::get_number(DVCVariables::LIBERATION_TYPE)!= 0  { item::change_liberation_type(); }
-    if GameVariableManager::get_number(DVCVariables::MISERCODE_TYPE) != 0 { item::change_misercode_type(); }
+    if DVCVariables::LiberationKind.get_value() > 0 { item::change_liberation_type(); }
+    if DVCVariables::MisercodeKind.get_value() > 0 { item::change_misercode_type(); }
     for x in 0..33 {
         if let Some(key) = DVCVariables::from(x).map(|v| v.get_key()) { DVCVariables::log_variable(key); }
     }
@@ -131,8 +130,7 @@ pub fn start_new_game(){
     let randomized = config.randomized;
     let ran_seed =
         if randomized {
-            if seed == 0 { utils::get_random_number_for_seed() }
-            else { seed }
+            if seed == 0 { utils::get_random_number_for_seed() } else { seed }
         }
         else { 0 };
 
@@ -246,6 +244,10 @@ fn upgrade() {
             let s = DVCVariables::get_dvc_emblem_index(x, false);
             DVCVariables::set_emblem_recruitment(x, s as i32);
         }
+    }
+    if version < 8 {
+        DVCVariables::TileRNG.init_var(0, false);
+        DVCVariables::NextChapter.init_var(0, false);
     }
     GameVariableManager::set_number("G_DVC_Version", VARIABLE_VERSION);
 }

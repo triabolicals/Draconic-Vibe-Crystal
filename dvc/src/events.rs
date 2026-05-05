@@ -41,7 +41,7 @@ pub fn map_sequence_events(proc: &ProcInst, label: i32) {
         },
         MapSequenceLabel::TurnEnd => { randomizer::terrain::fow::rando_fow();  }
         MapSequenceLabel::Complete => {
-            GameVariableManager::set_number(DVCVariables::TILE_RNG, 0);
+            DVCVariables::TileRNG.set_value(0);
             RandomizerStatus::get().map_complete();
             if GameUserData::get_chapter().cid.str_contains("M002") {
                 randomizer::item::change_liberation_type();
@@ -89,10 +89,7 @@ pub fn main_sequence_events(_proc: &ProcInst, label: i32) {
             RandomizerStatus::get().kizuna_replacements = false;
         },
         MainSequenceLabel::Map => {},
-        MainSequenceLabel::AfterChapterSave => {
-            crate::continuous::do_continious_mode();
-            crate::continuous::update_next_chapter();
-        },
+        MainSequenceLabel::AfterChapterSave => { crate::continuous::do_continious_mode(); },
         _ => {}
     }
 }
@@ -121,7 +118,6 @@ pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
         randomizer::tutorial_check();
         randomizer::emblem::correct_god_bond_holders();
         crate::continuous::do_continious_mode();
-        crate::continuous::update_next_chapter();
         crate::ironman::ironman_code_edits();
         randomizer::terrain::adjust_miasma_tiles();
         if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 {

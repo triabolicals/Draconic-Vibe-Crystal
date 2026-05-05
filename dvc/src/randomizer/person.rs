@@ -226,7 +226,7 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
                 }
                 lueur_unit.transfer(ForceType::Lost, false);
                 get_lueur_name_gender(); // grab gender and name
-                GameVariableManager::make_entry(DVCVariables::LUEUR_GENDER, lueur_unit.edit.gender);
+                DVCVariables::LueurGender.init_var(lueur_unit.edit.gender, true);
             }
             if let Some(unit) = UnitUtil::join_unit_person(new_hero) {
                 unit.edit.set_name(new_hero.get_name());
@@ -243,7 +243,7 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
         Patch::in_text(0x02d524e4).nop().unwrap();
 
         // LueurW_God or Lueur_God in GetPath
-        if GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) == 2 {
+        if DVCVariables::LueurGender.get_value() == 2 {
             Patch::in_text(0x02d524e8).bytes(&[0x48, 0x00, 0x80, 0x52]).unwrap();
             person_lueur.set_gender(Gender::Female);
         } else {

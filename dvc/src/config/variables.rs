@@ -11,7 +11,9 @@ use crate::{
     enums::{EMBLEM_GIDS, PIDS}
 };
 use std::cmp::PartialEq;
+use engage::gamedata::ChapterData;
 use unity::prelude::Il2CppString;
+use crate::randomizer::status::RandomizerStatus;
 
 /// Structure that contains and manages DVC-Related GameVariables
 #[repr(i32)]
@@ -30,7 +32,7 @@ pub enum DVCVariables {
     JobLearnMode = 10,  // "G_LearnMode"
     Reclassing = 11,    // "G_RandomCC"
     BattleStyles = 12,  // "G_BattleStyles"
-    SingleJob = 13, // "G_DVC_SingleJob"
+    SingleJob = 13,
     InteractSetting = 14,   // G_InteractSetting
     ClassMode = 15,    //  "G_Random_Item"
     RandomGifts = 16,   // G_RngGifts"
@@ -43,7 +45,6 @@ pub enum DVCVariables {
     UnitDeployment = 23,    // G_DeploymentMode"
     EmblemDeployment = 24,  // "G_EmblemDeployMode"
     GenericAppearance = 25, // "G_GenericMode"
-    Seed = 26,
     EnemyRevivalStone = 30, // G_EnemyRevivalStone"
     EnemySkillGauge = 31,   // "G_EnemySkillGauge"
     EnemyJobGauge = 32, // "G_EnemyJobGauge"
@@ -54,6 +55,18 @@ pub enum DVCVariables {
     BondSkillB = 37,
     BondSkillC = 38,
     BondRingSkillRate = 39,    // G_BRRS
+    // Gameplay tracking variables
+    LueurGender = 50,
+    LiberationKind = 51,
+    MisercodeKind = 52,
+
+    // Hashes, RNG, or custom range variables
+    Version = 100,
+    Seed = 101,
+    NextChapter = 102,
+    TileRNG = 103,
+    PlayerCapabilityRating = 104,
+
 }
 impl DVCVariables {
     pub fn from(i: i32) -> Option<Self> {
@@ -84,7 +97,6 @@ impl DVCVariables {
             23 => Some(Self::UnitDeployment),
             24 => Some(Self::EmblemDeployment),
             25 => Some(Self::GenericAppearance),
-            26 => Some(Self::Seed),
             30 => Some(Self::EnemyRevivalStone),
             31 => Some(Self::EnemySkillGauge),
             32 => Some(Self::EnemyJobGauge),
@@ -95,6 +107,15 @@ impl DVCVariables {
             37 => Some(Self::BondSkillB),
             38 => Some(Self::BondSkillC),
             39 => Some(Self::BondRingSkillRate),
+
+            50 => Some(Self::LueurGender),
+            51 => Some(Self::LiberationKind),
+            52 => Some(Self::MisercodeKind),
+            -1|100 => Some(Self::Version),
+            101 => Some(Self::Seed),
+            102 => Some(Self::NextChapter),
+            103 => Some(Self::TileRNG),
+            104 => Some(Self::PlayerCapabilityRating),
             _ => None,
         }
     }
@@ -122,7 +143,7 @@ impl DVCVariables {
     }
     pub fn set_by_variable(key: &str, value: i32) { GameVariableManager::set_number(key, value); }
     pub fn get_by_variable(key: &str) -> i32 { GameVariableManager::get_number(key) }
-    pub fn set_value(&self, value: i32) {
+    pub fn set_value(&self, mut value: i32) {
         if DVCVariables::is_main_menu() { DVCConfig::get().set_value(*self, value); }
         else if self.is_gauge() {
             let value = clamp_value(value, 0, 100);
@@ -139,9 +160,7 @@ impl DVCVariables {
             }
         }
         else {
-            // println!("Set Value #{}: {}", self.get_key(), value);
             match self {
-                Self::Seed => { Self::set_by_variable(self.get_key(), value); }
                 Self::SingleJob => {
                     if (value >= 0 && value < 3) || JobData::try_get_hash(value).is_some(){
                         Self::set_by_variable(self.get_key(), value);
@@ -149,7 +168,8 @@ impl DVCVariables {
                     else { Self::set_by_variable(self.get_key(), 0); }
                 }
                 _ => {
-                    let value = clamp_value(value, 0, self.get_max());
+                    let idx = *self as i32;
+                    if idx < 100 { value = clamp_value(value, 0, self.get_max()); }
                     Self::set_by_variable(self.get_key(), value);
                 }
             }
@@ -185,7 +205,14 @@ impl DVCVariables {
             Self::EmblemDeployment => "G_EmblemDeployMode",
             Self::GenericAppearance => "G_GenericMode",
             Self::BondRingSkillRate|Self::BondSkillS|Self::BondSkillA|Self::BondSkillB|Self::BondSkillC => "G_BRRS",
+            Self::LueurGender => "G_Lueur_Gender2",
+            Self::LiberationKind => "G_Liberation_Type",
+            Self::MisercodeKind => "G_Misercode_Type",
             Self::Seed => "G_Random_Seed",
+            Self::NextChapter => "G_DVC_Next",
+            Self::TileRNG => "G_TileRNG",
+            Self::Version => "G_DVC_Version",
+            Self::PlayerCapabilityRating => "G_Player_Rating_Average",
         }
     }
     pub fn can_a_call(&self, menu_value: i32) -> bool {  // Require to ACall to Change Value
@@ -225,10 +252,11 @@ impl DVCVariables {
     pub fn get_max(&self) -> i32 {
         match self {
             Self::SingleJob => { JobData::get_count() }
+            Self::LiberationKind|Self::MisercodeKind => 10,
             Self::UnitDeployment => 8,
             Self::InteractSetting => 7,
             Self::Continuous|Self::UnitRecruitment|Self::FogOfWar|Self::EngraveLevel|Self::ClassMode => 5,
-            Self::Reclassing|Self::EmblemDeployment|Self::EmblemInherit|Self::EmblemRecruitment|
+            Self::Reclassing|Self::EmblemInherit|Self::EmblemRecruitment|
             Self::ExplorationItem|Self::UnitInventory|Self::EmblemAppearance|Self::GenericAppearance => 4,
             _ => { if self.is_gauge() { 100 } else { 3 } }
         }
@@ -256,37 +284,20 @@ impl DVCVariables {
     }
 }
 impl DVCVariables {
-    pub const SEED: &'static str = "G_Random_Seed";
-    pub const DVC_STATUS: &'static str = "G_DVC_Status";
-
-    pub const LUEUR_NAME: &'static str = "G_Lueur_Name";    //
-    pub const LUEUR_GENDER: &'static str = "G_Lueur_Gender2";   //
-    pub const MISERCODE_TYPE: &'static str = "G_Misercode_Type";
-    pub const LIBERATION_TYPE: &'static str = "G_Liberation_Type";
-
-    pub const PLAYER_AVERAGE_CAP: &'static str = "G_Player_Rating_Average";
-    pub const EMBLEM_PARALOGUE_LEVEL: &'static str = "G_Paralogue_Level";
-    pub const SINGLE_CLASS: &'static str = "G_DVC_SingleJob";
-    pub const TILE_RNG: &'static str = "G_TileRNG";
+    pub const LUEUR_NAME: &'static str = "G_Lueur_Name";
     
     pub fn set_variable_key_string<'a>(key: impl Into<&'a Il2CppString>, value: impl Into<&'a Il2CppString>) {
         let key = key.into();
         if GameVariableManager::exist(key) { GameVariableManager::set_string(key, value.into()); }
         else { GameVariableManager::set_string(key, value.into()); }
     }
-
-    // pub const RANDOM_CLASS_OUTFITS: &'static str = "G_RandomJobOutfit";
     pub fn init_tile_rng(init: bool) -> &'static Random {
-        if !GameVariableManager::exist(Self::TILE_RNG) { GameVariableManager::make_entry(Self::TILE_RNG, 0); }
-        let mut v = GameVariableManager::get_number(Self::TILE_RNG);
-        if init || v == 0 {
-            v = Random::get_system().value();
-            GameVariableManager::set_number(Self::TILE_RNG, v);
-        }
-        Random::new(v as u32)
+        let current = DVCVariables::TileRNG.get_value();
+        let seed = if init || current == 0  { Random::get_system().value() } else { current } as u32;
+        Random::new(seed)
     }
-    pub fn get_seed() -> i32 {  GameVariableManager::get_number(Self::SEED) }
-    pub fn is_main_menu() -> bool { GameUserData::get_sequence() == 0 && !GameVariableManager::exist(Self::SEED) }
+    pub fn get_seed() -> i32 {  DVCVariables::Seed.get_value() }
+    pub fn is_main_menu() -> bool { GameUserData::get_sequence() == 0 && !RandomizerStatus::get().enabled }
     pub fn random_enabled() -> bool { Self::get_seed() != 0 }
     pub fn is_continuous() -> bool {
         let v = Self::Continuous.get_value();
@@ -296,7 +307,7 @@ impl DVCVariables {
         if emblem { DVCVariables::EmblemRecruitment.get_value()  != 0 }
         else { DVCVariables::UnitRecruitment.get_value()  != 0 }
     }
-    pub fn is_lueur_female() -> bool { GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) == 2 }
+    pub fn is_lueur_female() -> bool { DVCVariables::LueurGender.get_value() == 2 }
 
     pub fn get_dvc_person(pid_index: i32, reverse: bool) -> &'static Il2CppString {
         let key = if reverse {format!("G_R2_{}", PIDS[pid_index as usize]) } else { format!("G_R_{}", PIDS[pid_index as usize]) };
@@ -440,9 +451,14 @@ impl DVCVariables {
         }
     }
     pub fn is_random_map() -> bool { DVCVariables::Continuous.get_value() == 2 }
+    pub fn get_next_chapter() -> Option<&'static mut ChapterData>{
+        ChapterData::try_get_hash_mut(DVCVariables::NextChapter.get_value())
+    }
+    pub fn set_next_chapter(chapter: Option<&'static ChapterData>) {
+        DVCVariables::NextChapter.set_value(chapter.map(|v| v.parent.hash).unwrap_or(0));
+    }
     pub fn is_main_chapter_complete(main_index: i32) -> bool {
-        GameVariableManager::get_bool(if main_index < 10 { format!("G_Cleared_M00{}", main_index) }
-        else { format!("G_Cleared_M0{}", main_index) })
+        GameVariableManager::get_bool(format!("G_Cleared_{}", utils::get_chapter_from_idx(main_index)))
     }
     pub fn log_variable(var: &str) {
         if !GameVariableManager::exist(var) {

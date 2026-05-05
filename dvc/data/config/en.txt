@@ -70,8 +70,8 @@ Fog of War|d|O|o|Turn|Chapter
 Default chapter fog behavior.|Enables fog for all maps.|Disable fog for all maps.|Chance at end of turn for the fog to change.|Chance for chapters to have fog.
 Unit Deployment|d|r|Lowest Rating|Free|Expanded|Highest Rating|Male|Female
 Default unit selection behavior.|Deployed units are randomly selected.|Lowest rated units are deployed.|No forced deployment (Exception Chapter 22).|Extra deployment slots are added if possible.|Highest rated units are deployed|Only male units can be selected|Only female units can be selected.
-Emblem Deployment|d|r|s|n|All
-Default emblem selection behavior.|Emblems are randomly selected and assigned.|Equipped emblems will be shuffled among deployed units.|Emblems will not be selectable or equipped by deployed units.|All playable emblems are available.
+Emblem Deployment|d|r|s|n
+Default emblem selection behavior.|Emblems are randomly selected and assigned.|Equipped emblems will be shuffled among deployed units.|Emblems will not be selectable or equipped by deployed units.
 Generic Unit Appearance|o|Appearance|Color
 Randomly sets generic unit's appearance/color.
 Var26

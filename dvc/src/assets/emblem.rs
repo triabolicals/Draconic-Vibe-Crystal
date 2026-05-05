@@ -18,7 +18,7 @@ fn emblem_asset_rand(result: &mut AssetTableResult, mode: i32, god: &GodData, is
     let emblem_appearance = DVCVariables::EmblemAppearance.get_value();
     let name = DVCFlags::GodNames.get_value();
     let rng = utils::create_rng(god.parent.hash, 1);
-    let female = if god.parent.index == 13 { GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) == 2 } else { god.female == 1 };
+    let female = if god.parent.index == 13 { DVCVariables::LueurGender.get_value() == 2 } else { god.female == 1 };
     let menu_data = UnitAssetMenuData::get();
     let hash =
         if name { rng.get_value(100000) }

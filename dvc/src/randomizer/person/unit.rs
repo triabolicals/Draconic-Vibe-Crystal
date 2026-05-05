@@ -153,12 +153,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             return;
         }
         else { change_unit_autolevel(this, false);  }
-        if this.person.pid.str_contains(PIDS[ALEAR]) && GameUserData::get_sequence() != 0 {
-            this.edit.set_gender( GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) );
-            if GameVariableManager::exist(DVCVariables::LUEUR_NAME) {
-                this.edit.set_name( GameVariableManager::get_string(DVCVariables::LUEUR_NAME) );
-            }
-        }
+        set_unit_edit_name(this);
     }
     if random_class || single_class {  job::unit_change_to_random_class(this, true);  }
     if adjust_items {
@@ -249,12 +244,12 @@ pub fn adjust_unit_items(unit: &mut Unit) {
 }
 
 pub fn set_unit_edit_name(unit: &Unit) {
-    if unit.person.pid.str_contains(PIDS[0]) || unit.person.flag.value & 1024 != 0 {
-        if GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) != 0 {
-            unit.edit.set_gender( GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) );
+    let lueur_gender = DVCVariables::LueurGender.get_value();
+    if unit.person.parent.index == 1 || unit.person.flag.value & 1024 != 0 {
+        unit.edit.set_gender(if lueur_gender  != 0 { lueur_gender } else { 1 });
+        if GameVariableManager::exist(DVCVariables::LUEUR_NAME) {
+            unit.edit.set_name( GameVariableManager::get_string(DVCVariables::LUEUR_NAME) );
         }
-        else {unit.edit.set_gender( 1 );  }
-        if GameVariableManager::exist(DVCVariables::LUEUR_NAME) { unit.edit.set_name( GameVariableManager::get_string(DVCVariables::LUEUR_NAME) ); }
     }
     if !is_player_unit(unit.person) {
         if let Some(appearance) = RandomizedGameData::get_read().person_appearance.get_unit_appearance(unit) {
@@ -277,9 +272,7 @@ pub fn set_unit_edit_name(unit: &Unit) {
         }
         else {
             unit.edit.set_name(GameVariableManager::get_string(DVCVariables::LUEUR_NAME));
-            if GameVariableManager::get_number(DVCVariables::LUEUR_GENDER) != 0 {
-                unit.edit.set_gender(GameVariableManager::get_number(DVCVariables::LUEUR_GENDER));
-            } else { unit.edit.set_gender(1); }
+            unit.edit.set_gender(if lueur_gender  != 0 { lueur_gender } else { 1 });
         }
     }
 }
