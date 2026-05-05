@@ -170,6 +170,7 @@ pub fn god_bond_holder_get(this: &GodBondHolder, mut unit: Option<&mut Unit>, me
         bond
     }
 }
+/*
 pub fn god_unit_on_serialize(this: &mut GodUnit, stream: &Stream, _method_info: OptionalMethod){
     check_fix_god_bonds(this);
     this.on_serialize(stream);
@@ -196,14 +197,14 @@ fn check_fix_god_bonds(this: &mut GodUnit) {
         }
     }
     else {
-        println!("GodBondHolder is missing.");
         if let Some(god) = GodData::try_get_hash(hash){
-            println!("GodUnit::Build for {}", Mess::get(god.mid));
             this.build(god);
             set_bond_levels(this);
         }
     }
 }
+
+ */
 fn set_bond_levels(this: &mut GodUnit) {
     if this.data.force_type != 0 { return; }
     let level = if DVCVariables::is_main_chapter_complete(22) {
@@ -234,8 +235,8 @@ pub fn correct_god_bond_holders() {
     GodPool::get_instance().sort.iter_mut().for_each(|v|{
         let god_hash = v.data.main_data.parent.hash;
         if v.bonds.is_none_or(|b| b.data.is_some_and(|d| d.main_data.parent.hash != god_hash)){
-            if v.bonds.is_none() { println!("{} is missing Bonds.", Mess::get(v.data.main_data.mid)); }
-            else { println!("{} has wrong bonds.", Mess::get(v.data.main_data.mid)); }
+            // if v.bonds.is_none() { println!("{} is missing Bonds.", Mess::get(v.data.main_data.mid)); }
+            // else { println!("{} has wrong bonds.", Mess::get(v.data.main_data.mid)); }
             let bonds = god_bond_holders.create_or_get(v.data.main_data);
             if bonds.is_some() {
                 v.bonds = bonds;
@@ -243,10 +244,4 @@ pub fn correct_god_bond_holders() {
             }
         }
     });
-}
-pub fn god_pool() {
-    if let Some(klass) = Il2CppClass::from_name("App", "GodUnit").ok() {
-        vtable_edit(klass, "OnDeserialize", god_unit_on_deserialize as _);
-        vtable_edit(klass, "OnSerialize",  god_unit_on_serialize as _);
-    }
 }
