@@ -28,9 +28,10 @@ const STATS: &[&str] = &[
 const STATS_REPLACE: [i32; 11] = [5, 1, 1, 1, 1, 1, 3, 3, 3, 0, 1];
 pub fn mid_swaps_init() -> HashMap<String, (i32, i32)> {
     let mut vec: HashMap<String, (i32, i32)> = HashMap::new();
+    vec.insert(LUEUR_MIDS[0].to_string(), ( 1, 0) );
     /*
     for x in 0..LUEUR_MIDS.len() {
-        if x < 2 { vec.insert(LUEUR_MIDS[x].to_string(), ( 1, 0) ); }  // Lueur Name Swap
+        if x < 2 {  }  // Lueur Name Swap
         else { vec.insert(LUEUR_MIDS[x].to_string(), ( 2, x as i32) ); }  // Lueur Name Replacement
     }
     vec.insert("MSID_H_EirikEngage".to_string(), ( 9, 0) );
@@ -62,14 +63,18 @@ pub fn initialize_mess_hashs() {
 #[unity::hook("App", "Mess", "AddTagString")]
 pub fn mess_add_tag_to_string(tag_group: u16, tag_id: u16, params: Option<&Array<u8>>, method_info: OptionalMethod) {
     let sf = Il2CppClass::from_name("App", "Mess").unwrap().get_static_fields_mut::<MessStaticFields>();
-    if tag_group == 6 && tag_id >= 10 {
+    if (tag_group == 6 && tag_id >= 10) || tag_group >= 20 {
         let current_mess = sf.mess.to_string();
         let mut args: Vec<u16> = Vec::new();
-        if let Some(params) = params{
-            params.iter().step_by(2).for_each(|x|{ args.push(*x as u16); });
-        }
+        if let Some(params) = params{ params.iter().step_by(2).for_each(|x|{ args.push(*x as u16); }); }
         if let Some(replacement) = get_replacement_name(tag_id, &args) {
-            sf.mess = format!("{}{}", current_mess, replacement).into();
+            let mut str = format!("{}{}", current_mess, replacement);
+            if tag_group >= 20 {
+                if let Some(c) = char::from_u32(tag_group as u32 - 20) {
+                    str.push(c);
+                }
+            }
+            sf.mess = str.into();
             return;
         }
     }
@@ -116,8 +121,8 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
         if let Some(v) = hash_map.get(&mess_label) {
             match v.0 {
                 1 => {
-                  //  if GameVariableManager::exist(DVCVariables::LUEUR_NAME) { return GameVariableManager::get_string(DVCVariables::LUEUR_NAME); }
-                  //  else { return result; }
+                  if GameVariableManager::exist(DVCVariables::LUEUR_NAME) { return GameVariableManager::get_string(DVCVariables::LUEUR_NAME); }
+                  else { return result; }
                 }
                 2 => {  // Alear Name Swap
                     /*

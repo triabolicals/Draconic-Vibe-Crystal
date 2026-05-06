@@ -38,6 +38,7 @@ pub fn deployment_modes(){
         let absent_count = absent_force.get_count();
         let rng = Random::get_game();
         let unit_deployment_mode = DVCVariables::UnitDeployment.get_value();
+        println!("Unit Deployment Mode: {}", unit_deployment_mode);
         // Free deployment
         if unit_deployment_mode == 3 && !GameUserData::is_encount_map() && !GameUserData::get_chapter().cid.str_contains("CID_M022") {
             if hero_unit.status.value & 20 != 0 { hero_unit.status.value &= !20; }
@@ -55,21 +56,22 @@ pub fn deployment_modes(){
         match unit_deployment_mode {
             1 => {
                 while player_count < max_player {
-                    let mut pid: &Il2CppString = "PID_unit".into();
+                    let mut hash = 0;
                     let mut capability_score = 99999;
                     let mut force_iter = Force::iter(absent_force);
                     while let Some(unit) = force_iter.next() {
                         let cap = get_unit_rating(unit);
                         if cap < capability_score {
                             capability_score = cap;
-                            pid = unit.person.pid;
+                            hash = unit.person.parent.hash;
                         }
                     }
-                    if let Some(unit) = UnitPool::get_from_pid(pid, false) {
+                    if let Some(unit) = absent_force.iter().find(|f| f.person.parent.hash == hash) {
                         unit.transfer(ForceType::Player, true);
                         unit.try_create_actor();
                     }
                     player_count = player_force.get_count();
+                    if absent_force.get_count() == 0 { break; }
                 }
             }
             2 => {
@@ -92,17 +94,17 @@ pub fn deployment_modes(){
             }
             5 => {
                 while player_count < max_player {
-                    let mut pid: &Il2CppString = "PID_unit".into();
+                    let mut hash = 0;
                     let mut capability_score = 0;
                     let mut force_iter = Force::iter(absent_force);
                     while let Some(unit) = force_iter.next() {
                         let cap = get_unit_rating(unit);
                         if cap > capability_score {
                             capability_score = cap;
-                            pid = unit.person.pid;
+                            hash = unit.person.parent.hash;
                         }
                     }
-                    if let Some(unit) = UnitPool::get_from_pid(pid, false) {
+                    if let Some(unit) = absent_force.iter().find(|f| f.person.parent.hash == hash) {
                         unit.transfer(ForceType::Player, true);
                         unit.try_create_actor();
                     }

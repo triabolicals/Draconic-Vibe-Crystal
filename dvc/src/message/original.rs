@@ -1,8 +1,4 @@
-use engage::{
-    gamedata::{Gamedata, GodData},
-    language::*,
-    mess::{Mess, MessStaticFields},
-};
+use engage::{gamedata::{Gamedata, GodData}, language::*, mess::{Mess, MessStaticFields}, };
 use unity::prelude::*;
 use crate::{message::swap::copy_from_u16_ptr, enums::{EMBLEM_GIDS, MPIDS, RINGS}};
 
@@ -169,13 +165,15 @@ impl MessageList {
                 let mut changed = false;
                 person_list.iter().enumerate().for_each(|(i,p)|{
                     if let Some((pos, len, _)) = p.find_position(&copy, false) {
-                        copy.splice(pos..pos + len, [14, 6, 100+i as u16, 0]);
+                        let (group, l) = get_tag_group(pos, len, &copy);
+                        copy.splice(pos..pos + l, [14, group, 100+i as u16, 0]);
                         changed = true;
                     }
                 });
                 for x in 0..12 {
                     if let Some((pos, len, _)) = emblem_list[x].find_position(&copy, false) {
-                        copy.splice(pos..pos + len, [14, 6, 530+x as u16, 0]);
+                        let (group, l)= get_tag_group(pos, len, &copy);
+                        copy.splice(pos..pos + l, [14, group, 530+x as u16, 0]);
                         changed = true;
                     }
                 }
@@ -196,7 +194,6 @@ impl MessageList {
                 if original_len > 0 {
                     if line.execute(&mut s, &list) {
                         if s.len() <= original_len {
-                            // println!("Edited {} in place", line.mid);
                             for x in 0..s.len() { unsafe { *ptr.add(x) = s[x]; } }
                         }
                     }
@@ -246,5 +243,9 @@ fn find_position(message: &Vec<u16>, string: &String, ignore_case: bool, start_f
                         .is_some_and(|v| v.is_uppercase()))
             )
     }
+}
+fn get_tag_group(position: usize, len: usize, ptr: &Vec<u16>) -> (u16, usize) {
+    if len == 3 { if let Some(v) = ptr.get(position+3){ return (20 + v, 4) } }
+    (6, len)
 }
 

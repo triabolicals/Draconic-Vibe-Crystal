@@ -131,7 +131,6 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         if ( sequence == 4 ||  sequence == 5 ) ||
             (sequence == 3 && ( GameVariableManager::get_bool("MapRecruit") || ( DVCVariables::UnitDeployment.get_value() != 3 && !lueur_on_map() ) ) )
         {
-            // println!("Hub/Kizuna Recruitment");
             change_unit_autolevel(this, true);
             if this.person.pid.str_contains(PIDS[VEYLE]) {
                 this.item_list.put_off_all_item();
@@ -246,7 +245,7 @@ pub fn adjust_unit_items(unit: &mut Unit) {
 pub fn set_unit_edit_name(unit: &Unit) {
     let lueur_gender = DVCVariables::LueurGender.get_value();
     if unit.person.parent.index == 1 || unit.person.flag.value & 1024 != 0 {
-        unit.edit.set_gender(if lueur_gender  != 0 { lueur_gender } else { 1 });
+        unit.edit.set_gender(if lueur_gender != 0 { lueur_gender } else { 1 });
         if GameVariableManager::exist(DVCVariables::LUEUR_NAME) {
             unit.edit.set_name( GameVariableManager::get_string(DVCVariables::LUEUR_NAME) );
         }
@@ -325,7 +324,6 @@ pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
             unit.auto_grow_capability( current_level, current_level);
             unit.set_level( current_level );
             unit.set_internal_level( 0 );
-          //  println!("{} -> {} Base -> Base Level {}",  person.get_name().unwrap().to_string(), new_person.get_name().unwrap().to_string(), current_level);
         }
         else {
             let new_job_list = get_base_classes(new_person.get_job().unwrap());
@@ -350,12 +348,10 @@ pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
                 unit.auto_grow_capability(current_level, current_level + 20);
                 unit.set_level(current_level);
                 unit.set_internal_level(current_internal_level);
-                println!("Promoted Unit -> Base Unit");
             }
             else { // Promoted -> Special
                 if DVCVariables::ClassMode.get_value()== 1 {
                     unit.class_change(new_person.get_job().unwrap());
-                    println!("Promoted Unit -> Special Unit");
                 }
                 else { unit.class_change(new_person.get_job().unwrap()); }
                 unit.auto_grow_capability(total_level, 20+current_level);
@@ -393,8 +389,7 @@ fn calculate_new_offset(original: &PersonData, new: &PersonData) -> [i8; 11] {
 
     let n_autolevels =
         if DVCVariables::is_random_map() && DVCVariables::is_main_chapter_complete(4) {
-            max(crate::continuous::random::random_map_mode_level(), engage::util::get_instance::<engage::map::situation::MapSituation>().average_level) +
-                get_continious_total_map_complete_count() / 3
+            crate::continuous::random::random_map_mode_level()
         }
         else { ( if original_job.is_high() { 20 } else { 0 } + original.get_level() ) as i32 };
 
@@ -410,7 +405,6 @@ fn calculate_new_offset(original: &PersonData, new: &PersonData) -> [i8; 11] {
     else {
         let new_base = new_job.base;
         let max = calc_max_recruit_stat(n_autolevels);
-    // Everyone calculate offset by subtracting class growths to adjust to original unit's level
         for x in 0..11 {
             let class_base = new_base[x] as i32 * 100;
             let round = if diff_grow[x] as i32 + new_grow[x] as i32 > 0 { 50 } else { 0 };

@@ -23,7 +23,7 @@ pub fn hub_sequence_desc_edit(descs: &mut Array<&'static mut ProcDesc>) {
     // Edit Message Scripts after loading
     descs[6] = ProcDesc::call(ProcVoidMethod::new(None, hub_sequence_load_script));
     // Randomized Exploration Items here
-    descs[28] = ProcDesc::call(ProcVoidMethod::new(None, hub_sequence_map_opening_event));
+    descs[27] = ProcDesc::call(ProcVoidMethod::new(None, hub_sequence_prepare_event));
     
     // Gift Events for Continuious Mode here
     descs[32] = ProcDesc::call(ProcVoidMethod::new(None, hub_sequence_dlc_gift_0_event));
@@ -50,11 +50,9 @@ pub extern "C" fn hub_sequence_unload_script(proc: &mut ProcInst, _optional_meth
     if let Ok(mut lock) = swap.try_write() { lock.current_talk_lines.clear(); }
 }
 
-pub extern "C" fn hub_sequence_map_opening_event(proc: &mut ProcInst, _optional_method: OptionalMethod) {
-    if GameUserData::get_sequence() == 4 || GameUserData::get_sequence() == 5 {
-        call_proc_original_method(proc,"MapOpeningEvent");
-        item::hub::hub_item_randomized();
-    }
+pub extern "C" fn hub_sequence_prepare_event(proc: &mut ProcInst, _optional_method: OptionalMethod) {
+    item::hub::hub_item_randomized();
+    call_proc_original_method(proc,"PrepareEvent");
 }
 
 pub extern "C" fn hub_menu_sequence_next_map_bind(proc: &mut ProcInst, _optional_method: OptionalMethod) {

@@ -3,6 +3,7 @@ use engage::{
     gamevariable::GameVariableManager, mess::Mess, sequence::talk::*, tmpro::TextMeshProUGUI,
     language::{Language, LanguageLangs::*},
 };
+use engage::gamedata::{Gamedata, GodData};
 use crate::{
     config::DVCFlags, DVCVariables, enums::{EMBLEM_GIDS, RINGS}, message::{TextSwapper, MESSAGE_SWAPPER},
     randomizer::{data::EmblemPool, names::AppearanceRandomizer, item, RANDOMIZED_DATA}
@@ -142,7 +143,7 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
                     else if DVCFlags::GodNames.get_value() {
                         AppearanceRandomizer::get_emblem_app_person_index(recruitment_index as i32).map(|v| v.1.get_name())
                     }
-                    else { None }
+                    else { GodData::get(EMBLEM_GIDS[recruitment_index as usize]).map(|g| Mess::get(g.mid)) }
                 }
                 else { None }
             }

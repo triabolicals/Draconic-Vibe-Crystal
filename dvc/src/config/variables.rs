@@ -1,8 +1,12 @@
 use engage::{
-    gameuserdata::GameUserData, gamevariable::GameVariableManager,
+    gameuserdata::GameUserData,
+    gamevariable::GameVariableManager,
     gamedata::{Gamedata, GodData, JobData, PersonData},
-    menu::BasicMenuItemAttribute, random::Random,
-    unit::{UnitPool, Unit}, god::{GodPool}
+    menu::BasicMenuItemAttribute,
+    random::Random,
+    unit::{UnitPool, Unit},
+    god::{GodPool},
+    gamedata::ChapterData
 };
 use crate::{
     utils, DVCConfig, config::DVCFlags,
@@ -11,7 +15,6 @@ use crate::{
     enums::{EMBLEM_GIDS, PIDS}
 };
 use std::cmp::PartialEq;
-use engage::gamedata::ChapterData;
 use unity::prelude::Il2CppString;
 use crate::randomizer::status::RandomizerStatus;
 
