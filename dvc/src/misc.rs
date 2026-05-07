@@ -44,7 +44,7 @@ pub fn fx_patch() {
     Patch::in_text(0x01c79714).nop().unwrap();
     Patch::in_text(0x01c79790).nop().unwrap();
     Patch::in_text(0x01c79738).bytes(&[0x62, 0x0e, 0x00, 0x11]).unwrap();
-    Patch::in_text(0x01c79708).nop().unwrap(); 
+    Patch::in_text(0x01c79708).nop().unwrap();
 }
 
 pub fn battle_save_patch() {

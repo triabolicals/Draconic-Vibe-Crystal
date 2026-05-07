@@ -35,15 +35,16 @@ pub fn get_next_class(current_hash_job: i32, increase: bool) -> i32 {
 pub fn single_class_exists() {
     let v = DVCVariables::SingleJob.get_value();
     let enable = DVCFlags::SingleJobEnabled.get_value();
+    let class_mode = DVCVariables::ClassMode.get_value();
     if enable {
         let exist = (v == 1 && !dlc_check()) || JobData::try_get_hash(v).is_some();
         if !exist {
             DVCVariables::SingleJob.set_value(0);
-            DVCVariables::ClassMode.set_value(0);
+            if class_mode == 2 { DVCVariables::ClassMode.set_value(0); }
         }
     }
     else {
         DVCVariables::SingleJob.set_value(0);
-        DVCVariables::ClassMode.set_value(0);
+        if class_mode == 2 { DVCVariables::ClassMode.set_value(0); }
     }
 }
