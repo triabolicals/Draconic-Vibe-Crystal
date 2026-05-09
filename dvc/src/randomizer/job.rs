@@ -430,7 +430,6 @@ pub fn adjust_missing_weapon_mask() {
             let count = (1..10).into_iter().filter(|x| (1 << x) & selected != 0).count() as i32;
             if count < weapon_select_count { 
                 randomize_selected_weapon_mask(unit1, None);
-                println!("{} corrected weapon mask", unit1.get_name());
             }
             unit = unit1;
         }

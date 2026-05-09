@@ -43,7 +43,7 @@ pub fn change_map_dispos() {
             }
         });
         if DVCVariables::EmblemRecruitment.get_value() != 0 {
-            if let Some(pos) = EMBLEM_PARA.iter().position(|x| cid.ends_with(*x)) {
+            if let Some(pos) = EMBLEM_PARA.iter().position(|x| cid.ends_with(*x)).filter(|x| *x < 12) {
                 let recruit_idx = DVCVariables::get_dvc_emblem_index(pos as i32, true);
                 if recruit_idx >= 12 { return; }
                 let mut levels = [(0, 0); 3];
