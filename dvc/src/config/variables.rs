@@ -17,6 +17,7 @@ use crate::{
 use std::cmp::PartialEq;
 use unity::prelude::Il2CppString;
 use crate::randomizer::status::RandomizerStatus;
+use crate::utils::wrap;
 
 /// Structure that contains and manages DVC-Related GameVariables
 #[repr(i32)]
@@ -274,8 +275,8 @@ impl DVCVariables {
     }
     pub fn increment(&self, mut value: i32, increase: bool) -> i32 {
         if self.is_gauge() {
-            if increase { value += 10; } else { value -= 10; }
-            value = clamp_value(value, 0, 100);
+            value = if increase { value + 10 } else { value - 10 };
+            value = wrap(value, 0, 100);
             self.set_value(value);
         }
         else {
@@ -338,8 +339,6 @@ impl DVCVariables {
     }
     pub fn get_dvc_unit(dvc_person_index: i32, reverse: bool) -> Option<&'static mut Unit> {
         if dvc_person_index < 41 {
-            let pid = Self::get_dvc_person(dvc_person_index, reverse);
-            println!("PID: {} [{}]", engage::mess::Mess::get_name(pid), dvc_person_index);
             UnitPool::get_from_pid(Self::get_dvc_person(dvc_person_index, reverse), false)
         }
         else {

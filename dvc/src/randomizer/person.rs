@@ -9,27 +9,17 @@ pub use engage::{
         item::*, skill::{SkillDataCategorys, SkillData}, dispos::*
     },
 };
-use unity::il2cpp::object::Array;
-use crate::{config::DVCFlags, enums::*, utils::*, autolevel::*, DVCVariables};
-use super::{data::GameData, menu::CUSTOM_RECRUITMENT_ORDER, get_data_read, Randomizer};
+use crate::{
+    config::DVCFlags, enums::*, utils::*, autolevel::*, DVCVariables,
+    randomizer::job::reclass::ReclassType
+};
+use super::{data::GameData, menu::CUSTOM_RECRUITMENT_ORDER, Randomizer};
 
 pub mod ai;
 pub mod unit; 
 pub mod hub;
-
-pub fn is_playable_person(person: &PersonData) -> bool { get_data_read().playables.iter().any(|p| p.hash == person.parent.hash) }
-pub fn check_playable_classes() {
-    let list = &get_data_read().playables;
-    list.iter().for_each(|index|{
-        if let Some(person) = PersonData::try_get_hash_mut(index.hash) {
-            if person.get_job().is_none() {
-                if person.get_sp() >= 1000 || person.get_internal_level() > 0 { person.jid = Some("JID_ソードマスター".into()); }
-                else {person.jid = Some("JID_ソードファイター".into()); }
-                person.on_completed();
-            }
-        }
-    });
-}
+const PROTAG_SKILLS: [&str; 4] = ["SID_主人公", "SID_王族", "SID_リベラシオン装備可能", "SID_ヴィレグランツ装備可能"];
+pub fn is_playable_person(person: &PersonData) -> bool { GameData::get().playables.iter().any(|p| p.hash == person.parent.hash) }
 fn set_hub_facilities() {
     let aid = ["AID_蚤の市", "AID_筋肉体操", "AID_ドラゴンライド", "AID_釣り", "AID_占い小屋"];
     let locator = ["LocatorSell01", "LocatorTraining01", "LocatorDragon01", "LocatorFish01", "LocatorFortune01"];
@@ -70,7 +60,7 @@ pub fn randomize_person() {
                 let with_gender = DVCFlags::RRGenderUnitMatch.get_value();
                 let no_dlc = !dlc_check() | DVCFlags::ExcludeDLCUnitRR.get_value();
                 let with_custom_units = DVCFlags::CustomUnits.get_value();
-                let list = &get_data_read().playables;
+                let list = &GameData::get().playables;
                 let mut playable_list: Vec<_> =
                     list.iter()
                         .enumerate()
@@ -97,7 +87,6 @@ pub fn randomize_person() {
                     if let Some((pos, royal)) =  playable_list.iter().enumerate().find(|(i, x)| x.0 == x_royal) {
                         if let Some(royal_replacement) = to_replace_list.get_remove_filter(rng, |(i, gender)| *i < 36 && *i != 30 && ((with_gender && *gender == royal.1) || !with_gender)){
                             DVCVariables::set_person_recruitment(royal_replacement.0 as i32, royal.0 as i32);
-                            println!("#{}: {} -> {}", royal_replacement.0, Mess::get_name(PIDS[royal_replacement.0]), Mess::get_name(PIDS[x_royal]));
                             playable_list.remove(pos);
                         }
                     }
@@ -108,9 +97,6 @@ pub fn randomize_person() {
                     {
                         GameVariableManager::set_string(format!("G_R_{}", pids[*index_x].as_str()), pids[index_y].as_str());
                         GameVariableManager::set_string(format!("G_R2_{}", pids[index_y].as_str()), pids[*index_x].as_str());
-                        if *index_x < pids.len() && index_y < pids.len() {
-                            println!("#{}: {} -> {}", index_x, Mess::get_name(pids[*index_x].as_str()), Mess::get_name(pids[index_y].as_str()));
-                        }
                     }
                 });
             },
@@ -119,11 +105,7 @@ pub fn randomize_person() {
             },
             3 => { // Custom
                 let order =crate::DVCConfig::get().get_custom_recruitment(false);
-                order.iter().for_each(|(p1, p2)|{
-                    println!("{} -> {}", *p1, *p2);
-                    println!("{} to {}", Mess::get_name(PIDS[*p1 as usize]), Mess::get_name(PIDS[*p2 as usize]));
-                    DVCVariables::set_person_recruitment(*p1, *p2);
-                });
+                order.iter().for_each(|(p1, p2)|{ DVCVariables::set_person_recruitment(*p1, *p2); });
             },
             4 => {
                 let list = unsafe { &CUSTOM_RECRUITMENT_ORDER };
@@ -157,7 +139,6 @@ pub fn randomize_person() {
                     
                     if GameVariableManager::exist(&reversed) { GameVariableManager::set_string(&reversed, original.pid); }
                     else { GameVariableManager::make_entry_str(&reversed, original.pid); }
-                    println!("{} -> {}", Mess::get_name(original.pid), Mess::get_name(randomized.pid));
                 });
             }
             _ => { DVCVariables::create_recruitment_variables(false); },
@@ -177,41 +158,20 @@ pub fn find_pid_replacement(pid: &String, reverse: bool) -> Option<String>{
 pub fn change_lueur_for_recruitment(is_start: bool) {
     if !can_rand()  { return; }
     if DVCVariables::get_dvc_person(0, false).to_string() == PIDS[0] {
-        // let _ = RANDOMIZER_STATUS.try_write().map(|mut lock| lock.alear_person_set = true);
-        if let Some(lueur) = UnitPool::get_from_pid("PID_リュール".into(), false) {
-            if DVCVariables::ClassMode.get_value()== 1 && is_start && can_rand() {
-                crate::randomizer::job::unit_change_to_random_class(lueur, false);
-                unit::adjust_unit_items(lueur);
-                // println!("Lueur Class Changed to {}", Mess::get_name(lueur.job.jid));
+        if is_start && can_rand() {
+            if let Some(lueur) = UnitPool::get_from_pid(PIDS[0].into(), false) {
+                if can_rand() && DVCVariables::ClassMode.get_value() > 0 {
+                    crate::randomizer::job::reclass::unit_reclass(lueur,  ReclassType::get_from_settings(true));
+                    unit::adjust_unit_items(lueur);
+                }
             }
         }
         return;
     }
-    // println!("Lueur is {}", Mess::get_name(GameVariableManager::get_string("G_R_PID_リュール")));
-    // remove hero status on alear and place it on the replacement and add alear skills on the replacement
     let person_lueur = PersonData::get(PIDS[0]).unwrap();
-    let mut lueur_sids = person_lueur.get_common_sids().unwrap();
-    if let Some(hero_sid) = lueur_sids.iter_mut().find(|x| x.to_string().contains("SID_主人公")) {
-        *hero_sid =  "SID_無し".into();
-    }
-    person_lueur.on_completed();
+    PROTAG_SKILLS.iter().for_each(|x| { person_lueur.get_mask_skill().remove_sid(x.into()); });
     if let Some(new_hero) = switch_person(person_lueur) {
-        if let Some(hero) = UnitPool::get_from_person_force_mask(&new_hero, -1) {
-            hero.private_skill.add_sid("SID_主人公", SkillDataCategorys::Private, 0);
-            hero.private_skill.add_sid("SID_王族", SkillDataCategorys::Private, 0);
-            hero.private_skill.add_sid("SID_リベラシオン装備可能", SkillDataCategorys::Private, 0);
-            hero.private_skill.add_sid("SID_ヴィレグランツ装備可能", SkillDataCategorys::Private, 0);
-        }
-        let sids = new_hero.get_common_sids().unwrap();
-
-        let new_sids = Array::<&Il2CppString>::new_specific(sids.get_class(), sids.len() + 4).unwrap();
-        for x in 0..sids.len() { new_sids[x] = sids[x]; }
-        new_sids[sids.len()] = "SID_主人公".into();
-        new_sids[sids.len() + 1] = "SID_リベラシオン装備可能".into();
-        new_sids[sids.len() + 2] = "SID_ヴィレグランツ装備可能".into();
-        new_sids[sids.len() + 3] = "SID_王族".into();
-        new_hero.set_common_sids(new_sids);
-        new_hero.on_completed();
+        PROTAG_SKILLS.iter().for_each(|x|{ new_hero.get_mask_skill().add_sid(x, SkillDataCategorys::Private, 0); });
         if let Some(god) = GodData::get_mut("GID_リュール") {
             god.link = Some(new_hero.pid);
             new_hero.set_link_god(Some(god));
@@ -219,11 +179,9 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
         if is_start {   // Move alear to force 5
             if let Some(lueur_unit) = UnitPool::get_from_pid(PIDS[0].into(), false) {
                 unit::change_unit_autolevel(lueur_unit, true);
-                if DVCVariables::ClassMode.get_value()== 1 {
-                    super::job::unit_change_to_random_class(lueur_unit, true);
-                    unit::fixed_unit_weapon_mask(lueur_unit);
-                    unit::adjust_unit_items(lueur_unit);
-                }
+                crate::randomizer::job::reclass::unit_reclass(lueur_unit, ReclassType::get_from_settings(true));
+                unit::fixed_unit_weapon_mask(lueur_unit);
+                unit::adjust_unit_items(lueur_unit);
                 lueur_unit.transfer(ForceType::Lost, false);
                 get_lueur_name_gender(); // grab gender and name
                 DVCVariables::LueurGender.init_var(lueur_unit.edit.gender, true);
@@ -231,10 +189,7 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
             if let Some(unit) = UnitUtil::join_unit_person(new_hero) {
                 unit.edit.set_name(new_hero.get_name());
                 unit.edit.set_gender(new_hero.get_gender());
-                unit.private_skill.add_sid("SID_主人公", SkillDataCategorys::Private, 0);
-                unit.private_skill.add_sid("SID_王族", SkillDataCategorys::Private, 0);
-                unit.private_skill.add_sid("SID_リベラシオン装備可能", SkillDataCategorys::Private, 0);
-                unit.private_skill.add_sid("SID_ヴィレグランツ装備可能", SkillDataCategorys::Private, 0);
+                PROTAG_SKILLS.iter().for_each(|x|{ unit.private_skill.add_sid(x, SkillDataCategorys::Private, 0); });
                 unit.transfer(ForceType::Absent, false);
             }
         }
@@ -250,11 +205,8 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
             Patch::in_text(0x02d524e8).bytes(&[0x28, 0x00, 0x80, 0x52]).unwrap();
             person_lueur.set_gender(Gender::Male);
         }
-
-        Patch::in_text(0x0233f104).bytes(&[0x01, 0x10, 0x80, 0x52]).unwrap(); // GodUnit$$GetName ignore hero flag on Emblem Alear
-        let lueur_god_offsets = [0x02d51dec, 0x021e12ac, 0x02915844, 0x02915844, 0x02915694, 0x01c666ac, 0x02081edc, 0x01c69d60, 0x01c66588];
+        let lueur_god_offsets = [0x02d51dec, 0x021e12ac]; //, 0x02915844, 0x02915694, 0x01c666ac, 0x02081edc, 0x01c69d60, 0x01c66588];
         for x in lueur_god_offsets { mov_x0_0(x); }
-
         // For Hub-Related Activities
         let offsets = [0x02ae8d28, 0x02ae9000, 0x02a5d0f4, 0x01cfd4c4, 0x01d03184, 0x01e5fe00, 0x01e5ff4c, 0x027049c8];
         let new_hero_gender = if new_hero.get_gender() == 2 || (new_hero.get_gender() == 1 && new_hero.flag.value & 32 != 0) { 2 } else { 1 };
@@ -281,14 +233,6 @@ pub fn pid_to_index(pid: &String, reverse: bool) -> i32 {
         if let Some(found_gid) = EMBLEM_GIDS.iter().position(|&x| x == replacement).filter(|x| *x < 19) { return found_gid as i32;  }
     }
     -1  // to cause crashes
-}
-
-pub fn get_low_class_index(this: &PersonData) -> usize {
-    let apt = this.aptitude.value;
-    for x in 0..3 { if apt & (1 << (x+1) ) != 0 { return x; } }
-    let apt2 = this.sub_aptitude.value;
-    for x in 0..3 { if apt2 & (1 << (x+1) ) != 0 { return x; } }
-    0
 }
 
 pub fn switch_person(person: &PersonData) -> Option<&'static PersonData> {

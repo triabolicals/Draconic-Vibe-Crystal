@@ -121,7 +121,7 @@ fn reset_skill_inherit_menu_item_cost(menu_item: &mut SkillInheritanceMenuItem, 
 #[unity::hook("App", "SkillInheritanceMenu", "CreateMenuItemList")]
 pub fn skill_inheritance_menu_create_menu_item_list(god: &GodData, method_info: OptionalMethod) -> &'static mut List<SkillInheritanceMenuItem> {
     let menu: &'static mut List<SkillInheritanceMenuItem> = call_original!(god, method_info);
-    let mut ran_data = get_rand_data_read();
+    let mut ran_data = RandomizedGameData::get_read();
     let mode = DVCVariables::EmblemInherit.get_value();
     let random_sp = DVCFlags::RandomSP.get_value();
     if let Some(unit) = unsafe { get_skill_inheritance_sequence_select_unit(None) }{
@@ -164,7 +164,7 @@ pub fn ring_list_skill_menu_create_menu_items(
 ){
     call_original!(god, menu, from_lv, to_lv, max_bond, out, ring_select, method_info);
     let inherit_mode = DVCVariables::EmblemInherit.get_value();
-    let mut ran_data = get_rand_data_write();
+    let mut ran_data = RandomizedGameData::get_write();
     out.iter_mut().enumerate().for_each(|(index, item)|{
         let klass = item.get_class();
         let name = klass.get_name();

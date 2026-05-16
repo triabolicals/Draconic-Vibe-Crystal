@@ -32,12 +32,6 @@ pub enum EffectType {
     SpawnUnit = 11,
 }
 impl EffectType {
-    pub fn can_repeat(&self) -> bool {
-        match self {
-            EffectType::SpawnUnit|EffectType::Stat|EffectType::Class|EffectType::GoldItem => { true }
-            _ => { false }
-        }
-    }
     pub fn to_u8(&self) -> u8 {
         match self {
             EffectType::NoEffect => 0,

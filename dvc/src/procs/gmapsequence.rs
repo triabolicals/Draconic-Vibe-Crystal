@@ -40,7 +40,7 @@ pub fn check_gmap_spots(emblem_index: i32) {
     }
 }
 fn emblem_paralogue_chapter_check(idx: i32) -> bool {
-    let s = if idx == 6 { 11 } else { 11 };
+    let s = if idx == 6 { 11 } else { 12 };
     GameVariableManager::get_bool(format!("G_Cleared_M0{}", s))
 }
 fn is_spot_hidden(chapter: i32) -> bool {

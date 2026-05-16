@@ -111,23 +111,25 @@ pub fn terrain_spots() {
         let mut chance = 100;
 
         if let Some(tile) = pos_list.get_remove(rng) { 
-            let terrain = match rng.get_value(5) {
-                0 => { TerrainData::get("TID_炎上") }
-                1 => { TerrainData::get("TID_アロマ") }
-                2 => { TerrainData::get("TID_霧") }
-                _ => { TerrainData::get("TID_ブロック") }
-            }.unwrap();
-
-            for dx in -2..3 {
-                let total_x = tile.0 + dx;
-                if total_x < start_x || total_x >= end_x { continue; }
-                for dz in -2..3 {
-                    let total_z = tile.1 + dz;
-                    if total_z < start_z || total_z >= end_z { continue; }
-                    if rng.get_value(100) < chance {
-                        if MapOverlap::can_create(None, total_x, total_z, terrain) {
-                            if MapOverlap::set_by_terrain(total_x, total_z, terrain, -1, ForceType::Empty) {
-                                chance *= 2 / 3;
+            let terrain = 
+                match rng.get_value(5) {
+                    0 => { "TID_炎上" }
+                    1 => { "TID_アロマ" }
+                    2 => { "TID_霧" }
+                    _ => { "TID_ブロック" }
+                };
+            if let Some(terrain) = TerrainData::get(terrain) {
+                for dx in -2..3 {
+                    let total_x = tile.0 + dx;
+                    if total_x < start_x || total_x >= end_x { continue; }
+                    for dz in -2..3 {
+                        let total_z = tile.1 + dz;
+                        if total_z < start_z || total_z >= end_z { continue; }
+                        if rng.get_value(100) < chance {
+                            if MapOverlap::can_create(None, total_x, total_z, terrain) {
+                                if MapOverlap::set_by_terrain(total_x, total_z, terrain, -1, ForceType::Empty) {
+                                    chance *= 2 / 3;
+                                }
                             }
                         }
                     }

@@ -22,7 +22,7 @@ pub fn map_save_menu_edits() {
             vtable_edit(restart, "BuildAttribute", restart_menu_item_build_attr as _);
         }
         if let Some(reset) = get_nested_class(sub_menu, "ResetItem") {
-            vtable_edit(reset, "BuildAttribute", reset_menu_item_build_attr as _);
+            vtable_edit(reset, "BuildAttribute", map_system_temp_save_build_attr as _);
         }
     }
 }
@@ -34,9 +34,6 @@ fn map_system_temp_save_build_attr(_temp_save_menu_item: &BasicMenuItem, _method
 }
 fn restart_menu_item_build_attr(restart_item: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
     if DVCFlags::Ironman.get_value(){ BasicMenuItemAttribute::Hide } else { unsafe { original_restart_item_build_attr(restart_item, None) } }
-}
-fn reset_menu_item_build_attr(_reset_item: &BasicMenuItem,  _method_info: OptionalMethod) -> BasicMenuItemAttribute {
-    if DVCFlags::Ironman.get_value() { BasicMenuItemAttribute::Hide } else { BasicMenuItemAttribute::Enable } 
 }
 #[skyline::from_offset(0x01b72cb0)]
 fn original_restart_item_build_attr(restart_item: &BasicMenuItem, method_info: OptionalMethod) -> BasicMenuItemAttribute;

@@ -22,7 +22,7 @@ pub use config::DVCConfig;
 mod procs;
 
 pub use config::variables::*;
-use crate::utils::return_true;
+use crate::utils::{mov_1, return_true};
 
 pub static mut CONFIG: DVCConfig = DVCConfig::default();
 pub const VERSION: &str = "2.16.0N";
@@ -72,7 +72,6 @@ pub fn main() {
     Patch::in_text(0x02517830).bytes(&[0xa0, 0x02, 0x80, 0x52]).unwrap();
     Patch::in_text(0x0251a9c0).bytes(&[0x01, 0x00, 0x84, 0x52]).unwrap();
     Patch::in_text(0x024cba50).bytes(&[0x01, 0x00, 0x85, 0x52]).unwrap();
-    
     return_true(0x0203e1b0);    // Forging Item Display
     skyline::install_hooks!(
         sprite::unit_icon_set_god_icon,

@@ -58,10 +58,12 @@ impl DVCMenu {
         if let Some(&v) = unsafe { MENU_SELECT.get(i) }{ (v & 255, (v >> 8) & 255) }
         else { (0, 0) }
     }
-    pub fn get_items(&self) -> Vec<DVCMenuItemKind> {
+    pub fn get_items(&self, menu_item: &DVCConfigMenuItem) -> Vec<DVCMenuItemKind> {
         match self {
             DVCMenu::Main => {
-                [   Command(DVCCommand::ReRandJob), Menu(Self::Recruitment), Menu(Self::Emblem), Menu(Self::Skill),
+                [   
+                    // Command(DVCCommand::RecruitUnits),
+                    Command(DVCCommand::ReRandJob), Menu(Self::Recruitment), Menu(Self::Emblem), Menu(Self::Skill),
                     Menu(Self::UnitClass), Menu(Self::Item), Menu(Self::Growth), Menu(Self::Enemy),
                     Menu(Self::Asset), Menu(Self::Map), Menu(Self::Cutscene), Menu(Self::Other), Menu(Self::ReadOnly),
                     Command(DVCCommand::SetSeed)
@@ -83,8 +85,11 @@ impl DVCMenu {
                     Flag(RingStats), Flag(BondRing), Gauge(BondSkillS), Gauge(BondSkillA), Gauge(BondSkillB), Gauge(BondSkillC)].to_vec()
             }
             DVCMenu::UnitClass => {
-                [Variable(ClassMode), DVCMenuItemKind::SingleJob, Flag(CustomClass), Variable(Reclassing), Variable(BattleStyles),
-                    Flag(RandomClassAttrs)].to_vec()
+                let mut vec =
+                [Variable(ClassMode), Flag(CustomClass), Variable(Reclassing), Variable(BattleStyles),
+                    Flag(RandomClassAttrs)].to_vec();
+                if menu_item.dvc_value == 2 { vec.insert(1, DVCMenuItemKind::SingleJob); }
+                vec
             }
             DVCMenu::Item => {
                 [Flag(RandomEventItems), Variable(ExplorationItem), Flag(AddedShopItems), Variable(UnitInventory),
@@ -133,7 +138,8 @@ impl DVCMenu {
     }
     pub fn rebuild_menu(&self, item: &mut DVCConfigMenuItem, _keep_index: bool) {
         item.menu.full_menu_item_list.clear();
-        self.get_items().into_iter().enumerate().for_each(|(idx, k)| {
+        let list = self.get_items(item);
+        list.into_iter().enumerate().for_each(|(idx, k)| {
             match k {
                 Order(order) => {
                     let i = DVCConfigMenuItem::new_recruitment_item(order, idx as i32);
@@ -163,7 +169,8 @@ impl DVCMenu {
         match item.menu_item_kind {
             Variable(UnitRecruitment)|Variable(EmblemRecruitment)|Variable(Continuous)|Flag(BondRing)|Variable(ClassMode) => {
                 item.menu.full_menu_item_list.clear();
-                menu.get_items().into_iter().for_each(|k| {
+                let list = menu.get_items(item);
+                list.into_iter().for_each(|k| {
                     let i = DVCConfigMenuItem::new_kind(k);
                     if let Some((_, v, c)) = s.iter().find(|x| x.0 == k) {
                         i.dvc_value = *v;

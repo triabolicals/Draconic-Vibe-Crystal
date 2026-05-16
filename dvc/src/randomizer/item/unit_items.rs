@@ -270,7 +270,7 @@ pub fn add_generic_weapons(unit: &Unit) {
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_HPの薬").unwrap());  
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_力の薬").unwrap());  
     }
-    println!("Add Generic Weapons {}: Weapon mask: {} Selected: {}", Mess::get_name(unit.person.pid), unit.weapon_mask.value, unit.selected_weapon_mask.value);
+    // println!("Add Generic Weapons {}: Weapon mask: {} Selected: {}", Mess::get_name(unit.person.pid), unit.weapon_mask.value, unit.selected_weapon_mask.value);
     unit.update_weapon_mask();
     let combine_mask = unit.weapon_mask.value;
     let weapon_levels = get_unit_avail_weapon_levels(unit);

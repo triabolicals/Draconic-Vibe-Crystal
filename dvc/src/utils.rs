@@ -183,6 +183,11 @@ pub fn clamp(value: i32, min: i32, max: i32, method_info: OptionalMethod) -> i32
 
 pub fn max(v1: i32, v2: i32) -> i32 { if v1 > v2 { v1 } else { v2 } }
 pub fn min(v1: i32, v2: i32) -> i32 { if v1 > v2 { v2 } else { v1 } }
+pub fn wrap<T: PartialEq + PartialOrd>(value: T, min: T, max: T) -> T {
+    if value < min { max }
+    else if value > max { min }
+    else { value }
+}
 
 //DLC Check 
 #[unity::from_offset("App", "DLCManager", "HasContent")]

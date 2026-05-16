@@ -61,8 +61,7 @@ impl TalkSwapData {
                     } else if talk_demo.demo.len() > 0 {
                         if let Some(data) = TalkLine::new(line) {
                             talk_demo.lines.push(data);
-                        } 
-                        else { println!("Cannot Parse: {}", line); }
+                        }
                     }
                 }
             }

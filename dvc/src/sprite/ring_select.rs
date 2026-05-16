@@ -1,17 +1,19 @@
-use engage::gamedata::GodData;
-use engage::god::GodUnit;
-use engage::menu::{BasicMenu, BasicMenuItem};
-use engage::menu::content::common::UnitMenuItemSetter;
-use engage::menu::menu_item::BasicMenuItemContentFields;
-use engage::spriteatlasmanager::FaceThumbnail;
-use engage::tmpro::TextMeshProUGUI;
-use engage::unit::UnitRing;
+use engage::{
+    gamedata::GodData,
+    god::GodUnit,
+    menu::{
+        BasicMenu,
+        BasicMenuItem,
+        content::common::UnitMenuItemSetter,
+        menu_item::BasicMenuItemContentFields
+    },
+    spriteatlasmanager::FaceThumbnail,
+    tmpro::TextMeshProUGUI,
+    unit::UnitRing
+};
 use unity::engine::ui::{Image, IsImage};
 use unity::prelude::*;
-use crate::config::DVCFlags;
-use crate::DVCVariables;
-use crate::randomizer::data::GameData;
-use crate::randomizer::names::AppearanceRandomizer;
+use crate::{config::DVCFlags, DVCVariables, randomizer::{data::GameData, names::AppearanceRandomizer}};
 
 #[unity::class("App", "RingSelectMenuItemContent")]
 pub struct RingSelectMenuItemContent {
@@ -56,19 +58,21 @@ pub struct GodUnitSelectMenuItem {
 
 pub fn set_god_face(image: &Image, data: &GodData) {
     if DVCFlags::GodNames.get_value() {
-        let sprite =
-            if DVCFlags::GodNames.get_value() {
-                GameData::get_playable_emblem_hashes().iter().position(|&x| x == data.parent.hash)
-                    .and_then(|x| AppearanceRandomizer::get_emblem_app_person_index(x as i32))
-                    .and_then(|p| FaceThumbnail::get_from_person(p.1))
-            }
-            else if data.gid.str_contains("リュール") {
-                DVCVariables::get_dvc_person_data(0, false)
-                    .filter(|p| p.parent.index > 1)
-                    .and_then(|p| FaceThumbnail::get_from_person(p))
-            }
-            else { None };
-        if let Some(sprite) = sprite { image.set_sprite2(sprite); }
+        if let Some(sprite) =
+            GameData::get_playable_emblem_hashes().iter().position(|&x| x == data.parent.hash)
+                .and_then(|x| AppearanceRandomizer::get_emblem_app_person_index(x as i32))
+                .and_then(|p| FaceThumbnail::get_from_person(p.1))
+        {
+            image.set_sprite2(sprite);
+        }
+    }
+    else if data.is_hero() && DVCVariables::UnitRecruitment.get_value() > 0{
+        if let Some(sprite) = DVCVariables::get_dvc_person_data(0, false)
+            .filter(|p| p.parent.index > 1)
+            .and_then(|p| FaceThumbnail::get_from_person(p))
+        {
+            image.set_sprite2(sprite);
+        }
     }
 }
 pub fn ring_select_menu_item_content_build(this: &mut RingSelectMenuItemContent, menu_item: &RingMenuItem, _optional_method: OptionalMethod) {

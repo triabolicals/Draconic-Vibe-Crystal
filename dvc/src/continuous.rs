@@ -93,7 +93,7 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
     }
     Force::get(ForceType::Player).unwrap().iter().chain(Force::get(ForceType::Absent).unwrap().iter())
         .for_each(|unit|{
-            if unit.status.value & 35184372088832 == 0 {
+            if !unit.is_vision() && !unit.is_summon() {
                 let exp = if unit.force.is_some_and(|f| f.force_type == 3) {
                     base_exp_gain / 2 
                 }

@@ -76,7 +76,7 @@ impl DVCConfigMenuItem {
             DVCMenuItemKind::Command(_) => { item.is_command = true; }
             DVCMenuItemKind::SingleJob => {
                 let current = DVCVariables::SingleJob.get_value();
-                if current == 1 || JobData::try_get_hash(current).is_some() { item.dvc_value = current; }
+                if current == 1000 || JobData::try_get_hash(current).is_some() { item.dvc_value = current; }
                 else { item.dvc_value = get_next_class(0, true); }
             }
             _ => {}

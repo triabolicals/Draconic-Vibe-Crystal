@@ -278,7 +278,6 @@ impl WeaponDatabase {
         // converting to the &str array index from kind/weapon level values
         let rank = if rank < 2 { 0 } else if rank > 4 { 3 } else { rank - 1 } as usize;
         let generic_index = 9*rank + type_index;
-        println!("Type: {} -> {}, {}", new_type, type_index, generic_index);
         GENERICS.get(generic_index).and_then(|iid| ItemData::get(iid))
     }
 

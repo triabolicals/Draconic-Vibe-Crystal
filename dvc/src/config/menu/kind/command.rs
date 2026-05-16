@@ -1,9 +1,13 @@
 use engage::{gamemessage::GameMessage,gamevariable::GameVariableManager,keyboard::SoftwareKeyboard};
+use engage::force::ForceType;
+use engage::gamedata::PersonData;
+use engage::unit::{Unit, UnitPool, UnitUtil};
 use unity::system::action::Action1;
 use crate::{
     randomizer::{data::GameData, status::RandomizerStatus},
     DVCConfig, utils::{get_random_number_for_seed},
 };
+use crate::enums::PIDS;
 use super::*;
 
 #[repr(C)]
@@ -11,6 +15,7 @@ use super::*;
 pub enum DVCCommand {
     SetSeed,
     ReRandJob,
+//    RecruitUnits,
 }
 
 impl DVCCMenuItem for DVCCommand {
@@ -40,6 +45,21 @@ impl DVCCMenuItem for DVCCommand {
 
                 BasicDialog2::create_confirm_cancel_bind(item.menu, message, Some(action));
             }
+            /*
+            DVCCommand::RecruitUnits => {
+                PIDS.iter()
+                    .flat_map(|pid| PersonData::get(pid).filter(|p| !p.is_hero()))
+                    .for_each(|person|{
+                        if let Some(unit) = UnitPool::get_from_person(person, false) {
+                            unit.transfer(ForceType::Empty, true);
+                        }
+                });
+                PIDS.iter()
+                    .flat_map(|pid| PersonData::get(pid))
+                    .for_each(|person| { UnitUtil::join_unit_person(person); });
+                GameMessage::create_key_wait(item.menu, "Non hero units are removed and recruited.");
+            }
+            */
         }
         BasicMenuResult::se_cursor()
     }

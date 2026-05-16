@@ -59,8 +59,6 @@ pub fn auto_level_unit(unit: &mut Unit, leader: bool){
         }
     }
     else { unit.set_level(unit.level as i32 + level_gains); }
-
-    println!("Auto Level Unit: {} Gained {} levels [Promoted: {}]", unit.get_name(), level_gains, promoted);
     fix_unit_level(unit, avg_level);
     unit.set_hp(unit.get_capability(0, true));
     adjust_missing_weapons(unit);
@@ -176,17 +174,11 @@ pub fn get_difficulty_adjusted_average_level() -> i32 {
 }
 
 pub fn autolevel_party() -> Option<(i32, i32)> {
-    fixed_level();
     if !DVCFlags::PostChapterAutolevel.get_value() { None }
     else {
-        let player_average =
-            if DVCConfig::get().debug { GameUserData::get_chapter().recommended_level as i32 + 3 }
-            else { get_difficulty_adjusted_average_level() - 2 * GameUserData::get_difficulty(false) };
-
+        let player_average = get_difficulty_adjusted_average_level() - 2 * GameUserData::get_difficulty(false);
         let mut count = 0;
         Force::get(ForceType::Absent).unwrap().iter().for_each(|unit| { count += level_up_unit(unit, player_average) as i32; });
-        if DVCConfig::get().debug { Force::get(ForceType::Player).unwrap().iter().for_each(|unit| { level_up_unit(unit, player_average); }); }
-        fixed_level();
         if count > 0 { Some((player_average, count)) }
         else { None }
     }
@@ -204,22 +196,9 @@ fn level_up_unit(unit: &Unit, target_level: i32) -> bool {
             unit.level_up(3);
             unit.add_sp(100);
         }
-        // println!("{} gained {} level [{}/{}]", Mess::get_name(unit.person.pid), number_of_level_ups, unit.level, unit.internal_level);
         unit.set_hp(unit.get_capability(0, true));
         true
     }
     else { false }
 
-}
-pub fn fixed_level() {
-    for x in 1..250 {
-        if let Some(unit) = UnitPool::get(x).filter(|u| u.force.is_some_and(|f| (1 << f.force_type) & 57 != 0)){
-            let job_max_level = unit.get_job().get_max_level();
-            if unit.level >= job_max_level {
-                let diff = unit.level as i32 - job_max_level as i32;
-                unit.level = job_max_level;
-                unit.internal_level += diff as i8;
-            }
-        }
-    }
 }

@@ -1,15 +1,13 @@
-use engage::gamedata::assettable::AssetTableResult;
-use engage::gamedata::GodData;
-use engage::god::GodUnit;
-use engage::proc::ProcInstFields;
-use engage::resourcemanager::ResourceManager;
-use engage::unit::Unit;
-use unity::engine::Sprite;
-use unity::prelude::*;
-use crate::DVCVariables;
-use crate::enums::{MPIDS, RINGS};
-use crate::randomizer::names::get_emblem_person;
-use crate::sprite::get_gender_lueur_ascii;
+use engage::{
+    gamedata::assettable::AssetTableResult,
+    gamedata::GodData,
+    god::GodUnit,
+    proc::ProcInstFields,
+    resourcemanager::ResourceManager,
+    unit::Unit
+};
+use unity::{engine::Sprite, prelude::*};
+use crate::{DVCVariables, enums::{MPIDS, RINGS}, randomizer::names::get_emblem_person, sprite::get_gender_lueur_ascii};
 
 #[unity::class("App", "TelopManager")]
 pub struct TelopManager {}

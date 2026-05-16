@@ -1,5 +1,4 @@
 use engage::{
-    gamevariable::GameVariableManager,
     gameuserdata::GameUserData, proc::ProcInst,
     sequence::{
         mainmenusequence::MainMenuSequenceLabel,
@@ -35,9 +34,7 @@ pub fn map_sequence_events(proc: &ProcInst, label: i32) {
         MapSequenceLabel::TurnHuman => {
             randomizer::terrain::terrain_spots();   // Random TerrainTiles
             unsafe { autosave_proc_inst(proc, 5, 0, None, None); }
-            if DVCVariables::UnitRecruitment.get_value()  != 0 {
-                crate::script::replace_lueur_chapter22();
-            }
+            if DVCVariables::UnitRecruitment.get_value()  != 0 { crate::script::replace_lueur_chapter22(); }
         },
         MapSequenceLabel::TurnEnd => { randomizer::terrain::fow::rando_fow();  }
         MapSequenceLabel::Complete => {

@@ -306,32 +306,6 @@ pub fn asset_table_robin_hook(
     result
 }
 
-pub fn tiki_engage(result: &mut AssetTableResult, unit: &Unit, mode: i32) {
-    if mode == 2 {
-        result.body_model = "uRig_Tik1AT".into();
-        result.dress_model = "uBody_Tik1AT_c000".into();
-        result.head_model = "null".into();
-        result.hair_model = "null".into();
-        result.info_anims = Some("AOC_Info_c745".into());
-        result.talk_anims = Some("AOC_Talk_c745".into());
-        ["c_spine1_jnt", "c_spine2_jnt", "c_hip_jnt", "l_arm3_jnt", "r_arm3_jnt", "l_leg3_jnt", "r_leg3_jnt"]
-            .iter().for_each(|locator|  change_accessory(result.accessory_list, "null", *locator));
-        result.body_anims.add(Il2CppString::new_static("Ent0AT-Mg1_c000_N"));
-        result.body_anims.add(Il2CppString::new_static("Ent0AT-Ft1_c000_N"));
-        result.body_anims.add(Il2CppString::new_static("Ent0AT-Ft2_c000_N"));
-    }
-    else {
-        result.body_model = "oBody_Tik1AT_c000".into();
-        result.head_model = "oHair_null".into();
-        ["c_spine1_jnt", "c_spine2_jnt", "c_hip_jnt", "l_arm3_jnt", "r_arm3_jnt", "l_leg3_jnt", "r_leg3_jnt"]
-            .iter().for_each(|locator|  change_accessory(result.accessory_list, "null", *locator));
-        result.scale_stuff[18] = 0.50;
-        result.scale_stuff[16] = 1.0;
-        result.body_anim = Some("UAS_Ent0AT".into());
-    }
-    change_result_colors_by_unit(unit, result);
-}
-
 pub fn get_emblem_attack_index(unit: &Unit) -> usize {
     if let Some(engage_attack) = unit.get_engage_attack()  {
         let sid = engage_attack.sid.to_string();

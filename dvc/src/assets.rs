@@ -100,7 +100,6 @@ pub fn asset_table_result_setup_hook(
     if conditions.character_mode == CharacterAssetMode::Combat {  // weapon asset
         edit_asset_weapon(result, false, 2, equipped);
     }
-    if crate::DVCConfig::get().debug { print_asset_table_result(result, mode); }
     let pid = unit.person.pid.to_string();
     if ( mode == 2 && GameUserData::get_chapter().cid.str_contains("G00") && unit.force.is_some_and(|f| f.force_type != 0) ) || pid.contains("_チキ") {}
     result

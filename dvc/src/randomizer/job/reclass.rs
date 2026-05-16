@@ -2,9 +2,218 @@ use engage::{
     sortie::SortieSelectionUnitManager, unit::Gender,
     menu::{BasicMenuItemAttribute, menus::class_change::*}
 };
-use crate::utils::get_base_classes;
+use outfit_core::clamp_value;
+use crate::{
+    randomizer::{person::{switch_person_reverse}, skill::learn::unit_update_learn_skill},
+    utils::{get_base_classes}
+};
 use super::*;
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum ClassTier {
+    Base,
+    Promoted,
+    Special,
+}
+#[derive(Clone, Copy)]
+pub enum ReclassType {
+    Enemy,
+    Recruitment(bool),
+    PlayerSingle(bool),
+    PlayerLockout(bool, bool)
+}
+impl ClassTier {
+    pub fn from_job(job: &JobData) -> Self {
+        if job.is_high() { Self::Promoted }
+        else if job.max_level > 20 || !job.has_high_jobs() { Self::Special }
+        else { Self::Base }
+    }
+}
+impl ReclassType {
+    pub fn get_from_settings(recruitment: bool) -> Self {
+        let mode = DVCVariables::ClassMode.get_value();
+        match mode {
+            1 => Self::Recruitment(true),
+            2 => Self::PlayerSingle(recruitment),
+            3|4 => Self::PlayerLockout(recruitment, mode == 4),
+            _ => Self::Recruitment(false)
+        }
+    }
+}
+fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, player: bool, emblem: bool) -> bool {
+    if !DVCFlags::CustomClass.get_value() { if !JOB_HASH.iter().any(|&hash| hash == job.parent.hash ) { return false;} }
+    let hash = job.parent.hash;
+    if hash == VILLAGER || ((hash == ENCHANTER || hash == MAGE_CANNON) && !dlc_check()) { false }
+    else {
+        let job_flags = job.flag.value;
+        let flag = if is_female { 51 } else { 39 };  // Ignore + Reclass + GenderExc
+        let job_high = job.is_high() || !job.has_high_jobs();
+        if let Some(pos) = MONSTER_CLASS.iter().position(|&v| v == hash) {
+            player && !emblem && (
+                (pos < 2 && DVCVariables::is_main_chapter_complete(11)) ||
+                    (pos < 6 && DVCVariables::is_main_chapter_complete(16) && dlc_check())
+            )
+        }
+        else {
+            let flag_check = job_flags & flag == 3;     // Only have Reclass
+            let tier = (high_class == job_high) || (!high_class == job.is_low());
+            flag_check && tier && !job.jid.to_string().contains("_紋章士_")
+        }
+    }
+}
+pub fn unit_reclass(unit: &mut Unit, kind: ReclassType) -> bool {
+    let current_job = unit.get_job();
+    if current_job.jid.to_string().starts_with("JID_紋章士_") { return false; }
+    let old_class = current_job.parent.hash;
+    let person = unit.get_person();
+    let female =
+        if unit.person.get_flag().value & 32 != 0 { person.get_gender() == 1 }
+        else { unit.get_dress_gender() == Gender::Female };
+
+    let mut tier = ClassTier::from_job(current_job);
+    let mut level = unit.get_level();
+    let mut il = unit.get_internal_level();
+    match kind {
+        ReclassType::Enemy => {
+            let high_job = current_job.is_high() || (current_job.get_max_level() > 20 && level > 20);
+            let pool: Vec<_> = JobData::get_list().unwrap().iter()
+                .filter(|j| unit_random_can_reclass(j, female, high_job, false, false))
+                .collect();
+
+            if let Some(j) = pool.get_random_element(Random::get_game()) {
+                unit.class_change(j);
+                reclass_level_adjustment(unit, level, il, tier);
+            }
+        }
+        ReclassType::Recruitment(random) => {
+            if let Some(old_person) = switch_person_reverse(person){
+                level = old_person.get_level() as i32;
+                il = old_person.get_internal_level() as i32;
+                if old_person.get_job().is_some_and(|v| v.is_high()) && il == 0 { il = 20; }
+                if random {
+                    let high_job = tier == ClassTier::Promoted || (level > 20 && il == 0);
+                    let pool: Vec<_> = JobData::get_list().unwrap().iter()
+                        .filter(|j| unit_random_can_reclass(j, female, high_job, true, false))
+                        .collect();
+
+                    if let Some(j) = pool.get_random_element(Random::get_game()) { recruitment_job_level_adjustment(unit, old_person, j, true); }
+                    else { recruitment_job_level_adjustment(unit, old_person, unit.person.get_job().unwrap(), true); }
+                }
+                else { recruitment_job_level_adjustment(unit, old_person, unit.person.get_job().unwrap(), false); }
+            }
+            adaptive_growths(unit, true);
+        }
+        ReclassType::PlayerSingle(recruitment) => {
+            if recruitment {
+                if let Some(old_person) = switch_person_reverse(person){
+                    level = old_person.get_level() as i32;
+                    il = old_person.get_internal_level() as i32;
+                    if old_person.get_job().is_some_and(|v| v.is_high()) && il == 0 { il = 20; }
+                    tier = ClassTier::from_job(old_person.get_job().unwrap());
+                }
+            }
+            if let Some(job) = DVCVariables::get_single_class(tier == ClassTier::Base || level > 20, female){
+                unit.class_change(job);
+                reclass_level_adjustment(unit, level, il, tier);
+            }
+            if recruitment { adaptive_growths(unit, true); }
+        }
+        ReclassType::PlayerLockout(recruitment, random) => {
+            let playable = lockout::get_all_playable_unit_classes(person);
+            let mut selected_job = 0;
+            if recruitment {
+                if let Some(old_person) = switch_person_reverse(person){
+                    level = old_person.get_level() as i32;
+                    il = old_person.get_internal_level() as i32;
+                    if old_person.get_job().is_some_and(|v| v.is_high()) && il == 0 { il = 20; }
+                    tier = ClassTier::from_job(old_person.get_job().unwrap());
+                    if !random {
+                        if let Some(job) = GameData::get().job_db.get_reclass_job(unit, unit.person.get_job().unwrap(), tier) {
+                            if !playable.contains(&job.parent.hash) { selected_job = job.parent.hash; }
+                        }
+                    }
+                }
+            }
+            if let Some(job) = JobData::try_get_hash(selected_job){
+                unit.class_change(job);
+                reclass_level_adjustment(unit, level, il, tier);
+            }
+            else {
+                let is_high = tier == ClassTier::Promoted || (level > 20);
+                let pool: Vec<_> = JobData::get_list().unwrap().iter()
+                    .filter(|j| unit_random_can_reclass(j, female, is_high, true, false) && !playable.contains(&j.parent.hash))
+                    .collect();
+
+                if let Some(j) = pool.get_random_element(Random::get_game()) {
+                    unit.class_change(j);
+                    reclass_level_adjustment(unit, level, il, tier)
+                }
+                else {
+                    unit.class_change(JobData::try_get_hash(VILLAGER).unwrap());
+                    reclass_level_adjustment(unit, level, il, tier)
+                }
+            }
+            if recruitment { adaptive_growths(unit, true); }
+        }
+    }
+    fixed_unit_weapon_mask(unit);
+    assign_selected_weapon_mask_by_apt(unit, None);
+    unit.set_hp(unit.get_capability(0, true));
+    unit_update_learn_skill(unit);
+    unit.get_job().parent.hash != old_class
+}
+fn recruitment_job_level_adjustment(unit: &mut Unit, old_person: &PersonData, target: &JobData, random: bool) {
+    let old_level = old_person.get_level() as i32;
+    let old_il = old_person.get_internal_level() as i32;
+    let old_tier = ClassTier::from_job(old_person.get_job().unwrap());
+    let new_tier = ClassTier::from_job(target);
+    match (old_tier, new_tier) {
+        (ClassTier::Base, ClassTier::Promoted)|(ClassTier::Promoted, ClassTier::Base) => {
+            if let Some(job) = GameData::get().job_db.get_reclass_job(unit, target, old_tier) {
+                unit.class_change(job);
+                unit.set_hp(unit.get_capability(0, true));
+            }
+        }
+        (ClassTier::Special, ClassTier::Base) => {
+            if old_level > 20 {
+                if let Some(job) = GameData::get().job_db.get_reclass_job(unit, target, ClassTier::Promoted) {
+                    unit.class_change(job);
+                }
+            }
+            else { unit.class_change(target); }
+        }
+        _ => { unit.class_change(target); }
+    }
+    // println!("{} Reclasses to {} [Old Person {}]", unit.get_name(), unit.job.get_name(), old_person.get_name());
+    if random { randomize_selected_weapon_mask(unit, None); }
+    else { assign_selected_weapon_mask_by_apt(unit, None); }
+    reclass_level_adjustment(unit, old_level, old_il, old_tier);
+}
+fn reclass_level_adjustment(unit: &Unit, target_level: i32, target_il: i32, from: ClassTier) {
+    let total_level = target_level + target_il;
+    let job_max_level = unit.get_job().get_max_level() as i32;
+    let to = ClassTier::from_job(unit.get_job());
+    let mut set_level = target_level;
+    if to != from {
+        match (from, to) {
+            (ClassTier::Special, ClassTier::Base) => {
+                if total_level > job_max_level { set_level = clamp_value(total_level - job_max_level, 1, job_max_level); }
+            }
+            (ClassTier::Special, ClassTier::Promoted) => {
+                set_level =
+                    if total_level > (job_max_level + 5) { clamp_value(total_level - job_max_level, 1, job_max_level) }
+                    else if total_level > (job_max_level - 5) { clamp_value(total_level - job_max_level - 5, 1, job_max_level) }
+                    else if total_level > 10 { clamp_value(total_level - 10, 1, job_max_level) }
+                    else { 1 };
+            }
+            (ClassTier::Promoted|ClassTier::Base, ClassTier::Special) => { set_level = clamp_value(total_level, 1, job_max_level); }
+            _ => {}
+        }
+    }
+    unit.set_level(set_level);
+    let max_il = 40 + 10 * GameUserData::get_difficulty(false);
+    unit.set_internal_level(clamp_value(total_level-set_level, 0, max_il));
+}
 pub fn class_change_job_menu_item_build_attr(this: &mut ClassChangeJobMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
     if !DVCVariables::random_enabled() { return this.attribute; }
     if DVCConfig::get().debug { return BasicMenuItemAttribute::Enable; }

@@ -32,7 +32,6 @@ impl GmapPlayerUnit {
             self.unit.put_off_all_item();
         }
     }
-    pub fn apply_changes() {}
 }
 
 #[unity::from_offset("App", "GmapPlayerUnit", "LoadActor")]

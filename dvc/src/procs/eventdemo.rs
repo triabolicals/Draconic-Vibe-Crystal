@@ -67,7 +67,6 @@ fn set_motion(this: &EventDemoSequence, cmd_info: &mut CmdInfo, _: OptionalMetho
 fn sound_event(this: &EventDemoSequence, cmd_info: &mut CmdInfo, _: OptionalMethod) -> EventDemoSequenceEventCmdResult {
     if cmd_info.args.len() >= 1 && DVCFlags::CutsceneBGM.get_value()  {
         if cmd_info.args[0].str_contains("BGM") {
-            println!("Sound Event: {}", cmd_info.args[0]);
             GameSound::stop_all_bgm(GameSoundFadeSpeedType::Normal);
             if let Some(bgm) = crate::randomizer::bgm::BGM_POOL.get().and_then(|v| v.get_random_element(Random::get_system())) {
                 cmd_info.args[0] = bgm.into();

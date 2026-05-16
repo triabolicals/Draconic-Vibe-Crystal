@@ -1,5 +1,5 @@
 use engage::{
-    gamevariable::GameVariableManager, mess::Mess,
+    gamevariable::GameVariableManager,
     gamedata::{Gamedata, PersonData, skill::{SkillArray, SkillData}},
 };
 use crate::{
@@ -60,14 +60,8 @@ impl EnemyCharacter {
         if PersonData::try_get_hash_mut(self.hash).is_none_or(|p| p.flag.value & 512 != 0) { return; }    // Already updated
         if let Some(src_person) = self.playable_slot.and_then(|x| PersonData::get(PIDS[x])) {
             if let Some(new_person) = switch_person(src_person).or_else(||Some(src_person)){
-                let old_job = src_person.get_job().expect(
-                    format!("Person #{}: {} does not have a valid class.\nPlease change the JID of Person #{} in Person.xml.",
-                            src_person.parent.index, Mess::get_name(src_person.pid), src_person.parent.index).as_str()
-                );
-                let new_job = new_person.get_job().expect(
-                    format!("Person #{}: {} does not have a valid class.\nPlease change the JID of Person #{} in Person.xml.",
-                            new_person.parent.index, Mess::get_name(new_person.pid), new_person.parent.index).as_str()
-                );
+                let old_job = src_person.get_job().unwrap();
+                let new_job = new_person.get_job().unwrap();
                 let jid =
                     if old_job.is_high() && (new_job.is_high() || (new_job.is_low() && new_job.max_level == 40)) { new_job.jid }
                     else if (old_job.is_high() || src_person.get_level() > 20) && (new_job.is_low() && new_job.has_high_jobs()) { new_job.get_high_jobs()[0].jid } 
@@ -75,27 +69,26 @@ impl EnemyCharacter {
                         let lows = get_base_classes(new_job);
                         if lows.len() == 0 { "JID_ソードファイター".into() } else { lows[0].jid }
                     } else { new_job.jid };
+
                 let flag_value =
-                    if new_person.pid.to_string() == PIDS[0] {
-                        new_person.flag.value | 1536
-                    } else { new_person.flag.value | 512 };
+                    if new_person.pid.to_string() == PIDS[0] { new_person.flag.value | 1536 }
+                    else { new_person.flag.value | 512 };
+
                 let grow = new_person.get_grow();
                 let valid = new_person.unit_icon_id.is_some();
                 let icon_name = if valid { new_person.unit_icon_id.unwrap().to_string() } else { "".to_string() };
                 let help_name = new_person.help.map(|v| v.to_string()).unwrap_or_else(|| "MPID_H_Unknown".to_string());
                 if let Some(person_x) = PersonData::try_get_hash_mut(self.hash) {
                     person_x.hometown = src_person.parent.hash;
-                    let job_x = person_x.get_job().expect(
-                        format!("Person #{}: {} does not have a valid class.\nPlease change the JID of Person #{} in Person.xml.",
-                                person_x.parent.index, Mess::get_name(person_x.pid), person_x.parent.index).as_str()
-                    );
+                    let job_x = person_x.get_job().unwrap();
                     let level = person_x.get_level();
                     if (job_x.is_low() && job_x.max_level == 20) && new_job.is_high() { person_x.set_level(level); } else if (job_x.is_low() && job_x.max_level == 40) && new_job.is_high() {
                         if level > 20 {
                             person_x.set_level(level - 20);
                             person_x.set_internal_level(20);
                         }
-                    } else if job_x.is_high() && new_job.max_level == 40 {
+                    }
+                    else if job_x.is_high() && new_job.max_level == 40 {
                         let total = if person_x.get_internal_level() == 0 { 20 } else { person_x.get_internal_level() } as u8 + level;
                         person_x.set_level(total);
                         person_x.set_internal_level(0);

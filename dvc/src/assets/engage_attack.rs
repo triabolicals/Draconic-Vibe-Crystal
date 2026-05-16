@@ -330,8 +330,7 @@ fn houses_unite_partners(god_data: &GodData, linked: Option<&GodData>, rng: &Ran
 fn engage_atk_result_clear(result: &mut AssetTableResult, equipped: Option<&ItemData>) {
     result.ride_model = Some("null".into());
     result.ride_dress_model = None;
-    accessory::clear_accessory_at_locator(result.accessory_list, "reserve1_loc");
-    accessory::clear_accessory_at_locator(result.accessory_list, "reserve2_loc");
-    accessory::clear_accessory_at_locator(result.accessory_list, "reserve3_loc");
-    accessory::clear_accessory_at_locator(result.accessory_list, "reserve4_loc");
+    for i in 1..5 {
+        accessory::clear_accessory_at_locator(result.accessory_list, format!("reserve{}_loc", i).as_str());
+    }
 }

@@ -11,8 +11,7 @@ pub fn try_equip_emblem(unit: &Unit, emblem: usize) -> bool {
         if unit.person.gender == 0 || unit.person.gender == 3  { return false; }
         if emblem < 31 { if emblem_set_flag & (1 << emblem) != 0 { return false; }  }
         let gid = g_unit.data.main_data.gid.to_string();
-        
-        
+
         if let Some(god_unit) = GodData::get(gid.replace("GID_", "GID_相手")).and_then(|data| GodPool::create(data)){
             let valid = unit.try_connect_god_unit(god_unit).is_some();
             god_unit.set_escape(true);

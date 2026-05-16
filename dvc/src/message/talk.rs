@@ -36,8 +36,6 @@ pub fn mess_load(filename: &Il2CppString, method_info: OptionalMethod) -> bool {
 }
 pub fn talk_tag_name_initialize(this: &mut TalkTagName, talk_ptr: &mut TalkPtr, _optional_method: OptionalMethod) {
     let tag = talk_ptr.read_int16();
-    // let mid = unsafe { crate::talk::get_current_mid(None) }.to_string();
-    // println!("TalkTagName Initialize [{}]: {}", mid, tag);
     if tag >= 10 {
         let length = talk_ptr.read_int16() >> 1;
         let mut args = vec![];
@@ -47,7 +45,6 @@ pub fn talk_tag_name_initialize(this: &mut TalkTagName, talk_ptr: &mut TalkPtr, 
         this.tag_id = 3;    // TagID = 3,4,5 will replace text
         this.replacement_name = "".into();
         if let Some(replacement) = get_replacement_name(tag, &args) {
-            // println!("Replacement [{}]: {}", tag, replacement);
             this.replacement_name = replacement; 
         }
         else { this.replacement_name = "".into(); }
@@ -213,7 +210,6 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
         }
     }
     else { None };
-    // Convert Space into New Line if the replacement text new lines in the middle
     if let Some( (new_line_pos, new_mess))= args.last().filter(|v| **v > 0).map(|v| *v as usize).zip(mess.as_mut()){
         if let Some(space) = new_mess.to_u16_mut().iter_mut().enumerate().find(|(i, v)| *i >= new_line_pos && **v == 32) {
             *space.1 = 10;

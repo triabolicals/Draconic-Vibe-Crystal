@@ -112,19 +112,16 @@ pub struct DVCConfig {
 impl DVCConfig {
     pub fn get() -> &'static mut Self { unsafe { &mut CONFIG } }
     pub fn new() -> Self {
-        println!("Opening dvc.toml");
         let config_content = std::fs::read_to_string("sd:/engage/config/dvc.toml");
         // If the file is read to a string or there is no failure, parse into the config struct.
         if config_content.is_ok() {
             let content = config_content.unwrap();
             let config = toml::from_str(&content);
             if config.is_ok() {
-                println!("DVC Config file was parsed with no issues.");
                 let config = config.unwrap();
                 config
             } else {
                 // This is mostly intended to create a new file if more items are added to the struct
-                println!("DVC Config: Config file could not be parsed or new settings are added.\nNew default config file has been created.");
                 let config = DVCConfig::default();
                 // config.save();
                 config
@@ -132,7 +129,6 @@ impl DVCConfig {
         }
         else {
             // If the file could not be read to a string then create a new file with default values.
-            println!("DVC Config: The config file was either missing or unable to be read, creating new toml.");
             let config = DVCConfig::default();
             // config.save();
             config
@@ -492,7 +488,6 @@ pub fn migrate_to_v3() {
     GameVariableManager::make_entry_norewind(DVCVariables::EnemyItemDropGauge.get_key(), 0);
     for x in 0..5 {
         let v = GameVariableManager::get_number(gauges[x as usize]);
-        println!("{}: {}", gauges[x as usize], v);
         let v2 = clamp_value(v, 0, 100);
         if let Some(v) = DVCVariables::from(30+x) { v.set_value(v2); }
         GameVariableManager::remove(gauges[x as usize]);

@@ -84,7 +84,6 @@ pub fn set_next_random_chapter(current_chapter: &ChapterData) -> Option<&'static
         available.extend((51..57).filter(|&v| complete_mask & (1 << v) == 0));
     }
     if available.len() == 0 { return ChapterData::get("CID_M026"); }
-    // available.iter().for_each(|&v|{ println!("Random Chapter Available: {}", get_chapter_from_idx(v)); });
     let rng = Random::get_game();
     loop {
         if let Some(i) = available.get_random_element(rng).map(|v| get_chapter_from_idx(*v))

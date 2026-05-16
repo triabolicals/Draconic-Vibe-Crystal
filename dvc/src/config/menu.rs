@@ -47,7 +47,8 @@ pub fn create_dvc_bind<B: Bindable>(proc: &B) -> bool {
         single_class_check();
         let list = List::<DVCConfigMenuItem>::with_capacity(20).unwrap();
         DVCMenu::reset_select();
-        DVCMenu::Main.get_items().iter().for_each(|k|{
+        let list2 = DVCMenu::Main.get_items(DVCConfigMenuItem::new_kind(DVCMenuItemKind::SingleJob));
+        list2.iter().for_each(|k|{
             let item = DVCConfigMenuItem::new_kind(*k);
             item.menu_kind = DVCMenu::Main;
             list.add(item);

@@ -1,19 +1,21 @@
 use std::collections::HashSet;
 use bitflags::Flags;
-use engage::gameuserdata::GameUserData;
-use engage::unit::Gender::{Female, Male};
+use engage::{gameuserdata::GameUserData, unit::Gender::{Female, Male}};
 use outfit_core::{
     get_outfit_data, AssetConditions, AssetFlags, PersonalDressData, UnitAssetMenuData,
     CharacterAssetMode::UnitInfo,
 };
 use crate::{
-    config::DVCFlags, utils::create_rng,
+    config::DVCFlags,
+    utils::create_rng,
     assets::transform::is_dragonstone,
-    randomizer::{names::get_emblem_person, person::is_playable_person, data::RandomizedGameData},
+    randomizer::{
+        names::get_emblem_person, person::is_playable_person, data::RandomizedGameData,
+        job::LUEUR_CLASS, Randomizer
+    }
 };
 use accessory::*;
 use transform::{has_enemy_tiki};
-use crate::randomizer::Randomizer;
 use super::*;
 
 fn is_preview_unit(unit: &Unit) -> bool { unit.force.is_some_and(|x| (1 << x.force_type) & 25 != 0) && unit.status.value & 35184372088832 == 0 }
@@ -155,7 +157,7 @@ pub fn commit_for_unit_dress(
         return conditionss;
     }
     let condition_unit = if conditionss.flags.contains(AssetFlags::Vision) { UnitUtil::get_vision_owner(unit).unwrap_or(unit) } else { &unit  };
-
+    if condition_unit.job.parent.hash == LUEUR_CLASS[2] { AssetFlags::set_condition_key(condition_unit.job.jid, false); }
     if tiki_engage(result, condition_unit, mode, equipped, &mut conditionss) { return conditionss; }
     // Boss Randomization / Past Alear Edit / Veyle Edit
     let rand = RandomizedGameData::get_read();
@@ -262,7 +264,7 @@ pub fn commit_for_unit_dress(
     }
     if mode == 2 {
         if DVCVariables::BodyScaling.get_value() != 0 {  random_body_scale(result, Some(unit.grow_seed), false); }
-        if condition_unit.person.get_job().map(|j| j.parent.hash).unwrap_or(condition_unit.job.parent.hash) == 185671037 { lueur_fell_child_hair(result); }
+        if condition_unit.person.get_job().map(|j| j.parent.hash).unwrap_or(condition_unit.job.parent.hash) == LUEUR_CLASS[2] { lueur_fell_child_hair(result); }
     }
     if DVCVariables::BodyScaling.get_value() != 0 && mode == 2 { random_body_scale(result, Some(unit.grow_seed), false); }
     conditionss

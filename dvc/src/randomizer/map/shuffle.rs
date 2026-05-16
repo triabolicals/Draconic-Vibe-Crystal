@@ -147,7 +147,7 @@ pub fn shuffle_deployment() {
                     data.dispos_x = pos.0;
                     data.dispos_y = pos.1;
                     data.direction = rng.get_value(8);
-                    if let Some(name) = data.get_person().map(|p| p.get_name()) { println!("Boss Unit: {} moved to {}, {}", name, pos.0, pos.1); }
+                    // if let Some(name) = data.get_person().map(|p| p.get_name()) { println!("Boss Unit: {} moved to {}, {}", name, pos.0, pos.1); }
                 }
                 positions.remove(&(data.dispos_x, data.dispos_y));
                 for x in -2..2 {

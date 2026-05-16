@@ -174,7 +174,7 @@ impl DVCConfigText {
                 item.title = "Opps all".into();
                 item.help_text = "Playable units will be restricted to this class line".into();
                 match item.dvc_value {
-                    1 => { item.command_text = format!("{} (DLC)", Mess::get("MJID_ShadowLordR")).into(); }
+                    1000 => { item.command_text = format!("{} (DLC)", Mess::get("MJID_ShadowLordR")).into(); }
                     _ => {
                         if let Some(job) = JobData::try_get_hash(item.dvc_value) {
                             item.command_text = format!("{}: {}", job.parent.index, Mess::get_name(job.jid)).into()

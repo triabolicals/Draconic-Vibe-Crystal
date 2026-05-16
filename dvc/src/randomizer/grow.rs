@@ -1,9 +1,10 @@
 use engage::{unit::Unit, force::{ForceType, *}, gamedata::*, gamevariable::*, };
-use crate::{DVCVariables, config::DVCFlags, randomizer::get_data_read};
+use crate::{DVCVariables, config::DVCFlags};
+use crate::randomizer::data::GameData;
 
 pub fn randomize_person_grow(){
     let person_list = PersonData::get_list_mut().unwrap();
-    let data = get_data_read();
+    let data = GameData::get();
     let mode = DVCVariables::PersonalGrowthMode.get_value() & 255;
     let limits: (i32, i32) = 
         match mode {
@@ -55,7 +56,7 @@ pub fn player_pool_adaptive_growths() {
 }
 
 pub fn randomize_job_grow() {
-    let data = get_data_read();
+    let data = GameData::get();
     let job_list = JobData::get_list_mut().unwrap();
     job_list.iter_mut().for_each(|job|{
         let rng = crate::utils::create_rng(job.parent.hash, 2);
@@ -81,7 +82,7 @@ pub fn random_grow(){
             }
         }
     }
-    let data = get_data_read();
+    let data  = GameData::get();
     if !enabled {
         data.growth_data.reset(3);
         return;

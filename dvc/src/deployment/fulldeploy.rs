@@ -28,10 +28,7 @@ pub fn encounter_map_dispos() {
             }
         }
     }
-    if absent_count <= player_count || player_array == -1 { 
-        println!("Can't find player array or player count is less than absent count: {} < {}", absent_count, player_count);
-        return;
-     }
+    if absent_count <= player_count || player_array == -1 { return; }
     let terrain = MapTerrain::get_instance();
     if terrain.is_none() { return; }
     let map_terrain = terrain.unwrap();

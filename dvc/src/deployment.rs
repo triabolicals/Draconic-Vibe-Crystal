@@ -8,7 +8,7 @@ pub use engage::{
 };
 use engage::unit::Gender;
 use super::{randomizer, DVCVariables};
-use crate::{enums::*, config::DVCFlags, randomizer::data::GameData};
+use crate::{randomizer::data::GameData};
 
 pub mod fulldeploy;
 pub mod sortie;
@@ -38,7 +38,6 @@ pub fn deployment_modes(){
         let absent_count = absent_force.get_count();
         let rng = Random::get_game();
         let unit_deployment_mode = DVCVariables::UnitDeployment.get_value();
-        println!("Unit Deployment Mode: {}", unit_deployment_mode);
         // Free deployment
         if unit_deployment_mode == 3 && !GameUserData::is_encount_map() && !GameUserData::get_chapter().cid.str_contains("CID_M022") {
             if hero_unit.status.value & 20 != 0 { hero_unit.status.value &= !20; }

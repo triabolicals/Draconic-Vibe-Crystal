@@ -16,7 +16,7 @@ pub fn change_interaction_data(choice: i32, loaded: bool) {
     let interact_data = InteractData::get_list_mut().unwrap();
     match choice & 255 {
         2 => {  //Reverse
-            let data = get_data_read();
+            let data = GameData::get();
             for x in 0..10 {
                 interact_data[x].flag.value = data.interactions[10 + x];
                 interact_data[x + 10].flag.value = data.interactions[x];

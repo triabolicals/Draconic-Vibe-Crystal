@@ -1,15 +1,23 @@
-use engage::{gamedata::skill::SkillDataCategorys, unit::{Unit, UnitPool}};
+use engage::{
+    gamedata::skill::SkillDataCategorys,
+    unit::{Unit, UnitPool},
+    gamedata::terrain::TerrainData,
+    map::terrain::MapTerrain
+};
 use crate::{
-    assets::animation::MONSTERS, config::DVCVariables,
+    assets::animation::MONSTERS,
+    config::DVCVariables,
     continuous::get_continious_total_map_complete_count,
     randomizer::{
-        emblem::ENEMY_EMBLEM_LIST, grow, item::unit_items, job,
+        emblem::ENEMY_EMBLEM_LIST,
+        grow, item::unit_items, job,
         data::{GameData, RandomizedGameData},
         item::{unit_items::add_generic_weapons, change_liberation_type},
         job::{is_magic_class, randomize_selected_weapon_mask},
-    },
+        job::reclass::ReclassType,
+        status::RandomizerStatus
+    }
 };
-use crate::randomizer::status::RandomizerStatus;
 use super::{*, ai};
 
 const VANDER_MAX: [i8; 11] = [45, 12, 14, 11, 40, 12, 13, 12, 10, 5, 7];
@@ -31,15 +39,14 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     call_original!(this, method_info);
     if !RandomizerStatus::get().init { return; }
     if !can_rand()  || this.person.parent.hash == 1879825845 || this.status.value & 134217728 != 0 { return; }  // Doubles
-    let single_class = DVCVariables::get_single_class(false, false).is_some();
+
     let changed_recruit_order = DVCVariables::UnitRecruitment.get_value() != 0;
     let class_mode = DVCVariables::ClassMode.get_value();
-    let random_class =
-        if class_mode == 3 { job::lockout::get_all_playable_unit_classes(this.person).contains(&this.job.parent.hash) }
-        else { class_mode == 1 || class_mode == 4 };
+    let reclass_mode = ReclassType::get_from_settings(true);
+    let random_class = class_mode > 0;
 
     let random_inventory = DVCVariables::UnitInventory.get_value() & 1 != 0;
-    let adjust_items = changed_recruit_order || random_class || single_class;
+    let adjust_items = changed_recruit_order || random_class;
     ai::adjust_person_unit_ai(this);
     let sequence = GameUserData::get_sequence();
     if !DVCVariables::is_main_chapter_complete(2) && changed_recruit_order {
@@ -47,7 +54,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         if old_person.parent.index < 5 && old_person.parent.index > 0 {
             change_unit_autolevel(this, true);
             this.item_list.put_off_all_item();
-            if random_class || single_class { job::unit_change_to_random_class(this, true);  }
+            if random_class { job::reclass::unit_reclass(this, reclass_mode);  }
             if (old_person.parent.index == 3 || old_person.parent.index == 4) && GameUserData::get_chapter().cid.str_contains("M001") {
                 if random_inventory { adjust_unit_items(this); }
             }
@@ -64,7 +71,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     }
     if !is_player_unit(this.person) {
         if is_playable_person(this.person) {
-            if random_class || single_class { job::unit_change_to_random_class(this, true);  }
+            if random_class { job::reclass::unit_reclass(this, reclass_mode);  }
             if adjust_items {  adjust_unit_items(this);  }
             if random_inventory { unit_items::adjust_missing_weapons(this); }
             grow::adaptive_growths(this, true);
@@ -124,11 +131,11 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         this.auto_equip();
         this.set_hp(this.get_capability(0, true));
         set_unit_edit_name(this);
-        println!("Finish creating {} Lvl: {}/{}", this.get_name(), this.level, this.internal_level);
+        // println!("Finish creating {} Lvl: {}/{}", this.get_name(), this.level, this.internal_level);
         return;
     }
     if changed_recruit_order {
-        if ( sequence == 4 ||  sequence == 5 ) ||
+        if ( sequence == 4 || sequence == 5 ) ||
             (sequence == 3 && ( GameVariableManager::get_bool("MapRecruit") || ( DVCVariables::UnitDeployment.get_value() != 3 && !lueur_on_map() ) ) )
         {
             change_unit_autolevel(this, true);
@@ -139,8 +146,8 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             }
         }
         else if switch_person(this.person).is_none_or(|v| v.parent.hash == this.person.parent.hash){
-            if random_class || single_class  {
-                job::unit_change_to_random_class(this, true);
+            if random_class {
+                job::reclass::unit_reclass(this, reclass_mode);
                 fixed_unit_weapon_mask(this);
                 adjust_unit_items(this);
                 if DVCVariables::UnitInventory.get_value() & 1 != 0 { unit_items::adjust_missing_weapons(this); }
@@ -154,7 +161,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         else { change_unit_autolevel(this, false);  }
         set_unit_edit_name(this);
     }
-    if random_class || single_class {  job::unit_change_to_random_class(this, true);  }
+    if random_class {  job::reclass::unit_reclass(this, reclass_mode);  }
     if adjust_items {
         adjust_unit_items(this);
         if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 { ai::adjust_unitai(this); }
@@ -165,7 +172,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     grow::adaptive_growths(this, true);
     auto_level_unit_for_random_map(this, false);
     this.set_hp(this.get_capability(0, true));
-    println!("Finish creating {} Lvl: {}/{}", this.get_name(), this.level, this.internal_level);
+    // println!("Finish creating {} Lvl: {}/{}", this.get_name(), this.level, this.internal_level);
 }
 
 fn unit_set_drop_seals(this: &mut Unit) {
@@ -284,100 +291,21 @@ pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
         unit.extra_hp_stock_count = 1;
         unit.extra_hp_stock_count_max = 1;
     }
-    let new_person = if reverse { &unit.person } else { switch_person(unit.person).unwrap_or(unit.get_person()) };
+    let new_person = if reverse { unit.get_person() } else { switch_person(unit.person).unwrap_or(unit.get_person()) };
     if new_person.parent.hash == person.parent.hash { return; }
     println!("{} -> {}",  Mess::get_name(person.pid), Mess::get_name(new_person.pid));
-    let is_low = person.get_job().unwrap().is_low();    
-    let is_new_low = new_person.get_job().unwrap().is_low();
-    let current_level = person.get_level() as i32;
-    let mut current_internal_level = person.get_internal_level() as i32;
-    if current_internal_level == 0 && !is_low { current_internal_level = 20; }
-    unit.set_person(person);
-    unit.class_change(person.get_job().unwrap());
-    if is_low {
-       if current_level > 20 { //Old Unit is in a special class so new unit needs to be promoted
-            if is_new_low {
-                if new_person.get_job().unwrap().has_high_jobs() {    // new unpromoted unit can promoted
-                    let level = current_level - 20;
-                    let new_job = &new_person.get_job().unwrap().get_high_jobs()[0];
-                    unit.auto_grow_capability( level, current_level);
-                    unit.class_change(new_job);
-                    unit.set_level( level );
-                    unit.set_internal_level( 20 );
-                }
-                else {   // special -> special
-                    unit.class_change(new_person.get_job().unwrap());
-                    unit.auto_grow_capability( current_level, current_level);
-                    unit.set_level( current_level );
-                    unit.set_internal_level( 0 );
-                }
-            }
-            else {  // special -> high
-                unit.class_change(new_person.get_job().unwrap());
-                unit.auto_grow_capability( current_level-20, current_level);
-                unit.set_level( current_level - 20 );
-                unit.set_internal_level( 20 );
-            }
-        }
-        else if is_new_low { // base or special class lvl < 20 -> base class
-            unit.class_change(new_person.get_job().unwrap());
-            unit.auto_grow_capability( current_level, current_level);
-            unit.set_level( current_level );
-            unit.set_internal_level( 0 );
-        }
-        else {
-            let new_job_list = get_base_classes(new_person.get_job().unwrap());
-            unit.auto_grow_capability(current_level, current_level);
-            if new_job_list.len() == 3 {
-                let index = super::get_low_class_index(new_person);
-                unit.class_change(&new_job_list[index as usize]);
-            }
-            else if new_job_list.len() == 0 { unit.class_change(JobData::get("JID_ソードファイター").unwrap()); }    // if promoted class doesn't have a low class, change to sword fighter
-            else {  unit.class_change(&new_job_list[0]); }
-            unit.set_level(current_level);
-            unit.set_internal_level(0);
-        }
-    }
-    else {  // Promoted
-        if is_new_low { // new unit has a base class
-            let total_level = current_internal_level + current_level;
-            if new_person.get_job().unwrap().has_high_jobs() {   // base class -> 1st promoted class
-                let new_high_jobs = new_person.get_job().unwrap().get_high_jobs();
-                if new_high_jobs.len() == 0 { unit.class_change(JobData::get("JID_ソードマスター").unwrap());  } // if no high class, change to Swordmaster
-                else { unit.class_change(&new_high_jobs[0]); }
-                unit.auto_grow_capability(current_level, current_level + 20);
-                unit.set_level(current_level);
-                unit.set_internal_level(current_internal_level);
-            }
-            else { // Promoted -> Special
-                if DVCVariables::ClassMode.get_value()== 1 {
-                    unit.class_change(new_person.get_job().unwrap());
-                }
-                else { unit.class_change(new_person.get_job().unwrap()); }
-                unit.auto_grow_capability(total_level, 20+current_level);
-                unit.set_level(total_level);
-                unit.set_internal_level(0);
-            }
-        }
-        else {  // Promoted -> Promoted
-            unit.class_change(new_person.get_job().unwrap());
-            unit.auto_grow_capability(current_level, current_level + 20);
-            unit.set_level(current_level);
-            unit.set_internal_level( current_internal_level );
-        }
-    }
+    unit.set_sp( person.get_sp() );
+    unit.set_person(new_person);
+    job::reclass::unit_reclass(unit, ReclassType::get_from_settings(true));
     let bases = calculate_new_offset(person, new_person);
     for x in 0..11 {  unit.set_base_capability(x as i32, bases[x] as i32);  }
-
     unit.set_sp( person.get_sp() );
-    unit.set_person(new_person);    // change person
     fixed_unit_weapon_mask(unit);   // fixed weapon mask due to class changes  // Random map order level adjustment
-    println!("{}: Level {} / {} from Old Person: {} | {} ", unit.get_name(), unit.level, unit.internal_level, person.level, person.internal_level);
 }
 
 fn calculate_new_offset(original: &PersonData, new: &PersonData) -> [i8; 11] {
-    let original_job = original.get_job().expect("Original Person does not have a valid default class in Person.xml");
-    let new_job = new.get_job().expect("Replacement Person does not have a valid default class in Person.xml");
+    let original_job = original.get_job().unwrap();
+    let new_job = new.get_job().unwrap();
     let mut out: [i8; 11] = [0; 11];
     let old_level = if original_job.is_high() { 20  + original.get_level() as i32 }  else { original.get_level() as i32 };
     let new_level = if new_job.is_high() { 20 + new.get_level() as i32 } else { new.get_level() as i32 };
@@ -510,10 +438,10 @@ fn enemy_unit_randomization(unit: &mut Unit) {
                 changed_class = true;
                 unit_items::adjust_missing_weapons(unit);
             }
-            if DVCVariables::ClassMode.get_value()== 1  && m004_complete {
+            if m004_complete {
                 let gauge = DVCVariables::EnemyJobGauge.get_value();
                 if unit.person.get_bmap_size()  == 1 && ( rng.get_value(100) < gauge && gauge > 11 )  || ( gauge > 0 && gauge <= 11  && is_boss ) {
-                    if job::enemy_unit_change_to_random_class(unit){
+                    if job::reclass::unit_reclass(unit, ReclassType::Enemy){
                         changed_class = true;
                         fixed_unit_weapon_mask(unit);
                         adjust_unit_items(unit); 
@@ -537,7 +465,6 @@ fn enemy_unit_randomization(unit: &mut Unit) {
             if ( ( rng.get_value(100) < gauge && gauge > 11 ) || ( gauge > 0 && gauge <= 11 && is_boss ) )  && unit.person.engage_sid.is_none() {
                 if let Some(skill) = GameData::get_random_skill_job(GameUserData::get_difficulty(false), rng, unit){
                     unit.private_skill.add_skill(skill, SkillDataCategorys::Private, 0);
-                    println!("Gain Skill: {}", Mess::get(skill.name.unwrap()));
                 }
             }
             let stone_rate = DVCVariables::EnemyRevivalStone.get_value();
@@ -566,10 +493,25 @@ fn enemy_unit_randomization(unit: &mut Unit) {
         
         if changed_class {
             unit_items::adjust_missing_weapons(unit);
+            enemy_check_soar(unit);
             ai::adjust_unitai(unit);
         }
         if GameUserData::is_evil_map() { auto_level_unit(unit, is_boss); }
         unit.auto_equip();
         unit.set_hp(unit.get_capability(0, true));
+    }
+}
+pub fn enemy_check_soar(unit: &Unit) {
+    if unit.person.get_asset_force() == 0 { return; }
+    let dispos_x = unit.dispos_y as i32;
+    let dispos_z = unit.dispos_z as i32;
+    if dispos_x >= 32 || dispos_z >= 32 { return; }
+    if let Some(map_terrain) = MapTerrain::get_instance() {
+        if let Some(terrain) = map_terrain.get_tid(dispos_x, dispos_z).and_then(|tid| TerrainData::get(tid)) {
+            if terrain.is_flight_only() && unit.job.move_type != 3 {
+                unit.add_private_skill(SkillData::get("SID_天駆_飛行").unwrap());
+                unit.set_base_capability(10, -3);
+            }
+        }
     }
 }

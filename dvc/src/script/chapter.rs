@@ -22,7 +22,6 @@ pub extern "C" fn m026_phase_2_positions(_args: &Il2CppArray<&DynValue>, _method
         args[x] = DynValue::new_number(0.0);
     }
     if DVCFlags::RandomDeploySpot.get_value() {
-        println!("Phase 2 Deployment Random");
         let mut possible_pos = vec![];
         for z in 0..31 {
             for x in 0..31 {
@@ -133,7 +132,6 @@ extern "C" fn ring_dialog_up_dialog(args: &Il2CppArray<&DynValue>, _method_info:
         if let Some(mid) = args.try_get_string(0)
             .filter(|v| v.str_contains("MID_TUT_NAVI_M022_GET_")).map(|v| v.to_string())
         {
-            println!("Message: {}", mid.as_str());
             let mut message = Mess::get("MID_TUT_NAVI_M022_GET_Siglud").to_string();
             DVCFlags::GodNames.set_value(false);
             let sigurd = Mess::get("MGID_Ring_Siglud").to_string();

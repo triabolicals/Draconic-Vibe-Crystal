@@ -2,7 +2,7 @@ use super::*;
 
 pub fn random_engrave_by_setting(setting: i32, loaded: bool) {
     if loaded && setting == 0 { return; }
-    let data = get_data_read();
+    let data = GameData::get();
     match setting & 255 {
         1 => { randomize_engrave(data,0, 25); }
         2 => { randomize_engrave(data,-25, 25); }

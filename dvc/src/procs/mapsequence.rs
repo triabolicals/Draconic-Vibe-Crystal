@@ -18,6 +18,7 @@ use crate::{
 };
 use std::sync::RwLock;
 use unity::{il2cpp::object::Array, prelude::OptionalMethod};
+use crate::randomizer::person::unit;
 use crate::utils::remove_equip_emblems;
 
 pub fn map_sequence_desc_edit(descs: &mut Array<&mut ProcDesc>) {
@@ -67,6 +68,7 @@ pub extern "C" fn map_sequence_dispos_event(this: &mut MapSequence, _method_info
             get_instance::<MapSituation>().average_level = avg_level;
         }
     }
+    Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit| { unit::enemy_check_soar(unit); });
 }
 
 extern "C" fn map_sequence_dispos_unit(proc: &mut MapSequence, _method_info: OptionalMethod) {

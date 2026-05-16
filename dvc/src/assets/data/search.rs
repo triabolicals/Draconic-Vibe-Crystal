@@ -10,13 +10,3 @@ pub fn search_by_iid(iid: &'static Il2CppString, mode: i32) -> Option<&'static &
 pub fn has_condition(entry: &AssetTable, condition_index: i32) -> bool { 
     entry.condition_indexes.list.iter().any(|s| s.iter().any(|&index| index ==  condition_index)) 
 }
-
-pub fn has_condition_with(entry: &AssetTable, condition_index: i32, is_accessory: bool) -> bool {
-    let sf = AssetTableStaticFields::get();
-    let bit = &sf.condition_flags.bits;
-    if is_accessory {
-        let count = entry.condition_indexes.list.iter().filter(|x| x.iter().any(|s| bit.get(*s) || *s == condition_index) ).count();
-        count >= entry.condition_indexes.list.len()
-    }
-    else { entry.condition_indexes.list.iter().all(|x| x.iter().any(|s| bit.get(*s) || *s == condition_index) ) }
-}

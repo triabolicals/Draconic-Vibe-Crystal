@@ -18,7 +18,6 @@ const BOOK_OF_WORLDS: i32 = 106021179;
 pub const DARK_EMBLEM_SKILLS: [(i32, i32); 5] = [
     (40103191, 976162037), (870225249, 557493185), (1467048018, 659396462), (1876651662, -1416849344),
     (-1255795212, 459105266)
-
 ];
 
 #[derive(Clone, PartialEq)]
@@ -247,7 +246,6 @@ impl EmblemSkillRandomizer {
     }
     pub fn reset(&mut self) {}
     pub fn randomize(&mut self, game_data: &GameData) {
-        println!("Randomizing Emblem Skills...");
         let rng = get_rng();
         let pool = &game_data.skill_pool.emblem_skill;
         self.random_skill.clear();

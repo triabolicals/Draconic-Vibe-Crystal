@@ -8,7 +8,7 @@ pub use engage::{
 };
 use crate::{
     DVCVariables, config::DVCFlags,
-    enums::{EMBLEM_ASSET, EMBLEM_GIDS}, utils::*, ironman::vtable_edit,
+    enums::{EMBLEM_ASSET, EMBLEM_GIDS}, ironman::vtable_edit,
     randomizer::data::{EmblemPool, RandomizedGameData},
 };
 pub const VEYRE: [&str; 8] = [

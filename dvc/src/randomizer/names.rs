@@ -112,7 +112,6 @@ impl AppearanceRandomizer {
             let index =
                 if person.parent.index == 1 { DVCVariables::LueurGender.get_value() - 1 }
                 else { GameData::get().units.get(&person.parent.hash).map(|v| *v).unwrap_or(100) + 1};
-            println!("{} has appearance #{} [NPC: {}]", Mess::get_name(person.pid), index, DVCFlags::RandomBossesNPCs.get_value() );
             if index >= 100 || index < 0 { return None;}
             if index < 42 { self.playables.get(index as usize) } else if !DVCFlags::RandomBossesNPCs.get_value() { None }
             else { self.npcs.get(index as usize - 42) }

@@ -22,7 +22,6 @@ pub mod grow;
 pub mod item;
 pub mod person;
 pub mod interact;
-pub mod styles;
 pub mod emblem;
 pub mod skill;
 pub mod job;
@@ -37,6 +36,7 @@ use num_traits::FromPrimitive;
 use outfit_core::UnitAssetMenuData;
 use crate::randomizer::blacklist::DVCBlackLists;
 use crate::randomizer::data::{GameData, RandomizedGameData};
+use crate::randomizer::emblem::correct_god_bond_holders;
 use crate::randomizer::status::RandomizerStatus;
 use crate::VARIABLE_VERSION;
 
@@ -45,13 +45,15 @@ pub static DVC_BLACK_LIST: OnceLock<RwLock<DVCBlackLists>> = OnceLock::new();
 pub static RANDOMIZED_DATA: OnceLock<RwLock<RandomizedGameData>> = OnceLock::new();
 
 pub fn get_dvc_black_list_read() ->  RwLockReadGuard<'static, DVCBlackLists> { DVC_BLACK_LIST.get().unwrap().read().unwrap() }
-pub fn get_data_read() ->&'static GameData { RANDOMIZER_DATA.get_or_init(||GameData::init()) }
-pub fn get_rand_data_read() -> RwLockReadGuard<'static, RandomizedGameData> { RANDOMIZED_DATA.get().unwrap().read().unwrap() }
-pub fn get_rand_data_write() -> RwLockWriteGuard<'static, RandomizedGameData> { RANDOMIZED_DATA.get().unwrap().write().unwrap() }
 pub static mut STATUS: RandomizerStatus = RandomizerStatus::new();
 
 /// Tutorial clear and provide DLC seal usages
 pub fn tutorial_check() {
+    if dlc_check() && can_rand() {
+        GameVariableManager::set_bool("G_CC_エンチャント", true);
+        GameVariableManager::set_bool("G_CC_マージカノン", true);
+    }
+    GameVariableManager::find_starts_with("G_進化_").iter().for_each(|key| GameVariableManager::set_bool(key.to_string(), true));
     let list = GameVariableManager::find_starts_with("G_解説_");
     if !GameVariableManager::get_bool("G_解説_TUTID_クラスチェンジ") {
         for i in 0..list.len() {
@@ -60,26 +62,12 @@ pub fn tutorial_check() {
             if string == "G_解説_TUTID_クラスチェンジ" { return; }
         }
     }
-    GameVariableManager::find_starts_with("G_進化_").iter().for_each(|key| GameVariableManager::set_bool(key.to_string(), true));
-    if dlc_check() && can_rand() {
-        GameVariableManager::set_bool("G_CC_エンチャント", true);
-        GameVariableManager::set_bool("G_CC_マージカノン", true);
-    }
-    /*
-    if DVCConfig::get().debug {
-        GameVariableManager::find_starts_with("G_Cleared_M00").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 1));
-        // GameVariableManager::find_starts_with("G_Cleared_M01").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 0));
-        // GameVariableManager::find_starts_with("G_Cleared_M02").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 0));
-        // GameVariableManager::find_starts_with("G_GmapSpot_").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
-        GameData::get_playable_god_list().iter().for_each(|g|{
-            if let Some(g_unit) = GodPool::create(g) { g_unit.set_escape(false); }
-        });
-    }
-     */
+
 }
 /// SaveLoad Event Randomizing for Cobalt 1.21+
 pub fn save_file_load() {
     tutorial_check();
+    correct_god_bond_holders();
     let seed_key = DVCVariables::Seed.get_key();
     GameVariableManager::make_entry_norewind(DVCFlags::FlagSet1, 0);
     GameVariableManager::make_entry_norewind(DVCFlags::FlagSet2, 0);
@@ -106,7 +94,7 @@ pub fn randomize_gamedata(is_new_game: bool) {
     crate::continuous::continuous_mode_data_edit();
     if !DVCFlags::Initialized.get_value() || is_new_game {
         let data = GameData::get();
-        let mut random = get_rand_data_write();
+        let mut random = RandomizedGameData::get_write();
         random.randomize(data);
         random.commit(data);
     }
@@ -166,7 +154,6 @@ pub fn reload<T: Gamedata>() {
 pub fn reset_gamedata() {
     let status = RandomizerStatus::get();
     if !status.enabled { return; }
-    println!("Resetting GameData");
     reload::<ItemData>();
     ItemData::get_list_mut().unwrap().iter().for_each(|x| x.on_completed());
     reload::<InteractData>();
@@ -176,7 +163,6 @@ pub fn reset_gamedata() {
     reload::<PersonData>();
     reload::<GodData>();
     PersonData::get_list_mut().unwrap().iter().for_each(|x| x.on_completed() );
-    person::check_playable_classes();
     GodGrowthData::unload();
     GodGrowthData::load();
     reload::<RingData>();
@@ -213,11 +199,14 @@ pub fn reset_gamedata() {
     Patch::in_text(0x0233f104).bytes(&[0x01, 0x00, 0xb0, 0x52]).unwrap();   // Emblem Alear Stuff
     Patch::in_text(0x02d51dec).bytes(&[0xb1, 0x60, 0xc7, 0x97]).unwrap();   //FaceThumbnail removes check for hero 
     Patch::in_text(0x021e12ac).bytes(&[0x81, 0x23, 0xf5, 0x97]).unwrap();   //GetBondLevelFacePath
+    /*
     Patch::in_text(0x02915844).bytes(&[0x1b, 0x52, 0xd8, 0x97]).unwrap();   //InfoUtil$$SetGodName to prevent the Emblem name to disable for the Hero with Emblem Alear
     Patch::in_text(0x02915694).bytes(&[0x87, 0x52, 0xd8, 0x97]).unwrap();   //SetUnitName - prevents Emblem X on hero unit when engaged with Alear
     Patch::in_text(0x01c66588).bytes(&[0xca, 0x0e, 0x0b, 0x94]).unwrap();   // Bond Exp Gauge-Related Hero check
     Patch::in_text(0x01c666ac).bytes(&[0x81, 0x0e, 0x0b, 0x94]).unwrap();   // Bond Exp Gauge-Related Hero Check
     Patch::in_text(0x02081edc).bytes(&[0x75, 0xa0, 0xfa, 0x97]).unwrap();   // god face for hero + emblem alear
+
+     */
     Patch::in_text(0x01c69d60).bytes(&[0xd4, 0x00, 0x0b, 0x94]).unwrap();   // hero disappear when selecting emblem alear
 
     Patch::in_text(0x02ae9000).bytes(&[0x60, 0xc7, 0xfd, 0x97]).unwrap(); // Gender animation for the replacement unit 
@@ -253,6 +242,7 @@ fn upgrade() {
 }
 
 pub fn initialize_game_data() {
+    emblem::god_unit_patches();
     DVC_BLACK_LIST.get_or_init(|| RwLock::new(DVCBlackLists::init()));
     RANDOMIZER_DATA.get_or_init(|| GameData::init());
     let emblems = GameData::get_playable_god_list().len();
@@ -262,7 +252,6 @@ pub fn initialize_game_data() {
     person::ai::create_custom_ai();
     emblem::initialize_emblem_list();
     engage_count();
-    person::check_playable_classes();
     crate::assets::data::initialize_search_list();
     crate::talk::fill_name_array();
     job::correct_job_base_stats();

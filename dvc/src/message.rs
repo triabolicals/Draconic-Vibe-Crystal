@@ -224,7 +224,6 @@ fn name_replace(str: &Il2CppString, index: i32) -> &mut Il2CppString {
     let replace_name = Mess::get_name(DVCVariables::get_dvc_person(index, false));
     replace_string(str, name, replace_name)
 }
-// Prevents Alear or anyone with no cooking data from cooking 
 pub fn cooking_menu_build_attribute(_this: u64, _method_info: OptionalMethod) -> i32 {
     if let Some(chef) = util::HubUtil::get_current_cooking_pid() {
         if CookData::get(chef).is_none() {  return 4; }

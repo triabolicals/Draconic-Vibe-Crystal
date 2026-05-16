@@ -1,6 +1,6 @@
 use engage::{gamedata::{ring::RingData, skill::{SkillDataCategorys, SkillData}, Gamedata}};
-use crate::{config::DVCFlags, randomizer::{get_data_read, Randomizer}, utils::get_rng};
-use super::{SkillsList, sync::get_highest_priority};
+use crate::{config::DVCFlags, randomizer::Randomizer, utils::get_rng};
+use super::{SkillsList, sync::get_highest_priority, GameData};
 
 pub struct BondRingData {
     pub hash: i32,
@@ -26,13 +26,12 @@ impl BondRingData {
 }
 
 pub fn randomize_bond_ring_skills() {
-    let data = get_data_read();
+    let data = GameData::get();
     if DVCFlags::Initialized.get_value() { data.bond_ring.iter().for_each(|r| { r.reset(); }); }
     let ring_list = RingData::get_list_mut().unwrap();
     let ranks = [3, 2, 1, 0];
     let ranks_rate = crate::DVCConfig::get().get_bond_ring_rates();
     let none = ranks_rate.iter().filter(|x| **x > 0).count() == 0;
-    println!("Bond Rings Rates: S: {} A: {} B: {} C: {}: Bond Ring: {}", ranks_rate[0], ranks_rate[1], ranks_rate[2], ranks_rate[3], DVCFlags::BondRing.get_value());
     if DVCFlags::BondRing.get_value() && !none { 
         let rng_rings = get_rng();
         ring_list.iter_mut().for_each(|ring| { ring.get_equip_skills().clear(); });
@@ -83,7 +82,6 @@ pub fn randomize_bond_ring_skills() {
                         _ => 1 + (ring.rank / 2) + rng_rings.get_value(2+ring.rank),
                     };
                 ring.enhance[*s as usize] = stat as i8;
-                // println!("{}: {}", CapabilityDefinition::get_name(*s), stat);
             });
         });
     }

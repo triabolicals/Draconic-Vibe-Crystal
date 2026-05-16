@@ -23,13 +23,10 @@ pub fn initialize_emblem_list() {
             }).for_each(|god| list.push(god.parent.index));
         list
     });
-    println!("Number of Enemy Emblems: {}", ENEMY_EMBLEM_LIST.get().unwrap().len());
 }
 pub fn randomize_emblems() {
     if !DVCVariables::random_enabled() { DVCVariables::create_recruitment_variables(true); }
-    if DVCVariables::is_recruitment_set(true) {
-        set_m022_emblem_assets();
-    }
+    if DVCVariables::is_recruitment_set(true) { set_m022_emblem_assets(); }
     else {
         let rng = get_rng();
         let no_dlc = !dlc_check() || DVCConfig::get().dlc & 2 != 0;
@@ -62,8 +59,7 @@ pub fn randomize_emblems() {
                             let key2 = format!("G_R2_{}", v.gid);
                             DVCVariables::set_variable_key_string(key.as_str(), v.gid);
                             DVCVariables::set_variable_key_string(key2.as_str(), god.gid);
-                            println!("{} -> {}", Mess::get(god.mid), Mess::get(v.mid));
-                        } else { println!("No Emblem Swaps for {}", Mess::get(god.mid)); }
+                        }
                     });
             },
             2 => {  // Reverse
@@ -110,18 +106,16 @@ pub fn set_m022_emblem_assets() {
     }
 }
 pub fn update_lueur_bonds() {
-    if DVCVariables::is_main_chapter_complete(22) {
-        if let Some(g_unit) = GodPool::try_get_gid("GID_リュール", false) {
-            Force::get(ForceType::Absent).unwrap().iter().chain(  Force::get(ForceType::Player).unwrap().iter() )
-                .for_each(|unit|{
-                    if let Some(g_bond) = g_unit.get_bond(unit){
-                        if g_bond.level < 20 {
-                            g_bond.set_level(20);
-                            unit.inherit_apt(g_unit);
-                        }
+    if let Some(g_unit) = GodPool::try_get_gid("GID_リュール", false) {
+        Force::get(ForceType::Absent).unwrap().iter().chain(  Force::get(ForceType::Player).unwrap().iter() )
+            .for_each(|unit|{
+                if let Some(g_bond) = g_unit.get_bond(unit){
+                    if g_bond.level < 20 {
+                        g_bond.set_level(20);
+                        unit.inherit_apt(g_unit);
                     }
-                });
-        }
+                }
+            });
     }
 }
 pub fn get_engage_attack_type(skill: Option<&SkillData>) -> i32 {
@@ -149,28 +143,31 @@ pub fn get_engage_attack_type(skill: Option<&SkillData>) -> i32 {
 }
 
 #[unity::hook("App", "GodBondHolder", "Get")]
-pub fn god_bond_holder_get(this: &GodBondHolder, mut unit: Option<&mut Unit>, method_info: OptionalMethod) -> Option<&'static mut GodBond> {
+pub fn god_bond_holder_get(this: &mut GodBondHolder, mut unit: Option<&mut Unit>, method_info: OptionalMethod) -> Option<&'static mut GodBond> {
     if this.data.is_some_and(|f| f.force_type == 1 && !f.gid.str_contains("M0")) { call_original!(this, unit, method_info) }
-    else if DVCVariables::is_random_map() || DVCVariables::Continuous.get_value() == 1 {
-        let bond: Option<&'static mut GodBond> = call_original!(this, UnitPool::get_hero(false), method_info);
-        if let Some((bond, unit)) = bond.as_ref().zip(unit.as_mut()) {
-            unit.aptitude.value |= bond.level_data.aptitude.value;
+    else{
+        if DVCVariables::is_random_map() || DVCVariables::Continuous.get_value() == 1 {
+            let bond: Option<&'static mut GodBond> = call_original!(this, UnitPool::get_hero(false), method_info);
+            if let Some((bond, unit)) = bond.as_ref().zip(unit.as_mut()) {
+                unit.aptitude.value |= bond.level_data.aptitude.value;
+            }
+            bond
         }
-        bond
-    }
-    else if unit.as_ref().is_some_and(|unit|{
-        let pid = unit.person.pid.to_string();
-        PIDS.contains(&pid.as_str()) || pid.contains("E00")
-    }) { call_original!(this, unit, method_info) }
-    else {
-        let bond: Option<&'static mut GodBond> = call_original!(this, UnitPool::get_hero(false), method_info);
-        if let Some((bond, unit)) = bond.as_ref().zip(unit.as_mut()) {
-            unit.aptitude.value |= bond.level_data.aptitude.value;
+        else if unit.as_ref().is_some_and(|unit|{
+            let pid = unit.person.pid.to_string();
+            PIDS.contains(&pid.as_str()) || pid.contains("E00")
+        }) {
+            call_original!(this, unit, method_info)
         }
-        bond
+        else {
+            let bond: Option<&'static mut GodBond> = call_original!(this, UnitPool::get_hero(false), method_info);
+            if let Some((bond, unit)) = bond.as_ref().zip(unit.as_mut()) {
+                unit.aptitude.value |= bond.level_data.aptitude.value;
+            }
+            bond
+        }
     }
 }
-/*
 pub fn god_unit_on_serialize(this: &mut GodUnit, stream: &Stream, _method_info: OptionalMethod){
     check_fix_god_bonds(this);
     this.on_serialize(stream);
@@ -181,30 +178,15 @@ pub fn god_unit_on_deserialize(this: &mut GodUnit, stream: &Stream, version: i32
 }
 fn check_fix_god_bonds(this: &mut GodUnit) {
     let hash = this.data.main_data.parent.hash;
-    if let Some(bond) = this.get_god_bonds() {
-        if bond.data.is_some_and(|g| g.main_data.parent.hash != hash && g.force_type == 0) {
-            if hash == 2044088482 || hash == 1120993642 { bond.data = GodData::try_get_hash(1120993642); }
-            else { bond.data = GodData::try_get_hash(hash); }
-        }
-        else if bond.bonds.is_none(){
-            println!("GodBonds are missing. Deleting GodBondHolder.");
-            this.delete();
-            if let Some(god) = GodData::try_get_hash(hash) {
-                println!("GodUnit::Build for {}", Mess::get(god.mid));
-                this.build(god);
-                set_bond_levels(this);
-            }
-        }
-    }
-    else {
-        if let Some(god) = GodData::try_get_hash(hash){
-            this.build(god);
+    if this.bonds.is_none_or(|b| b.data.is_some_and(|d| d.main_data.parent.hash != hash)){
+        let bonds = GodBondHolderPool::get_instance().create_or_get(this.data.main_data);
+        if bonds.is_some() {
+            this.bonds = bonds;
             set_bond_levels(this);
         }
     }
 }
 
- */
 fn set_bond_levels(this: &mut GodUnit) {
     if this.data.force_type != 0 { return; }
     let level = if DVCVariables::is_main_chapter_complete(22) {
@@ -231,17 +213,10 @@ fn set_bond_levels(this: &mut GodUnit) {
     });
 }
 pub fn correct_god_bond_holders() {
-    let god_bond_holders = GodBondHolderPool::get_instance();
-    GodPool::get_instance().sort.iter_mut().for_each(|v|{
-        let god_hash = v.data.main_data.parent.hash;
-        if v.bonds.is_none_or(|b| b.data.is_some_and(|d| d.main_data.parent.hash != god_hash)){
-            // if v.bonds.is_none() { println!("{} is missing Bonds.", Mess::get(v.data.main_data.mid)); }
-            // else { println!("{} has wrong bonds.", Mess::get(v.data.main_data.mid)); }
-            let bonds = god_bond_holders.create_or_get(v.data.main_data);
-            if bonds.is_some() {
-                v.bonds = bonds;
-                set_bond_levels(v);
-            }
-        }
-    });
+    GodPool::get_instance().sort.iter_mut().for_each(|v|{ check_fix_god_bonds(v); });
+}
+pub fn god_unit_patches() {
+    let god_unit_class = Il2CppClass::from_name("App", "GodUnit").unwrap();
+    vtable_edit(god_unit_class, "OnSerialize", god_unit_on_serialize as _);
+    vtable_edit(god_unit_class, "OnDeserialize", god_unit_on_deserialize as _);
 }

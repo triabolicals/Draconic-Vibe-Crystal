@@ -9,6 +9,8 @@ use crate::{
     randomizer::{person::switch_person, *, status::RandomizerStatus},
     utils::*, enums::PIDS, config::DVCVariables,
 };
+use crate::randomizer::data::GameData;
+
 pub(crate) mod chapter;
 mod common;
 
@@ -48,7 +50,7 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
         let sequence =  GameUserData::get_sequence();
         if sequence == 4 || sequence == 5 {
             if let Some(person) = PersonData::get(str1.as_str()) {
-                if let Some(pos) = get_data_read().playables.iter().position(|x| x.hash == person.parent.hash) {
+                if let Some(pos) = GameData::get().playables.iter().position(|x| x.hash == person.parent.hash) {
                     return
                         if pos < 41 || (pos >= 41 && pos < 90 && !DVCFlags::CustomUnitRecruitDisable.get_value()) {
                             if GameVariableManager::exist(format!("G_R_{}", str1).as_str()) {

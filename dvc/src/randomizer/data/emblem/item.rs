@@ -39,7 +39,6 @@ impl EngageItemRandomizer {
         }
     }
     pub fn randomize(&mut self, data: &GameData, engage_attacks: &EngageAttackRandomizer) {
-        println!("Randomizing Engage Weapons...");
         let types_non_rand: Vec<_> = data.emblem_pool.emblem_data.iter().map(|data| {
             SkillData::try_get_hash(data.engage_atk).map(|skill| {
                 if skill.sid.str_contains("リンエンゲージ技") { EngageRandoSet::MustBow }
@@ -116,7 +115,6 @@ impl EngageItemRandomizer {
     }
     pub fn commit(&self, data: &GameData) {
         let engage_atk_random = DVCFlags::EngageAttacks.get_value();
-        println!("Engage Atk: {}", engage_atk_random);
         data.emblem_pool.emblem_data.iter().for_each(|data| { data.reset_weapons(); });
         if !DVCFlags::EngageWeapons.get_value() {
             if engage_atk_random {

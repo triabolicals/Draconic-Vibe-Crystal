@@ -1,26 +1,35 @@
-use std::{collections::{HashMap, HashSet}, sync::{RwLockReadGuard, RwLockWriteGuard}};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{RwLockReadGuard, RwLockWriteGuard},
+    io::{Cursor, Read}
+};
 use engage::{
     mess::Mess, gamevariable::GameVariableManager, random::Random,
     unit::{UnitPool, Unit},
     gamedata::{
-        item::ItemData, person::*, GodData, JobData, PersonData, job::BattleStyles, 
+        item::ItemData, person::*, GodData, JobData, PersonData,
         ring::RingData, skill::SkillData, GamedataArray, Gamedata,
     }
 };
 use unity::system::Il2CppString;
 use crate::{
     config::menu::{DVCMenuItemKind, CUSTOM_RECRUITMENT_ORDER},
-    enums::{EMBLEM_ASSET, PIDS}, utils::{create_rng, get_rng}, config::{DVCFlags, DVCVariables},
+    enums::{EMBLEM_ASSET, PIDS},
+    utils::{create_rng, get_rng},
+    config::{DVCFlags, DVCVariables},
     randomizer::{
-        Randomizer, item::*, names::AppearanceRandomizer, *, status::RandomizerStatus,
+        Randomizer,
+        item::*, names::AppearanceRandomizer, *, status::RandomizerStatus,
         data::{
             emblem::item::EngageItemRandomizer,
-            aptitude::EmblemAptitudeRandomizer, 
-            engage_attacks::EngageAttackRandomizer, 
+            aptitude::EmblemAptitudeRandomizer,
+            engage_attacks::EngageAttackRandomizer,
             items::ItemPool,
             sync::{get_lowest_priority, get_skill_level, EmblemSkillRandomizer, DARK_EMBLEM_SKILLS}
         },
-    },
+        data::job::JobDataBase,
+        job::reclass::ReclassType
+    }
 };
 
 mod skill;
@@ -28,6 +37,7 @@ mod emblem;
 mod person;
 mod items;
 mod bondring;
+mod job;
 
 pub use skill::*;
 pub use person::*;
@@ -41,7 +51,6 @@ pub struct GrowthData {
     person_grow: Vec<(i32, [u8; 10])>,
     non_base_grow_jobs: HashSet<i32>,
     job_grow: Vec<[i8; 10]>,
-    job_cap: Vec<[u8; 10]>,
     person_cap: Vec<(i32, [i8; 10])>,
 }
 impl GrowthData {
@@ -84,13 +93,7 @@ impl GrowthData {
             }
             g
         }).collect();
-        let job_cap = JobData::get_list().unwrap().iter().map(|x| {
-            let mut g = [0; 10];
-            let limit = x.get_limit();
-            for x in 0..10 { g[x] = limit[x]; }
-            g
-        }).collect();
-        Self{ person_grow, job_stat, job_grow, person_stats, non_base_grow_jobs, job_cap, person_cap }
+        Self{ person_grow, job_stat, job_grow, person_stats, non_base_grow_jobs, person_cap }
     }
     pub fn get_personal(&self, rng: &Random, cap: &mut engage::unit::Capability) -> i32 {
         let mut total = 0;
@@ -144,34 +147,19 @@ impl GrowthData {
             })
         }
     }
-    pub fn set_job_caps(&self, enable: bool) {
-        if enable {
-            JobData::get_list_mut().unwrap().iter().for_each(|job|{
-                let base = job.get_base();
-                let cap = job.get_limit();
-                for x in 0..10 { cap[x] = base[x] + 120; }
-                cap[10] = 99;
-            });
-        }
-        else {
-            JobData::get_list_mut().unwrap().iter_mut().zip(self.job_cap.iter()).for_each(|(j,x)| {
-                j.get_limit().iter_mut().zip(x.iter()).for_each(|(j,v)| { *j = *v; });
-            });
-        }
-    }
 }
 pub struct GameData {
     pub bond_ring: Vec<BondRingData>,
     pub playables: Vec<PlayableCharacter>,
     pub enemy: Vec<EnemyCharacter>,
     pub growth_data: GrowthData,
-    pub job_style_attr: Vec<(i32, i32)>,
     pub interactions: Vec<i32>,
     pub units: HashMap<i32, i32>,
     pub unit_name: HashMap<String, i32>,
     pub skill_pool: SkillPool,
     pub item_pool: ItemPool,
     pub emblem_pool: EmblemPool,
+    pub job_db: JobDataBase,
 }
 impl GameData {
     pub fn init() -> Self {
@@ -189,9 +177,24 @@ impl GameData {
         });
         for x in [0, 4, 14, 17, 23, 27] { unsafe { CUSTOM_RECRUITMENT_ORDER[x as usize] = x; } }
         unsafe { CUSTOM_RECRUITMENT_ORDER[41] = playable_count as u8; }
-        let job_style_attr = JobData::get_list().unwrap().iter().map(|j|{ (BattleStyles::get_style(j.style_name) as i32 , j.attrs) }).collect();
         let mut unit_name: HashMap<String, i32> = HashMap::new();
         let mut units: HashMap<i32, i32> = HashMap::new();
+        let mut cursor = Cursor::new(include_bytes!("../../data/person.bin"));
+        let mut buffer: [u8; 5] = [0; 5];
+        let hashes = playables.iter().map(|v| v.hash).collect::<Vec<i32>>();
+        let mut enemy = vec![];
+        while cursor.read_exact(&mut buffer).is_ok() {
+            let idx = u8::from_be_bytes(buffer[0..1].try_into().unwrap());
+            let hash = i32::from_be_bytes(buffer[1..].try_into().unwrap());
+            if let Some(person) = PersonData::try_get_hash(hash) {
+                units.insert(hash, idx as i32);
+                if let Some(name) = person.name.as_ref() { unit_name.insert(name.to_string(), idx as i32); }
+                if !hashes.contains(&hash) && (person.asset_force != 0 || idx > 35) && idx < 41 {
+                    enemy.push(EnemyCharacter::new(person, idx as i32));
+                }
+            }
+        }
+        /*
             include_str!("person/persons.txt").lines().enumerate().for_each(|(i, l)|{
                 l.split_ascii_whitespace().for_each(|s|{
                    if !s.contains("_") {
@@ -208,24 +211,24 @@ impl GameData {
                    }
                 });
             });
-
         let enemy =
             units.iter().filter(|(h, i)| **i < 41 && !playables.iter().any(|x| x.hash == **h))
                 .flat_map(|x|
                     PersonData::try_get_hash(*x.0).filter(|v| v.asset_force != 0 || *x.1 > 35).zip(Some(x.1)))
                 .map(|p| { EnemyCharacter::new(p.0, *p.1) })
                 .collect();
+         */
         for x in 36..41 {
             let hash = PersonData::get(PIDS[x]).unwrap().parent.hash;
             units.insert(hash, x as i32);
         }
         Self {
-            job_style_attr,
             growth_data: GrowthData::new(),
             item_pool: ItemPool::init(),
             skill_pool: SkillPool::init(),
             emblem_pool: EmblemPool::init(),
             interactions: InteractData::get_list().unwrap().iter().map(|data| data.flag.value).collect(),
+            job_db: JobDataBase::init(),
             playables, enemy, bond_ring, units, unit_name,
         }
     }
@@ -264,11 +267,7 @@ impl GameData {
     pub fn reset_interaction(&self) {
         InteractData::get_list_mut().unwrap().iter_mut().zip(self.interactions.iter()).for_each(|(interaction, data)|{ interaction.flag.value = *data; });
     }
-    pub fn reset_battle_styles(&self) {
-        JobData::get_list_mut().unwrap().iter_mut().zip(self.job_style_attr.iter()).for_each(|(job, data)|{ job.style = data.0; });
-    }
     pub fn reset_job_diff(&self) { self.growth_data.reset(2); }
-
     pub fn update_bond_ring(&self) { randomize_bond_ring_skills(); }
     pub fn get_randomized_person(index: usize) -> Option<&'static PersonData> {
         Self::get().playables.get(index).and_then(|p|{
@@ -360,11 +359,11 @@ impl RandomizedGameData {
         self.engage_weapons.commit(data);
     }
     pub fn commit(&self, data: &GameData) {
-        data.growth_data.set_job_caps(DVCFlags::MaxStatCaps.get_value());
         data.growth_data.personal_caps();
         crate::randomizer::emblem::engrave::random_engrave_by_setting(DVCVariables::EngraveLevel.get_value(), true);
-        styles::randomize_job_styles();
-        styles::randomize_job_attrs();
+        data.job_db.update_attr();
+        data.job_db.update_styles();
+        data.job_db.update_caps();
         interact::change_interaction_data(DVCVariables::InteractSetting.get_value(), true);
         self.update_evolve_items(data);
         self.engage_skills.commit_stats(data);
@@ -489,11 +488,11 @@ impl RandomizedGameData {
                     DVCVariables::EmblemWepProf => { Self::get_read().emblem_aptitude_randomizer.commit(data); }
                     DVCVariables::EmblemSyncSkill|DVCVariables::EmblemEngageSkill => { RandomizedGameData::get_read().engage_skills.commit(data); }
                     DVCVariables::JobLearnMode => { crate::randomizer::skill::learn::update_learn_skills(); }
-                    DVCVariables::BattleStyles => { styles::randomize_job_styles(); }
+                    DVCVariables::BattleStyles => { data.job_db.update_styles(); }
                     DVCVariables::InteractSetting => { interact::change_interaction_data(value, false);  }
                     DVCVariables::PersonalGrowthMode => { grow::random_grow(); }
                     DVCVariables::EngraveLevel => { crate::randomizer::emblem::engrave::random_engrave_by_setting(value, false); }
-                    _ => { println!("No Action for Variable #{}: {}", variables as i32, variables.get_key()); }
+                    _ => {}
                 }
             }
             DVCMenuItemKind::Flag(flag) => {
@@ -505,8 +504,7 @@ impl RandomizedGameData {
                         random_data.update_enemy_emblem(data);
                     }
                     DVCFlags::RandomClassGrowth => { grow::random_grow(); }
-                    // DVCFlags::CustomSkillEnemy => {}
-                    DVCFlags::RandomClassAttrs => { styles::randomize_job_attrs(); }
+                    DVCFlags::RandomClassAttrs => { data.job_db.update_attr(); }
                     DVCFlags::RingStats|DVCFlags::BondRing => { data.update_bond_ring(); }
                     DVCFlags::EquipLearnSkills => {
                         if v {
@@ -522,23 +520,17 @@ impl RandomizedGameData {
                     DVCFlags::EmblemStats => { Self::get_read().engage_skills.commit_stats(data); }
                     DVCFlags::AdaptiveGrowths => { grow::randomize_person_grow(); }
                     DVCFlags::PersonalSkills => { data.update_personals(); }
-                    // DVCFlags::RefineItem => {}
-                    DVCFlags::MaxStatCaps => {
-                        GameData::get().growth_data.set_job_caps(DVCFlags::MaxStatCaps.get_value());
-                    }
+                    DVCFlags::MaxStatCaps => { data.job_db.update_caps(); }
                     DVCFlags::PersonalCaps => { data.growth_data.personal_caps(); }
-                    _ => { println!("Flag #{} was not affected", flag as i32); }
+                    _ => {}
                 }
             }
-            DVCMenuItemKind::Order(_) => {
-
-            }
+            DVCMenuItemKind::Order(_) => {}
             DVCMenuItemKind::SingleJob => {
                 if DVCVariables::get_single_class(false, false).is_some() && DVCFlags::SingleJobEnabled.get_value() {
                     for x in 1..250 {
                         if let Some(unit) = UnitPool::get(x).filter(|x| x.force.is_some_and(|f| f.force_type < 5) && x.person.asset_force == 0) {
-                            crate::randomizer::job::unit_change_to_random_class(unit, false);
-                            // println!("{} Changed into {}", unit.get_name(), Mess::get_name(unit.job.jid));
+                            crate::randomizer::job::reclass::unit_reclass(unit, ReclassType::PlayerSingle(false));
                         }
                     }
                 }
