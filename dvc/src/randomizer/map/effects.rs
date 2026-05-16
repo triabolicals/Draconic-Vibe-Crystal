@@ -4,50 +4,30 @@ use EffectType::*;
 use crate::utils::min;
 
 pub fn install_tilebolical_effects(script: &EventScript) {
-    GameVariableManager::make_entry("DVC", 1);
     GameVariableManager::make_entry("TileSkills", 0);
     script.register_function("PlayerGender", crate::script::dvc_alear_is_female);
     script.register_function("IsAlearFemale", crate::script::is_alear_female);
     register_action(script, "ShuffleEmblems", shuffle_emblems, Emblem);
     register_action(script, "DanceTeam", dance_all, Other);
-    register_action(script, "EngageOn", all_engage, Emblem);
-    register_action(script, "EngageOff", all_disengage, Emblem);
+    register_action(script, "EngagedAll", all_engage, Emblem);
 
     register_action(script, "HP100", set_hp_to_max, HP);
     register_action(script, "HP100Team", set_hp_to_max_team, HP);
-    register_action(script, "LevelUp", unit_level_up, Level);
-    register_action(script, "SP100", unit_get_sp, SP);
-    register_action(script, "SP500", unit_get_sp_500, SP);
+    register_action(script, "GainSP", unit_get_sp, SP);
 
-    register_action(script, "SP1000", unit_get_sp_1000, SP);
-    register_action(script, "SPMax", unit_get_sp_max, SP);
     register_action(script, "RevivalStone", revival_stone, Other);
-    register_action(script, "EnemyLevelUp", enemy_level_up, Level);
-    register_action(script, "EnemyLevelDown", enemy_level_down, Level);
-    
-    register_action(script, "Enemy1HP", enemy_1_hp, HP);
-    register_action(script, "EnemyMaxHP", enemy_max_hp, HP);
-    register_action(script, "EnemyActive", enemy_all_active, Other);
-    register_action(script, "EnemyInactive", enemy_all_inactive, Other);
-    
-    register_action(script, "EnemyGuard", enemies_guarding, Other);
-    register_action(script, "Enemy50Exp", enemy_exp_50, Exp);
-    register_action(script, "VoidCurse", enemy_void_curse, Exp);
-    register_action(script, "GetExpertise", unit_expertise, Skill);
-    register_action(script, "DoubleExp", unit_double_exp, Exp);
+    register_action(script, "EnemyLevel", enemy_level_up, Level);
 
-    register_action(script, "CompleteMap", finish_map, Other);
+    register_action(script, "EnemyActive", enemy_all_active, Other);
+
+    register_action(script, "GetExpertise", unit_expertise, Skill);
+
     register_action(script, "PlayerWait", player_all_inactive, Other);
-    register_action(script, "EnemyStones", revival_stone_enemy, Other);
     register_action(script, "BondUp", bond_up, Emblem);
-    register_action(script, "Vision", enemy_vision, Other);
+    register_action(script, "Vision", vision, Other);
 
     register_action(script, "AllInactive", all_inactive, Other);
     register_action(script, "ReviveDead", revive_units, Other);
-    register_action(script, "PlayerVision", player_vision, Other);
-
-    register_action(script, "RevivalAll", revival_all_stone, Other);
-    register_action(script, "LevelReset", unit_level_reset, Level);
 
     register_action(script, "RandomSkill", skill_gain, Skill);
     register_action(script, "StatUp!", stat_up_change, Stat);
@@ -64,7 +44,6 @@ pub fn install_tilebolical_effects(script: &EventScript) {
             class.get_virtual_method_mut("GetCommandHelp").map(|method| method.method_ptr = visit_command_help as _);
         }
     }
-
 }
 
 fn nothing_message() { GameMessage::create_key_wait(ScriptUtil::get_sequence(), Mess::get("MTID_Nothing").to_string()); }
@@ -125,50 +104,33 @@ fn added_skill_message(mut affected_units: i32, index: i32) {
     else { nothing_message(); }
 }
 
-extern "C" fn finish_map(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    if GameUserData::is_encount_map() || !GameUserData::get_chapter().cid.contains("M0") { 
-        GameVariableManager::set_bool("勝利", true); 
-        GameMessage::create_key_wait(ScriptUtil::get_sequence(), Mess::get("MID_MSG_STAGE_CLEAR").to_string() );
-    }
-    else { nothing_message_with_name("MID_MSG_STAGE_CLEAR"); }
-}
-
-extern "C" fn enemy_exp_50(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    let message = format!("Enemies gives +50 {}", Mess::get("MID_SYS_Exp"));
-    Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit|{
-        MapHistory::private_skill(unit);
-        unit.private_skill.add_sid("SID_撃破経験加算５０", SkillDataCategorys::Private, 0);
-        MapEffect::play_on_unit("ステータス上昇".into(), unit);
-    });
-    GameMessage::create_key_wait(ScriptUtil::get_sequence(),  message);
-}
-extern "C" fn enemy_void_curse(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit| { 
-        unsafe { MapHistory::private_skill(unit); }
-        unit.private_skill.add_sid("SID_虚無の呪い", SkillDataCategorys::Private, 0);
-    });
-    GameMessage::create_key_wait(ScriptUtil::get_sequence(), Mess::get("MSID_CurseOfNihility").to_string());
-}
 extern "C" fn unit_expertise(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
     added_skill_message(0, 3);
 }
 
-extern "C" fn unit_double_exp(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    if let Some(unit) = MapMind::get_unit(){
-        MapHistory::private_skill(unit);
-        MapEffect::play_on_unit("ステータス上昇".into(), unit);
-        unit.private_skill.add_sid("SID_経験値２倍", SkillDataCategorys::Private, 0);
-        let message = format!("{}: 2x {}", Mess::get_name(unit.person.pid), Mess::get("MID_SYS_Exp"));
-        GameMessage::create_key_wait(ScriptUtil::get_sequence(),  message);
-    }
-}
 extern "C" fn enemy_all_active(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
+    let active = Random::get_system().get_value(2) == 0;
     Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit|{
-        unit.ai.set_active(1);
-        unit.clear_status(1);
+        if active {
+            unit.ai.set_active(1);
+            unit.clear_status(1);
+        }
+        else {
+            unit.ai.set_active(0);
+            unit.set_status(1);
+        }
     });
-    GameMessage::create_key_wait(ScriptUtil::get_sequence(), "Enemies are all active.");
+    let message = if active { "Enemies are all active." } else { "Enemies are inactive." };
+    GameMessage::create_key_wait(ScriptUtil::get_sequence(), message);
 }
+extern "C" fn enemy_all_inactive(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
+    Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit|{
+        unit.ai.set_active(0);
+        unit.set_status(1);
+    });
+    GameMessage::create_key_wait(ScriptUtil::get_sequence(), "Enemies are inactive.");
+}
+
 extern "C" fn skill_gain(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
     let s = GameVariableManager::get_number("TileSkills");
     let mut indexes = vec![];
@@ -184,14 +146,6 @@ extern "C" fn skill_gain(_args: &Array<&DynValue>, _method_info: OptionalMethod)
         }
     }
     nothing_message();
-}
-
-extern "C" fn enemy_all_inactive(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit|{
-        unit.ai.set_active(0); 
-        unit.set_status(1);
-    });
-    GameMessage::create_key_wait(ScriptUtil::get_sequence(), "Enemies are inactive.");
 }
 
 extern "C" fn dance_all(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
@@ -213,19 +167,6 @@ extern "C" fn all_inactive(_args: &Array<&DynValue>, _method_info: OptionalMetho
     let message = format!("All Units: {}", Mess::get("MID_MENU_WAIT"));
     GameMessage::create_key_wait(ScriptUtil::get_sequence(), message);
 }
-
-extern "C" fn enemies_guarding(_args: &Array<&DynValue>, _method_info: OptionalMethod){
-    Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit|{
-        if unit.person.get_asset_force() != 0 {
-            unit.set_status(128|64);
-            unit.private_skill.add_sid("SID_チェインガード許可", SkillDataCategorys::Private, 0);
-            MapEffect::play_on_unit("チェインガードコマンド".into(), unit);
-        }
-    });
-    let messages = format!("Enemies: {}", Mess::get("MID_MENU_GUARD"));
-    GameMessage::create_key_wait(ScriptUtil::get_sequence(), messages);
-}
-
 extern "C" fn shuffle_emblems(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
     let mut emblem_list = crate::deployment::get_emblem_list();
     if emblem_list.len() < 2 { 
@@ -262,36 +203,22 @@ extern "C" fn remove_stones(_args: &Array<&DynValue>, _method_info: OptionalMeth
 }
 extern "C" fn all_engage(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
     let mut has_engage = false;
+    let on = Random::get_system().get_value(2) == 0;
     Force::get(ForceType::Player).unwrap().iter().for_each(|player|{
         if player.god_unit.is_some() {
-            player.clear_status(67108864);
-            player.set_engage(true, None);
+            if on { player.clear_status(67108864); }
+            player.set_engage(on, None);
             player.reload_actor();
             has_engage = true;
         }
     });
+    let mid = if on { "MID_MENU_ENGAGE_COMMAND" } else { "MID_MENU_ENGAGE_COMMAND_RELEASE" };
     if has_engage {
-        GameMessage::create_key_wait(ScriptUtil::get_sequence(), Mess::get("MID_MENU_ENGAGE_COMMAND").to_string());
+        GameMessage::create_key_wait(ScriptUtil::get_sequence(), Mess::get(mid).to_string());
         GameSound::post_event("SE_Effect_Engage_On", None);
     }
-    else { nothing_message_with_name("MID_MENU_ENGAGE_COMMAND"); }
+    else { nothing_message_with_name(mid); }
 }
-extern "C" fn all_disengage(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    let mut has_engage = false;
-    Force::get(ForceType::Player).unwrap().iter().for_each(|player|{
-        if player.god_unit.is_some() {
-            player.set_engage(false, None);
-            player.reload_actor();
-            has_engage = true;
-        }
-    });
-    if has_engage {
-        GameMessage::create_key_wait(ScriptUtil::get_sequence(), Mess::get("MID_MENU_ENGAGE_COMMAND_RELEASE").to_string());
-        GameSound::post_event("SE_Effect_Engage_Off", None);
-    }
-    else { nothing_message_with_name("MID_MENU_ENGAGE_COMMAND_RELEASE"); }
-}
-
 extern "C" fn set_hp_to_max (_args: &Array<&DynValue>, _method_info: OptionalMethod) {
     if let Some(unit) = MapMind::get_unit(){
         unit.set_hp(unit.get_capability(0, true));
@@ -299,21 +226,9 @@ extern "C" fn set_hp_to_max (_args: &Array<&DynValue>, _method_info: OptionalMet
     }
 }
 
-extern "C" fn set_hp_to_max_team (_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    Force::get(ForceType::Player).unwrap().iter().for_each(|player|{
-        player.set_hp(player.get_capability(0, true));
-        player.play_set_damage(-999, false, true);
-    });
-}
-
-extern "C" fn enemy_1_hp(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    Force::get(ForceType::Enemy).unwrap().iter().for_each(|player|{
-        player.set_hp(1);
-        player.play_set_damage(999, false, true);
-    });
-}
-extern "C" fn enemy_max_hp(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    Force::get(ForceType::Enemy).unwrap().iter().for_each(|player|{
+extern "C" fn set_hp_to_max_team(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
+    let force = if Random::get_system().get_value(3) == 0 { ForceType::Player } else { ForceType::Enemy };
+    Force::get(force).unwrap().iter().for_each(|player|{
         player.set_hp(player.get_capability(0, true));
         player.play_set_damage(-999, false, true);
     });
@@ -323,111 +238,62 @@ extern "C" fn revival_stone(_args: &Array<&DynValue>, _method_info: OptionalMeth
     if let Some(unit) = MapMind::get_unit(){
         MapHistory::plain_hp_stock(unit);
         MapEffect::play_on_unit("エンゲージ技_発射_G1".into(), unit);
-        unit.extra_hp_stock_count += 1;
-        unit.extra_hp_stock_count_max += 1;
-    }
-}
-extern "C" fn revival_all_stone(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    if let Some(unit) = MapMind::get_unit(){
-        MapHistory::plain_hp_stock(unit);
-        MapEffect::play_on_unit("エンゲージ技_発射_G1".into(), unit);
-        UnitPool::class().get_static_fields_mut::<job::UnitPoolStaticFieldsMut>().s_unit
-            .iter_mut().filter(|unit| unit.force.is_some_and(|f| f.force_type < 3 )).for_each(|unit| {
+        if unit.extra_hp_stock_count == 0 {
             unit.extra_hp_stock_count += 1;
             unit.extra_hp_stock_count_max += 1;
-        });
-    }
-}
-extern "C" fn revival_stone_enemy(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    let rng = Random::get_system();
-    let mut count = 0;
-    UnitPool::class().get_static_fields_mut::<job::UnitPoolStaticFieldsMut>().s_unit
-        .iter_mut().filter(|unit| unit.force.is_some_and(|f| f.force_type == 1 )).for_each(|unit|{
-            if rng.get_value(10) < 1 {
-                MapHistory::plain_hp_stock(unit);
-                count += 1;
-                unit.extra_hp_stock_count += 1;
-                unit.extra_hp_stock_count_max += 1;
-            }
         }
-    );
-    if count == 0 { nothing_message(); }
-    else { 
-        GameMessage::create_key_wait(ScriptUtil::get_sequence(), Mess::get("MID_TUT_BMAP_HPSTOCK_0").to_string());
-        GameSound::post_event("Status_Up", None);
-    }
-}
-extern "C" fn unit_level_up(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    if let Some(unit) = MapMind::get_unit(){
-        if unit.level >= unit.job.max_level {
-            unit_get_sp(_args, None);
-            return;
+        let rng = Random::get_system().get_value(5);
+        if rng < 2 { return; }
+        else {
+            let ff = if rng == 2 { 0 } else { 1 };
+            UnitPool::class().get_static_fields_mut::<job::UnitPoolStaticFieldsMut>().s_unit
+                .iter_mut()
+                .filter(|unit| unit.force.is_some_and(|f| f.force_type == ff ))
+                .for_each(|unit|{
+                    if unit.extra_hp_stock_count == 0 {
+                        unit.extra_hp_stock_count += 1;
+                        unit.extra_hp_stock_count_max += 1;
+                    }
+            });
         }
-        let exp_need = 100 - unit.exp as i32;
-        let proc = ScriptUtil::get_sequence();
-        let grow_sequence = UnitGrowSequence::create_bind(proc);
-        grow_sequence.set_unit_grow_data(unit, exp_need, 0, false);
     }
 }
-extern "C" fn unit_level_reset(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    if let Some(unit) = MapMind::get_unit(){
-        unit.set_level(0);
-        unit.set_internal_level(0);
-        let exp_need = 100 - unit.exp as i32;
-        let proc = ScriptUtil::get_sequence();
-        let grow_sequence = UnitGrowSequence::create_bind(proc);
-        grow_sequence.set_unit_grow_data(unit, exp_need, 0, false);
-    }
-}
-
 extern "C" fn unit_get_sp(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
     if let Some(unit) = MapMind::get_unit(){
         let proc = ScriptUtil::get_sequence();
         let grow_sequence = UnitGrowSequence::create_bind(proc);
-        grow_sequence.set_unit_grow_data(unit, 0, 100, false);
-    }
-}
-
-extern "C" fn unit_get_sp_500(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    if let Some(unit) = MapMind::get_unit(){
-        let proc = ScriptUtil::get_sequence();
-        let grow_sequence = UnitGrowSequence::create_bind(proc);
-        grow_sequence.set_unit_grow_data(unit, 0, 500, false);
-    }
-}
-
-extern "C" fn unit_get_sp_1000(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    if let Some(unit) = MapMind::get_unit() {
-        let proc = ScriptUtil::get_sequence();
-        let grow_sequence = UnitGrowSequence::create_bind(proc);
-        grow_sequence.set_unit_grow_data(unit, 0, 1000, false);
-    }
-}
-extern "C" fn unit_get_sp_max(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    if let Some(unit) = MapMind::get_unit() {
-        let proc = ScriptUtil::get_sequence();
-        let grow_sequence = UnitGrowSequence::create_bind(proc);
-        grow_sequence.set_unit_grow_data(unit, 0, 9999, false);
+        let rng = Random::get_system();
+        let rng_v = rng.get_value(15);
+        let sp =
+            match rng_v {
+                0..5 => 100,
+                5|6 => 500,
+                7|8 => 1000,
+                _ => 2,
+            };
+        if sp == 2 { grow_sequence.set_unit_grow_data(unit, rng.get_value(10)*10, 0, false); }
+        else { grow_sequence.set_unit_grow_data(unit, 0, sp, false); }
     }
 }
 extern "C" fn enemy_level_up(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
+    let increase = Random::get_system().get_value(2) == 0;
     Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit|{
-        unit.level_up(2);
+        if increase { unit.level_up(2); }
+        else {
+            let hp = unit.get_display_hp();
+            unit.level_down();
+            let new_hp = min(unit.get_capability(0, true), hp);
+            unit.set_hp(new_hp);
+        }
         MapEffect::play_on_unit("ステータス下降".into(), unit);
     });
-    GameMessage::create_key_wait(ScriptUtil::get_sequence(), "Enemies: Level Up");
-    GameSound::post_event("FF_LevelUp_ST_Play", None);
-}
-
-extern "C" fn enemy_level_down(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit|{
-        let hp = unit.get_display_hp();
-        unit.level_down();
-        let new_hp = min(unit.get_capability(0, true), hp);
-        unit.set_hp(new_hp);
-        MapEffect::play_on_unit("ステータス下降".into(), unit);
-    });
-    GameMessage::create_key_wait(ScriptUtil::get_sequence(), "Enemies: Level Down");
+    let message =
+    if increase {
+        GameSound::post_event("FF_LevelUp_ST_Play", None);
+        "Enemies: Level Up"
+    }
+    else { "Enemies: Level Down" };
+    GameMessage::create_key_wait(ScriptUtil::get_sequence(), message);
 }
 
 extern "C" fn bond_up(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
@@ -443,14 +309,14 @@ extern "C" fn bond_up(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
                 return;
             }
         }
-        unit_get_sp(_args, None);
     }
 }
-extern "C" fn enemy_vision(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
+extern "C" fn vision(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
     let rng = Random::get_system();
     let mut created = false;
     let mut mpid_str = String::new();
-    Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit|{
+    let force = if rng.get_value(2) == 0 { ForceType::Player } else { ForceType::Enemy };
+    Force::get(force).unwrap().iter().for_each(|unit|{
         if rng.get_value(10) < 1 && unit.person.gender != 0 && unit.person.get_bmap_size() == 1 {
             unit.private_skill.add_sid("SID_残像", SkillDataCategorys::Private, 0);
             MapHistory::private_skill(unit);
@@ -461,29 +327,6 @@ extern "C" fn enemy_vision(_args: &Array<&DynValue>, _method_info: OptionalMetho
             else if !mpid_str.contains(name.as_str()) {
                 mpid_str.push_str(", ");
                 mpid_str.push_str(name.as_str());
-            }
-            UnitUtil::vision_create(unit);
-            created = true;
-        }
-    });
-    if !created { nothing_message_with_name("MSID_LinEngage");  }
-    else {
-        let message = format!("{}: {}", mpid_str, Mess::get("MSID_LinEngage"));
-        GameMessage::create_key_wait(ScriptUtil::get_sequence(), message);
-    }
-}
-extern "C" fn player_vision(_args: &Array<&DynValue>, _method_info: OptionalMethod) {
-    let rng = Random::get_system();
-    let mut created = false;
-    let mut mpid_str = String::new();
-    Force::get(ForceType::Player).unwrap().iter().for_each(|unit|{
-        if rng.get_value(10) < 2 && unit.person.gender != 0 && unit.person.get_bmap_size() == 1 {
-            MapHistory::private_skill(unit);
-            unit.private_skill.add_sid("SID_残像", SkillDataCategorys::Private, 0);
-            if mpid_str.is_empty() { mpid_str = Mess::get_name(unit.person.pid).to_string(); }
-            else {
-                mpid_str.push_str(", ");
-                mpid_str.push_str(Mess::get_name(unit.person.pid).to_string().as_str());
             }
             UnitUtil::vision_create(unit);
             created = true;
