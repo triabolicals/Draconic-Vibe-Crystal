@@ -93,28 +93,6 @@ impl TextSwapper {
                 let original_length = message.len();
                 let mut changed = self.replace_picture(&mut message);
                 changed |= self.replace_for_names(&mut message, &label_str);
-                /*
-                if let Some(wait) = message.windows(2).rposition(|w| w[0] == 14 && w[1] == 4){
-                    let str = format!(" {}", label_str.trim_start_matches("MID_")).encode_utf16().collect::<Vec<u16>>();
-                    message.splice(wait..wait, str);
-                    changed = true;
-                }
-                if let Some(wait) = message.windows(2).rposition(|w| w[0] == 14 && w[1] == 7){
-                    /*
-                        w[0] = 14
-                        w[1] = 7
-                        w[2] = Tag
-                        w[3] = size
-                        w[4] = Sec
-                        w[5] = Sec
-                        w[6] = Color
-                     */
-                    let ty = if message[wait+2] == 1 { 1 } else { 0 };
-                    message.drain(wait..wait+5+ty);
-                    changed = true;
-                }
-
-                 */
                 if changed {
                     if message.len() <= original_length {
                         for x in 0..message.len() { unsafe { *text_ptr.add(x) = message[x]; } }
@@ -137,9 +115,9 @@ impl TextSwapper {
                 MessSwapType::UnitName(idx) => { self.original_data.person_list.get(*idx as usize).and_then(|d| d.find_position(message, false)) }
                 MessSwapType::EmblemName(idx) => { self.original_data.emblem_list.get(*idx as usize).and_then(|d| d.find_position(message, false)) }
                 MessSwapType::HeroAlias(_) => { self.original_data.alias.get(0).and_then(|d| d.find_position(message, false)) }
-                MessSwapType::RingName(idx) => { self.original_data.emblem_alias.get(*idx as usize).and_then(|d| d.find_position(message, false)) }
-                MessSwapType::EmblemInvocation(idx) =>{ self.original_data.emblem_alias.get(*idx as usize+40).and_then(|d| d.find_position(message, false)) }
-                MessSwapType::EmblemAlias(idx) => { self.original_data.emblem_alias.get(*idx as usize+20).and_then(|d| d.find_position(message, false)) }
+                MessSwapType::RingName(idx) => { self.original_data.rings.get(*idx as usize).and_then(|d| d.find_position(message, false)) }
+                MessSwapType::EmblemInvocation(idx) =>{ self.original_data.emblem_alias.get(*idx as usize+20).and_then(|d| d.find_position(message, false)) }
+                MessSwapType::EmblemAlias(idx) => { self.original_data.emblem_alias.get(*idx as usize).and_then(|d| d.find_position(message, false)) }
                 MessSwapType::HeroJob => { 
                     self.original_data.hero_jobs.get(1).and_then(|x| x.find_position(message, true))
                 }
@@ -190,7 +168,6 @@ impl TextSwapper {
                 string += " ";
                 string += arg.to_string().as_str();
             });
-            // println!("Replacement Args: {}", string);
             message.splice(pos..pos+len, args);
             true
         }
@@ -282,7 +259,6 @@ impl TextSwapper {
         self.original_data.person_list.iter().enumerate()
             .for_each(|(i, x)| {
                 while let Some((pos, length, _)) = x.find_position_for_name(message) {
-                    // println!("Unit Name Replace #{}", i);
                     message.splice(pos..pos + length, MessSwapType::UnitName(i as u16).create_tag_arguments(false, 0));
                     change_count += 1;
                     let search_pos = if pos < 2 { 0 } else { pos - 2 };
@@ -293,7 +269,6 @@ impl TextSwapper {
                                 .and_then(|x| x.find_from(message, search_pos))
                                 .filter(|(pos_h, _, _)| *pos_h < pos)
                             {
-                               // println!("Found Honor at {}", pos_h);
                                 message.splice(
                                     pos_h..pos_h + len_h,
                                     MessSwapType::UnitGenderTextSwap { person_idx: i as u16, txt_idx: x as u16 }.create_tag_arguments(is_upper, 0)
@@ -308,24 +283,25 @@ impl TextSwapper {
         self.original_data.emblem_list.iter().enumerate().for_each(|(txt_idx, x)| {
             while let Some((pos, length, _)) = x.find_position_for_name(message) {
                 message.splice(pos..pos + length, [14, 6, 200+txt_idx as u16, 0]);
-               // println!("Emblem Name Replace #{}", txt_idx);
                 change_count += 1;
             }
         });
         for x in 0..20 {
-            for y in 0..4 {
-                let index = (x + y * 20) as usize;
+            if let Some((pos, len, _)) = self.original_data.rings[x].find_position(message, false){
+                for x in 0..len {
+                    if message[pos+x] == 10 { break; }
+                }
+                message.splice(pos..pos + len, [14, 6, 300+x as u16, 0]);
+                change_count += 1;
+            }
+            for y in 0..3 {
+                let index = x + y * 20;
                 if let Some((pos, len, _)) = self.original_data.emblem_alias[index].find_position(message, false){
-                    // let mut new_line_pos = 0;
                     for x in 0..len {
-                        if message[pos+x] == 10 {
-                            // new_line_pos = x;
-                            break;
-                        }
+                        if message[pos+x] == 10 { break; }
                     }
-                    message.splice(pos..pos + len, [14, 6, 300+(index as u16), 0]);
+                    message.splice(pos..pos + len, [14, 6, 600+(index as u16), 0]);
                     change_count += 1;
-                    // println!("{} Replace #{}", EMBLEM_REPLACE_KIND[y as usize], x);
                 }
             }
         }
@@ -412,7 +388,6 @@ fn find_and_splice_for_gid(gid: &str, index: usize, message: &mut Vec<u16>) {
         _ => { return; }
     };
     if DVCVariables::get_dvc_emblem_index(recruitment_index as i32, false) != recruitment_index {
-
         while let Some(pos) = message.windows(pid_slice.len()).position(|window| window == pid_slice) {
             message.splice(pos..pos + pid_slice.len(), [14, 6, 500 + index as u16, 0]);
             if message.len() < pid_slice.len() { return; }

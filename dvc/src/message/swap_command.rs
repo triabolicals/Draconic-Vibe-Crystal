@@ -173,51 +173,27 @@ impl TalkLine {
                 MessSwapType::RingName(idx) => {
                     let idx = (*idx) as usize;
                     if idx < 20 {
-                        if let Some((pos, len, _)) = data.emblem_alias.get(idx).and_then(|m| m.find_position(&message, false)){
+                        if let Some((pos, len, _)) = data.rings.get(idx).and_then(|m| m.find_position(&message, false)){
                             message.splice(pos..pos+len, [14, 6, 300+idx as u16, 0]);
                             changed = true;
-                        }
-                    }
-                    else {
-                        for xx in 0..20 {
-                            if let Some((pos, len, _)) = data.emblem_alias[xx].find_position(&message, false) {
-                                message.splice(pos..pos+len, [14, 6, 300+xx as u16, 0]);
-                                changed = true;
-                            }
                         }
                     }
                 }
                 MessSwapType::EmblemAlias(idx) => {
                     let idx = (*idx) as usize;
                     if idx < 20 {
-                        if let Some((pos, len, _)) = data.emblem_alias.get(idx+20).and_then(|m| m.find_position(&message, false)){
-                            message.splice(pos..pos+len, [14, 6, 320+idx as u16, 0]);
+                        if let Some((pos, len, _)) = data.emblem_alias.get(idx).and_then(|m| m.find_position(&message, false)){
+                            message.splice(pos..pos+len, [14, 6, 600+idx as u16, 0]);
                             changed = true;
-                        }
-                    }
-                    else {
-                        for xx in 0..20 {
-                            if let Some((pos, len, _)) = data.emblem_alias[xx+20].find_position(&message, false) {
-                                message.splice(pos..pos+len, [14, 6, 320+xx as u16, 0]);
-                                changed = true;
-                            }
                         }
                     }
                 }
                 MessSwapType::EmblemInvocation(idx) => {
                     let idx = (*idx) as usize;
                     if idx < 20 {
-                        if let Some((pos, len, _)) = data.emblem_alias.get(idx+40).and_then(|m| m.find_position(&message, false)){
-                            message.splice(pos..pos+len, [14, 6, 340+idx as u16, 0]);
+                        if let Some((pos, len, _)) = data.emblem_alias.get(idx+20).and_then(|m| m.find_position(&message, false)){
+                            message.splice(pos..pos+len, [14, 6, 620+idx as u16, 0]);
                             changed = true;
-                        }
-                    }
-                    else {
-                        for xx in 0..20 {
-                            if let Some((pos, len, _)) = data.emblem_alias[xx+40].find_position(&message, false) {
-                                message.splice(pos..pos+len, [14, 6, 340+xx as u16, 0]);
-                                changed = true;
-                            }
                         }
                     }
                 }
