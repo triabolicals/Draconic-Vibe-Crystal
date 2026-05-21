@@ -78,7 +78,7 @@ pub fn asset_table_result_god_setup(
 
             let result = this.setup_for_person_job_item(mode, Some(person), person.get_job(), item, conditions);
             if is_darkness || gid.contains("E0") || (gid.contains("M0") && !gid.contains("M002")){
-                result.unity_colors[0].r = 0.69;
+                result.unity_colors[0].r = 3.69;
                 result.unity_colors[0].g = 0.19;
                 result.unity_colors[0].b = 0.19;
                 let masks = [60, 70, 40, 70];
@@ -89,6 +89,7 @@ pub fn asset_table_result_god_setup(
                     result.unity_colors[x+4].b = value;
                 }
             }
+            else { result.unity_colors[0].r += 2.0; }
             change_accessory(result.accessory_list, format!("uAcc_Eff_EmblemAura-0{}-00", if is_darkness { "2" } else { "1" }).as_str(), "c_trans");
             result.sound.voice = voice;
             result.demo_anims = demo_anim.map(|v| v.into());
@@ -121,7 +122,14 @@ pub fn asset_table_result_god_setup(
             if let Some(appearance) = UnitPool::get_hero(false).and_then(|unit| db.dress.get_personal_dress(unit)){
                 appearance.apply_appearance(result, mode, false, None, &db.hashes, true);
             }
-            if is_darkness { lueur_fell_child_hair(result); } else { lueur_god_hair(result) }
+            if is_darkness {
+                lueur_fell_child_hair(result);
+                result.unity_colors[0].r += 3.0;
+            }
+            else {
+                lueur_god_hair(result);
+                result.unity_colors[0].r += 2.0;
+            }
             result.body_anims.clear();
             if person.get_dress_gender() == Gender::Female {
                 if mode == 2 {
@@ -214,7 +222,12 @@ pub fn asset_table_result_god_setup(
             let emblem = 
                 if new_emblem < 12 || new_emblem >= 19 || is_m002 { replace_god }
                 else { GodData::get(&format!("GID_E006_敵{}", EMBLEM_ASSET[new_emblem])).unwrap() };
-            return call_original!(this, mode, Some(emblem), !is_m002, conditions, method_info);
+            let result = call_original!(this, mode, Some(emblem), !is_m002, conditions, method_info);
+            if new_emblem >= 19 && !is_m002 { result.unity_colors[0].r += 3.0; }
+            if !is_m002 {
+                change_accessory(result.accessory_list, "uAcc_Eff_EmblemAura-02-00", "c_trans");
+            }
+            return result;
         }
     }
     let result = call_original!(this, mode, god_data, is_darkness, conditions, method_info);
