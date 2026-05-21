@@ -223,7 +223,7 @@ pub fn commit_for_unit_dress(
         else {
             let job_hash = GameVariableManager::get_number(format!("G_JG_{}", condition_unit.person.pid));
             if job_hash == condition_unit.job.parent.hash && conditionss.random_dress.is_off() {
-                if DVCVariables::is_changed_recruitment_order(false) && conditionss.character_mode != CharacterAssetMode::Hub {
+                if DVCVariables::is_changed_recruitment_order(false) && conditionss.character_mode != CharacterAssetMode::PrivateClothes {
                     if let Some(dress) = db.dress.get_personal_dress(condition_unit) {
                         dress.apply(result, mode, promoted, db.anims.get_mount_type(unit, get_unit_dress(unit)), &db.hashes);
                     }
