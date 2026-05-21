@@ -1,14 +1,9 @@
 use engage::{
-    gamedata::{Gamedata, JobData},
-    gamedata::job::BattleStyles,
-    gamedata::skill::{SkillData, SkillDataCategorys},
+    gamedata::{Gamedata, JobData, job::BattleStyles, skill::{SkillData, SkillDataCategorys}},
     random::Random,
     unit::{Gender, Unit}
 };
-use crate::{randomizer::{
-    data::GameData,
-    job::reclass::ClassTier
-}, DVCVariables};
+use crate::{randomizer::{data::GameData, job::reclass::ClassTier}, DVCVariables};
 use crate::config::DVCFlags;
 
 pub struct Job {
@@ -120,12 +115,20 @@ impl JobDataBase {
     pub fn get_reclass_job(&self, unit: &Unit, job: &JobData, class_tier: ClassTier) -> Option<&'static mut JobData> {
         let hash = job.parent.hash;
         let j = self.jobs.iter().find(|j| j.hash == hash)?;
-        let apt = unit.get_person().aptitude.value | unit.get_person().sub_aptitude.value;
+        let apt = unit.get_person().aptitude.value; 
+        let sub_apt = unit.get_person().sub_aptitude.value;
         j.cc.iter()
             .flat_map(|v| self.get_by_hash(*v).filter(|j| j.tier == class_tier))
             .map(|j| (j, j.match_aptitude(apt)))
             .max_by(|a, b| a.1.cmp(&b.1))
             .map(|a| a.0.get())
+            .or_else(||
+                j.cc.iter()
+                 .flat_map(|v| self.get_by_hash(*v).filter(|j| j.tier == class_tier))
+                 .map(|j| (j, j.match_aptitude(sub_apt)))
+                 .max_by(|a, b| a.1.cmp(&b.1))
+                 .map(|a| a.0.get())
+            )
     }
     pub fn get() -> &'static Self { &GameData::get().job_db }
     pub fn update_styles(&self) {
