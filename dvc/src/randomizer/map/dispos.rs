@@ -24,9 +24,8 @@ pub const PARALOGUE_LEVELS: [u8; 48] = [
 pub fn change_map_dispos() {
     if !can_rand() { return; }
     if let Some(dispos) =  DisposData::get_list_mut().as_mut() {
-        let chapter = GameUserData::get_chapter();
-        let cid = chapter.cid.to_string();
-        let lythos_crew = cid.contains("M001") || cid.contains("M002") || cid.contains("M003");
+        let chapter_idx = DVCVariables::get_chapter_index();
+        let lythos_crew = chapter_idx < 4;
         dispos.iter_mut().flat_map(|array| array.iter_mut()).for_each(|dispos| {
             if DVCVariables::UnitRecruitment.get_value() != 0 {
                 if let Some(lythos_person) = dispos.get_person().filter(|p| p.parent.index > 0 && p.parent.index < 5 ) {
@@ -42,7 +41,8 @@ pub fn change_map_dispos() {
                 }
             }
         });
-        if DVCVariables::EmblemRecruitment.get_value() != 0 {
+        if chapter_idx >= 32 && chapter_idx < 45 && DVCVariables::EmblemRecruitment.get_value() != 0 {
+            let cid = GameUserData::get_chapter().cid.to_string();
             if let Some(pos) = EMBLEM_PARA.iter().position(|x| cid.ends_with(*x)).filter(|x| *x < 12) {
                 let recruit_idx = DVCVariables::get_dvc_emblem_index(pos as i32, true);
                 if recruit_idx >= 12 { return; }
