@@ -1,12 +1,14 @@
 use engage::{gamedata::{Gamedata, GodData}, language::*, mess::{Mess, MessStaticFields}, };
 use unity::prelude::*;
-use crate::{message::swap::copy_from_u16_ptr, enums::{EMBLEM_GIDS, MPIDS, RINGS}};
+use crate::{message::swap::copy_from_u16_ptr, enums::{EMBLEM_GIDS, MPIDS}};
+use crate::randomizer::data::GameData;
 
-const NPC_MPIDS: [&str; 22] = [
+const NPC_MPIDS: [&str; 23] = [
     "MPID_Sepia", "MPID_Gris", "MPID_Marron", "MPID_Lumiere", "MPID_M003_Boss", "MPID_M004_Boss",
     "MPID_M005_Boss", "MPID_M006_Boss", "MPID_M013_BossA", "MPID_M013_BossB", "MPID_Sombre",
     "MPID_JeanFather","MPID_JeanMother","MPID_S002_Boss","MPID_Eve","MPID_Morion","MPID_Hyacinth",
     "MPID_Sfoglia","MPID_AccessoriesShop","MPID_BlackSmith","MPID_ItemShop","MPID_WeaponShop",
+    "MPID_Il",
 ];
 
 #[derive(Clone)]
@@ -96,6 +98,7 @@ pub struct MessageList {
     pub person_list: Vec<MessDataString>,
     pub emblem_list: Vec<MessDataString>,
     pub alias: Vec<MessDataString>,
+    pub rings: Vec<MessDataString>,
     pub emblem_alias: Vec<MessDataString>,
     pub gender: Vec<GenderConditionString>,
     pub hero_jobs: Vec<MessDataString>,
@@ -103,8 +106,9 @@ pub struct MessageList {
     pub text: Vec<MessDataString>,
     pub honorifics: Vec<MessDataString>,
 }
-
+#[allow(non_upper_case_globals)]
 impl MessageList {
+    pub const RingNames: i32 = 300;
     pub fn init() -> Self {
         let mut item_kinds = [Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), ];
         let person_list: Vec<MessDataString> = MPIDS.iter().chain(NPC_MPIDS.iter())
@@ -114,16 +118,19 @@ impl MessageList {
                 .flat_map(|gid| GodData::get(gid))
                 .map(|gd| MessDataString::from(Mess::get(gd.mid)))
                 .collect();
-
-        let mut emblem_alias: Vec<_> =
-            RINGS.iter().enumerate()
-                .filter(|x| x.0 < 19)
-                .map(|(_, x)| MessDataString::from(Mess::get(format!("MGID_Ring_{}", x))))
-                .collect();
-        emblem_alias.push(MessDataString::from(Mess::get("MGID_Ring_Lueur")));
-        let mut alias: Vec<_> = MPIDS.iter().map(|m|{
-            MessDataString::from(Mess::get(m.replace("MPID_", "MPID_alias_")))
+        let god_list = &GameData::get_playable_god_list();
+        let mut rings: Vec<MessDataString> =
+            god_list.iter().map(|v|{
+            if let Some(ring_name) = v.ring_name {
+                let name = Mess::get(ring_name).to_string().trim_end_matches('.').to_string();
+                MessDataString::from_str(name.as_str())
+            }
+            else if let Some(engrave) = v.engrave_word { MessDataString::from(Mess::get(engrave)) }
+            else { MessDataString::from(Mess::get(v.mid))}
         }).collect();
+
+        let mut emblem_alias = Vec::new();
+        let mut alias: Vec<_> = MPIDS.iter().map(|m|{ MessDataString::from(Mess::get(m.replace("MPID_", "MPID_alias_"))) }).collect();
         let mut text = vec![];
         let lines =
         match Language::get_lang() {
@@ -156,34 +163,22 @@ impl MessageList {
                 }
             }
         });
-        let sf = Il2CppClass::from_name("App", "Mess").unwrap().get_static_fields_mut::<MessStaticFields>();
-        sf.mess_data_dictionary.entries.iter().filter_map(|v| v.key.filter(|v| v.str_contains("MID_RULE")))
-            .for_each(|rule|{
-                let ptr = Mess::get_int_ptr_mut(rule);
-                let mut copy = copy_from_u16_ptr(ptr);
-                let len = copy.len();
-                let mut changed = false;
-                person_list.iter().enumerate().for_each(|(i,p)|{
-                    if let Some((pos, len, _)) = p.find_position(&copy, false) {
-                        let (group, l) = get_tag_group(pos, len, &copy);
-                        copy.splice(pos..pos + l, [14, group, 100+i as u16, 0]);
-                        changed = true;
-                    }
-                });
-                for x in 0..12 {
-                    if let Some((pos, len, _)) = emblem_list[x].find_position(&copy, false) {
-                        let (group, l)= get_tag_group(pos, len, &copy);
-                        copy.splice(pos..pos + l, [14, group, 530+x as u16, 0]);
-                        changed = true;
-                    }
+        god_list.iter().enumerate().filter(|v| v.0 > 19 )
+            .for_each(|v|{
+                if let Some(engrave) = v.1.engrave_word {
+                    emblem_alias.push(MessDataString::from_str(format!("Emblem of {}", Mess::get(engrave)).as_str()));
                 }
-                if changed && copy.len() <= len {
-                    for x in 0..copy.len() { unsafe { *ptr.add(x) = copy[x]; } }
+                else {
+                    emblem_alias.push(MessDataString::from_str(format!("{} Emblem", Mess::get(v.1.mid)).as_str()));
                 }
             });
+        let sf = Il2CppClass::from_name("App", "Mess").unwrap().get_static_fields_mut::<MessStaticFields>();
+        replace_mess_char(sf, "MID_RULE", (&person_list, 100), Some((&emblem_list, 530)));
+        replace_mess_char(sf, "MTID_Ring_", (&rings, 300), None);
+        replace_mess_char(sf, "MID_TUT_NAVI_M022_GET_", (&rings, 300), None);
         let list =       
             Self {
-                person_list, alias, gender, emblem_list, emblem_alias, 
+                person_list, alias, gender, emblem_list, emblem_alias, rings,
                 hero_jobs, item_kinds, honorifics: vec![], text,
             };
         include_str!("label_swap.txt").lines().flat_map(|l| crate::message::swap_command::TalkLine::new(l))
@@ -201,6 +196,34 @@ impl MessageList {
             });
         list
     }
+}
+fn replace_mess_char(sf: &mut MessStaticFields, mess_key_prefix: &str, table: (&Vec<MessDataString>, i32), table2: Option<(&Vec<MessDataString>, i32)>) {
+    sf.mess_data_dictionary.entries.iter().filter_map(|v| v.key.filter(|v| v.str_contains(mess_key_prefix)))
+        .for_each(|rule|{
+            let ptr = Mess::get_int_ptr_mut(rule);
+            let mut copy = copy_from_u16_ptr(ptr);
+            let len = copy.len();
+            let mut changed = false;
+            table.0.iter().enumerate().for_each(|(i,p)|{
+                if let Some((pos, len, _)) = p.find_position(&copy, false) {
+                    let (group, l) = get_tag_group(pos, len, &copy);
+                    copy.splice(pos..pos + l, [14, group, table.1 as u16 +i as u16, 0]);
+                    changed = true;
+                }
+            });
+            if let Some(table2) = table2 {
+                table2.0.iter().enumerate().for_each(|(i,p)|{
+                    if let Some((pos, len, _)) = p.find_position(&copy, false) {
+                        let (group, l) = get_tag_group(pos, len, &copy);
+                        copy.splice(pos..pos + l, [14, group, table2.1 as u16 +i as u16, 0]);
+                        changed = true;
+                    }
+                });
+            }
+            if changed && copy.len() <= len {
+                for x in 0..copy.len() { unsafe { *ptr.add(x) = copy[x]; } }
+            }
+        });
 }
 fn find_position(message: &Vec<u16>, string: &String, ignore_case: bool, start_from: Option<usize>) -> Option<(usize, usize, bool)>  {
     let mut v: Vec<char> =
@@ -248,4 +271,3 @@ fn get_tag_group(position: usize, len: usize, ptr: &Vec<u16>) -> (u16, usize) {
     if len == 3 { if let Some(v) = ptr.get(position+3){ return (20 + v, 4) } }
     (6, len)
 }
-

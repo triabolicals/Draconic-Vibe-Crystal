@@ -11,12 +11,14 @@ use crate::{
 };
 use outfit_core::UnitAssetMenuData;
 use unity::{prelude::OptionalMethod, il2cpp::object::Array};
+use crate::message::TextSwapper;
 use crate::randomizer::status::RandomizerStatus;
 
 pub fn main_sequence_desc_edit(descs: &mut Array<&mut ProcDesc>) {
     descs[18] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_initialize));
 
     replace_desc_void_function(descs, "LoadResource", main_sequence_load_resource as _);
+    descs[32] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_post_initialize));
     // descs[30] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_load_resource));
     descs[43] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_game_reset));
     descs[101] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_try_jump_to_next_chapter));
@@ -45,7 +47,11 @@ extern "C" fn main_sequence_load_resource(main_sequence: &mut MainSequence, _opt
     message::initialize_mess_hashs();
     AccessoryShopChangeRoot::load_prefab_async();
 }
-
+extern "C" fn main_sequence_post_initialize(proc: &mut ProcInst, _: OptionalMethod) {
+    call_proc_original_method(proc, "PostInitialize");
+    TextSwapper::change_char_puppet("HubCommon_P0");
+    TextSwapper::change_char_puppet("HubCommon_P3");
+}
 extern "C" fn main_sequence_game_reset(main_sequence: &mut ProcInst, _optional_method: OptionalMethod) {
     if RandomizerStatus::get().enabled { crate::randomizer::reset_gamedata(); }
     call_proc_original_method(main_sequence, "GameReset");
