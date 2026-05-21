@@ -61,7 +61,9 @@ pub fn asset_table_result_setup_hook(
         return result;
     }
     let conditions = dress::commit_for_unit_dress(result, mode, unit, equipped, conditions);  // Pre-set Conditions
-    if conditions.flags.contains(AssetFlags::EngageTiki) || unit.job.jid.str_contains("紋章士")  { return result; }
+    if conditions.flags.contains(AssetFlags::EngageTiki) || unit.job.jid.str_contains("紋章士") ||
+        (conditions.flags.contains(AssetFlags::MapTransform) && mode == 1) || conditions.flags.contains(AssetFlags::Monster)
+    { return result; }
     if mode == 3 && unit.person.parent.index == 1 {
         if unit.person.parent.index > 1 { result.scale_stuff[16] = 4.8; }
         return result;
@@ -81,7 +83,6 @@ pub fn asset_table_result_setup_hook(
         }
         return result;
     }
-    if (conditions.flags.contains(AssetFlags::MapTransform) && mode == 1) || conditions.flags.contains(AssetFlags::Monster) { return result; }
     else if mode == 2 && (conditions.flags.contains(AssetFlags::EngAtkCoopMain) || conditions.flags.contains(AssetFlags::EngAtkCoopSub)) { // DragonBlast or BondBlast
         lueur_engage_atk(result, unit, &conditions);
     }

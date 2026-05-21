@@ -4,7 +4,6 @@ use engage::transporter::Transporter;
 use crate::{
     utils::min,
     randomizer::Randomizer,
-    continuous::get_story_chapters_completed
 };
 use super::*;
 
@@ -297,7 +296,7 @@ impl WeaponDatabase {
         else if total_level < 31 { 4 }
         else { 5 };
         let rank = min(rank_level, job_rank) as u8;
-        let chapter_completed = get_story_chapters_completed();
+        let chapter_completed = DVCVariables::chapter_number_complete(false);
         self.weapon_list
             .get(&6)
             .and_then(|list|{
@@ -318,7 +317,7 @@ impl WeaponDatabase {
                 .and_then(|list| list.get_random_element(Random::get_system()).and_then(|data| ItemData::try_index_get(data.item_index)))
         }
         else {
-            let chapter_completed = get_story_chapters_completed();
+            let chapter_completed = DVCVariables::chapter_number_complete(false);
             let mut search_rank = if start_rank == -1 { 6 } else { start_rank as u8 };
             let mut lower_rank = if search_rank > 2 { search_rank - 1 } else { search_rank };
             if let Some(list) = self.weapon_list.get(&kind) {
@@ -383,18 +382,9 @@ impl WeaponDatabase {
         }
         // let weapon = Mess::get(item.name);
         replace.or_else(|| {
-            // println!("Item {} has no replacement", weapon);
             let rank = item.get_weapon_level();
             avail_weapons.iter()
                 .filter(|(dm, x)| {
-                    /*
-                    println!("Possible {} Replacement {}: {} || {}",
-                             weapon,
-                             Mess::get_name(ItemData::try_index_get(x.item_index).unwrap().iid),
-                             x.flag.contains(WeaponDataFlag::Generic),
-                             x.flag.is_normal()
-                    );
-                    */
                     x.flag.is_normal() || x.flag.contains(WeaponDataFlag::Generic)
                 })
                 .map(|x| {
@@ -476,7 +466,7 @@ impl WeaponDatabase {
                 removed_from_pool.push(unit_item.item.parent.index);
             }
         }
-        let chapter_completed = get_story_chapters_completed();
+        let chapter_completed = DVCVariables::chapter_number_complete(false);
         let mut kind_replace: HashMap<usize, Vec<WeaponData>> =
             weapon_types.iter().zip(current_item_weapon_ranks.iter())
                 .flat_map(|(x1, x2)| Some(x2.0 as usize).zip(self.weapon_list.get(&(x1.0 as i32))))
@@ -490,7 +480,7 @@ impl WeaponDatabase {
         for x in 0..8 {
             if let Some(unit_item) = unit.item_list.get_item(x)
                 .filter(|x| x.item.parent.index > 2 && x.item.flag.value & 128 == 0 && x.is_weapon() &&
-                    unit.can_equip_item(x.item, false, true))
+                    !unit.can_equip_item(x.item, false, true))
             {
                 let might = unit_item.item.power;
                 let flags = unit_item.flags;

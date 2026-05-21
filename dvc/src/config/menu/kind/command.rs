@@ -1,13 +1,9 @@
 use engage::{gamemessage::GameMessage,gamevariable::GameVariableManager,keyboard::SoftwareKeyboard};
-use engage::force::ForceType;
-use engage::gamedata::PersonData;
-use engage::unit::{Unit, UnitPool, UnitUtil};
 use unity::system::action::Action1;
 use crate::{
     randomizer::{data::GameData, status::RandomizerStatus},
     DVCConfig, utils::{get_random_number_for_seed},
 };
-use crate::enums::PIDS;
 use super::*;
 
 #[repr(C)]
@@ -15,7 +11,6 @@ use super::*;
 pub enum DVCCommand {
     SetSeed,
     ReRandJob,
-//    RecruitUnits,
 }
 
 impl DVCCMenuItem for DVCCommand {

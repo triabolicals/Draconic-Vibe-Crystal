@@ -113,7 +113,6 @@ impl DVCConfig {
     pub fn get() -> &'static mut Self { unsafe { &mut CONFIG } }
     pub fn new() -> Self {
         let config_content = std::fs::read_to_string("sd:/engage/config/dvc.toml");
-        // If the file is read to a string or there is no failure, parse into the config struct.
         if config_content.is_ok() {
             let content = config_content.unwrap();
             let config = toml::from_str(&content);
@@ -121,16 +120,13 @@ impl DVCConfig {
                 let config = config.unwrap();
                 config
             } else {
-                // This is mostly intended to create a new file if more items are added to the struct
                 let config = DVCConfig::default();
-                // config.save();
                 config
             }
         }
         else {
-            // If the file could not be read to a string then create a new file with default values.
             let config = DVCConfig::default();
-            // config.save();
+            config.save();
             config
         }
     }
@@ -357,8 +353,7 @@ impl DVCConfig {
     pub fn save(&self) {
         toml::to_string(&self).unwrap();
         let out_toml = toml::to_string(&self).unwrap(); // toml::to_string_pretty(&self).unwrap();
-        std::fs::write("sd:/engage/config/dvc.toml", out_toml)
-            .expect("should be able to write to write default configuration");
+        std::fs::write("sd:/engage/config/dvc.toml", out_toml).unwrap();
     }
     pub fn create_game_variables(&mut self, set_value: bool) {
         GameVariableManager::make_entry_norewind(DVCFlags::FlagSet1, 0);

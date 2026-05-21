@@ -29,7 +29,7 @@ pub fn next_chapter_get_name(_this: &BasicMenuItem, _optional_method: OptionalMe
         if let Some(chapter) = ChapterData::try_get_hash(GameVariableManager::get_number("G_DVC_Next")){
             let prefix = Mess::get(format!("{}_PREFIX", chapter.name));
             let name = Mess::get(chapter.name);
-            let count = get_continious_total_map_complete_count();
+            let count = DVCVariables::chapter_number_complete(true);
             return format!("{}: {} [#{}]", prefix, name, count+1).into()
         }
     }

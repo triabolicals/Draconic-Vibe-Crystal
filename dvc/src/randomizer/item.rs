@@ -6,7 +6,8 @@ pub use engage::{
     gamevariable::*, gameuserdata::*, random::*,
     gamedata::{*, item::*},
 };
-use crate::{continuous::get_continious_total_map_complete_count, utils::*};
+use engage::force::{Force, ForceType};
+use crate::utils::*;
 use unit_items::{add_generic_weapons, get_max_job_weapon_type, get_number_of_usable_weapons};
 
 pub mod unit_items;
@@ -14,14 +15,16 @@ pub mod shop;
 pub mod data;
 pub mod hub;
 pub mod well;
-
+pub const MISERCODE: &'static str = "IID_ミセリコルデ";
+pub const OBSCURITE: &'static str = "IID_オヴスキュリテ";
+pub const SECOND_SEAL: &'static str = "IID_チェンジプルフ";
 pub fn get_random_item(item: &'static Il2CppString, allow_rare: bool) -> &'static Il2CppString {
     if let Some(item_check) = ItemData::get(item) {
         let flag = item_check.flag.value;
         if flag & 1 == 1 { return item;  }
         if let Some(item) = ItemData::get(item).filter(|x| x.use_type == 23 || x.use_type == 24 || x.use_type == 40 || x.use_type == 41){
             if item.use_type == 23 && DVCVariables::ClassMode.get_value()& 1 != 0 && DVCVariables::Reclassing.get_value() == 0 {
-                if let Some(second_seal) = ItemData::get("IID_チェンジプルフ") { second_seal.add_inventory(1); }
+                if let Some(second_seal) = ItemData::get(SECOND_SEAL) { second_seal.add_inventory(1); }
             }
             item.add_inventory(1);
         }
@@ -97,7 +100,7 @@ pub fn change_misercode_type(){
         5
     }
     else { value };
-    if let Some(misercode) = ItemData::get_mut("IID_ミセリコルデ"){
+    if let Some(misercode) = ItemData::get_mut(MISERCODE){
         misercode.equip_skills.clear();
         misercode.give_skills.clear();
         misercode.range_o = 2;
@@ -136,17 +139,18 @@ pub fn get_unit_avail_weapon_levels(unit: &Unit) -> [i32; 10] {
     let mut levels = [0; 10];
     let level = unit.level as i32 + unit.internal_level as i32;
     let enemy = unit.person.get_asset_force() == 1;
+    let rng = Random::get_game().get_value(100);
     let story_weapon_level =
         if !DVCVariables::is_main_chapter_complete(4) { 1 }
         else {
             match level {
                 0..10 => { 1 }  // D
                 10..15 => { // D or C
-                    if enemy { if Random::get_game().get_value(100) < (level - 9) * 10 { 2 } else { 1 } } else { 2 }
+                    if enemy { if rng < (level - 9) * 10 { 2 } else { 1 } } else { 2 }
                 }
                 15..20 => { 2 } // C
                 20..25 => { // C or B
-                    if enemy { if Random::get_game().get_value(100) < (level - 19) * 10 { 3 } else { 2 } } else { 3 }
+                    if enemy { if rng < (level - 19) * 10 { 3 } else { 2 } } else { 3 }
                 }
                 25..30 => { 3 }    // B
                 30..40 => { // B or A
@@ -212,8 +216,8 @@ pub fn adjust_non_unit_items_inventory() {
             count += 1;
         }
     }
-    for x in 1..250 {
-        if let Some(unit) = engage::unit::UnitPool::get(x).filter(|unit| unit.force.is_some_and(|f| (1 << f.force_type) & 25 != 0)) {
+    Force::get(ForceType::Player).unwrap().iter().chain(Force::get(ForceType::Absent).unwrap().iter())
+        .for_each(|unit|{
             let mut changed = false;
             unit.item_list.unit_items.iter().filter_map(|item| item.as_ref().filter(|i| i.item.is_inventory() || i.item.kind > 13))
                 .for_each(|item| {
@@ -223,8 +227,7 @@ pub fn adjust_non_unit_items_inventory() {
                     changed = true;
                 });
             if changed { unit.item_list.put_engage_item(unit.god_link.or(unit.god_unit), unit.status.value & 8388608 != 0); }
-        }
-    }
+        });
 }
 
 #[unity::hook("App", "ItemRefineData", "TryGetFromItem")]

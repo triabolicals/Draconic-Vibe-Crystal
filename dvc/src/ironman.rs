@@ -27,12 +27,12 @@ pub fn map_save_menu_edits() {
     }
 }
 
-fn map_system_temp_save_menu_name(_temp_save_menu_item: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString { Mess::get("MID_SORTIE_SAVE") }
-fn map_system_temp_save_get_help_text(_temp_save_menu_item: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString { Mess::get("MID_SORTIE_SAVE_HELP") }
+fn map_system_temp_save_menu_name(_temp_save_menu_item: &BasicMenuItem, _: OptionalMethod) -> &'static Il2CppString { Mess::get("MID_SORTIE_SAVE") }
+fn map_system_temp_save_get_help_text(_temp_save_menu_item: &BasicMenuItem, _: OptionalMethod) -> &'static Il2CppString { Mess::get("MID_SORTIE_SAVE_HELP") }
 fn map_system_temp_save_build_attr(_temp_save_menu_item: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
     if DVCFlags::Ironman.get_value() { BasicMenuItemAttribute::Hide } else { BasicMenuItemAttribute::Enable }
 }
-fn restart_menu_item_build_attr(restart_item: &BasicMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
+fn restart_menu_item_build_attr(restart_item: &BasicMenuItem, _: OptionalMethod) -> BasicMenuItemAttribute {
     if DVCFlags::Ironman.get_value(){ BasicMenuItemAttribute::Hide } else { unsafe { original_restart_item_build_attr(restart_item, None) } }
 }
 #[skyline::from_offset(0x01b72cb0)]

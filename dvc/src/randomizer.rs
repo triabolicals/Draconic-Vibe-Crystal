@@ -44,7 +44,7 @@ pub static RANDOMIZER_DATA: OnceLock<GameData> = OnceLock::new();
 pub static DVC_BLACK_LIST: OnceLock<RwLock<DVCBlackLists>> = OnceLock::new();
 pub static RANDOMIZED_DATA: OnceLock<RwLock<RandomizedGameData>> = OnceLock::new();
 
-pub fn get_dvc_black_list_read() ->  RwLockReadGuard<'static, DVCBlackLists> { DVC_BLACK_LIST.get().unwrap().read().unwrap() }
+pub fn get_dvc_black_list_read() ->  RwLockReadGuard<'static, DVCBlackLists> { DVCBlackLists::get_read() }
 pub static mut STATUS: RandomizerStatus = RandomizerStatus::new();
 
 /// Tutorial clear and provide DLC seal usages
@@ -60,6 +60,13 @@ pub fn tutorial_check() {
             let string = list[i].to_string();
             GameVariableManager::set_bool(&string, true);
             if string == "G_解説_TUTID_クラスチェンジ" { return; }
+        }
+    }
+
+    #[cfg(feature = "debug")]{
+        if DVCConfig::get().debug {
+            GameVariableManager::find_starts_with("G_GmapSpot").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
+            GameData::get_playable_god_list().iter().for_each(|key|{ GodPool::create(key); });
         }
     }
 
@@ -228,12 +235,6 @@ fn upgrade() {
     let version = GameVariableManager::get_number("G_DVC_Version");
     if version < 3 { migrate_to_v3(); }
     if version < 5 { migrate_to_v5(); }
-    if version < 7 {
-        for x in 0..19 {
-            let s = DVCVariables::get_dvc_emblem_index(x, false);
-            DVCVariables::set_emblem_recruitment(x, s as i32);
-        }
-    }
     if version < 8 {
         DVCVariables::TileRNG.init_var(0, false);
         DVCVariables::NextChapter.init_var(0, false);
@@ -250,7 +251,6 @@ pub fn initialize_game_data() {
     RANDOMIZED_DATA.get_or_init(|| RwLock::new(RandomizedGameData::new(emblems, playables)));
     bgm::initalize_bgm_pool();
     person::ai::create_custom_ai();
-    emblem::initialize_emblem_list();
     engage_count();
     crate::assets::data::initialize_search_list();
     crate::talk::fill_name_array();
@@ -263,11 +263,7 @@ pub fn engage_count() {
     god_data.iter_mut()
         .filter(|god| god.engage_count > 0)
         .for_each(|god| god.engage_count = 7);
-
-    emblem::ENEMY_EMBLEM_LIST.get().unwrap()
-        .iter()
-        .flat_map(|&x|GodData::try_index_get_mut(x))
-        .for_each(|x| { x.force_type = 1; });
+    
 }
 /*
 #[skyline::hook(offset=0x02291fd0)]

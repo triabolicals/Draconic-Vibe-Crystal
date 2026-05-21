@@ -151,7 +151,7 @@ pub fn update_added_shop_items(map_complete: bool) {
     if !DVCVariables::is_main_chapter_complete(4) { return; }
     let rng = Random::get_system();
     let (max_price, rank) =
-        match crate::continuous::get_story_chapters_completed() {
+        match DVCVariables::chapter_number_complete(false) {
             0..5 => { (1250, 2) }
             5..10 => { (1600, 3) }
             10..15 => { (2000, 3) }

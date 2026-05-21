@@ -8,14 +8,7 @@ use engage::{
     sequence::mapsequence::MapSequence,
     util::get_instance,
 };
-use crate::{
-    config::DVCFlags,
-    procs, randomizer, DVCVariables,
-    message::{TextSwapper, MESSAGE_SWAPPER},
-    deployment::fulldeploy,
-    script::adjust_person_map_inspectors,
-    randomizer::{map::shuffle::shuffle_deployment},
-};
+use crate::{config::DVCFlags, procs, randomizer, DVCVariables, message::{TextSwapper, MESSAGE_SWAPPER}, deployment::fulldeploy, script::adjust_person_map_inspectors, randomizer::{map::shuffle::shuffle_deployment}, DVCConfig};
 use std::sync::RwLock;
 use unity::{il2cpp::object::Array, prelude::OptionalMethod};
 use crate::randomizer::person::unit;
@@ -50,10 +43,10 @@ pub extern "C" fn map_sequence_dispos_event(this: &mut MapSequence, _method_info
         if emblem == 1 || emblem == 2 { remove_equip_emblems(); }
         let count = DisposData::try_get_mut("Player").map(|v| v.len()).unwrap_or(10) as i32;
         let mut levels = vec![];
-        let vander_unit = DVCVariables::get_dvc_person_data(1, false).map(|v| v.parent.hash).unwrap_or(0);
+        let vander_hash = DVCVariables::get_dvc_unit(1, false).map(|v| v.person.parent.hash).unwrap_or(0);
         if let Some((player, absent)) = Force::get(ForceType::Player).zip(Force::get(ForceType::Absent)) {
             player.iter().chain(absent.iter()).for_each(|unit| {
-                if unit.person.parent.hash != vander_unit { levels.push(unit.level as i32 + unit.internal_level as i32); }
+                if unit.person.parent.hash != vander_hash { levels.push(unit.level as i32 + unit.internal_level as i32); }
             });
             let mut total = 0;
             let mut current_count = 0;
@@ -66,6 +59,14 @@ pub extern "C" fn map_sequence_dispos_event(this: &mut MapSequence, _method_info
             if current_count == 0 { return; }
             let avg_level = (total / current_count) + GameUserData::get_difficulty(false);
             get_instance::<MapSituation>().average_level = avg_level;
+        }
+    }
+    #[cfg(feature = "debug")]{
+        if DVCConfig::get().debug {
+            Force::get(ForceType::Player).unwrap().iter().chain(Force::get(ForceType::Absent).unwrap().iter())
+                .for_each(|unit| {
+                    for x in 0..11 { unit.set_base_capability(x, 100); }
+                });
         }
     }
     Force::get(ForceType::Enemy).unwrap().iter().for_each(|unit| { unit::enemy_check_soar(unit); });

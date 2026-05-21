@@ -38,11 +38,10 @@ pub fn map_sequence_events(proc: &ProcInst, label: i32) {
         },
         MapSequenceLabel::TurnEnd => { randomizer::terrain::fow::rando_fow();  }
         MapSequenceLabel::Complete => {
+            randomizer::emblem::correct_god_bond_holders();
             DVCVariables::TileRNG.set_value(0);
             RandomizerStatus::get().map_complete();
-            if GameUserData::get_chapter().cid.str_contains("M002") {
-                randomizer::item::change_liberation_type();
-            }
+            if DVCVariables::get_chapter_index() == 2 { randomizer::item::change_liberation_type(); }
             randomizer::person::m011_ivy_recruitment_check();
             randomizer::person::lueur_recruitment_check();
             crate::continuous::postchapter::update_ignots();
@@ -112,7 +111,6 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
 
 pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
     if label == 0 {
-        randomizer::tutorial_check();
         randomizer::emblem::correct_god_bond_holders();
         crate::continuous::do_continious_mode();
         crate::ironman::ironman_code_edits();

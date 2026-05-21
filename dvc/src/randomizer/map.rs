@@ -6,10 +6,12 @@ use engage::{
         mind::MapMind, overlap::MapOverlap, terrain::MapTerrain
     },
     script::*, sequence::unitgrowsequence::UnitGrowSequence,
-    unit::{Unit, UnitPool},
+    unit::Unit,
 };
 use std::sync::Mutex;
+use engage::menu::BasicMenuItem;
 use crate::randomizer::status::RandomizerStatus;
+use crate::utils::for_each_unit;
 use super::*;
 pub mod effects;
 pub(crate) mod dispos;
@@ -51,9 +53,7 @@ impl EffectType {
     }
 }
 static SCRIPT_COMMANDS: Mutex<Vec<(String, EffectType)>> = Mutex::new(Vec::new());
-pub const EXTRA_SIDS: &[&str] = &[
-    "SID_手加減", "SID_不死身", "SID_異形兵", "SID_慈悲", "SID_チェインアタック許可",
-];
+pub const EXTRA_SIDS: &[&str] = &["SID_手加減", "SID_不死身", "SID_異形兵", "SID_慈悲", "SID_チェインアタック許可", ];
 pub const SKILL_SIDS: &[&str] = &[
     "SID_慈悲",   // Enemy Only   2
     "SID_デュアルアシスト＋",  //Dual Assist
@@ -127,26 +127,21 @@ pub fn tilabolical() {
 }
 
 pub fn remove_map_effects() {
-    Il2CppClass::from_name("App", "UnitPool").unwrap()
-        .get_static_fields_mut::<job::UnitPoolStaticFieldsMut>().s_unit
-        .iter_mut()
-        .filter(|unit| unit.force.is_some_and(|f| ( 1 << f.force_type) & 25 != 0 ))
-        .for_each(|unit|{
-            unit.hp_stock_count = 0;
-            unit.hp_stock_count_max = 0;
-            unit.extra_hp_stock_count = 0;
-            unit.extra_hp_stock_count_max = 0;
-            EXTRA_SIDS.iter().for_each(|sid| { unit.private_skill.remove_sid(sid.into()); });
-            SKILL_SIDS.iter().for_each(|sid| { unit.private_skill.remove_sid(sid.into()); });
-        }
-    );
+    for_each_unit(25, |unit| {
+        unit.hp_stock_count = 0;
+        unit.hp_stock_count_max = 0;
+        unit.extra_hp_stock_count = 0;
+        unit.extra_hp_stock_count_max = 0;
+        EXTRA_SIDS.iter().for_each(|sid| { unit.private_skill.remove_sid(sid.into()); });
+        SKILL_SIDS.iter().for_each(|sid| { unit.private_skill.remove_sid(sid.into()); });
+    });
     if GameVariableManager::get_bool("G_Revive"){
         if let Some(dead) = Force::get(ForceType::Dead) { dead.iter().for_each(|u|{ u.transfer(ForceType::Absent, true); }); }
         GameVariableManager::set_bool("G_Revive", false);
     }
 }
 
-pub fn visit_command_name(_item: engage::menu::BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString {
+pub fn visit_command_name(_item: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString {
     if let Some(unit) = MapMind::get_unit() {
         let ty = RandomizerStatus::get_tile(unit.x, unit.z);
         let mess =
@@ -169,7 +164,7 @@ pub fn visit_command_name(_item: engage::menu::BasicMenuItem, _method_info: Opti
     }
     else { Mess::get("MID_MENU_VISIT") }
 }
-pub fn visit_command_help(_item: engage::menu::BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString {
+pub fn visit_command_help(_item: &BasicMenuItem, _method_info: OptionalMethod) -> &'static Il2CppString {
     let map_mind = MapMind::get_unit().unwrap();
     let ty = RandomizerStatus::get_tile(map_mind.x, map_mind.z);
     if ty == 0 { Mess::get("MID_MENU_HELP_VISIT") } else { "Tilebolical Effect".into() }

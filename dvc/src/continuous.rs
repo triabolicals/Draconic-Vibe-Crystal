@@ -85,11 +85,11 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
     let mut level_cap = get_recommended_level_main() as i32;
     let random_map = DVCVariables::is_random_map();
     if random_map {
-        let map_completed = get_story_chapters_completed();
-        base_exp_gain = 50 - (GameUserData::get_difficulty(false) as i32)*10;
+        let map_completed = DVCVariables::chapter_number_complete(false);
+        base_exp_gain = 50 - (GameUserData::get_difficulty(false))*10;
         level_cap = 
             if map_completed < 7  { 1 + map_completed } 
-            else { max( (get_story_chapters_completed()-6)*2, get_story_chapters_completed()+4) }
+            else { max( (map_completed-6)*2, map_completed+4) }
     }
     Force::get(ForceType::Player).unwrap().iter().chain(Force::get(ForceType::Absent).unwrap().iter())
         .for_each(|unit|{
@@ -139,10 +139,10 @@ pub fn continous_mode_post_battle_stuff(proc: &ProcInst){
 // Item List for well drops and gifts
 fn generate_item_list(_proc: &ProcInst) -> &'static mut List<ItemData> {
     WellSequence::set_use_flag(WellSequenceUseFlags::ItemReturn);
-    let current_cid = GameUserData::get_chapter().cid.to_string();
+    let current_cid = DVCVariables::get_chapter_index();
     let random = Random::get_hub_item();
     let rand_map = DVCVariables::Continuous.get_value() == 2;
-    let completed = get_continious_total_map_complete_count();
+    let completed = DVCVariables::chapter_number_complete(false);
     WellSequence::set_evil_weapon_event_state(3);
     if WellSequence::get_exchange_level() != 0 { WellSequence::calc_item_exchange(WellSequence::get_exchange_level(), random) }
     else {
@@ -152,11 +152,11 @@ fn generate_item_list(_proc: &ProcInst) -> &'static mut List<ItemData> {
         }
         if DVCVariables::is_main_chapter_complete(22) { level += 1; }
         let items = WellSequence::calc_item_exchange(level, random);
-        if (!rand_map && current_cid == "CID_M006") ||  (rand_map && completed == 7 ) {
+        if (!rand_map && current_cid == 6) ||  (rand_map && completed == 7 ) {
             items.add(ItemData::get_mut("IID_トライゾン").unwrap());
             items.add(ItemData::get_mut("IID_ルヴァンシュ").unwrap());
         }
-        else if current_cid == "CID_M008" || ( current_cid == "CID_G002" || current_cid == "CID_G005" ){
+        else if current_cid == 8 || ( current_cid == 52 || current_cid == 55 ){
             items.add(ItemData::get_mut("IID_マスタープルフ").unwrap());
             items.add(ItemData::get_mut("IID_チェンジプルフ").unwrap());
         }
@@ -247,16 +247,16 @@ pub(crate) fn set_next_chapter(){
 
 fn do_dlc() {
     if !continuous_mode_dlc_allowed() { return; }
-    let current_cid = GameUserData::get_chapter().cid.to_string();
+    let current_cid = DVCVariables::get_chapter_index();
     let random = DVCVariables::Continuous.get_value() == 2;
-    let completed = get_story_chapters_completed();
-    if (!random && current_cid == "CID_M006" ) || ( random && completed >= 4 ) {
+    let completed = DVCVariables::chapter_number_complete(false);
+    if (!random && current_cid == 6 ) || ( random && completed >= 4 ) {
         let god =
         if DVCVariables::EmblemRecruitment.get_value() == 0 { GodData::get("GID_エーデルガルト") }
         else { GodData::get( GameVariableManager::get_string("G_R_GID_エーデルガルト")) }.unwrap();
         GodPool::create(god);
     }
-    if (!random && current_cid == "CID_M017" ) || ( random && completed == 16 ) {
+    if (!random && current_cid == 17 ) || ( random && completed == 16 ) {
         let dlc1 = "G_所持_IID_マージカノン専用プルフ";
         let dlc2 = "G_所持_IID_エンチャント専用プルフ";
         GameVariableManager::set_number(dlc1, GameVariableManager::get_number(dlc1) + 1); // add dlc deals
@@ -271,17 +271,6 @@ fn do_dlc() {
         }
         GameVariableManager::set_bool("MapRecruit", false);
     }
-}
-
-pub fn get_continious_total_map_complete_count() -> i32 {
-    let main = get_story_chapters_completed();
-    let side = GameVariableManager::find_starts_with("G_Cleared_S0").iter()
-        .filter(|cleared| GameVariableManager::get_bool(cleared.to_string())).count() as i32;
-    main + side
-}
-pub fn get_story_chapters_completed() -> i32 {
-    GameVariableManager::find_starts_with("G_Cleared_M0").iter()
-        .filter(|cleared| GameVariableManager::get_bool(cleared.to_string())).count() as i32
 }
 
 fn get_recommended_level_main() -> u8 {

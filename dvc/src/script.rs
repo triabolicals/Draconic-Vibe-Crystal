@@ -28,6 +28,7 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
     if result.is_none() || !DVCVariables::random_enabled() { return result; }
     let result_string = result.unwrap();
     let str1 = result_string.to_string();
+    let chapter_idx = DVCVariables::get_chapter_index();
     if str1.contains("Kengen") && !DVCFlags::CustomEmblemsRecruit.get_value() {
         if DVCVariables::EmblemRecruitment.get_value() == 0 { return result; }
         let emblem_index = KENGEN.iter().position(|x| *x == str1);
@@ -39,8 +40,7 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
     }
     if str1.contains("GID_") {
         if DVCVariables::EmblemRecruitment.get_value() == 0 { return result; }
-        let cid = GameUserData::get_chapter().cid.to_string();
-        if cid == "CID_M026" || cid.contains("CID_S0")  { return result; } //Do not shuffle emblems in endgame
+        if chapter_idx == 26 || (chapter_idx >= 30 && chapter_idx < 45)  { return result; } //Do not shuffle emblems in endgame
         if GameVariableManager::exist(format!("G_R_{}", str1).as_str()) {
             Some(GameVariableManager::get_string(format!("G_R_{}", str1).as_str()))
         }
@@ -61,8 +61,7 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
             }
             return result;
         }
-        let cid = GameUserData::get_chapter().cid.to_string();
-        if cid == "CID_M022" && sequence == 3 {
+        if chapter_idx == 22 && sequence == 3 {
             if !GameVariableManager::exist("VeyleRecruitment") {
                 GameVariableManager::make_entry_norewind("VeyleRecruitment", 0);
             }
@@ -82,7 +81,7 @@ pub fn script_get_string(dyn_value: u64,  method_info: OptionalMethod) -> Option
             }
             return result; 
         }
-        else if cid == "CID_M026" { return result; }
+        else if chapter_idx == 26 { return result; }
         if GameVariableManager::exist(format!("G_R_{}", str1).as_str()) {
             Some(GameVariableManager::get_string(format!("G_R_{}", str1).as_str()))
         }
@@ -109,13 +108,13 @@ pub fn change_g_pid_lueur() {
 }
 
 pub fn replace_lueur_chapter22() {
-    if GameUserData::get_chapter().cid.to_string() == "CID_M022" && GameUserData::get_sequence() == 3 {
+    if DVCVariables::get_chapter_index() == 22 && GameUserData::get_sequence() == 3 {
         change_g_pid_lueur();
     }
 }
 
 pub fn post_sortie_script_adjustment() {
-    if GameUserData::get_chapter().cid.to_string() == "CID_M022" {
+    if DVCVariables::get_chapter_index() == 22 {
         GameVariableManager::make_entry("VeyleRecruitment", 0);
         GameVariableManager::make_entry("TalkPID", 0);
         if DVCVariables::UnitRecruitment.get_value()  != 0 || lueur_on_map() { change_g_pid_lueur(); }
@@ -142,18 +141,20 @@ pub fn post_sortie_script_adjustment() {
 }
 
 fn person_index_convert(person_index: &mut i32) {
+    let original = *person_index;
     if DVCVariables::UnitRecruitment.get_value()  == 0 || *person_index < 1 { return; }
     if let Some(person) = PersonData::try_index_get(*person_index) {
         if is_player_unit(person){
             if let Some(person) = switch_person(person).map(|p| p.parent.index){
                 *person_index = person;
+                println!("Person Swap: {} -> {}", original, person);
             }
         }
     }
 }
 
 pub fn adjust_person_map_inspectors() {
-    if GameUserData::get_chapter().cid.to_string() == "CID_M026" {
+    if DVCVariables::get_chapter_index() == 26 {
         // Expand the temp position when placing big dragon
         EventScript::set("temp_x_start", DynValue::new_number(1.0));
         EventScript::set("temp_x_end", DynValue::new_number(29.0));

@@ -44,6 +44,7 @@ pub use person::*;
 pub use emblem::*;
 pub use bondring::*;
 pub use items::*;
+use crate::utils::for_each_unit;
 
 pub struct GrowthData {
     person_stats: [Vec<u8>; 10],
@@ -194,30 +195,6 @@ impl GameData {
                 }
             }
         }
-        /*
-            include_str!("person/persons.txt").lines().enumerate().for_each(|(i, l)|{
-                l.split_ascii_whitespace().for_each(|s|{
-                   if !s.contains("_") {
-                       person_list.iter()
-                           .filter(|p| p.pid.str_contains(s) && !p.pid.str_contains("M024") && !p.pid.str_contains("_竜化") && p.bmap_size == 1)
-                           .for_each(|p|{
-                               if let Some(name) = p.name.as_ref() { unit_name.insert(name.to_string(), i as i32); }
-                               units.insert(p.parent.hash, i as i32);
-                           });
-                   }
-                   else if let Some(person) = PersonData::get(s).or_else(|| PersonData::get(format!("PID_{}", s))) {
-                       if let Some(name) = person.name.as_ref() { unit_name.insert(name.to_string(), i as i32); }
-                       units.insert(person.parent.hash, i as i32);
-                   }
-                });
-            });
-        let enemy =
-            units.iter().filter(|(h, i)| **i < 41 && !playables.iter().any(|x| x.hash == **h))
-                .flat_map(|x|
-                    PersonData::try_get_hash(*x.0).filter(|v| v.asset_force != 0 || *x.1 > 35).zip(Some(x.1)))
-                .map(|p| { EnemyCharacter::new(p.0, *p.1) })
-                .collect();
-         */
         for x in 36..41 {
             let hash = PersonData::get(PIDS[x]).unwrap().parent.hash;
             units.insert(hash, x as i32);
@@ -412,7 +389,10 @@ impl RandomizedGameData {
                 enemy.emblem_data.reset_all_skills();
                 enemy.emblem_data.reset_weapons();
                 let enemy_god = enemy.emblem_data.get_god_mut();
-                let randomized_index = if enemy.emblem_index >= 12 { enemy.emblem_index } else { DVCVariables::get_dvc_emblem_index(enemy.emblem_index as i32, false) };
+                let randomized_index =
+                    if enemy.emblem_index >= 12 { enemy.emblem_index }
+                    else { DVCVariables::get_dvc_emblem_index(enemy.emblem_index as i32, false) };
+
                 let syncs_old = &data.emblem_pool.emblem_data[enemy.emblem_index].syncs;
                 let syncs_new = &data.emblem_pool.emblem_data[if enemy.emblem_index == 12 { 12 } else { randomized_index} ].syncs;
                 let weapons = &data.emblem_pool.emblem_data[randomized_index].level_data[0].style_items;
@@ -457,6 +437,7 @@ impl RandomizedGameData {
                             if DVCVariables::EmblemEngageSkill.get_value() != 0 { s.set_index(self.engage_skills.get_engage_skill_index(new_engage)); }
                             else { s.set_index(new_engage); }
                         }
+                        else { level.engage_skills.clear(); }
                         if DVCFlags::EngageWeapons.get_value() {
                             level.style_items.iter_mut().flat_map(|x| x.iter_mut())
                                 .for_each(|x1| {
@@ -470,7 +451,9 @@ impl RandomizedGameData {
                                 style_items.iter_mut().enumerate().for_each(|(item_pos, item)| {
                                     if randomized_index == 9 { if let Some(v) = ItemData::get_mut(weap[item_pos]) { *item = v; } }
                                     else if randomized_index == 13 { if let Some(v) = ItemData::get_mut(weap[3+item_pos]) { *item = v; } }
-                                    else if let Some(v) = ItemData::try_get_hash_mut(weapons[style_index * 3 + item_pos]) { *item = v; }
+                                    else if let Some(v) = weapons.get(style_index * 3 + item_pos).and_then(|v| ItemData::try_get_hash_mut(*v)){
+                                        *item = v;
+                                    }
                                });
                             })
                         }
@@ -508,11 +491,9 @@ impl RandomizedGameData {
                     DVCFlags::RingStats|DVCFlags::BondRing => { data.update_bond_ring(); }
                     DVCFlags::EquipLearnSkills => {
                         if v {
-                            for x in 1..250 {
-                                if let Some(unit) = UnitPool::get(x).filter(|x| x.force.is_some_and(|x| x.force_type < 5) && x.person.asset_force == 0 && x.learned_job_skill.is_some()) {
-                                    if let Some(skill) = unit.learned_job_skill.as_ref() { unit.add_to_equip_skill_pool(skill); }
-                                }
-                            }
+                            for_each_unit(25, |unit|{
+                                if let Some(skill) = unit.learned_job_skill.as_ref() { unit.add_to_equip_skill_pool(skill); }
+                            });
                         }
                     }
                     DVCFlags::BGM => { if GameUserData::get_sequence() == 3 { bgm::change_bgm(); } }
@@ -528,11 +509,11 @@ impl RandomizedGameData {
             DVCMenuItemKind::Order(_) => {}
             DVCMenuItemKind::SingleJob => {
                 if DVCVariables::get_single_class(false, false).is_some() && DVCFlags::SingleJobEnabled.get_value() {
-                    for x in 1..250 {
-                        if let Some(unit) = UnitPool::get(x).filter(|x| x.force.is_some_and(|f| f.force_type < 5) && x.person.asset_force == 0) {
+                    for_each_unit(25, |unit|{
+                        if unit.person.asset_force == 0 {
                             crate::randomizer::job::reclass::unit_reclass(unit, ReclassType::PlayerSingle(false));
                         }
-                    }
+                    });
                 }
             }
             _ => {}

@@ -2,7 +2,8 @@ use engage::unit::UnitReliance;
 use super::*;
 
 pub fn update_ignots(){
-    let add_iron = get_continious_total_map_complete_count()*5;
+    let cleared = DVCVariables::chapter_number_complete(true);
+    let add_iron = cleared*5;
     let mut add_steel = 0;
     let mut add_silver = 0;
     GameUserData::add_iron( add_iron );
@@ -20,7 +21,6 @@ pub fn update_ignots(){
         }
     }
     else {
-        let cleared = get_story_chapters_completed();
         if cleared >= 5 { add_steel += 1;} 
         if cleared >= 6 { add_steel += 1;} 
         if cleared >= 7 { add_silver += 1; } 

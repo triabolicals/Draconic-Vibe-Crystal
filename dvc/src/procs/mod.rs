@@ -49,6 +49,9 @@ pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
             descs[0] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::job::chaos::level_up_prepare));
             descs[9] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::job::chaos::level_up_reflect));
         }
+        GAME_SAVE_DATA_PROC_READ => {
+            descs[6] = ProcDesc::call(ProcVoidFunction::new(None, save_deserialize));
+        }
         GMAP_SEQUENCE => { gmap_sequence_desc_edit(descs); }
         SORTIE_SEQUENCE => { descs[1] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::bgm::sortie_play_bgm)); }
         WELL_SEQUENCE => { descs[19] = ProcDesc::call(ProcVoidFunction::new(None, randomizer::item::well::well_get_item_rng)); }
@@ -92,3 +95,26 @@ pub fn call_proc_original_method(proc: &ProcInst, method_name: &str) {
     }
 }
 pub extern "C" fn nothing_proc(_proc: &mut ProcInst, _method_info: OptionalMethod) {}
+
+extern "C" fn save_deserialize(this: &mut ProcInst, _: OptionalMethod) {
+    call_proc_original_method(this, "Deserialize");
+    let read = unsafe { std::mem::transmute::<&ProcInst, &GameSaveDataProcRead>(this) };
+    if read.save_data.success && read.save_data.ty != 1 {
+        randomizer::save_file_load();
+    }
+}
+#[unity::class("App", "GameSaveData")]
+pub struct GameSaveData {
+    pub ty: i32,
+    pub index: i32,
+    pub from_type: i32,
+    pub from_idx: i32,
+    header: u64,
+    pub success: bool,
+}
+#[unity::class("App", "GameSaveData.ProcRead")]
+pub struct GameSaveDataProcRead {
+    pub proc: ProcInstFields,
+    game_message: u64,
+    pub save_data: &'static GameSaveData,
+}
