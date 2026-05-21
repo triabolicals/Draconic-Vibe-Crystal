@@ -19,9 +19,11 @@ pub fn update_learn_skills() {
 pub fn unit_update_learn_skill(unit: &Unit) { 
     if unit.learned_job_skill.is_some() && unit.job.learn_skill.is_some() {
         unit.set_learned_job_skill(None);
-        if let Some(skill) = unit_learn_job_skill_hook(unit, unit.job, None) {
-            if DVCFlags::EquipLearnSkills.get_value() { unit.add_to_equip_skill_pool(skill); }
-            unit.set_learned_job_skill(Some(skill));
+        if (unit.level >= 5 && unit.job.is_high()) || (unit.level >= 25 && unit.job.max_level == 40) {
+            if let Some(skill) = unit_learn_job_skill_hook(unit, unit.job, None) {
+                if DVCFlags::EquipLearnSkills.get_value() { unit.add_to_equip_skill_pool(skill); }
+                unit.set_learned_job_skill(Some(skill));
+            }
         }
     }
     else { unit.try_learn_job_skill(); }
@@ -89,7 +91,6 @@ pub fn class_change_job_menu_item_on_select(this: &mut ClassChangeJobMenuItem, _
     let data = &this.job_data;
     let menu_content = unsafe { std::mem::transmute::<&BasicMenuContent, &ClassChangeJobMenuContent>(this.menu.menu_content) };
     set_menu_content_for_learn_skill(menu_content, data);
-    
 }
 pub fn class_change_job_menu_item_custom_call(this: &mut ClassChangeJobMenuItem, _optional_method: OptionalMethod) -> BasicMenuResult {
     let unit = SortieSelectionUnitManager::get_unit().person.parent.hash;

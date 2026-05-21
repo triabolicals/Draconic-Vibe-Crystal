@@ -96,10 +96,10 @@ pub fn unit_reclass(unit: &mut Unit, kind: ReclassType) -> bool {
                         .filter(|j| unit_random_can_reclass(j, female, high_job, true, false))
                         .collect();
 
-                    if let Some(j) = pool.get_random_element(Random::get_game()) { recruitment_job_level_adjustment(unit, old_person, j, true); }
-                    else { recruitment_job_level_adjustment(unit, old_person, unit.person.get_job().unwrap(), true); }
+                    if let Some(j) = pool.get_random_element(Random::get_game()) { recruitment_job_level_adjustment(unit, old_person, j, random); }
+                    else { recruitment_job_level_adjustment(unit, old_person, unit.person.get_job().unwrap(), random); }
                 }
-                else { recruitment_job_level_adjustment(unit, old_person, unit.person.get_job().unwrap(), false); }
+                else { recruitment_job_level_adjustment(unit, old_person, unit.person.get_job().unwrap(), random); }
             }
             adaptive_growths(unit, true);
         }
@@ -182,9 +182,14 @@ fn recruitment_job_level_adjustment(unit: &mut Unit, old_person: &PersonData, ta
             }
             else { unit.class_change(target); }
         }
+        (ClassTier::Special, ClassTier::Promoted) => {
+            if old_level <= 20 {
+                if let Some(job) = GameData::get().job_db.get_reclass_job(unit, target, ClassTier::Base) { unit.class_change(job); }
+            }
+            else { unit.class_change(target); }
+        }
         _ => { unit.class_change(target); }
     }
-    // println!("{} Reclasses to {} [Old Person {}]", unit.get_name(), unit.job.get_name(), old_person.get_name());
     if random { randomize_selected_weapon_mask(unit, None); }
     else { assign_selected_weapon_mask_by_apt(unit, None); }
     reclass_level_adjustment(unit, old_level, old_il, old_tier);
@@ -203,8 +208,8 @@ fn reclass_level_adjustment(unit: &Unit, target_level: i32, target_il: i32, from
                 set_level =
                     if total_level > (job_max_level + 5) { clamp_value(total_level - job_max_level, 1, job_max_level) }
                     else if total_level > (job_max_level - 5) { clamp_value(total_level - job_max_level - 5, 1, job_max_level) }
-                    else if total_level > 10 { clamp_value(total_level - 10, 1, job_max_level) }
-                    else { 1 };
+                    else if total_level > 20 { clamp_value(total_level-20, 1, job_max_level) }
+                    else { total_level }
             }
             (ClassTier::Promoted|ClassTier::Base, ClassTier::Special) => { set_level = clamp_value(total_level, 1, job_max_level); }
             _ => {}
