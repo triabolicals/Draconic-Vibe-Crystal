@@ -1,12 +1,11 @@
 use unity::prelude::*;
 use engage::{
-    unit::{UnitPool, Unit}, force::*, gamedata::*,
+    unit::Unit, force::*, gamedata::*,
     gameuserdata::*, gamevariable::*, map::situation::MapSituation,
-    mess::*, random::Random, util::get_instance
+    random::Random, util::get_instance
 };
 use crate::{
-    config::DVCFlags, DVCVariables, randomizer, DVCConfig, utils::*,
-    continuous::get_continious_total_map_complete_count,
+    config::DVCFlags, DVCVariables, randomizer, utils::*,
     randomizer::item::unit_items::adjust_missing_weapons,
     randomizer::person::unit::fixed_unit_weapon_mask
 };
@@ -36,7 +35,6 @@ pub fn auto_level_unit(unit: &mut Unit, leader: bool){
     let current_job = &unit.job;
     let is_base = current_job.is_low() && current_job.has_high_jobs();
     let level_gains = avg_level - unit_level;
-    let mut promoted = false;
     for x in 0..9 {
         let increase = unit.get_capability(x, true) * (1 + avg_level - unit_level) / 100;
         let new_stat = clamp_value(unit.base_capability[x as usize] as i32 + increase, 1, 120);
@@ -52,7 +50,6 @@ pub fn auto_level_unit(unit: &mut Unit, leader: bool){
             fixed_unit_weapon_mask(unit);
             unit.set_level(new_level);
             unit.set_internal_level(internal);
-            promoted = true;
         } else {
             unit.set_level(unit.job.max_level as i32);
             unit.set_internal_level(new_level);
@@ -101,7 +98,7 @@ pub fn auto_level_unit_for_random_map(unit: &mut Unit, leader: bool){
     let seq = GameUserData::get_sequence();
     let rng_level = crate::continuous::random::random_map_mode_level();
     let level =
-    if GameUserData::get_chapter().cid.to_string().contains("S0") || get_continious_total_map_complete_count() < 10 {
+    if GameUserData::get_chapter().cid.to_string().contains("S0") || DVCVariables::chapter_number_complete(true)  < 10 {
         rng_level  + if leader { 3 } else { 0 } 
     }
     else {

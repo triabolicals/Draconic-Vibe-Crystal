@@ -3,6 +3,7 @@ use engage::{
     random::*, mess::*, unit::UnitPool, gamevariable::GameVariableManager,
     gamedata::{*, terrain::TerrainData, skill::*},
 };
+use engage::unit::{Unit, UnitFor};
 use skyline::patching::Patch;
 use crate::{config::DVCVariables, enums::*};
 
@@ -189,6 +190,16 @@ pub fn wrap<T: PartialEq + PartialOrd>(value: T, min: T, max: T) -> T {
     else { value }
 }
 
+pub fn for_each_unit(force_mask: u32, function: impl Fn(&mut Unit)){
+    if let Some(unit) = UnitPool::get_first(force_mask, 0) {
+        function(unit);
+        let mut next = UnitFor::get_next(unit);
+        while let Some(unit) = next {
+            function(unit);
+            next = UnitFor::get_next_by_force(unit, force_mask as i32);
+        }
+    }
+}
 //DLC Check 
 #[unity::from_offset("App", "DLCManager", "HasContent")]
 pub fn has_content(content: i32, method_info: OptionalMethod) -> bool;

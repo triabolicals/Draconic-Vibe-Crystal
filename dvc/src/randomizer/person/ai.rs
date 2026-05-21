@@ -78,7 +78,7 @@ fn ai_data_ctor(this: &AIData, method_info: OptionalMethod);
 
 pub fn adjust_unitai(unit: &mut Unit) {
     let job = unit.get_job();
-    let m022 = GameUserData::get_chapter().cid.str_contains("CID_M022");
+    let m022 = DVCVariables::get_chapter_index() == 22;
     let activation = unit.ai.sequence[0].to_string();
     let ac_every_time = activation.contains("AC_Everytime");
     let ac_turn =  activation.contains("Turn");

@@ -1,13 +1,16 @@
 use std::sync::RwLock;
 use engage::{
-    gamevariable::GameVariableManager, mess::Mess, sequence::talk::*, tmpro::TextMeshProUGUI,
+    mess::Mess,
+    sequence::talk::*,
+    tmpro::TextMeshProUGUI,
     language::{Language, LanguageLangs::*},
+    gamedata::{Gamedata, GodData}
 };
-use engage::gamedata::{Gamedata, GodData};
 use crate::{
     config::DVCFlags, DVCVariables, enums::{EMBLEM_GIDS, RINGS}, message::{TextSwapper, MESSAGE_SWAPPER},
     randomizer::{data::EmblemPool, names::AppearanceRandomizer, item, RANDOMIZED_DATA}
 };
+use crate::randomizer::data::GameData;
 
 #[unity::class("App.Talk3D", "TalkUI")]
 pub struct TalkUI {
@@ -26,7 +29,7 @@ pub struct TalkObject {
 #[unity::hook("App", "Mess", "Load")]
 pub fn mess_load(filename: &Il2CppString, method_info: OptionalMethod) -> bool {
     let result = call_original!(filename, method_info);
-    if filename.str_contains("M0") || filename.str_contains("S0") || filename.str_contains("G0") || filename.str_contains("E0"){
+    if filename.str_contains("M0") || filename.str_contains("S0") || filename.str_contains("G0") || filename.str_contains("E0")  {
         if let Some(mut text) = MESSAGE_SWAPPER.get_or_init(|| RwLock::new(TextSwapper::init())).write().ok() {
             text.get_chapter_data(filename.to_string().as_str());
         }
@@ -79,36 +82,46 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
         match tag {
             100..200 => { // Person Name Replacement
                 let person = tag as i32 - 100;
-                if person < 41 {
+                if person == 63 && DVCVariables::get_dvc_recruitment_index(37) != 37 {  //IL
+                    DVCVariables::get_dvc_unit(37, false).map(|u| u.get_name())
+                        .or_else(|| GameData::get_randomized_person(37).map(|p| p.get_name()))
+                }
+                else if person < 41 {
                     DVCVariables::get_dvc_unit(person, false).map(|u| u.get_name())
-                        .or_else(||DVCVariables::get_dvc_person_data(person, false).map(|p| p.get_name()))
+                        .or_else(|| GameData::get_randomized_person(person as usize).map(|p| p.get_name()))
                 }
                 else {
                     if DVCFlags::RandomBossesNPCs.get_value() {
                         if let Some(v) = RANDOMIZED_DATA.get().and_then(|s| s.read().ok()){
                             v.person_appearance.get_npc_name(person - 41).map(|n| Mess::get(n))
                         }
-                        else { DVCVariables::get_dvc_person_data(person, false).map(|p| p.get_name()) }
+                        else { GameData::get_randomized_person(person as usize).map(|p| p.get_name()) }
                     }
-                    else { DVCVariables::get_dvc_person_data(person, false).map(|p| p.get_name()) }
+                    else { text.original_data.person_list.get(person as usize).map(|p| p.to_str()) }
                 }
             }
             200..224 => { // Emblem Swap
                 let index = (tag - 200) as usize;
-                if let Some(god) = DVCVariables::get_current_god(index as i32){
+                if index > 18 && index < 24 {
+                    Some(Mess::get(format!("MPID_{}", RINGS[index-1])))
+                }
+                else if let Some(god) = DVCVariables::get_current_god(index as i32){
                     crate::randomizer::names::get_emblem_person(god.mid).map(|p| p.get_name())
                         .or_else(||Some(Mess::get(god.mid.to_string().replace("MGID", "MPID"))))
                 }
                 else { Some(Mess::get(format!("MPID_{}", RINGS[index]))) }
             }
-            300..380 => { // Ring Name
-                let emblem_index = tag % 20;
-                let offset = ((tag - 300) / 20) as usize;
+            300..320 => { // Ring Name
+                let emblem_index = tag - 300;
                 let index = DVCVariables::get_dvc_emblem_index(emblem_index as i32, false);
-                if DVCFlags::GodNames.get_value() && offset == 0 {  // Ring Name
+                if DVCFlags::GodNames.get_value() && index < 19 {  // Ring Name
                     AppearanceRandomizer::get_emblem_app_person_index(index as i32).map(|v| AppearanceRandomizer::get_alias(v.1))
                 }
-                else { Some(text.original_data.emblem_alias[index+20*offset].to_str()) }
+                else {
+                    text.original_data.rings.get(index)
+                        .or_else(|| text.original_data.rings.get(emblem_index as usize))
+                        .map(|v| v.to_str())
+                }
             }
             400..460 => {
                 let recruitment_index = 
@@ -117,11 +130,10 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
                     442 => { 16 }
                     443 => { 37 }
                     _ => { tag - 400 }
-                };
-                DVCVariables::get_dvc_person_data(recruitment_index as i32, false)
-                    .map(|p| p.pid.to_string().into())
+                } as usize;
+                GameData::get_randomized_person(recruitment_index).map(|p| p.pid.to_string().into())
             }
-            500..542 => {
+            500..542 => {   //GID
                 if tag < 522 {
                     let recruitment_index =
                         match tag {
@@ -130,7 +142,7 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
                         };
                     DVCVariables::get_current_god(recruitment_index as i32).map(|g| g.gid.to_string().into())
                 }
-                else if tag >= 530 {
+                else if tag >= 530 {    // GodName
                     let recruitment_index = tag - 530;
                     if let Some(name) = EmblemPool::get_dvc_emblem_data(EMBLEM_GIDS[recruitment_index as usize])
                         .filter(|g| EmblemPool::is_custom(g))
@@ -144,18 +156,45 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
                 }
                 else { None }
             }
+            600..640 => {
+                let emblem_index = tag % 20;
+                let offset = ((tag - 600) / 20) as usize;
+                let index = DVCVariables::get_dvc_emblem_index(emblem_index as i32, false);
+                if index < 19 {
+                    if DVCFlags::GodNames.get_value() && offset == 0 {  // Ring Name
+                        AppearanceRandomizer::get_emblem_app_person_index(index as i32)
+                            .map(|v| AppearanceRandomizer::get_alias(v.1))
+                    }
+                    else { Some(text.original_data.emblem_alias[index+20*offset].to_str()) }
+                }
+                else {
+                    Some(text.original_data.emblem_alias[emblem_index as usize +20*offset].to_str())
+                }
+            }
+            640..699 => {
+                let emblem_index = tag - 640;
+                let index = DVCVariables::get_dvc_emblem_index(emblem_index as i32, false);
+                if DVCFlags::GodNames.get_value() && index < 19 {  // Ring Name
+                    AppearanceRandomizer::get_emblem_app_person_index(index as i32).map(|v| AppearanceRandomizer::get_alias(v.1))
+                }
+                else {
+                    text.original_data
+                        .emblem_alias.get(index + 40)
+                        .or_else(|| text.original_data.emblem_alias.get(emblem_index as usize + 40))
+                        .map(|v| v.to_str())
+                }
+            }
             16 => { // Divine Dragon to New Alias
                 let offset = if args[0] == 1 { 41 } else { 0 };
-                let person_index = DVCVariables::get_dvc_recruitment_index(0);
-                if person_index == -1 { Some(text.original_data.alias[82].to_str()) }
-                else { Some(text.original_data.alias[offset+person_index as usize].to_str()) }
+                let idx = DVCVariables::get_dvc_recruitment_index(0);
+                if idx != -1 { Some(text.original_data.alias[offset+idx as usize].to_str()) }
+                else { Some(text.original_data.alias[82].to_str()) }
             }
             17 => { // Text Swap based on person gender
                 let mut text_idx = args[1] as usize;
                 let gender = DVCVariables::get_dvc_unit(args[0] as i32, false)
                     .map(|v| v.get_gender() as i32)
-                    .or_else(|| DVCVariables::get_dvc_person_data(args[0] as i32, false)
-                        .map(|p| p.get_gender())
+                    .or_else(|| GameData::get_randomized_person(args[0] as usize).map(|p| p.get_gender())
                     )?;
                 if text_idx == 15 {
                     let sibling = if args[0] == 11 { 14 } else { 17 };
@@ -196,7 +235,7 @@ pub fn get_replacement_name(tag: u16, args: &Vec<u16>) -> Option<&'static mut Il
                 DVCVariables::get_dvc_unit(args[0] as i32, false)
                     .map(|u| u.job.jid)
                     .or_else(||
-                        DVCVariables::get_dvc_person_data(args[0] as i32, false)
+                        GameData::get_randomized_person(args[0] as usize)
                             .and_then(|p| p.get_job())
                             .map(|j| j.jid)
                     )

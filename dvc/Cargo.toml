@@ -10,6 +10,9 @@ titleid = "01006A800016E000"
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+debug = []
+
 [dependencies]
 skyline = { git = "https://github.com/ultimate-research/skyline-rs", version = "0.6.0" }
 outfit_core = { path = "/Users/trile/Project/outfit/outfit-core" }
@@ -25,6 +28,8 @@ serde = { version = "1.0.228", features = ["derive"] }
 [patch."https://github.com/triabolicals/engage"]
 engage = {path = "/Users/trile/Project/lib/engage"}
 
+[patch."https://github.com/triabolicals/unity"]
+unity = {path = "/Users/trile/Project/lib2/unity"}
 
 [profile.dev]
 panic = "abort"

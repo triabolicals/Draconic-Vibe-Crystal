@@ -19,29 +19,25 @@ pub mod ai;
 pub mod unit; 
 pub mod hub;
 const PROTAG_SKILLS: [&str; 4] = ["SID_主人公", "SID_王族", "SID_リベラシオン装備可能", "SID_ヴィレグランツ装備可能"];
+
 pub fn is_playable_person(person: &PersonData) -> bool { GameData::get().playables.iter().any(|p| p.hash == person.parent.hash) }
 fn set_hub_facilities() {
-    let aid = ["AID_蚤の市", "AID_筋肉体操", "AID_ドラゴンライド", "AID_釣り", "AID_占い小屋"];
-    let locator = ["LocatorSell01", "LocatorTraining01", "LocatorDragon01", "LocatorFish01", "LocatorFortune01"];
-    let index = [ 23, 4, 17, 14, 27];
-    if let Some(hub_dispos) = HubDisposData::get_list_mut() {
-        for x in 0..aid.len() {
-            let data = HubFacilityData::get_mut(aid[x]);
-            let pid = PIDS[index[x] as usize];
-            let a_index = pid_to_index(&pid.to_string(), true) as usize;
-            if data.is_some() && a_index < 41 {
-                let facility = data.unwrap();
-                facility.condition_cid = format!("CID_{}", RECRUIT_CID[a_index] ).into() ;
-                for y in 0..hub_dispos[1].len() {
-                    if let Some(hub_locator) = hub_dispos[1][y].locator.as_ref() {
-                        if hub_locator.to_string() == locator[x] {
-                            hub_dispos[1][y].set_chapter(RECRUIT_CID[a_index].into() );
-                            break;
-                        }
-                    }
+    let aid = [
+        ("AID_蚤の市", "LocatorSell01", 23), ("AID_筋肉体操", "LocatorTraining01", 4),
+        ("AID_ドラゴンライド", "LocatorDragon01", 17), ("AID_釣り", "LocatorFish01", 14), ("AID_占い小屋", "LocatorFortune01", 27)
+    ];
+    if let Some(somniel) = HubDisposData::get_list_mut().and_then(|v| v.get_mut(1)) {
+        aid.iter().for_each(|(aid, locator, recruitment_idx)| {
+            let new_recruit_idx = DVCVariables::get_dvc_recruitment_index(*recruitment_idx);
+            if new_recruit_idx != -1 {
+                if let Some(dispos) = somniel.iter_mut().find(|v| v.locator.is_some_and(|l| l.to_string() == *locator)) {
+                    dispos.set_chapter(RECRUIT_CID[new_recruit_idx as usize].into());
+                }
+                if let Some(facility) = HubFacilityData::get_mut(aid) {
+                    facility.condition_cid = format!("CID_{}", RECRUIT_CID[new_recruit_idx as usize]).into() ;
                 }
             }
-        }
+        });
     }
 }
 pub fn randomize_person() {
@@ -73,15 +69,6 @@ pub fn randomize_person() {
                         .collect();
                 let mut to_replace_list: Vec<_> = playable_list.clone();
                 let pids: Vec<String> = list.iter().map(|x| PersonData::try_get_hash(x.hash).unwrap().pid.to_string()).collect();
-                pids.iter().for_each(|pid| {
-                    GameVariableManager::make_entry_str(format!("G_R_{}", pid.as_str()).as_str(), pid.as_str());
-                    GameVariableManager::make_entry_str(format!("G_R2_{}", pid.as_str()).as_str(), pid.as_str());
-                });
-
-                // println!("Playable Unit Size: {}", playable_list.len());
-                // Alear and somniel royals must be switched with non-dlc units
-                //  x_i in to_replace, x_j in playable_list, royals are x_i
-                //  x_j -> x_i, remove royal (x_i) from to_replace and remove x_j from playable_list
                 let royals = [0, 23, 4, 17, 14, 27];
                 for x_royal in royals {
                     if let Some((pos, royal)) =  playable_list.iter().enumerate().find(|(i, x)| x.0 == x_royal) {
@@ -95,8 +82,8 @@ pub fn randomize_person() {
                     if let Some((index_y, _)) = playable_list.get_remove_filter(rng, |(i, gender_y)| (with_gender && gender_x == gender_y) || !with_gender)
                         .or_else(|| playable_list.get_remove(rng))
                     {
-                        GameVariableManager::set_string(format!("G_R_{}", pids[*index_x].as_str()), pids[index_y].as_str());
-                        GameVariableManager::set_string(format!("G_R2_{}", pids[index_y].as_str()), pids[*index_x].as_str());
+                        DVCVariables::set_variable_key_string(format!("G_R_{}", pids[*index_x].as_str()), pids[index_y].as_str());
+                        DVCVariables::set_variable_key_string(format!("G_R2_{}", pids[index_y].as_str()), pids[*index_x].as_str());
                     }
                 });
             },
@@ -134,11 +121,8 @@ pub fn randomize_person() {
                 ).for_each(|(original, randomized)|{
                     let key = format!("G_R_{}", original.pid);
                     let reversed = format!("G_R2_{}", randomized.pid);
-                    if GameVariableManager::exist(&key) { GameVariableManager::set_string(&key, randomized.pid); }
-                    else { GameVariableManager::make_entry_str(&key, randomized.pid); }
-                    
-                    if GameVariableManager::exist(&reversed) { GameVariableManager::set_string(&reversed, original.pid); }
-                    else { GameVariableManager::make_entry_str(&reversed, original.pid); }
+                    DVCVariables::set_variable_key_string(key.as_str(), randomized.pid);
+                    DVCVariables::set_variable_key_string(reversed.as_str(), original.pid);
                 });
             }
             _ => { DVCVariables::create_recruitment_variables(false); },
@@ -169,8 +153,9 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
         return;
     }
     let person_lueur = PersonData::get(PIDS[0]).unwrap();
+    person_lueur.set_link_god(None);
     PROTAG_SKILLS.iter().for_each(|x| { person_lueur.get_mask_skill().remove_sid(x.into()); });
-    if let Some(new_hero) = switch_person(person_lueur) {
+    if let Some(new_hero) = DVCVariables::get_dvc_person_data(0, false){
         PROTAG_SKILLS.iter().for_each(|x|{ new_hero.get_mask_skill().add_sid(x, SkillDataCategorys::Private, 0); });
         if let Some(god) = GodData::get_mut("GID_リュール") {
             god.link = Some(new_hero.pid);
@@ -246,7 +231,7 @@ pub fn switch_person_reverse(person: &PersonData) -> Option<&'static PersonData>
 // Handle the case of Chapter 11 ends with not escape
 pub fn m011_ivy_recruitment_check(){
     if !DVCVariables::random_enabled() || DVCVariables::UnitRecruitment.get_value()  == 0 { return; }
-    if GameUserData::get_chapter().cid.to_string() == "CID_M011" && lueur_on_map() {
+    if DVCVariables::get_chapter_index() == 11  && lueur_on_map() {
         GameVariableManager::make_entry("MapRecruit", 1);
         GameVariableManager::set_bool("MapRecruit", true);
     }

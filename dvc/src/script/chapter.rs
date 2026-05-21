@@ -1,15 +1,15 @@
 use engage::{
     gamedata::Gamedata, map::image::MapImage, mess::Mess, random::Random,
-    gamemessage::GameMessage, gameuserdata::GameUserData, gamevariable::GameVariableManager,
+    gamemessage::GameMessage, gamevariable::GameVariableManager,
     script::*, util::get_instance,
 };
 use unity::{prelude::*, il2cpp::object::Array};
 use crate::{randomizer::Randomizer, config::DVCFlags, DVCVariables, enums::{MPIDS, PIDS, RINGS}};
 
 pub extern "C" fn install_script_edits(script: &EventScript) {
-    let chapter = GameUserData::get_chapter().cid.to_string();
-    if chapter == "CID_M026" { script.register_action("味方キャラを再配置", m026_phase_2_positions); }
-    if chapter == "CID_M022" {
+    let chapter = DVCVariables::get_chapter_index();
+    if chapter == 26 { script.register_action("味方キャラを再配置", m026_phase_2_positions); }
+    if chapter == 22 {
         script.register_action("ユニット会話_ソロ時", ring_talk_1);
         script.register_action("ユニット会話_シンクロ中", ring_talk_2);
         script.register_action("Dialog", ring_dialog_up_dialog);

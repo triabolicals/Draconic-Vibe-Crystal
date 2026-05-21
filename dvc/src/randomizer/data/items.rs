@@ -1,11 +1,10 @@
 use engage::{mess::Mess, random::Random, gamedata::{Gamedata, GamedataArray, item::*, skill::SkillData}};
 use crate::{
-    config::DVCVariables, utils::{dlc_check, max},
-    continuous::get_continious_total_map_complete_count,
+    config::DVCVariables,
+    utils::{dlc_check, max},
     randomizer::{item::data::WeaponDatabase, Randomizer, blacklist::DVCBlackLists},
 };
 use unity::prelude::Il2CppString;
-use crate::continuous::get_story_chapters_completed;
 
 pub struct ItemPool {
     pub engage_items: EngageItems,
@@ -46,7 +45,7 @@ impl ItemPool {
         }
     }
     pub fn get_weapon_level_drop() -> i32 {
-        let completed = get_story_chapters_completed();
+        let completed = DVCVariables::chapter_number_complete(false);
         if completed < 4 { 1 }
         else if completed < 10 { 2 }
         else if completed < 17 { 3 }
@@ -55,7 +54,7 @@ impl ItemPool {
     }
     pub fn random_item(&self, item_type: i32, allow_rare: bool) -> &'static Il2CppString {
         let rng = Random::get_system();
-        let chapters = get_continious_total_map_complete_count();
+        let chapters = DVCVariables::chapter_number_complete(true);
         let weapon_level = Self::get_weapon_level_drop();
         let extra_rate = 5 + 2*(chapters / 6);
         if rng.get_value(100) <= extra_rate && item_type != 1 && item_type != 2 {

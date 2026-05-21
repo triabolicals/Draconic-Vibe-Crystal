@@ -8,6 +8,7 @@ use crate::{
         person::unit::fixed_unit_weapon_mask, grow::adaptive_growths, job::reclass::ReclassType
     }
 };
+use crate::utils::for_each_unit;
 
 pub const JOB_HASH: [i32; 111] = [
     1367578960, -1369632991, 689554073, -1369626630, 185671037, 1499787884, 185670709, -1998645787, 
@@ -126,81 +127,33 @@ pub fn correct_job_base_stats() {
     job_list.iter_mut()
         .filter(|job| job.is_low())
         .for_each(|job| {
-            if job.flag.value & 3 == 1 {
-                let hash = job.parent.hash;
-                if let Some(gender) = PersonData::get_list().unwrap().iter().find(|x| x.get_job().is_some_and(|x| x.parent.hash == hash)).map(|p| p.gender) {
-                    if gender == 1 {
-                        job.flag.value ^= !4;
-                        job.flag.value |= 16;
-
-                    }
-                    else if gender == 2 {
-                        job.flag.value ^= !16;
-                        job.flag.value |= 4;
-                    }
-                }
-            }
-            if job.get_base()[10] == 0 { job.flag.value = 0; }
+            if job.get_base()[10] == 0 ||  job.jid.str_contains("JID_紋章士_") { job.flag.value = 0; }
         });
+
     LUEUR_CLASS.iter().flat_map(|j| JobData::try_get_hash_mut(*j))
-        .for_each(|job|{ job.flag.value == 3; });
+        .for_each(|job|{ job.flag.value = 3; });
     ENEMY_ONLY.iter().chain(MONSTER_CLASS.iter()).flat_map(|j| JobData::try_get_hash_mut(*j))
-        .for_each(|job|{ job.flag.value == 0; });
+        .for_each(|job|{ job.flag.value = 0; });
     FEMALE_CLASS.iter().flat_map(|j| JobData::try_get_hash_mut(*j))
         .for_each(|job|{ job.flag.value |= 7; });
     MALE_CLASS.iter().flat_map(|j| JobData::try_get_hash_mut(*j))
         .for_each(|job|{ job.flag.value |= 19; });
-    /*
-    ["JID_邪竜", "JID_不明", "JID_邪竜ノ王", "JID_M000_邪竜ノ王"].iter().for_each(|jid|
-        if let Some(job) = JobData::get_mut(jid) { job.flag.value = 0; }
-    );
-    ["JID_フロラージュ下級", "JID_フロラージュ", "JID_フロラージュ_E", "JID_リンドブルム下級", "JID_リンドブルム", "JID_リンドブルム_E",
-        "JID_スレイプニル下級", "JID_スレイプニル", "JID_スレイプニル_E", "JID_ピッチフォーク下級", "JID_ピッチフォーク", "JID_ピッチフォーク_E",
-        "JID_メリュジーヌ_味方", "JID_メリュジーヌ", "JID_裏邪竜ノ娘", "JID_邪竜ノ娘", "JID_邪竜ノ娘_敵"].iter()
-        .for_each(|jid|
-            if let Some(job) = JobData::get_mut(jid) { job.flag.value |= 7; }
-        );
-
-    ["JID_アヴニール下級", "JID_アヴニール", "JID_アヴニール_E", "JID_スュクセサール下級", "JID_スュクセサール",
-        "JID_スュクセサール_E", "JID_ティラユール下級", "JID_ティラユール", "JID_ティラユール_E", "JID_クピードー下級",
-        "JID_クピードー", "JID_クピードー_E", "JID_裏邪竜ノ子", "JID_ダンサー"
-    ].iter()
-        .for_each(|jid|
-            if let Some(job) = JobData::get_mut(jid) {
-                job.flag.value |= 19;
-                job.flag.value &= !4;
-            }
-        );
-    */
-    JobData::get_list_mut().unwrap().iter_mut()
-        .filter(|job| job.jid.str_contains("JID_紋章士_") && job.parent.index > 0)
-        .for_each(|emblem_job| { emblem_job.flag.value = 0; });
 }
 pub fn adjust_missing_weapon_mask() {
-    if let Some(start) = UnitPool::get_first(9, 0) {
+    for_each_unit(9, |unit|{
         let mut weapon_select_count = 0;
-        start.job.get_selectable_weapon_mask(&mut weapon_select_count);
-        let selected = start.selected_weapon_mask.value;
+        unit.job.get_selectable_weapon_mask(&mut weapon_select_count);
+        let selected = unit.selected_weapon_mask.value;
         let count = (1..10).into_iter().filter(|x| (1 << x) & selected != 0).count() as i32;
-        if count < weapon_select_count { randomize_selected_weapon_mask(start, None); }
-        let mut unit = start;
-        while let Some(unit1) = UnitFor::get_next_by_force(unit, 9) {
-            unit1.job.get_selectable_weapon_mask(&mut weapon_select_count);
-            let selected = unit1.selected_weapon_mask.value;
-            let count = (1..10).into_iter().filter(|x| (1 << x) & selected != 0).count() as i32;
-            if count < weapon_select_count { 
-                randomize_selected_weapon_mask(unit1, None);
-            }
-            unit = unit1;
-        }
-    }
+        if count < weapon_select_count { randomize_selected_weapon_mask(unit, None); }
+    });
 }
 pub fn assign_selected_weapon_mask_by_apt(unit: &mut Unit, with_kind: Option<i32>) {
     let job = unit.get_job();
     let n_selects = job.weapons.iter().max().map(|x| (*x)-1).unwrap_or(0);
     if n_selects == 0 { return; }
     let mut possible_kinds: Vec<_> = job.weapons.iter().enumerate()
-        .filter(|(k, v)| **v > 1 && *k > 0).map(|(kind, _)| (kind) as i32).collect();
+        .filter(|(k, v)| **v > 1 && *k > 0).map(|(kind, _)| kind as i32).collect();
     let mut new_mask = 0;
     let mut count = 0;
     if let Some(kind) = with_kind.filter(|k| possible_kinds.contains(k)){
@@ -210,8 +163,9 @@ pub fn assign_selected_weapon_mask_by_apt(unit: &mut Unit, with_kind: Option<i32
     if count < n_selects {
         for apt in [unit.person.aptitude.value, unit.person.sub_aptitude.value] {
             if count == n_selects { break; }
-            if let Some(kind) = possible_kinds.iter().find(|v| apt & (1 << *v) != 0 && new_mask & (1 << *v) == 0) {
+            if let Some(kind) = possible_kinds.iter().find(|v| (apt & (1 << *v) != 0) && (new_mask & (1 << *v) == 0)) {
                 new_mask |= 1 << *kind;
+                println!("Adding Kind: {} to {}", *kind, unit.get_name());
                 count += 1;
             }
         }

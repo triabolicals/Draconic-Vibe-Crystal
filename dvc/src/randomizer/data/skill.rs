@@ -222,7 +222,7 @@ impl SkillPool {
     pub fn get_random_skill(&self, _difficulty: i32, rng: &Random) -> &'static SkillData {
         loop {
             if let Some(skill) = self.pool.get_random_element(rng).and_then(|s| SkillData::try_get_hash_mut(*s).filter(|v| is_custom_allow(v))){
-                let chapter_completed = crate::continuous::get_story_chapters_completed() / 5;
+                let chapter_completed = DVCVariables::chapter_number_complete(false) / 5;
                 let mut current_skill = skill.parent.index;
                 for _ in 0..chapter_completed {
                     if let Some(higher) = SkillData::try_index_get(current_skill) { current_skill = higher.parent.index; }

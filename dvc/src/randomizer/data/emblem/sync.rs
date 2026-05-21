@@ -41,13 +41,6 @@ impl SkillGroup {
                 indexes.push(s.parent.index);
                 current = s;
             }
-            /*
-            if skill.group > 0 {
-                if let Some(name) = skill.name.map(|m| Mess::get(m)) {
-                    println!("#{} {}: Group: {}, #{}", skill.parent.index, name, skill.group, indexes.len());
-                }
-            }
-             */
             Self { group: skill.group, indexes, can_inherit: skill.inheritance_cost != 0, emblem_index: None, is_sync: false }
         }
 
@@ -169,8 +162,6 @@ impl EmblemSkillPool {
         let pool = if is_sync { &self.syncs[diff] } else { &self.groups[diff] };
         let mut inherit: Vec<SkillGroup> = self.inherit_only.iter().filter(|l| l.indexes.len() == (diff+1)).map(|x| x.clone()).collect();
         let mut non_inherit: Vec<_> = pool.iter().filter(|x| !x.can_inherit).map(|x| x.clone()).collect::<Vec<_>>();
-        //inherit.extend(self.inherit_only.iter().filter(|p| p.indexes.len() == diff).map(|x| x.clone()));
-
         if diff == 0 {
             self.extra_syncs.iter().for_each(|x| {
                 let s = SkillGroup::from_index(*x, false, 1000);

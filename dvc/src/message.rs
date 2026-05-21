@@ -142,23 +142,6 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                      */
                 }
                 /*
-                3 => {  //Enemy Person Name Swap
-                    if DVCVariables::UnitRecruitment.get_value() != 0 {
-                        return replace_string(
-                            result,
-                            Mess::get(MPIDS[v.1 as usize]),
-                            Mess::get_name(GameVariableManager::get_string(format!("G_R_{}", PIDS[v.1 as usize])))
-                        );
-                    }
-                }
-                4 => {  // Mauvier Replacement
-                    if DVCVariables::UnitRecruitment.get_value() != 0 {
-                        if v.1 != -1 { result = name_replace(result, v.1); }
-                        result = name_replace(result, 33);
-                    }
-                }
-
-                 */
                 5 => {  // Ring/bracelet of XXXX Swaps
                     if DVCVariables::EmblemRecruitment.get_value() != 0 {
                         let new_index = crate::randomizer::person::pid_to_index(&EMBLEM_GIDS[v.1 as usize].to_string(), false);
@@ -168,6 +151,7 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                         else { return result; }
                     }
                 }
+                 */
                 8 => {
                     if DVCVariables::Continuous.get_value() != 0 {
                         if let Some(next) = GameUserData::get_chapter().get_next_chapter() {
@@ -179,50 +163,19 @@ pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: boo
                                     call_original!(Some("MID_Hub_Next_Go".into()), true, None), 
                                     call_original!(Some(next.name), true, None), 
                                     call_original!(Some(format!("{}_PREFIX", next.name).into()), true, None),
-                                    crate::continuous::get_continious_total_map_complete_count()
+                                               DVCVariables::chapter_number_complete(true)
                                 ).into();
                             }   
                         }
                     }
                 }
-                10 => { return name_replace(result, 37); }
-                11 => {
-                    if let Some(name) = get_emblem_person(mess_il2cp).and_then(|x| x.name) { return call_original!(Some(name), true, None); }
-                }
+                // 10 => { return name_replace(result, 37); }
+                // 11 => { if let Some(name) = get_emblem_person(mess_il2cp).and_then(|x| x.name) { return call_original!(Some(name), true, None); } }
                 _ => {}
             }
         }
-        if mess_label.contains("MID_RULE_") && mess_label.contains("WIN") {
-            if mess_label.contains("E00") {
-                if mess_label.contains("E002") {
-                    result = name_replace(result, 4);
-                    result = name_replace(result, 7);
-                }
-                else if mess_label.contains("E003") {
-                    result = name_replace(result, 11);
-                    result = name_replace(result, 14);
-                }
-                else if mess_label.contains("E004") {
-                    result = name_replace(result, 17);
-                    result = name_replace(result, 23);
-                }
-                else if mess_label.contains("E005") || mess_label.contains("E006")
-                { result = name_replace(result, 37); }
-                return result;
-            }
-        }
-        if mess_label.contains("MID_RULE_DLC") && mess_label.contains("LOSE") {
-            result = name_replace(result, 36);
-            return name_replace(result, 37);
-        }
     }
    result
-}
-
-fn name_replace(str: &Il2CppString, index: i32) -> &mut Il2CppString {
-    let name = if index == 37 { Mess::get("MPID_Il") } else { Mess::get_name(PIDS[index as usize]) };
-    let replace_name = Mess::get_name(DVCVariables::get_dvc_person(index, false));
-    replace_string(str, name, replace_name)
 }
 pub fn cooking_menu_build_attribute(_this: u64, _method_info: OptionalMethod) -> i32 {
     if let Some(chef) = util::HubUtil::get_current_cooking_pid() {

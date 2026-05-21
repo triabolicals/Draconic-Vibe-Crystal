@@ -54,9 +54,8 @@ pub fn fill_name_array() {
 
 fn is_character_specific() -> bool {
     let mid = Talk::get_playing_mid();
-    let chapter = GameUserData::get_chapter().cid.to_string();
-    (mid.contains("MID_TK_") && chapter == "CID_M022") ||
-    chapter == "CID_M026" ||
+    let idx = DVCVariables::get_chapter_index();
+    (mid.contains("MID_TK_") && idx == 22) || idx == 26 ||
     mid.contains( "MID_KR_") ||
     mid.contains( "MID_GR_") ||
     mid.contains( "MID_DIE") ||
@@ -65,14 +64,8 @@ fn is_character_specific() -> bool {
     (mid.contains( "MID_HUB") && ( !mid.contains( "MID_HUB_DLC") && !mid.contains( "MID_HUB_Mascot")))
 }
 fn is_emblem_paralogue() -> bool {
-    let chapter = GameUserData::get_chapter().cid.to_string();
-    (
-        chapter.contains("CID_S0") &&
-            !chapter.contains("CID_S015") &&
-            !chapter.contains("CID_S001") &&
-            !chapter.contains("CID_S002")
-    )
-    || chapter.contains("CID_G00")
+    let idx = DVCVariables::get_chapter_index();
+    (idx >= 32 && idx < 45) || (idx > 50 && idx < 57)
 }
 fn talk_tag_window(this: &mut TalkTagWindow, ptr: &TalkPtr, _optional_method: OptionalMethod) {
     this.initialize_(ptr);

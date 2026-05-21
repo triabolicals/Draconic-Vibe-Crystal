@@ -261,7 +261,7 @@ impl DVCVariables {
             Self::InteractSetting => 7,
             Self::Continuous|Self::UnitRecruitment|Self::FogOfWar|Self::EngraveLevel|Self::ClassMode => 5,
             Self::Reclassing|Self::EmblemInherit|Self::EmblemRecruitment|
-            Self::ExplorationItem|Self::UnitInventory|Self::EmblemAppearance|Self::GenericAppearance => 4,
+            Self::TerrainEffect|Self::ExplorationItem|Self::UnitInventory|Self::EmblemAppearance|Self::GenericAppearance => 4,
             _ => { if self.is_gauge() { 100 } else { 3 } }
         }
     }
@@ -293,7 +293,7 @@ impl DVCVariables {
     pub fn set_variable_key_string<'a>(key: impl Into<&'a Il2CppString>, value: impl Into<&'a Il2CppString>) {
         let key = key.into();
         if GameVariableManager::exist(key) { GameVariableManager::set_string(key, value.into()); }
-        else { GameVariableManager::set_string(key, value.into()); }
+        else { GameVariableManager::make_entry_str(key.to_string().as_str(), value.into()); }
     }
     pub fn init_tile_rng(init: bool) -> &'static Random {
         let current = DVCVariables::TileRNG.get_value();
@@ -350,7 +350,7 @@ impl DVCVariables {
     }
     pub fn get_single_class(is_base: bool, female: bool) -> Option<&'static JobData> {
         let hash = DVCVariables::SingleJob.get_value();
-        if hash == 1 && dlc_check() { JobData::get(if female { "JID_裏邪竜ノ娘" } else { "JID_裏邪竜ノ子" }) }
+        if hash == 1000 && dlc_check() { JobData::get(if female { "JID_裏邪竜ノ娘" } else { "JID_裏邪竜ノ子" }) }
         else if let Some(job) = JobData::try_get_hash(hash) {
             if job.max_level == 40 || !is_base { Some(job) }
             else {
@@ -365,23 +365,6 @@ impl DVCVariables {
             }
         }
         else { None }
-    }
-
-    pub fn get_dvc_emblem(index: i32, reverse: bool) -> &'static Il2CppString {
-        // for extra supporting emblems swapping
-        let emblem_index =
-            match index {
-                20|21 => { 12 }    // Dimitri, Claude to Edelgard Index
-                22 => { 18 }    // Robin -> Chrom
-                23 => { 11 }    // Ephiram  -> Eirika
-                _ => { index }
-            };
-        let key =
-            if reverse {format!("G_R2_{}", EMBLEM_GIDS[emblem_index as usize]) }
-            else { format!("G_R_{}", EMBLEM_GIDS[emblem_index as usize]) };
-
-        if GameVariableManager::exist(key.as_str()) { GameVariableManager::get_string(key.as_str()) }
-        else { EMBLEM_GIDS[emblem_index as usize].into() }
     }
     pub fn get_current_god(recruitment_index: i32) -> Option<&'static GodData> {
         let god = Self::get_god_from_index(recruitment_index, true)?;
@@ -412,11 +395,12 @@ impl DVCVariables {
     }
     /// Non-Custom Emblems Only
     pub fn set_emblem_recruitment(emblem_index: i32, replace_emblem_index: i32) {
-        if emblem_index > 18 || replace_emblem_index > 18 || emblem_index == replace_emblem_index { return; }
-        GameVariableManager::set_string(&format!("G_R_{}",EMBLEM_GIDS[emblem_index as usize]), EMBLEM_GIDS[replace_emblem_index as usize]);
-        GameVariableManager::set_string(&format!("G_R2_{}",EMBLEM_GIDS[replace_emblem_index as usize]), EMBLEM_GIDS[emblem_index as usize]);
+        if emblem_index > 18 { return; }
+        if let Some(god) = GameData::get_playable_emblem_hashes().get(replace_emblem_index as usize).and_then(|v| GodData::try_get_hash(*v)) {
+            GameVariableManager::set_string(format!("G_R_{}",EMBLEM_GIDS[emblem_index as usize]), god.gid);
+            GameVariableManager::set_string(format!("G_R2_{}",god.gid), EMBLEM_GIDS[emblem_index as usize]);
+        }
     }
-
     pub fn set_person_recruitment(pid_index: i32, replace_pid_index: i32) {
         if pid_index > 40 || replace_pid_index > 40 { return; }
         GameVariableManager::set_string(&format!("G_R_{}",PIDS[pid_index as usize]), PIDS[replace_pid_index as usize]);
@@ -470,5 +454,26 @@ impl DVCVariables {
             let value = GameVariableManager::get_number(var);
             println!("[DVC Variable] {}: {}", var.trim_start_matches("G_"), value);
         }
+    }
+    pub fn get_chapter_index() -> i32 {
+        let prefixless = GameUserData::get_chapter().prefixless_cid.to_string();
+        let p = [("M0", 0), ("S0", 30), ("G00", 50), ("E00", 60)];
+        p.iter()
+            .find(|(p, _)| prefixless.starts_with(p))
+            .and_then(|(p, offset)| {
+                prefixless.trim_start_matches(p).parse::<i32>().ok().map(|i| i + offset)
+            }).unwrap_or(-1)
+    }
+    pub fn chapter_number_complete(with_side: bool) -> i32 {
+        let main =
+        GameVariableManager::find_starts_with("G_Cleared_M0")
+            .iter().map(|v| GameVariableManager::get_bool(v.to_string().as_str()) as i32)
+            .sum::<i32>();
+        if with_side {
+            GameVariableManager::find_starts_with("G_Cleared_S0")
+                .iter().map(|v| GameVariableManager::get_bool(v.to_string().as_str()) as i32)
+                .sum::<i32>() + main
+        }
+        else { main }
     }
 }

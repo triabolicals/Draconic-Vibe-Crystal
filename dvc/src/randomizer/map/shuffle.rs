@@ -4,7 +4,7 @@ use engage::{
     gamedata::{GamedataArray, dispos::DisposData},
     gameuserdata::GameUserData, gamevariable::GameVariableManager,
 };
-use crate::{config::DVCFlags, randomizer::Randomizer, utils};
+use crate::{config::DVCFlags, randomizer::Randomizer, utils, DVCVariables};
 
 pub struct MapRect {
     pub x1: i8,
@@ -88,7 +88,7 @@ pub fn shuffle_deployment() {
         let end_x = terrain.width as i8 - 1;
         let start_z = terrain.z as i8 + 1;
         let end_z = terrain.height as i8 - 1;
-        let is_m015 = GameUserData::get_chapter().cid.str_contains("CID_M015");
+        let is_m015 = DVCVariables::get_chapter_index() == 15;
         let mut player_deployment = vec![];
         let mut occupied = HashSet::new();
             dispos_data.iter().flat_map(|d| d.iter())

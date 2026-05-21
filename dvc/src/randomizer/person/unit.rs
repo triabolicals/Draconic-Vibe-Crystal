@@ -7,9 +7,7 @@ use engage::{
 use crate::{
     assets::animation::MONSTERS,
     config::DVCVariables,
-    continuous::get_continious_total_map_complete_count,
     randomizer::{
-        emblem::ENEMY_EMBLEM_LIST,
         grow, item::unit_items, job,
         data::{GameData, RandomizedGameData},
         item::{unit_items::add_generic_weapons, change_liberation_type},
@@ -47,6 +45,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
 
     let random_inventory = DVCVariables::UnitInventory.get_value() & 1 != 0;
     let adjust_items = changed_recruit_order || random_class;
+    let chapter_idx = DVCVariables::get_chapter_index();
     ai::adjust_person_unit_ai(this);
     let sequence = GameUserData::get_sequence();
     if !DVCVariables::is_main_chapter_complete(2) && changed_recruit_order {
@@ -55,7 +54,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             change_unit_autolevel(this, true);
             this.item_list.put_off_all_item();
             if random_class { job::reclass::unit_reclass(this, reclass_mode);  }
-            if (old_person.parent.index == 3 || old_person.parent.index == 4) && GameUserData::get_chapter().cid.str_contains("M001") {
+            if (old_person.parent.index == 3 || old_person.parent.index == 4) && chapter_idx == 1 {
                 if random_inventory { adjust_unit_items(this); }
             }
             else { adjust_unit_items(this); }
@@ -172,7 +171,6 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     grow::adaptive_growths(this, true);
     auto_level_unit_for_random_map(this, false);
     this.set_hp(this.get_capability(0, true));
-    // println!("Finish creating {} Lvl: {}/{}", this.get_name(), this.level, this.internal_level);
 }
 
 fn unit_set_drop_seals(this: &mut Unit) {
@@ -216,7 +214,7 @@ pub fn adjust_unit_items(unit: &mut Unit) {
         add_generic_weapons(unit);
     }
     else {
-        has_drops = 0;
+        if !is_enemy { has_drops = 0; }
         GameData::get_item_pool().weapon_db.do_simple_replacement(unit, false);
     }
     unit_items::assign_tomes(unit);
@@ -228,18 +226,12 @@ pub fn adjust_unit_items(unit: &mut Unit) {
     unit_items::add_equip_condition(unit);
     unit_items::remove_duplicates(unit.item_list);
     unit.auto_equip();
-    if has_drops != 0 {
-        let iid = GameData::get_item_pool().random_item(5, has_drops == 2 ).to_string();
-        unit.item_list.add_iid_no_duplicate(&iid);
-        if let Some(x) = unit.item_list.unit_items.iter_mut()
-            .flatten().find(|x| x.item.iid.to_string() == iid) { x.flags |= 2; }
-    }
 
     if unit.person.get_asset_force() == 0 {
         if unit.get_capability(0, true) >= 45 { unit.item_list.add_iid_no_duplicate("IID_特効薬") }
         else { unit.item_list.add_iid_no_duplicate("IID_傷薬") }
     }
-    else if DVCVariables::UnitInventory.get_value() & 2 != 0 && get_continious_total_map_complete_count() > 10 {
+    else if DVCVariables::UnitInventory.get_value() & 2 != 0 && DVCVariables::chapter_number_complete(true) > 10 {
         let rng = Random::get_system();
         let playable_gods = GameData::get_playable_god_list();
         unit.item_list.unit_items.iter().flat_map(|x| x.as_ref().filter(|x| x.is_weapon() && x.item.parent.index > 2 && rng.get_value(10) < 2 ))
@@ -364,16 +356,16 @@ pub fn has_sid(this: &Unit, sid: &str) -> bool {
 }
 
 pub fn reload_all_actors() {
-    UnitPool::class().get_static_fields_mut::<job::UnitPoolStaticFieldsMut>().s_unit
-        .iter_mut().filter(|unit| unit.force.is_some_and(|f| f.force_type < 3  )).for_each(|unit|{
-            unit.reload_actor();
-            unit.auto_equip();
+    for_each_unit(15, |unit|{
+        unit.reload_actor();
+        unit.auto_equip();
     });
 }
 fn enemy_unit_randomization(unit: &mut Unit) {
     let x = unit.dispos_y as i8;
     let z = unit.dispos_z as i8;
     let diff = 1 << GameUserData::get_difficulty(false);
+    let chapter_idx = DVCVariables::get_chapter_index();
     if let Some(data) = DisposData::get_list().unwrap().iter()
         .flat_map(|array| array.iter())
         .find(|data| 
@@ -416,9 +408,9 @@ fn enemy_unit_randomization(unit: &mut Unit) {
         }
         if (unit.person.get_asset_force() | 2 == 2) && DVCVariables::ClassMode.get_value()== 1{  ai::adjust_unitai(unit);  }
         if unit.person.get_asset_force() != 0 {
-            if random_map && m004_complete && !GameUserData::get_chapter().cid.contains("E00") { // Continuous Mode Random Map
+            if random_map && m004_complete && chapter_idx < 60 { // Continuous Mode Random Map
                 fixed_unit_weapon_mask(unit);
-                let maps_completed = get_continious_total_map_complete_count();
+                let maps_completed = DVCVariables::chapter_number_complete(true);
                 if maps_completed < 16 {
                     unit.item_list.put_off_all_item();
                     adjust_unit_items(unit); 
@@ -477,10 +469,8 @@ fn enemy_unit_randomization(unit: &mut Unit) {
             if unit.person.get_asset_force() == 1 && rng.get_value(100) < DVCVariables::EnemyEmblemGauge.get_value() &&
                 (  unit.person.engage_sid.is_none() && unit.get_god_unit().is_none())
             {
-                let current_chapter = GameUserData::get_chapter().cid.to_string();
-                if current_chapter != "CID_M022" && current_chapter != "CID_M011"  {
-                    let emblem = rng.get_value( ENEMY_EMBLEM_LIST.get().unwrap().len() as i32) as usize;
-                    if enemy::try_equip_emblem(unit, emblem) {
+                if chapter_idx != 22 && chapter_idx != 11 {
+                    if enemy::try_equip_emblem(unit) {
                         ai::adjust_enemy_emblem_unit_ai_flags(unit);
                     }
                 }

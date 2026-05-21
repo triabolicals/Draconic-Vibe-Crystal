@@ -2,7 +2,8 @@ use engage::{god::GodPool, map::history::MapHistory};
 use super::*;
 
 pub fn random_map_mode_level() -> i32 {
-    max( (get_story_chapters_completed()-6)*2, get_story_chapters_completed() + 4)
+    let num = DVCVariables::chapter_number_complete(false);
+    max( (num-6)*2, num + 4)
 }
 
 pub fn continous_rand_emblem_adjustment() {
@@ -79,7 +80,7 @@ pub fn set_next_random_chapter(current_chapter: &ChapterData) -> Option<&'static
     if complete_mask & 4194304 != 0 {
         available.extend([23, 24, 25, 26, 45].iter().filter(|&&v| complete_mask & (1 << v) == 0));
     }
-    let completed = get_continious_total_map_complete_count();
+    let completed = DVCVariables::chapter_number_complete(true);
     if completed > 10 && dlc {
         available.extend((51..57).filter(|&v| complete_mask & (1 << v) == 0));
     }
@@ -89,13 +90,6 @@ pub fn set_next_random_chapter(current_chapter: &ChapterData) -> Option<&'static
         if let Some(i) = available.get_random_element(rng).map(|v| get_chapter_from_idx(*v))
             .and_then(|i| ChapterData::get(format!("CID_{}", i)))
         {
-            /*
-            println!("Current Chapter: {}", current_chapter.cid);
-            println!("New Random Chapter: {} out of {} Possible", i.cid, available.len() );
-            println!("Number of Map Completed: {}", completed);
-            println!("Number of Story Maps Completed: {}", get_story_chapters_completed());
-
-             */
             return Some(i);
         }
     }

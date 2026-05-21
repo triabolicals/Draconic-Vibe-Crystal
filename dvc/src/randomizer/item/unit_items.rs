@@ -1,7 +1,10 @@
 use engage::unit::UnitItemList;
 use super::*;
-use crate::{assets::animation::MONSTERS, continuous::get_continious_total_map_complete_count};
-use crate::randomizer::item::data::WeaponDataFlag;
+use crate::{
+    randomizer::item::data::WeaponDataFlag,
+    assets::animation::MONSTERS,
+    randomizer::job::{ENCHANTER, MAGE_CANNON}
+};
 
 pub fn replace_staves(item_list: &UnitItemList){
     for x in 0..8 {
@@ -16,7 +19,7 @@ pub fn replace_staves(item_list: &UnitItemList){
 }
 pub fn has_drops(unit: &Unit) -> i32 {
     unit.item_list.unit_items.iter().flatten().find(|w| w.is_drop())
-        .map(|f| (f.item.flag.value & 1 != 0) as i32 + 1  ).unwrap_or(0)
+        .map(|f| (f.item.flag.value & 1 != 0) as i32 ).unwrap_or(0)
 }
 
 pub fn dispose_item_type(item_list: &UnitItemList, item_kind: i32){
@@ -160,9 +163,16 @@ pub fn assign_unique_items(unit: &Unit) {
     let enemy = unit.person.get_asset_force() != 0;
     if veyle { 
         magic_dagger_weapon_change(unit.get_job());
-        unit.item_list.add_iid_no_duplicate("IID_ミセリコルデ");
+        unit.item_list.add_iid_no_duplicate(MISERCODE);
     }  // Misercode for Veyle
-    if job_hash == 185670709 || veyle {  unit.item_list.add_iid_no_duplicate("IID_オヴスキュリテ");  } // Obscurite for Veyle / Fell Child Veyle
+    if job_hash == 185670709 || veyle {
+        if let Some(item) = ItemData::get(OBSCURITE) {
+            unit.add_item(item);
+            if let Some(skill) = item.equip_condition.and_then(|sid| SkillData::get(sid)) {
+                unit.add_private_skill(skill);
+            }
+        }
+    } // Obscurite for Veyle / Fell Child Veyle
 
     if unit.job.get_max_weapon_level(9) > 1 &&  unit.job.mask_skills.find_sid("SID_竜石装備").is_some() && (pid != PIDS[36] && pid != PIDS[37])
         && unit.item_list.unit_items.iter().any(|i| i.as_ref().is_some_and(|i| i.item.flag.value &  0x4000000 != 0))
@@ -264,13 +274,13 @@ pub fn adjust_player_weapons(unit: &Unit) {
 pub fn add_generic_weapons(unit: &Unit) {
     let weapon_db = &GameData::get_item_pool().weapon_db;
     let job = unit.get_job();
-    let jid = job.jid.to_string();
-    if jid == "JID_ボウナイト" { unit.item_list.add_item_no_duplicate(ItemData::get("IID_銀の弓").unwrap());  }
-    if jid == "JID_エンチャント" {
-        unit.item_list.add_item_no_duplicate(ItemData::get("IID_HPの薬").unwrap());  
-        unit.item_list.add_item_no_duplicate(ItemData::get("IID_力の薬").unwrap());  
+    if job.parent.hash == MAGE_CANNON {
+        unit.item_list.add_item_no_duplicate(ItemData::get("IID_銀の弓").unwrap());
     }
-    // println!("Add Generic Weapons {}: Weapon mask: {} Selected: {}", Mess::get_name(unit.person.pid), unit.weapon_mask.value, unit.selected_weapon_mask.value);
+    else if job.parent.hash == ENCHANTER {
+        unit.item_list.add_item_no_duplicate(ItemData::get("IID_HPの薬").unwrap());
+        unit.item_list.add_item_no_duplicate(ItemData::get("IID_力の薬").unwrap());
+    }
     unit.update_weapon_mask();
     let combine_mask = unit.weapon_mask.value;
     let weapon_levels = get_unit_avail_weapon_levels(unit);
@@ -307,7 +317,7 @@ pub fn add_generic_weapons(unit: &Unit) {
                     }
                 }
             }
-            else if DVCVariables::UnitInventory.get_value() & 2 != 0 && !player && get_continious_total_map_complete_count() > 9 {
+            else if DVCVariables::UnitInventory.get_value() & 2 != 0 && !player && DVCVariables::chapter_number_complete(true) > 9 {
                 if let Some(item) = weapon_db.get_random_weapon(Some(unit), i, rank, true) {
                     if item.get_weapon_level() <= rank {
                         unit.item_list.add_item_no_duplicate(item);
@@ -327,7 +337,7 @@ pub fn add_generic_weapons(unit: &Unit) {
             }
         }
     }
-    if job.get_max_weapon_level(4) >= 2 && DVCVariables::is_main_chapter_complete(22) && Random::get_system().get_value(10) < 2 {
+    if job.get_max_weapon_level(4) >= 2 && DVCVariables::is_main_chapter_complete(22) && Random::get_system().get_value(3) == 0 {
         unit.item_list.add_item_no_duplicate(ItemData::get("IID_長弓").unwrap());
     }
     dispose_unusables(unit);
@@ -335,9 +345,9 @@ pub fn add_generic_weapons(unit: &Unit) {
 
 pub fn random_items_drops(unit: &Unit){
     let rng = Random::get_system();
-    let mut rate = DVCVariables::EnemyItemDropGauge.get_value();
+    let mut rate = DVCVariables::EnemyItemDropGauge.get_value() >> 1;
     if !GameVariableManager::get_bool("G_Cleared_M002") { return; }
-    if rng.get_value(100) < (rate / 2) {
+    if rng.get_value(100) < rate {
         let mut item_count = 0;
         for x in 0..8 {
             if let Some(u_item) = unit.item_list.get_item(x) {
@@ -352,7 +362,7 @@ pub fn random_items_drops(unit: &Unit){
                 if rng.get_value(100) < rate {
                     unit_item.ctor_str(&pool.random_item(4, false).to_string());
                     unit_item.flags |= 2;
-                    rate = rate / 2;
+                    rate = rate >> 2;
                 }
             }
         }
@@ -399,17 +409,6 @@ pub fn add_equip_condition(unit: &Unit) {
         }
     }
 }
-pub fn removing_equip_condition(unit: &mut Unit) {
-    for x in 0..8 {
-        if let Some(equip) = unit.item_list.unit_items[x].as_ref()
-            .filter(|x| x.item.flag.value & 201326720 == 0).and_then(|x| x.item.equip_condition)    // No Engage/Dragon/Bullet Weapons
-        {
-            unit.private_skill.remove_sid(equip);
-        }
-    }
-}
-
-
 pub fn add_monster_weapons(unit: &Unit) -> bool {
     let jid = unit.get_job().jid.to_string();
     if let Some(pos) = MONSTERS.iter().position(|&x| jid == x) {

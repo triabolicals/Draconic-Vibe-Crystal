@@ -16,7 +16,7 @@ pub extern "C" fn well_get_item_rng(proc: &mut WellSequence, _method_info: Optio
         let level = WellSequence::get_exchange_level();
         let seed = WellSequence::get_seed();
         let rng = Random::new(seed as u32);
-        let map_completed = get_continious_total_map_complete_count();
+        let map_completed = DVCVariables::chapter_number_complete(true);
         let list = List::<ItemData>::with_capacity(3).unwrap();
         if !item_pool.has_well || level == 0 || map_completed  < 6 {
             list.add(ItemData::get_mut("IID_スキルの書・守").unwrap());
