@@ -8,22 +8,7 @@ use super::*;
 
 pub mod engrave;
 pub mod menu;
-pub static ENEMY_EMBLEM_LIST: OnceLock<Vec<i32>> = OnceLock::new();
 
-pub fn initialize_emblem_list() {
-    ENEMY_EMBLEM_LIST.get_or_init(||{
-        let mut list: Vec<i32> = Vec::new();
-        for x in 0..20 {
-            GodData::get(format!("GID_相手{}", EMBLEM_ASSET[x])).map(|god| list.push(god.parent.index));
-        }
-        GodData::get_list().unwrap().iter()
-            .filter(|god| {
-                let gid = god.gid.to_string();
-                !EMBLEM_ASSET.iter().any(|asset| gid.contains(asset)) && gid.contains("GID_相手")
-            }).for_each(|god| list.push(god.parent.index));
-        list
-    });
-}
 pub fn randomize_emblems() {
     if !DVCVariables::random_enabled() { DVCVariables::create_recruitment_variables(true); }
     if DVCVariables::is_recruitment_set(true) { set_m022_emblem_assets(); }
@@ -73,7 +58,7 @@ pub fn randomize_emblems() {
                     let idx = x.0 as usize;
                     let new_idx = x.1 as usize;
                     if idx < list_size && new_idx < list_size {
-                        DVCVariables::set_variable_key_string(format!( "G_R_{}",emblems[idx].gid), emblems[new_idx].gid);
+                        DVCVariables::set_variable_key_string(format!("G_R_{}",emblems[idx].gid), emblems[new_idx].gid);
                         DVCVariables::set_variable_key_string(format!("G_R2_{}",emblems[new_idx].gid), emblems[idx].gid);
                     }
                 });
@@ -106,16 +91,18 @@ pub fn set_m022_emblem_assets() {
     }
 }
 pub fn update_lueur_bonds() {
-    if let Some(g_unit) = GodPool::try_get_gid("GID_リュール", false) {
-        Force::get(ForceType::Absent).unwrap().iter().chain(  Force::get(ForceType::Player).unwrap().iter() )
-            .for_each(|unit|{
-                if let Some(g_bond) = g_unit.get_bond(unit){
-                    if g_bond.level < 20 {
-                        g_bond.set_level(20);
-                        unit.inherit_apt(g_unit);
+    if DVCVariables::get_dvc_recruitment_index(0) > 0 {
+        if let Some(g_unit) = GodPool::try_get_gid("GID_リュール", false) {
+            Force::get(ForceType::Absent).unwrap().iter().chain(  Force::get(ForceType::Player).unwrap().iter() )
+                .for_each(|unit|{
+                    if let Some(g_bond) = g_unit.get_bond(unit){
+                        if g_bond.level < 20 {
+                            g_bond.set_level(20);
+                            unit.inherit_apt(g_unit);
+                        }
                     }
-                }
-            });
+                });
+        }
     }
 }
 pub fn get_engage_attack_type(skill: Option<&SkillData>) -> i32 {
@@ -191,8 +178,7 @@ fn set_bond_levels(this: &mut GodUnit) {
     if this.data.force_type != 0 { return; }
     let level = if DVCVariables::is_main_chapter_complete(22) {
         if let Some(lock) = this.data.main_data.unlock_level_cap_flag {
-            if GameVariableManager::get_bool(lock) { 20 }
-            else { 10 }
+            if GameVariableManager::get_bool(lock) { 20 } else { 10 }
         }
         else { 20 }
     }

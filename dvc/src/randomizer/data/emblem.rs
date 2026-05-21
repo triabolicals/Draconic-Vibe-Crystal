@@ -7,6 +7,7 @@ use engage::{
     },
 
 };
+use engage::god::GodPool;
 use unity::prelude::Il2CppString;
 use crate::{DVCVariables, enums::EMBLEM_ASSET, randomizer::EMBLEM_GIDS};
 use super::{GameData, SkillsList, enemy::EnemyEmblemData, sync::get_lowest_priority};
@@ -36,6 +37,13 @@ impl EmblemPool {
     pub fn get_dvc_emblem_data<'a>(gid: impl Into<&'a Il2CppString>) -> Option<&'static GodData> {
         GameVariableManager::try_get_string(format!("G_R_{}", gid.into()))
             .and_then(|gid| GodData::get(gid))
+    }
+    pub fn available_opp_emblems() -> Vec<&'static GodData> {
+        GodPool::get_instance().sort.iter()
+            .filter(|v| v.data.force_type == 0)
+            .flat_map(|v| GodData::get(v.data.main_data.gid.to_string().replace("GID_", "GID_相手")))
+            .filter(|v| GodPool::try_get(v, false).is_none_or(|v| v.parent_unit.is_none()))
+            .collect()
     }
     pub fn is_custom(god_data: &GodData) -> bool {
         let hash = god_data.parent.hash;
@@ -87,7 +95,7 @@ impl EmblemPool {
 
         let emblem_persons =
         PersonData::get_list().unwrap().iter()
-            .filter(|s| s.jid.is_some_and(|jid| jid.str_contains("JID_紋章士") & gids.iter().any(|&gid| s.pid.str_contains(gid))))
+            .filter(|s| s.jid.is_some_and(|jid| jid.str_contains("JID_紋章士_") & gids.iter().any(|&gid| s.pid.str_contains(gid))))
             .flat_map(|person|  gids.iter().position(|&gid| person.pid.str_contains(gid)).map(|pos| EmblemPerson::new(person, pos)))
             .collect();
         Self {
@@ -269,7 +277,9 @@ impl EmblemPerson {
                     }
                     person.aid = Some(god.gid);
                     let gid = god.gid.to_string();
-                    if let Some(summon) = PersonData::get_list().unwrap().iter().find(|p| p.summon_god.is_some_and(|god| god.str_contains(gid.as_str()))){
+                    if let Some(summon) = PersonData::get_list().unwrap().iter()
+                        .find(|p| p.summon_god.is_some_and(|god| god.str_contains(gid.as_str())))
+                    {
                         set_emblem_person(person, summon);
                     }
                     else {
@@ -299,7 +309,8 @@ impl EmblemPerson {
     }
     pub fn get_person(&self) -> &'static mut PersonData { PersonData::try_get_hash_mut(self.hash).unwrap() }
     pub fn is_custom(&self) -> bool {
-        DVCVariables::get_god_from_index(self.emblem_index as i32, true).filter(|god| !EMBLEM_HASHES.contains(&god.parent.hash)).is_some()
+        DVCVariables::get_god_from_index(self.emblem_index as i32, true)
+            .map(|v| !EMBLEM_HASHES.contains(&v.parent.hash)).unwrap_or(false)
     }
     pub fn is_paralogue(&self) -> bool {
         PersonData::try_get_hash(self.hash).is_some_and(|p| p.pid.str_contains("PID_S0"))
