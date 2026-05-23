@@ -136,7 +136,7 @@ Max Class Stat Caps|Class max stats set to 120 + Class Base.|ed
 Cutscene SFX|Randomly replaces sound effects in cutscenes.|rn
 Personal Stat Caps|Randomizes character stat caps. Range: -5 to 5.|rn
 Bond Ring Stats|Randomize the stat boosts from bond rings.|rn
-F41
+Randomize Starting Proficiencies|Units will start with random weapon proficiencies.|rn
 F42
 F43
 F44
