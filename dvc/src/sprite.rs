@@ -149,7 +149,25 @@ pub fn unit_icon_set_god_icon(this: u64, god_data: Option<&GodData>, is_female: 
             else { format!("{}_{}", unit_icon, unit_icon) };
         unsafe { unit_icon_try_set(this, Some(icon_key.into()), person.unit_icon_id, None); }
     }
-    else { call_original!(this, god_data, is_female, is_dark, method_info); }
+    else {
+        if is_dark {
+            if let Some(god) = god_data.filter(|v| v.force_type != 0 && !v.gid.contains("GID_相手")){
+                if let Some(god) = GameData::get().emblem_pool.enemy_emblem.iter()
+                    .find(|v| v.emblem_data.hash == god.parent.hash)
+                    .and_then(|v| DVCVariables::get_current_god(v.emblem_index as i32))
+                    .filter(|h| EmblemPool::is_custom(h))
+                {
+                    if god.unit_icon_id.is_some() {
+                        call_original!(this, Some(god), is_female, false, None);
+                        return;
+                    }
+                    unsafe { unit_icon_try_set(this, Some("997Darkness_711ShadowEmblem_NoWeapon".into()), Some("997Darkness".into()), None); }
+                    return;
+                }
+            }
+        }
+        call_original!(this, god_data, is_female, is_dark, method_info);
+    }
 }
 
 #[skyline::from_offset(0x01f82440)]
