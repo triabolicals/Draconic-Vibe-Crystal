@@ -1,8 +1,10 @@
 use std::collections::HashSet;
 use bitflags::Flags;
-use engage::{unit::Gender::{Female, Male}};
-use engage::unityengine::{GameObject, Material2, Renderer, UnityObject, UnityRenderer};
-use engage::ut::Ut;
+use engage::{
+    unit::Gender::{Female, Male},
+    unityengine::{GameObject, Material2, Renderer, UnityObject, UnityRenderer},
+    ut::Ut
+};
 use outfit_core::{
     get_outfit_data, AssetConditions, AssetFlags, PersonalDressData, UnitAssetMenuData,
 };

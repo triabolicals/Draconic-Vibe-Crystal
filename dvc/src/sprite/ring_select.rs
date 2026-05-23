@@ -11,8 +11,7 @@ use engage::{
     tmpro::TextMeshProUGUI,
     unit::UnitRing
 };
-use unity::engine::ui::{Image, IsImage};
-use unity::prelude::*;
+use unity::{engine::ui::{Image, IsImage}, prelude::*};
 use crate::{config::DVCFlags, DVCVariables, randomizer::{data::GameData, names::AppearanceRandomizer}};
 
 #[unity::class("App", "RingSelectMenuItemContent")]

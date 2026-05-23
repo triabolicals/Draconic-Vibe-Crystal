@@ -95,14 +95,6 @@ pub fn call_proc_original_method(proc: &ProcInst, method_name: &str) {
     }
 }
 pub extern "C" fn nothing_proc(_proc: &mut ProcInst, _method_info: OptionalMethod) {}
-
-extern "C" fn save_deserialize(this: &mut ProcInst, _: OptionalMethod) {
-    call_proc_original_method(this, "Deserialize");
-    let read = unsafe { std::mem::transmute::<&ProcInst, &GameSaveDataProcRead>(this) };
-    if read.save_data.success && read.save_data.ty != 1 {
-        randomizer::save_file_load();
-    }
-}
 #[unity::class("App", "GameSaveData")]
 pub struct GameSaveData {
     pub ty: i32,
@@ -117,4 +109,11 @@ pub struct GameSaveDataProcRead {
     pub proc: ProcInstFields,
     game_message: u64,
     pub save_data: &'static GameSaveData,
+}
+extern "C" fn save_deserialize(this: &mut ProcInst, _: OptionalMethod) {
+    call_proc_original_method(this, "Deserialize");
+    let read = unsafe { std::mem::transmute::<&ProcInst, &GameSaveDataProcRead>(this) };
+    if read.save_data.success && read.save_data.ty != 1 {
+        randomizer::save_file_load();
+    }
 }

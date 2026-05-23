@@ -27,15 +27,15 @@ pub fn resume_fow() {
 }
 pub fn map_start_fow() {
     let sight = get_instance::<MapSight>();
-    let initial = sight.usable;
     let rng = Random::get_system();
+    let initial = sight.usable;
     let value = match DVCVariables::FogOfWar.get_value()  {
         1 => { true }
         2 => { false }
         3 => { rng.get_value(10) % 2 == 0  }
         _ => { GameUserData::get_chapter().flag & 4 != 0 }
     };
-    sight.usable = GameVariableManager::make_entry_norewind("MapFog", (rng.get_value(10) % 2 == 0) as i32);
+    GameVariableManager::make_entry_norewind("MapFog", (rng.get_value(10) % 2 == 0) as i32);
     sight.usable = value;
-    if sight.usable != initial {   sight.update_all(); }
+    if initial != value { sight.update_all(); }
 }

@@ -160,28 +160,15 @@ pub fn return_true(address: usize){
     let _ = Patch::in_text(address).bytes(&[0x20,0x00, 0x80, 0x52]).unwrap();
     let _ = Patch::in_text(address+0x4).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
  }
- pub fn return_4(address: usize){
-    let _ = Patch::in_text(address).bytes(&[0x80,0x00, 0x80, 0x52]).unwrap();
-    let _ = Patch::in_text(address+0x4).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
- }
-pub fn return_n(address: usize, value: u8){
-    let div = value / 8;
-    let n = (value % 8) * 32;
-    let _ = Patch::in_text(address).bytes(&[n, div, 0x80, 0x52]).unwrap();
-    let _ = Patch::in_text(address+0x4).bytes(&[0xC0, 0x03, 0x5F, 0xD6]).unwrap();
-}
-
 pub fn dlc_check() -> bool { unsafe { has_content(0, None) }  }
 
-pub fn clamp_value(v: i32, min: i32, max: i32) -> i32 { unsafe { clamp(v, min, max, None)  } }
+pub fn clamp_value(v: i32, min: i32, max: i32) -> i32 {
+    if v < min { min } else if v > max { max } else { v }
+}
 
 pub fn replace_string(this: &Il2CppString, str1: &Il2CppString, str2: &Il2CppString) -> &'static mut Il2CppString {
     unsafe { replace_str(this, str1, str2, None) }
 }
-
-#[skyline::from_offset(0x032dfb20)]
-pub fn clamp(value: i32, min: i32, max: i32, method_info: OptionalMethod) -> i32;
-
 pub fn max(v1: i32, v2: i32) -> i32 { if v1 > v2 { v1 } else { v2 } }
 pub fn min(v1: i32, v2: i32) -> i32 { if v1 > v2 { v2 } else { v1 } }
 pub fn wrap<T: PartialEq + PartialOrd>(value: T, min: T, max: T) -> T {

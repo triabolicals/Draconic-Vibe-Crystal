@@ -62,14 +62,6 @@ pub fn tutorial_check() {
             if string == "G_解説_TUTID_クラスチェンジ" { return; }
         }
     }
-
-    #[cfg(feature = "debug")]{
-        if DVCConfig::get().debug {
-            GameVariableManager::find_starts_with("G_GmapSpot").iter().for_each(|key| GameVariableManager::set_number(key.to_string(), 3));
-            GameData::get_playable_god_list().iter().for_each(|key|{ GodPool::create(key); });
-        }
-    }
-
 }
 /// SaveLoad Event Randomizing for Cobalt 1.21+
 pub fn save_file_load() {
@@ -121,7 +113,7 @@ pub fn start_new_game(){
     config.correct_rates();
     GameVariableManager::make_entry("G_DVC_Version", VARIABLE_VERSION);
     let seed = config.seed;
-    let iron_man = config.ironman;
+    let iron_man = config.get_flag(DVCFlags::Ironman);
     let randomized = config.randomized;
     let ran_seed =
         if randomized {
@@ -263,7 +255,9 @@ pub fn engage_count() {
     god_data.iter_mut()
         .filter(|god| god.engage_count > 0)
         .for_each(|god| god.engage_count = 7);
-    
+    god_data.iter_mut()
+        .filter(|g| g.gid.to_string().starts_with("GID_相手"))
+        .for_each(|g|{g.force_type = 1; });
 }
 /*
 #[skyline::hook(offset=0x02291fd0)]

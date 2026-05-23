@@ -20,15 +20,14 @@ pub use config::DVCConfig;
 #[allow(static_mut_refs, warnings)] pub mod assets;
 #[allow(static_mut_refs)] mod sprite;
 mod procs;
-
 pub use config::variables::*;
-use crate::utils::{mov_1, return_true};
 
 pub static mut CONFIG: DVCConfig = DVCConfig::default();
-pub const VERSION: &str = "2.16.0N";
-pub const VARIABLE_VERSION: i32 = 8;
+pub const VERSION: &str = "2.16.0o";
+pub const VARIABLE_VERSION: i32 = 9;
 extern "C" fn event_install(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
+        println!("DVC EVENT");
         match ev {
             SystemEvent::ProcInstJump {proc, label } => {
                 println!("Proc: {}, Label: {}", proc.name.unwrap(), *label);
@@ -43,9 +42,6 @@ extern "C" fn event_install(event: &Event<SystemEvent>) {
                     _ => {}
                 }
             }
-            SystemEvent::SaveLoaded { ty, slot_id: _ } => {
-                if *ty > 1 { randomizer::save_file_load(); }
-            }
             SystemEvent::ProcInstBind { proc, parent} => {
                 let mut proc = proc.borrow_mut();
                 let hashcode = proc.hashcode;
@@ -56,8 +52,7 @@ extern "C" fn event_install(event: &Event<SystemEvent>) {
             }
             _ => {}
         }
-    } 
-    else { }
+    }
 }
 
 #[skyline::main(name = "vibe")]
@@ -72,7 +67,7 @@ pub fn main() {
     Patch::in_text(0x02517830).bytes(&[0xa0, 0x02, 0x80, 0x52]).unwrap();
     Patch::in_text(0x0251a9c0).bytes(&[0x01, 0x00, 0x84, 0x52]).unwrap();
     Patch::in_text(0x024cba50).bytes(&[0x01, 0x00, 0x85, 0x52]).unwrap();
-    return_true(0x0203e1b0);    // Forging Item Display
+    utils::return_true(0x0203e1b0);    // Forging Item Display
     skyline::install_hooks!(
         sprite::unit_icon_set_god_icon,
         script::script_get_string,
@@ -80,6 +75,7 @@ pub fn main() {
         message::mess_get_impl_hook,
         sprite::try_get_sprite,
         sprite::unit_icon_set_icon,
+        assets::dress::modify_colors,
         randomizer::item::calc_reward,
         randomizer::person::unit_pool_get_from_person,
         assets::dvc_create_break_effect_hook,

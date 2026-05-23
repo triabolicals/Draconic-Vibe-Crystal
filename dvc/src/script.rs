@@ -141,13 +141,11 @@ pub fn post_sortie_script_adjustment() {
 }
 
 fn person_index_convert(person_index: &mut i32) {
-    let original = *person_index;
     if DVCVariables::UnitRecruitment.get_value()  == 0 || *person_index < 1 { return; }
     if let Some(person) = PersonData::try_index_get(*person_index) {
         if is_player_unit(person){
             if let Some(person) = switch_person(person).map(|p| p.parent.index){
                 *person_index = person;
-                println!("Person Swap: {} -> {}", original, person);
             }
         }
     }

@@ -125,7 +125,6 @@ pub fn skill_inheritance_menu_create_menu_item_list(god: &GodData, method_info: 
     let mode = DVCVariables::EmblemInherit.get_value();
     let random_sp = DVCFlags::RandomSP.get_value();
     if let Some(unit) = unsafe { get_skill_inheritance_sequence_select_unit(None) }{
-        // if crate::DeploymentConfig::get().debug { unit.skill_point = 9999; }
         if mode == 3 {
             let playable_index = GameData::get().playables.iter().position(|x| x.hash == unit.person.parent.hash).unwrap_or(0);
             menu.iter_mut().for_each(|x| {

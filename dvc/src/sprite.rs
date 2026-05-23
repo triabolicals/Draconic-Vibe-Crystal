@@ -11,6 +11,7 @@ use engage::{
 };
 use engage::unit::Gender;
 use crate::{enums::PIDS, ironman::vtable_edit, config::DVCVariables, randomizer::names::get_emblem_person};
+use crate::randomizer::data::{EmblemPool, GameData};
 mod ring_select;
 pub mod telop;
 
@@ -124,9 +125,6 @@ pub fn try_get_sprite(this: &SpriteAtlasManager, name: &Il2CppString, method_inf
                     call_original!(this, format!("{}_{}_NoWeapon", parts[0], parts[0]).into(), None)
                 };
             }
-            else if let Some(unit_icon) = is_player_with_default_weapon(parts[0].as_str()) {
-                return call_original!(this, unit_icon.into(), None);
-            }
         }
     }
     call_original!(this, name, None)
@@ -173,15 +171,6 @@ pub fn unit_icon_set_god_icon(this: u64, god_data: Option<&GodData>, is_female: 
 #[skyline::from_offset(0x01f82440)]
 fn unit_icon_try_set(this: u64, index: Option<&Il2CppString>, palette_name: Option<&Il2CppString>, method_info: OptionalMethod);
 
-fn is_player_with_default_weapon(person_icon: &str) -> Option<String> {
-    match person_icon {
-        "102Louis" => Some("102Louis_630LanceArmor_Lance".to_string()),
-        "153Chloe" => Some("153Chloe_646LancePegasus_Lance".to_string()),
-        "203Umber" => Some("203Umber_637LanceKnight_Lance".to_string()),
-        "250Jade" => Some("250Jade_631AxArmor_Ax".to_string()),
-        _ => None
-    }
-}
 fn get_unit_icon_from_unique(job_icon: &str) -> Option<String>  {
     match job_icon {
         "600DragonLord"|"602DragonKing" => Some("001Lueur".to_string()),

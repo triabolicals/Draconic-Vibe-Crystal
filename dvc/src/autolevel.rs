@@ -1,14 +1,10 @@
 use unity::prelude::*;
 use engage::{
     unit::Unit, force::*, gamedata::*,
-    gameuserdata::*, gamevariable::*, map::situation::MapSituation,
+    gameuserdata::*, map::situation::MapSituation,
     random::Random, util::get_instance
 };
-use crate::{
-    config::DVCFlags, DVCVariables, randomizer, utils::*,
-    randomizer::item::unit_items::adjust_missing_weapons,
-    randomizer::person::unit::fixed_unit_weapon_mask
-};
+use crate::{config::DVCFlags, DVCVariables, randomizer, utils::*, randomizer::item::unit_items::adjust_missing_weapons, randomizer::person::unit::fixed_unit_weapon_mask};
 
 pub mod enemy;
 
@@ -26,7 +22,7 @@ pub fn auto_level_unit(unit: &mut Unit, leader: bool){
         return;
     }
     if !DVCFlags::Autolevel.get_value() { return; }
-    let mut avg_level = get_difficulty_adjusted_average_level();
+    let mut avg_level = get_difficulty_adjusted_average_level() + GameUserData::get_difficulty(false) + 1;
     let recommended = GameUserData::get_chapter().recommended_level as i32;
     if avg_level < recommended { return; }
     if leader { avg_level += 3; }
@@ -151,23 +147,38 @@ pub fn auto_level_unit_for_random_map(unit: &mut Unit, leader: bool){
     randomizer::skill::learn::unit_update_learn_skill(unit);
 }
 
-//Get Average Level of Party
-#[skyline::from_offset(0x02b4afa0)]
-pub fn get_average_level(difficulty: i32, sortie_count: i32, method_info: OptionalMethod) -> i32;
-
 #[skyline::from_offset(0x024f2c10)]
 pub fn get_sortie_unit_count(method_info: OptionalMethod) -> i32;
 
 pub fn get_difficulty_adjusted_average_level() -> i32 {
     let diff = GameUserData::get_difficulty(false);
-    if GameUserData::get_sequence() != 3 {
+    let mut il_count = 0;
+    let mut levels: Vec<(i32, i32)> = vec![];
+    Force::get(ForceType::Absent).unwrap().iter().chain(Force::get(ForceType::Player).unwrap().iter())
+        .for_each(|unit|{
+            let l = unit.level as i32;
+            let il = unit.internal_level as i32;
+            if il > 10 { il_count += 1; }
+            levels.push((l, il));
+        });
+    let mut levels =
+    if il_count < 3 { levels.iter().filter(|v| v.1 < 10).map(|v| v.0).collect::<Vec<i32>>() }
+    else { levels.iter().map(|v| v.0 + v.1).collect::<Vec<i32>>() };
+    levels.sort_by(|a, b| b.cmp(a));
+    let count =
         unsafe {
             let count = get_sortie_unit_count(None);
-            if count == 0 { get_average_level(0, 10, None) }
-            else { get_average_level(diff, get_sortie_unit_count(None), None) }
-        }
+            if count == 0 { 12 - 2*diff } else { count }
+        };
+    let mut i = 0;
+    let mut total = 0;
+    let mut iter = levels.iter();
+    while let Some(&level) = iter.next() {
+        i += 1;
+        total += level;
+        if i >= count { break;}
     }
-    else { MapSituation::get_instance().average_level + diff }
+    total / count
 }
 
 pub fn autolevel_party() -> Option<(i32, i32)> {

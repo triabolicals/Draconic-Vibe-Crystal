@@ -16,8 +16,19 @@ use crate::{
         status::RandomizerStatus
     }
 };
+use crate::assets::dress::M002_LUMERA;
+use crate::randomizer::item::{MISERCODE, OBSCURITE};
 use super::{*, ai};
 
+const VANDRE: i32 = 152765422;
+const CLANNE: i32 = 1875144918;
+const FRAMME: i32 = 654010808;
+const YUNAKA: i32 = 1172357650;
+const SEADALL: i32 = -266109647;
+const VEYLE: i32 = 356559395;
+const NEL: i32 = 2023447537;
+const RAFALE: i32 = 1696364213;
+const ILLUSORY_DOUBLE: i32 = 1879825845;
 const VANDER_MAX: [i8; 11] = [45, 12, 14, 11, 40, 12, 13, 12, 10, 5, 7];
 
 fn calc_max_recruit_stat(total_level: i32) -> [i32; 11] {
@@ -36,16 +47,15 @@ fn calc_max_recruit_stat(total_level: i32) -> [i32; 11] {
 pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     call_original!(this, method_info);
     if !RandomizerStatus::get().init { return; }
-    if !can_rand()  || this.person.parent.hash == 1879825845 || this.status.value & 134217728 != 0 { return; }  // Doubles
+    if !can_rand() || this.person.parent.hash == 1879825845 || this.status.value & 134217728 != 0 { return; }  // Doubles
 
     let changed_recruit_order = DVCVariables::UnitRecruitment.get_value() != 0;
     let class_mode = DVCVariables::ClassMode.get_value();
     let reclass_mode = ReclassType::get_from_settings(true);
     let random_class = class_mode > 0;
-
     let random_inventory = DVCVariables::UnitInventory.get_value() & 1 != 0;
     let adjust_items = changed_recruit_order || random_class;
-    let chapter_idx = DVCVariables::get_chapter_index();
+
     ai::adjust_person_unit_ai(this);
     let sequence = GameUserData::get_sequence();
     if !DVCVariables::is_main_chapter_complete(2) && changed_recruit_order {
@@ -54,17 +64,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             change_unit_autolevel(this, true);
             this.item_list.put_off_all_item();
             if random_class { job::reclass::unit_reclass(this, reclass_mode);  }
-            if (old_person.parent.index == 3 || old_person.parent.index == 4) && chapter_idx == 1 {
-                if random_inventory { adjust_unit_items(this); }
-            }
-            else { adjust_unit_items(this); }
-            if sequence== 3 || sequence == 2 { ai::adjust_unitai(this); }
-            unit_items::remove_duplicates(this.item_list);
-            set_unit_edit_name(this);
-            this.auto_equip();
-            grow::adaptive_growths(this, true);
-            auto_level_unit_for_random_map(this, false);
-            this.set_hp(this.get_capability(0, true));
+            post_unit_creation_adjustment(this);
             return;
         }
     }
@@ -73,8 +73,6 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             if random_class { job::reclass::unit_reclass(this, reclass_mode);  }
             if adjust_items {  adjust_unit_items(this);  }
             if random_inventory { unit_items::adjust_missing_weapons(this); }
-            grow::adaptive_growths(this, true);
-            auto_level_unit_for_random_map(this, false);
             if this.person.unit_icon_id.is_some_and(|x| x.str_contains("Lueur")) && this.person.parent.index > 1 {
                 let gender = this.person.gender;
                 this.edit.set_gender(gender);
@@ -89,48 +87,11 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
                 this.edit.set_name(Mess::get_name(v.pid));
                 this.edit.set_gender(v.gender);
             }
-            if this.person.parent.hash == 258677212 && DVCVariables::EnemyJobGauge.get_value() >= 10 {
-                let mut stats: [i32; 11] = [0; 11];
-                for x in 0..11 { stats[x] = this.job.base[x] as i32; }
-                if let Some(unit) = UnitPool::get_hero(false){
-                    let kind = change_liberation_type();
-                    if unit.job.has_high_jobs() {
-                        if let Some(new_job) = unit.job.get_high_jobs().iter().find(|job| job.weapons[kind as usize] >= 1) {
-                            this.set_job(&new_job);
-                            randomize_selected_weapon_mask(this, Some(kind));
-                        }
-                        else {
-                            this.set_job(&unit.job);
-                            this.selected_weapon_mask.value = unit.selected_weapon_mask.value;
-                        }
-                    }
-                    else {
-                        this.set_job(&unit.job);
-                        this.selected_weapon_mask.value = unit.selected_weapon_mask.value;
-                    }
-                    if is_magic_class(this.job) {
-                        let base = this.base_capability[1];
-                        let str = stats[1];
-                        stats[1] = stats[6];
-                        stats[6] = str;
-                        this.base_capability[1] = this.base_capability[6];
-                        this.base_capability[6] = base;
-                    }
-                    for x in 0..11 {
-                        let diff = stats[x] - this.job.base[x] as i32;
-                        let base = (this.base_capability[x] as i32) + diff;
-                        this.base_capability[x] = base as i8;
-                    }
-                }
-            }
-            else { enemy_unit_randomization(this); }
+            enemy_unit_randomization(this);
             let rng = Random::get_game();
             if rng.get_value(100) < DVCVariables::EnemyItemDropGauge.get_value() { unit_items::random_items_drops(this);  }
         }
-        this.auto_equip();
-        this.set_hp(this.get_capability(0, true));
-        set_unit_edit_name(this);
-        // println!("Finish creating {} Lvl: {}/{}", this.get_name(), this.level, this.internal_level);
+        post_unit_creation_adjustment(this);
         return;
     }
     if changed_recruit_order {
@@ -138,11 +99,6 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             (sequence == 3 && ( GameVariableManager::get_bool("MapRecruit") || ( DVCVariables::UnitDeployment.get_value() != 3 && !lueur_on_map() ) ) )
         {
             change_unit_autolevel(this, true);
-            if this.person.pid.str_contains(PIDS[VEYLE]) {
-                this.item_list.put_off_all_item();
-                this.item_list.add_iid_no_duplicate("IID_オヴスキュリテ");
-                this.item_list.add_iid_no_duplicate("IID_ミセリコルデ");
-            }
         }
         else if switch_person(this.person).is_none_or(|v| v.parent.hash == this.person.parent.hash){
             if random_class {
@@ -151,26 +107,14 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
                 adjust_unit_items(this);
                 if DVCVariables::UnitInventory.get_value() & 1 != 0 { unit_items::adjust_missing_weapons(this); }
             }
-            grow::adaptive_growths(this, true);
-            auto_level_unit_for_random_map(this, false);
-            ai::adjust_unitai(this);
-            this.set_hp(this.get_capability(0, true));
+            post_unit_creation_adjustment(this);
             return;
         }
         else { change_unit_autolevel(this, false);  }
-        set_unit_edit_name(this);
     }
     if random_class {  job::reclass::unit_reclass(this, reclass_mode);  }
-    if adjust_items {
-        adjust_unit_items(this);
-        if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 { ai::adjust_unitai(this); }
-    }
-    unit_items::remove_duplicates(this.item_list);
-    set_unit_edit_name(this);
-    this.auto_equip();
-    grow::adaptive_growths(this, true);
-    auto_level_unit_for_random_map(this, false);
-    this.set_hp(this.get_capability(0, true));
+    if adjust_items { adjust_unit_items(this); }
+    post_unit_creation_adjustment(this);
 }
 
 fn unit_set_drop_seals(this: &mut Unit) {
@@ -503,5 +447,84 @@ pub fn enemy_check_soar(unit: &Unit) {
                 unit.set_base_capability(10, -3);
             }
         }
+    }
+}
+/// Unit is assumed to be the correct person after recruitment swaps, etc...
+pub fn post_unit_creation_adjustment(unit: &mut Unit) {
+    if unit.person.parent.hash == VEYLE {
+        unit.item_list.add_iid_no_duplicate(MISERCODE);
+        unit.item_list.add_iid_no_duplicate(OBSCURITE);
+    }
+    else if let Some(old_person) = switch_person_reverse(unit.person) {
+        let person_hash = old_person.parent.hash;
+        match person_hash{
+            CLANNE|FRAMME => {
+                if DVCVariables::get_chapter_index() == 1 {
+                    unit.item_list.put_off_all_item();
+                    if DVCVariables::UnitInventory.get_value() & 1 != 0 { adjust_unit_items(unit); }
+                }
+                else { adjust_unit_items(unit); }
+            }
+            YUNAKA => { unit.item_list.add_iid_no_duplicate("IID_リライブ"); }
+            NEL => {
+
+            }
+            RAFALE => {
+
+            }
+            SEADALL => {
+                if DVCVariables::is_random_map() {
+                    unit.extra_hp_stock_count = 1;
+                    unit.extra_hp_stock_count_max = 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    else if unit.person.parent.hash == M002_LUMERA && DVCVariables::EnemyJobGauge.get_value() >= 10 {
+        let mut stats: [i32; 11] = [0; 11];
+        for x in 0..11 { stats[x] = unit.job.base[x] as i32; }
+        if let Some(unit) = UnitPool::get_hero(false){
+            let kind = change_liberation_type();
+            if unit.job.has_high_jobs() {
+                if let Some(new_job) = unit.job.get_high_jobs().iter().find(|job| job.weapons[kind as usize] >= 1) {
+                    unit.set_job(&new_job);
+                    randomize_selected_weapon_mask(unit, Some(kind));
+                }
+                else {
+                    unit.set_job(&unit.job);
+                    unit.selected_weapon_mask.value = unit.selected_weapon_mask.value;
+                }
+            }
+            else {
+                unit.set_job(&unit.job);
+                unit.selected_weapon_mask.value = unit.selected_weapon_mask.value;
+            }
+            if is_magic_class(unit.job) {
+                let base = unit.base_capability[1];
+                let str = stats[1];
+                stats[1] = stats[6];
+                stats[6] = str;
+                unit.base_capability[1] = unit.base_capability[6];
+                unit.base_capability[6] = base;
+            }
+            for x in 0..11 {
+                let diff = stats[x] - unit.job.base[x] as i32;
+                let base = (unit.base_capability[x] as i32) + diff;
+                unit.base_capability[x] = base as i8;
+            }
+        }
+    }
+    unit_items::remove_duplicates(unit.item_list);
+    set_unit_edit_name(unit);
+    unit.auto_equip();
+    if unit.person.asset_force == 0 && unit.person.parent.hash != ILLUSORY_DOUBLE {
+        grow::adaptive_growths(unit, true);
+    }
+    auto_level_unit_for_random_map(unit, false);
+    unit.set_hp(unit.get_capability(0, true));
+    let sequence = GameUserData::get_sequence();
+    if sequence == 2 || sequence == 3 {
+        ai::adjust_unitai(unit);
     }
 }
