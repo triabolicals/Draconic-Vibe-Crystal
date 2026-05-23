@@ -73,6 +73,7 @@ pub fn unit_reclass(unit: &mut Unit, kind: ReclassType) -> bool {
     let mut tier = ClassTier::from_job(current_job);
     let mut level = unit.get_level();
     let mut il = unit.get_internal_level();
+    let mut initial_apt = false;
     match kind {
         ReclassType::Enemy => {
             let high_job = current_job.is_high() || (current_job.get_max_level() > 20 && level > 20);
@@ -102,6 +103,7 @@ pub fn unit_reclass(unit: &mut Unit, kind: ReclassType) -> bool {
                 else { recruitment_job_level_adjustment(unit, old_person, unit.person.get_job().unwrap(), random); }
             }
             adaptive_growths(unit, true);
+            initial_apt = true;
         }
         ReclassType::PlayerSingle(recruitment) => {
             if recruitment {
@@ -116,7 +118,10 @@ pub fn unit_reclass(unit: &mut Unit, kind: ReclassType) -> bool {
                 unit.class_change(job);
                 reclass_level_adjustment(unit, level, il, tier);
             }
-            if recruitment { adaptive_growths(unit, true); }
+            if recruitment {
+                adaptive_growths(unit, true);
+                initial_apt = true;
+            }
         }
         ReclassType::PlayerLockout(recruitment, random) => {
             let playable = lockout::get_all_playable_unit_classes(person);
@@ -133,6 +138,7 @@ pub fn unit_reclass(unit: &mut Unit, kind: ReclassType) -> bool {
                         }
                     }
                 }
+                initial_apt = true;
             }
             if let Some(job) = JobData::try_get_hash(selected_job){
                 unit.class_change(job);
@@ -153,14 +159,36 @@ pub fn unit_reclass(unit: &mut Unit, kind: ReclassType) -> bool {
                     reclass_level_adjustment(unit, level, il, tier)
                 }
             }
-            if recruitment { adaptive_growths(unit, true); }
+            if recruitment {
+                initial_apt = true;
+                adaptive_growths(unit, true); 
+            }
         }
     }
     fixed_unit_weapon_mask(unit);
     assign_selected_weapon_mask_by_apt(unit, None);
+    update_weapon_apt(unit, initial_apt);
     unit.set_hp(unit.get_capability(0, true));
     unit_update_learn_skill(unit);
     unit.get_job().parent.hash != old_class
+}
+fn update_weapon_apt(unit: &mut Unit, init: bool) {
+    let mut mask = 0;
+    if init {
+        if DVCFlags::RandomStartingApt.get_value() {
+            let rng = Random::get_game();
+            unit.original_aptitude.value = 0;
+            let mut mask = 1 << (rng.get_value(9)+ 1 );
+            if rng.get_value(3) == 0 {
+                mask |= 1 << (rng.get_value(9)+ 1 );
+            }
+            unit.original_aptitude.value = mask;
+        }
+    }
+    for x in 1..9 {
+        if unit.job.weapons[x] == 1 { mask |= 1 << x; }
+    }
+    unit.aptitude.value = unit.selected_weapon_mask.value | unit.original_aptitude.value | mask;
 }
 fn recruitment_job_level_adjustment(unit: &mut Unit, old_person: &PersonData, target: &JobData, random: bool) {
     let old_level = old_person.get_level() as i32;
@@ -221,7 +249,10 @@ fn reclass_level_adjustment(unit: &Unit, target_level: i32, target_il: i32, from
 }
 pub fn class_change_job_menu_item_build_attr(this: &mut ClassChangeJobMenuItem, _method_info: OptionalMethod) -> BasicMenuItemAttribute {
     if !DVCVariables::random_enabled() { return this.attribute; }
-    if DVCConfig::get().debug { return BasicMenuItemAttribute::Enable; }
+    if DVCConfig::get().debug {
+        this.job_data.is_enough_item = true;
+        return BasicMenuItemAttribute::Enable;
+    }
     let job = &this.job_data.job;
     let job_flags = job.flag.value;
     let unit = SortieSelectionUnitManager::get_unit();
@@ -272,11 +303,6 @@ pub fn class_change_job_menu_item_build_attr(this: &mut ClassChangeJobMenuItem, 
             else { BasicMenuItemAttribute::Hide }
         }
         else { BasicMenuItemAttribute::Hide }
-    }
-    else if DVCConfig::get().debug {
-        this.attribute = BasicMenuItemAttribute::Enable;
-        this.job_data.is_default_job = true;
-        BasicMenuItemAttribute::Enable
     }
     else {
         for dlc in ["SID_弾丸装備", "SID_エンチャント"] {

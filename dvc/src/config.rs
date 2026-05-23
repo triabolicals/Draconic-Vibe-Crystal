@@ -15,72 +15,46 @@ pub use flags::*;
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct DVCConfig {
-    pub randomized: bool,
     pub seed: u32,
     pub debug: bool,
+    pub randomized: bool,
     // Misc Settings
     pub continuous: i32,
-    pub continuous_dlc: bool,
-    pub continuous_items: bool,
-    pub ironman: bool,
     // Recruitment Settings
     pub random_recruitment: i32,
     pub emblem_mode: i32,
     pub dlc: i32,
-    pub recruitment_option: i32,
     // Emblem Settings
-    pub random_engage_attacks: bool,
-    pub random_engage_weapon: bool,
     pub emblem_weap_prof_mode: i32,
-    pub emblem_stats: bool,
     pub sync_skill_mode: i32,
     pub engage_skill_mode: i32,
     pub emblem_inheritance_mode: i32,
     pub engrave_settings: i32,
 
     // Skill Settings
-    pub personal_skills: bool,
     pub random_skill: i32,
     pub learn_skill: i32,
-    pub random_skill_cost: bool,
-    pub enemy_custom_skill: bool,
-    pub equip_learn_skill: bool,
-    pub bond_ring_skill: bool,
     pub bond_ring_skill_s_rate: i32,
     pub bond_ring_skill_a_rate: i32,
     pub bond_ring_skill_b_rate: i32,
     pub bond_ring_skill_c_rate: i32,
-    pub bond_ring_stat: bool,
     // Class Settings
     pub random_job: i32,
-    pub custom_jobs: bool,
     pub random_reclass: i32,
     pub random_battle_styles: i32,
-    pub random_job_attrs: bool,
     pub single_class: i32,
     //Item Settings
-    pub random_item: bool,
     pub random_gift_items: i32,
     pub exploration_items: i32,
-    pub random_shop_items: bool,
     pub random_inventory: i32,
     pub interaction_type: i32,
-    pub random_evolve_items: bool,
-    pub random_refine: bool,
+
     // Growths
     pub random_grow: i32,
-    pub class_growth: bool,
-    pub adaptive_growth: bool,
-    pub autolevel: bool,
-    pub post_chapter_scaling: bool,
-    pub personal_caps: bool,
+
     // Assets
     pub random_class_outfits: i32,
-    pub weapon_asset: bool,
-    pub unit_info_asset: bool,
     pub generic_mode: i32,
-    pub bosses: bool,
-    pub random_names: bool,
     pub emblem_appearance: i32,
     pub body_scale: i32,
     // Enemy
@@ -93,16 +67,12 @@ pub struct DVCConfig {
     // Map
     pub deployment_type: i32,
     pub emblem_deployment: i32,
-    pub random_deploy_spots: bool,
-    pub tile: bool,
-    pub random_map_bgm: bool,
     pub terrain: i32,
     pub fow: i32,
 
-    pub max_stat_caps: bool,
     pub misc_option_1 : f32,
     pub misc_option_2 : f32,
-    pub cutscene_options: i32,
+    pub flags: i64,
     // Custom Recruitment
     pub unit1: [u8; 32],
     pub unit2: [u8; 10],
@@ -132,84 +102,52 @@ impl DVCConfig {
     }
     pub const fn default() -> Self {
         let config = DVCConfig {
+            randomized: true,
             body_scale: 0,
             unit1: [50; 32],
             unit2: [50; 10],
             emblem: [50; 25],
-            randomized: true,
             seed: 0,
-            personal_caps: false,
             random_enemy_job_rate: 50,
             random_enemy_skill_rate: 50,
             revival_stone_rate: 0,
-            enemy_emblem_rate: 0, 
-            random_map_bgm: false,
+            enemy_emblem_rate: 0,
             bond_ring_skill_s_rate: 75,
             bond_ring_skill_a_rate: 30,
             bond_ring_skill_b_rate: 10,
             bond_ring_skill_c_rate: 5,
             engrave_settings: 0,
-            autolevel: false,
-            random_evolve_items: false,
             exploration_items: 0,
             enemy_drop_rate: 10,
             deployment_type: 0,
             emblem_deployment: 0,
             emblem_mode: 0,
             continuous: 0,
-            continuous_dlc: false,
             fow: 0,
             terrain: 0,
             random_inventory: 0,
             random_recruitment: 0,
             random_job: 0,
             random_skill: 0,
-            random_skill_cost: false,
-            random_item: false,
             random_grow: 0,
-            class_growth: false,
-            random_engage_attacks: false,
             emblem_inheritance_mode: 0,
             emblem_weap_prof_mode: 0,
-            random_engage_weapon: false,
             random_gift_items: 0,
             interaction_type: 0,
-            random_job_attrs: false,
-            random_shop_items: false,
             random_battle_styles: 0,
             generic_mode: 0,
-            random_names: false,
             random_reclass: 0,
-            custom_jobs: false,
             learn_skill: 0,
-            enemy_custom_skill: false,
             debug: false,
             dlc: 0,
-            bosses: false,
-            tile: false,
-            equip_learn_skill: false,
-            max_stat_caps: false,
-            bond_ring_skill: false,
             emblem_appearance: 0,
             random_class_outfits: 0,
-            weapon_asset: false,
             single_class: 0,
-            random_deploy_spots: false,
-            emblem_stats: false,
             sync_skill_mode: 0,
-            post_chapter_scaling: false,
             misc_option_1 : 0.0,
             misc_option_2 : 1.0,
-            ironman: false,
-            recruitment_option: 0,
             engage_skill_mode: 0,
-            adaptive_growth: false,
-            unit_info_asset: false,
-            personal_skills: false,
-            continuous_items: false,
-            random_refine: false,
-            bond_ring_stat: false,
-            cutscene_options: 0,
+            flags: 0,
         };
         config
     }
@@ -476,6 +414,10 @@ impl DVCConfig {
             DVCVariables::BodyScaling => { self.body_scale }
             _ => { 0 }
         }
+    }
+    pub fn get_flag(&self, flag: DVCFlags) -> bool {
+        let idx = flag as i32;
+        self.flags & (1 << idx) != 0
     }
 }
 pub fn migrate_to_v3() {

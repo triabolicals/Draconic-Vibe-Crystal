@@ -96,7 +96,7 @@ impl DVCMenu {
                     Variable(InteractSetting), Flag(EvolveItems), Flag(RefineItem)].to_vec()
             }
             DVCMenu::Growth => {
-                [Variable(PersonalGrowthMode), Flag(PersonalCaps), Flag(RandomClassGrowth),
+                [Variable(PersonalGrowthMode), Flag(RandomStartingApt), Flag(PersonalCaps), Flag(RandomClassGrowth),
                     Flag(AdaptiveGrowths), Flag(Autolevel), Flag(PostChapterAutolevel)].to_vec()
             }
             DVCMenu::Enemy => {

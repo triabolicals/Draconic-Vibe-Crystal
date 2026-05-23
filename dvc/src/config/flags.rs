@@ -49,6 +49,7 @@ pub enum DVCFlags {
     CutsceneSFX = 38,
     PersonalCaps = 39,
     RingStats = 40,
+    RandomStartingApt = 41,
     PlayerAppearance = 50,
     CustomUnits = 51,
     Randomized = 52,
@@ -154,7 +155,7 @@ impl DVCFlags {
             24 => Some(Self::EmblemStats),
             25 => Some(Self::RandomSP),
             26 => Some(Self::RandomClassAttrs),
-            27 => None,
+            // 27
             28 => Some(Self::AdaptiveGrowths),
             29 => Some(Self::RandomClassGrowth),
             30 => Some(Self::PersonalSkills),
@@ -167,8 +168,7 @@ impl DVCFlags {
             37 => Some(Self::MaxStatCaps),
             39 => Some(Self::PersonalCaps),
             40 => Some(Self::RingStats),
-            // 37
-            // 38
+            41 => Some(Self::RandomStartingApt),
             50 => Some(Self::PlayerAppearance),
             51 => Some(Self::CustomUnits),
             52 => Some(Self::Randomized),
@@ -221,111 +221,18 @@ impl DVCFlags {
     pub fn get_from_config(self) -> bool {
         let config = DVCConfig::get();
         match self {
-            Self::Initialized | Self::LueurJobSet => { false }
-            Self::RandomEventItems => { config.random_item }
-            Self::ContinuousModeItems => config.continuous_items,
-            Self::CustomEmblemsRecruit => get_bit_from_bool(config.recruitment_option, 0),
-            Self::Ironman => config.ironman,
-            Self::Tile => config.tile,
-            Self::CustomClass => config.custom_jobs,
-            Self::Autolevel => config.autolevel,
-            Self::PostChapterAutolevel => config.post_chapter_scaling,
-            Self::EquipLearnSkills => config.equip_learn_skill,
-            Self::CustomUnitRecruitDisable => get_bit_from_bool(config.recruitment_option, 1),
-            Self::ContinuousDLC => config.continuous_dlc,
-            Self::RandomBossesNPCs => config.bosses,
-            Self::RandomWeaponAsset => config.weapon_asset,
-            Self::RandomUnitInfo => config.unit_info_asset,
-            Self::CustomSkillEnemy => config.enemy_custom_skill,
-            Self::BGM => config.random_map_bgm,
-            Self::GodNames => config.random_names,
-            Self::EngageWeapons => config.random_engage_weapon,
-            Self::AddedShopItems => config.random_shop_items,
-            Self::BondRing => config.bond_ring_skill,
-            Self::RandomDeploySpot => config.random_deploy_spots,
-            Self::EngageAttacks => config.random_engage_attacks,
-            Self::EmblemStats => config.emblem_stats,
-            Self::RandomSP => config.random_skill_cost,
-            Self::RandomClassAttrs => config.random_job_attrs,
-            Self::AdaptiveGrowths => config.adaptive_growth,
-            Self::RandomClassGrowth => config.class_growth,
-            Self::PersonalSkills => config.personal_skills,
-            Self::EvolveItems => config.random_evolve_items,
-            Self::RefineItem => { config.random_refine }
-            Self::PlayerAppearance => get_bit_from_bool(config.recruitment_option, 6),
-            Self::CustomUnits => get_bit_from_bool(config.recruitment_option, 2),
-            Self::Randomized => config.randomized,
-            Self::CutsceneBGM => get_bit_from_bool(config.cutscene_options, 0),
-            Self::CutsceneFacial => get_bit_from_bool(config.cutscene_options, 1),
-            Self::CutsceneMotion => get_bit_from_bool(config.cutscene_options, 2),
-            Self::CutsceneBackground => get_bit_from_bool(config.cutscene_options, 3),
-            Self::CutsceneSFX => get_bit_from_bool(config.cutscene_options, 4),
-            Self::RRGenderUnitMatch => get_bit_from_bool(config.recruitment_option, 3),
-            Self::ExcludeDLCUnitRR => get_bit_from_bool(config.recruitment_option, 4),
-            Self::ExcludeDLCEmblemRR => get_bit_from_bool(config.recruitment_option, 5),
-            Self::MaxStatCaps => config.max_stat_caps,
-            Self::PersonalCaps => { config.personal_caps  }
-            Self::SingleJobEnabled => false,
-            Self::RingStats => { config.bond_ring_stat }
+            Self::Initialized | Self::LueurJobSet | Self::SingleJobEnabled => { false }
+            _ => { config.flags & (1 << self as i64) != 0 }
         }
     }
     pub fn set_config(self, value: bool) {
         let config = DVCConfig::get();
         match self {
-            // Self::Initialized|Self::LueurJobSet => {}
-            Self::RandomEventItems => { config.random_item = value }
-            Self::ContinuousModeItems => { config.continuous_items = value; },
-            Self::CustomEmblemsRecruit => set_bit_from_bool(&mut config.recruitment_option, 0, value),
-            Self::Ironman => { config.ironman = value; }
-            Self::Tile => { config.tile = value;}
-            Self::CustomClass => { config.custom_jobs = value; }
-            Self::Autolevel => { config.autolevel = value; }
-            Self::PostChapterAutolevel => { config.post_chapter_scaling = value; }
-            Self::EquipLearnSkills => { config.equip_learn_skill = value; }
-            Self::CustomUnitRecruitDisable => set_bit_from_bool(&mut config.recruitment_option, 1, value),
-            Self::ContinuousDLC => { config.continuous_dlc = value; }
-            Self::RandomBossesNPCs => { config.bosses = value; }
-            Self::RandomWeaponAsset  => { config.weapon_asset = value; }
-            Self::RandomUnitInfo => { config.unit_info_asset = value; }
-            Self::CustomSkillEnemy => { config.enemy_custom_skill = value;}
-            Self::BGM => { config.random_map_bgm = value; }
-            Self::GodNames => { config.random_names = value; }
-            Self::EngageWeapons => { config.random_engage_weapon = value; }
-            Self::AddedShopItems => { config.random_shop_items = value;}
-            Self::BondRing => { config.bond_ring_skill = value;}
-            Self::RandomDeploySpot => { config.random_deploy_spots = value; }
-            Self::EngageAttacks => { config.random_engage_attacks = value; }
-            Self::EmblemStats => { config.emblem_stats = value; }
-            Self::RandomSP => { config.random_skill_cost = value;}
-            Self::RandomClassAttrs => { config.random_job_attrs = value; }
-            Self::AdaptiveGrowths => { config.adaptive_growth = value; }
-            Self::RandomClassGrowth => { config.class_growth = value; }
-            Self::PersonalSkills => { config.personal_skills = value; }
-            Self::EvolveItems => { config.random_evolve_items = value; }
-            Self::RefineItem => { config.random_refine = value; }
-            Self::CustomUnits => set_bit_from_bool(&mut config.recruitment_option, 2, value),
-            Self::Randomized => config.randomized = value,
-            Self::CutsceneBGM => set_bit_from_bool(&mut config.cutscene_options, 0, value),
-            Self::CutsceneFacial => set_bit_from_bool(&mut config.cutscene_options, 1, value),
-            Self::CutsceneMotion => set_bit_from_bool(&mut config.cutscene_options, 2, value),
-            Self::CutsceneBackground => set_bit_from_bool(&mut config.cutscene_options, 3, value),
-            Self::CutsceneSFX => set_bit_from_bool(&mut config.cutscene_options, 4, value),
-            Self::RRGenderUnitMatch => set_bit_from_bool(&mut config.recruitment_option, 3, value),
-            Self::ExcludeDLCUnitRR => set_bit_from_bool(&mut config.recruitment_option, 4, value),
-            Self::ExcludeDLCEmblemRR => set_bit_from_bool(&mut config.recruitment_option, 5, value),
-            Self::PlayerAppearance => set_bit_from_bool(&mut config.recruitment_option, 6, value),
-            Self::MaxStatCaps => { config.max_stat_caps = value; }
-            Self::PersonalCaps => { config.personal_caps = value; }
-            Self::RingStats => { config.bond_ring_stat = value; }
-            _ => {}
+            Self::Initialized | Self::LueurJobSet | Self::SingleJobEnabled => {}
+            _ => {
+                let mask = 1 << (self as i64);
+                if value { config.flags |= mask; } else { config.flags &= !mask; }
+            }
         }
     }
-}
-fn set_bit_from_bool(v: &mut i32, bit: usize, value: bool) {
-    let mask = 1 << bit;
-    if value { *v |= mask; } else { *v &= !mask; }
-}
-fn get_bit_from_bool(v: i32, bit: usize) -> bool {
-    let mask = 1 << bit;
-    v & mask != 0
 }
