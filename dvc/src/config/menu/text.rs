@@ -1,13 +1,13 @@
 use std::sync::OnceLock;
 use super::*;
 use engage::{
-    gamedata::{Gamedata, GodData, JobData, PersonData},
-    gamevariable::GameVariableManager, language::*, mess::Mess,
+    gamedata::{Gamedata, GodData, JobData, PersonData}, language::*, mess::Mess,
 };
 use crate::{
     DVCVariables, VERSION, randomizer::data::GameData,
-    menus::ingame::draconic_vibe_name, enums::{EMBLEM_GIDS, MPIDS, RINGS, PIDS}
+    menus::ingame::draconic_vibe_name, enums::{MPIDS, RINGS}
 };
+use crate::randomizer::data::EmblemPool;
 
 pub static CONFIG_TEXT: OnceLock<DVCConfigText> = OnceLock::new();
 pub static NONE: &'static str = "---";
@@ -291,24 +291,19 @@ impl DVCConfigText {
                 }
             }
             DVCMenuItemKind::Order(order) => {
-                let index = item.index as usize;
-                if order != RecruitmentOrder::Emblem { item.title = Mess::get_name(MPIDS[index]); }
-                else { item.title = Mess::get(format!("MPID_{}", RINGS[index])); }
+                let index = item.menu_id as usize;
+                if order != RecruitmentOrder::Emblem { item.title = GameData::get().playables.get(index).map(|v| v.get_person_data().get_name()).unwrap_or(Mess::get_item_none()); }
+                else { item.title = DVCVariables::get_god_from_index(index as i32, false).map(|v| Mess::get(v.mid)).unwrap_or(Mess::get_item_none()); }
                 if !DVCVariables::is_main_menu() {
                     item.command_text =
                         match order {
                         RecruitmentOrder::Unit|RecruitmentOrder::UnitCustom => {
-                            let key = format!("G_R_{}", PIDS[index]);
-                            if GameVariableManager::exist(key.as_str()){
-                                Mess::get_name(GameVariableManager::get_string(key.as_str())) }
-                            else {Mess::get_name(MPIDS[index]) }
+                            GameData::get_randomized_person(index).map(|v| v.get_name())
+                                .unwrap_or(Mess::get_item_none())
                         }
                         RecruitmentOrder::Emblem => {
-                            let key = format!("G_R_{}", EMBLEM_GIDS[index]);
-                            if GameVariableManager::exist(key.as_str()) {
-                                Mess::get(GodData::get(GameVariableManager::get_string(key.as_str()).to_string()).unwrap().mid)
-                            }
-                            else { Mess::get(format!("MPID_{}", RINGS[index])) }
+                            DVCVariables::get_god_from_index(index as i32, true).map(|v| Mess::get(v.mid))
+                                .unwrap_or(Mess::get_item_none())
                         }
                     }
                 }

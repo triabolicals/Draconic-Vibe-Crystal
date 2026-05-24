@@ -91,6 +91,7 @@ impl DVCConfigMenuItem {
         item.ctor();
         item.config_method = 0;
         item.index = index;
+        item.menu_id = index;
         if GameUserData::get_sequence() != 0 { item.help_text = "View the set unit recruitment order.".into(); } else {
             match order {
                 RecruitmentOrder::Unit => {

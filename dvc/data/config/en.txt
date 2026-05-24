@@ -146,7 +146,7 @@ F47
 F48
 F49
 Random Player Appearance|Sets all playable units to use their random appearance.|of
-Custom Units|Custom units included in random recruitment order.|ei
+Custom Units|Custom units included in random recruitment order.|ie
 DVC Randomization|Applies randomization settings to save.|ed
 Unit Gender Match|Forces unit random recruitment order to swap by gender.|of
 DLC Units|DLC units included in random recruitment order.|ei

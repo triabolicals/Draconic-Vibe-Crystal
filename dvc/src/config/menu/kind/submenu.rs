@@ -6,6 +6,7 @@ use crate::{
 };
 use super::*;
 use DVCMenuItemKind::*;
+use crate::randomizer::data::GameData;
 
 pub static mut MENU_SELECT: [i32; 21] = [0; 21];
 #[repr(C)]
@@ -61,8 +62,7 @@ impl DVCMenu {
     pub fn get_items(&self, menu_item: &DVCConfigMenuItem) -> Vec<DVCMenuItemKind> {
         match self {
             DVCMenu::Main => {
-                [   
-                    // Command(DVCCommand::RecruitUnits),
+                [
                     Command(DVCCommand::ReRandJob), Menu(Self::Recruitment), Menu(Self::Emblem), Menu(Self::Skill),
                     Menu(Self::UnitClass), Menu(Self::Item), Menu(Self::Growth), Menu(Self::Enemy),
                     Menu(Self::Asset), Menu(Self::Map), Menu(Self::Cutscene), Menu(Self::Other), Menu(Self::ReadOnly),
@@ -70,7 +70,7 @@ impl DVCMenu {
                 ].to_vec()
             }
             DVCMenu::Recruitment => {
-                [Variable(UnitRecruitment), Variable(EmblemRecruitment), Flag(CustomUnitRecruitDisable), Flag(CustomEmblemsRecruit),
+                [Variable(UnitRecruitment), Variable(EmblemRecruitment), Flag(CustomUnitRecruitDisable), Flag(CustomUnits), Flag(CustomEmblemsRecruit),
                     Flag(RRGenderUnitMatch), Flag(ExcludeDLCUnitRR), Flag(ExcludeDLCEmblemRR),
                     Menu(Self::CustomUnitOrder), Menu(Self::CustomUnitOrder2), Menu(Self::CustomEmblemOrder)
                 ].to_vec()
@@ -122,11 +122,19 @@ impl DVCMenu {
                 [Flag(Ironman), Variable(Continuous), Flag(ContinuousDLC), Flag(ContinuousModeItems),
                     Menu(DVCMenu::ViewUnitOrder), Menu(DVCMenu::ViewEmblemOrder)].to_vec()
             }
-            DVCMenu::CustomEmblemOrder|DVCMenu::ViewEmblemOrder => {
+            DVCMenu::CustomEmblemOrder => {
                 let n = if dlc_check() { 19 } else { 12 };
                 vec![Order(RecruitmentOrder::Emblem); n]
             }
-            DVCMenu::CustomUnitOrder|DVCMenu::ViewUnitOrder => {
+            DVCMenu::ViewEmblemOrder => {
+                let n = GameData::get_playable_emblem_hashes().len();
+                vec![Order(RecruitmentOrder::Emblem); n]
+            }
+            DVCMenu::ViewUnitOrder => {
+                let n = GameData::get().playables.len();
+                vec![Order(RecruitmentOrder::Unit); n]
+            }
+            DVCMenu::CustomUnitOrder => {
                 let n = if dlc_check() { 41 } else { 36 };
                 vec![Order(RecruitmentOrder::Unit); n]
             }
@@ -196,7 +204,6 @@ impl DVCCMenuItem for DVCMenu {
             self.rebuild_menu(item, false);
         }
         BasicMenuResult::se_cursor()
-
     }
     fn build_attribute(&self, _item: &DVCConfigMenuItem) -> BasicMenuItemAttribute {
         let enable =

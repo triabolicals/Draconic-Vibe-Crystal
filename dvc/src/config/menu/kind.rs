@@ -162,7 +162,6 @@ impl DVCCMenuItem for DVCMenuItemKind {
                 }
                 DVCMenuItemKind::Flag(flags) => {
                     if get_change(true).is_some(){
-                        // println!("Current: {}", item.dvc_value);
                         let current = item.dvc_value != 0;
                         item.dvc_value = if current { 0 } else { 1 };
                         if flags.need_confirm_to_change() { item.is_command = flags.get_value() != !current; }
@@ -170,7 +169,6 @@ impl DVCCMenuItem for DVCMenuItemKind {
                             flags.set_value(!current);
                             item.is_command = flags.can_a_call(!current);
                         }
-                        // println!("Flag: #{} DVC Value: {} / Var: {}", *flags as i32, item.dvc_value, flags.get_value());
                         item.update_config_text();
                         DVCMenu::rebuild_menu_variable_change(item);
                         BasicMenuResult::se_cursor()

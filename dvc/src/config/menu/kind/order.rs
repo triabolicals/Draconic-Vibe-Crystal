@@ -1,6 +1,8 @@
 use super::*;
 use engage::{gameuserdata::GameUserData, menu::{BasicMenuItemAttribute, BasicMenuResult}};
 use crate::DVCConfig;
+use crate::utils::dlc_check;
+
 pub static mut CUSTOM_RECRUITMENT_ORDER: [u8; 42] = [255; 42];
 #[repr(C)]
 #[derive(Clone, PartialOrd, PartialEq, Copy)]
@@ -105,7 +107,12 @@ impl DVCCMenuItem for RecruitmentOrder {
     fn build_attribute(&self, item: &DVCConfigMenuItem) -> BasicMenuItemAttribute{
         match self {
             RecruitmentOrder::UnitCustom => {
-                if is_required(item.index) { BasicMenuItemAttribute::Disable }
+                if is_required(item.menu_id) { BasicMenuItemAttribute::Disable }
+                else { BasicMenuItemAttribute::Enable }
+            }
+            RecruitmentOrder::Emblem => {
+                if item.menu_id >= 12 && item.menu_id < 19 && !dlc_check() { BasicMenuItemAttribute::Hide }
+                else if item.menu_id == 19 { BasicMenuItemAttribute::Hide }
                 else { BasicMenuItemAttribute::Enable }
             }
             _ => { BasicMenuItemAttribute::Enable }

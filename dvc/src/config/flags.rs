@@ -92,7 +92,8 @@ impl DVCFlags {
                 Self::ExcludeDLCEmblemRR => DVCVariables::EmblemRecruitment.get_value() == 1 && dlc_check(),
                 Self::RRGenderUnitMatch => DVCVariables::UnitRecruitment.get_value() == 1,
                 Self::ContinuousDLC => dlc_check(),
-                Self::CustomUnits|Self::CustomUnitRecruitDisable => GameData::get().playables.len() > 41,
+                Self::CustomUnits => DVCVariables::UnitRecruitment.get_value() == 1 && GameData::get().playables.len() > 41,
+                Self::CustomUnitRecruitDisable => GameData::get().playables.len() > 41,
                 Self::CustomEmblemsRecruit => DVCVariables::EmblemRecruitment.get_value() == 1 && GameData::get_playable_emblem_hashes().len() > 19,
                 Self::CustomSkillEnemy => SkillData::get_count() > 1260,
                 _ => true
