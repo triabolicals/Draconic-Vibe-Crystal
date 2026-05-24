@@ -188,6 +188,7 @@ pub struct EmblemSkillRandomizer {
     pub unit_inherit: Vec<HashMap<i32, i32>>,
     pub random_gambits: [i32; 3],
     pub chaos_gambits: [i32; 3],
+    pub random_sp: HashMap<i32, i32>,
 }
 
 pub struct EmblemSkillRandomizerPool {
@@ -224,6 +225,7 @@ impl EmblemSkillRandomizerPool {
 impl EmblemSkillRandomizer {
     pub fn init(playables: usize) -> Self {
         Self {
+            random_sp: HashMap::new(),
             random_gambits: [-1; 3],
             chaos_gambits: [-1; 3],
             random_skill: HashMap::new(),
@@ -235,6 +237,9 @@ impl EmblemSkillRandomizer {
             unit_inherit: vec![HashMap::new(); playables],
         }
     }
+    pub fn get_random_inherit_cost(&self, skill: &SkillData) -> i32 {
+        self.random_sp.get(&skill.parent.hash).map(|v| *v).unwrap_or(1000 + skill.priority as i32 * 500)
+    }
     pub fn reset(&mut self) {}
     pub fn randomize(&mut self, game_data: &GameData) {
         let rng = get_rng();
@@ -245,6 +250,7 @@ impl EmblemSkillRandomizer {
         self.random_engage.clear();
         self.chaos_engage.clear();
         self.random_inherit.clear();
+        self.random_sp.clear();
         let mut has_extra = [false; 200];
         let skill_data = SkillData::get_list_mut().unwrap();
         pool.groups.iter().enumerate().for_each(|(diff, g)| {
@@ -252,14 +258,13 @@ impl EmblemSkillRandomizer {
             g.iter().for_each(|x| {
                 let mut sp = 100 + 50 * rng.get_value(49);
                 x.indexes.iter().for_each(|&x| {
-                    skill_data[x as usize].pad4 = sp;
+                    self.random_sp.insert(skill_data[x as usize].parent.hash, sp);
                     sp += increase * rng.get_value(increase);
                 });
             })
         });
         let emblem_count = game_data.emblem_pool.emblem_data.len();
         let chaos_pool = pool.get_chaos_inherit();
-
         // Chaos Inherit
         let inherit_skills: Vec<i32> = pool.inherit_only.iter().flat_map(|v| v.indexes.iter()).map(|v| *v).collect();
         let mut chaos_random_pool: Vec<i32> = chaos_pool.iter().flat_map(|s| s.indexes.last()).map(|x| *x).collect();
@@ -344,18 +349,12 @@ impl EmblemSkillRandomizer {
                 chaos_random_pool.shuffle(create_rng(hash, 2), 5);
                 *inherit_list = inherit_skills.iter().zip(chaos_random_pool.iter()).map(|(x, y)| (*x, *y)).collect();
             });
-        // if let Ok(_) = self.print() { println!("Saved Inherit List"); }
     }
     pub fn get_unit_inherit(&self, skill: &SkillData, playable_index: i32) -> Option<&'static mut SkillData> {
         let i = if playable_index as usize >= self.unit_inherit.len() { 0 } else { playable_index as usize };
         self.unit_inherit[i].get(&skill.parent.index).and_then(|index| SkillData::try_index_get_mut(*index))
     }
     pub fn get_inherit(&self, skill: &SkillData) -> Option<&'static mut SkillData> {
-        /*
-        if let Some(name) = skill.name.map(|v| Mess::get(v)) {
-            println!("Getting Inherit Replacement for Skill: #{} {}", skill.parent.index, name);
-        }
-         */
         match DVCVariables::EmblemInherit.get_value() {
             0 => Some(self.get_sync_replacement_index(skill.parent.index)),
             1 => self.random_inherit.get(&skill.parent.index).or_else(|| self.random_skill.get(&skill.parent.index)).cloned(),
@@ -430,7 +429,6 @@ impl EmblemSkillRandomizer {
         let engage = DVCVariables::EmblemEngageSkill.get_value();
         data.emblem_pool.emblem_data.iter().for_each(|e|{ e.reset_all_skills(); });
         data.emblem_pool.emblem_persons.iter().for_each(|e|{ e.reset_skill(data); });
-        data.skill_pool.reset_sp_cost();
         SkillData::try_get_hash_mut(GAMBITS_HASH[2]).unwrap().change_skills.iter_mut().enumerate()
             .for_each(|(i, s)|{ *s = SkillData::try_get_hash_mut(GAMBITS_HASH[3+i]).unwrap(); });
 
@@ -450,8 +448,6 @@ impl EmblemSkillRandomizer {
                     g.synchro_skills.list.iter_mut().for_each(|s| { s.set_index(self.get_sync_replacement_index(s.get_index())); });
                     g.engaged_skills.list.iter_mut().for_each(|s| { s.set_index(self.get_sync_replacement_index(s.get_index())); });
                 });
-
-            // Gambit
             let gambit_list = if sync == 1 { &self.random_gambits } else { &self.chaos_gambits };
             if let Some(gambit) = SkillData::get_mut("SID_計略") {
                 gambit.change_skills.iter_mut().zip(gambit_list.iter().flat_map(|&h| SkillData::try_index_get_mut(h)))

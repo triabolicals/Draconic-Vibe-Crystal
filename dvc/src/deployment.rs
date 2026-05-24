@@ -20,9 +20,10 @@ pub fn get_unit_rating(this: &Unit) -> i32 {
 }
 
 pub fn get_emblem_list() -> Vec<String> {
-    GameData::get_playable_god_list().iter().filter(|g| GodPool::try_get(g, false)
-        .is_some_and(|g| !g.get_escape() && g.data.force_type == 0))
-        .map(|g| g.main_data.gid.to_string()).collect()
+    GameData::get_playable_emblem_hashes().iter()
+        .flat_map(|x| GodData::try_get_hash(*x))
+        .flat_map(|g| GodPool::try_get(g, false).filter(|g| !g.get_escape() && g.data.force_type == 0))
+        .map(|g| g.data.main_data.gid.to_string()).collect()
 }
 pub fn deployment_modes(){
     if let Some(hero_unit) = UnitPool::get_hero(false) {

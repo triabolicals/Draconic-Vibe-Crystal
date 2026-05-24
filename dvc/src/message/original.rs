@@ -118,9 +118,11 @@ impl MessageList {
                 .flat_map(|gid| GodData::get(gid))
                 .map(|gd| MessDataString::from(Mess::get(gd.mid)))
                 .collect();
-        let god_list = &GameData::get_playable_god_list();
         let mut rings: Vec<MessDataString> =
-            god_list.iter().map(|v|{
+            GameData::get_playable_emblem_hashes().
+                iter()
+                .flat_map(|v| GodData::try_get_hash(*v))
+                .map(|v| {
             if let Some(ring_name) = v.ring_name {
                 let name = Mess::get(ring_name).to_string().trim_end_matches('.').to_string();
                 MessDataString::from_str(name.as_str())
@@ -163,7 +165,11 @@ impl MessageList {
                 }
             }
         });
-        god_list.iter().enumerate().filter(|v| v.0 > 19 )
+        GameData::get_playable_emblem_hashes().
+            iter()
+            .flat_map(|v| GodData::try_get_hash(*v))
+            .enumerate()
+            .filter(|v| v.0 > 19 )
             .for_each(|v|{
                 if let Some(engrave) = v.1.engrave_word {
                     emblem_alias.push(MessDataString::from_str(format!("Emblem of {}", Mess::get(engrave)).as_str()));

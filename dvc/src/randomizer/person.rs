@@ -73,6 +73,7 @@ pub fn randomize_person() {
                 for x_royal in royals {
                     if let Some((pos, royal)) =  playable_list.iter().enumerate().find(|(i, x)| x.0 == x_royal) {
                         if let Some(royal_replacement) = to_replace_list.get_remove_filter(rng, |(i, gender)| *i < 36 && *i != 30 && ((with_gender && *gender == royal.1) || !with_gender)){
+                            println!("{} -> {}", royal_replacement.0, royal.0);
                             DVCVariables::set_person_recruitment(royal_replacement.0 as i32, royal.0 as i32);
                             playable_list.remove(pos);
                         }

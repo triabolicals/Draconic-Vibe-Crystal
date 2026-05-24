@@ -158,11 +158,6 @@ impl SkillPool {
     }
     pub fn is_emblem_stat_boost(&self, skill_entity: &SkillArrayEntity) -> bool { self.is_emblem_stat( (skill_entity.value & 0xFFF) as i32) }
     pub fn is_emblem_stat(&self, index: i32) -> bool { self.emblem_stat_boost.iter().any(|x| *x == index && index > 0 ) }
-    pub fn reset_sp_cost(&self) {
-        self.sp_cost.iter()
-            .map(|(hash, sp)| (SkillData::try_get_hash_mut(*hash).unwrap(), *sp))
-            .for_each(|(skill, sp)| { skill.inheritance_cost = sp; });
-    }
     pub fn randomize(&self, data: &GameData) {
         let personal_bl = DVCBlackLists::get_read();
         let rng = Random::new(2 * DVCVariables::get_seed() as u32);

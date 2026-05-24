@@ -10,8 +10,10 @@ use unity::prelude::*;
 use skyline::patching::Patch;
 use num_traits::cast::FromPrimitive;
 use outfit_core::{install_outfit_plugin, UnitAssetMenuData};
-use crate::{config::DVCVariables, randomizer, DVCConfig};
-use crate::randomizer::status::RandomizerStatus;
+use crate::{
+    config::DVCVariables,
+    randomizer::{self, status::RandomizerStatus, tutorial_check}, DVCConfig,
+};
 
 pub const TITLE_SEQUENCE: i32 = -988690862;
 pub const MAIN_SEQUENCE: i32 = -339912801;
@@ -25,12 +27,11 @@ pub const PROC_CHECK: [i32; 8] = [570083351, TITLE_SEQUENCE, MAINMENU_SEQUENCE, 
 pub fn map_sequence_events(proc: &ProcInst, label: i32) {
     let sequence_label: MapSequenceLabel = MapSequenceLabel::from_i32(label).unwrap_or(MapSequenceLabel::End);
     match sequence_label {
-        MapSequenceLabel::ResumeSortie | MapSequenceLabel::ResumeMap => { 
+        MapSequenceLabel::ResumeMap => {
             randomizer::terrain::fow::resume_fow();
             randomizer::in_map_randomize();
-            randomizer::map::tilabolical();
             if DVCVariables::UnitRecruitment.get_value() != 0 { crate::script::replace_lueur_chapter22(); }
-        },
+        }
         MapSequenceLabel::TurnHuman => {
             randomizer::terrain::terrain_spots();   // Random TerrainTiles
             unsafe { autosave_proc_inst(proc, 5, 0, None, None); }
@@ -104,6 +105,7 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
             }
             else { outfit_core::reset_faces(true); }
             crate::ironman::map_save_menu_edits();
+            crate::menus::menu_calls_install();
         }
         _ => { UnitAssetMenuData::get().is_loaded = false; }
     }
@@ -111,25 +113,22 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
 
 pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
     if label == 0 {
-        randomizer::emblem::correct_god_bond_holders();
-        crate::continuous::do_continious_mode();
+        let sequence = GameUserData::get_sequence();
+
         crate::ironman::ironman_code_edits();
         randomizer::terrain::adjust_miasma_tiles();
-        if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 {
+        if sequence  == 3 || sequence == 2 {
             RandomizerStatus::get().map_complete();
             crate::script::adjust_person_map_inspectors();
         }
-        randomizer::item::shop::update_added_shop_items(false);
-        crate::menus::menu_calls_install();
-        randomizer::job::adjust_missing_weapon_mask();
-        randomizer::item::adjust_non_unit_items_inventory();
-    }
-}
-
-pub fn sortie_sequence_events(_proc: &ProcInst, label: i32) {
-    if label == 14 {
-        crate::script::post_sortie_script_adjustment();
-        randomizer::map::tilabolical();
+        else {
+            crate::continuous::do_continious_mode();
+            randomizer::item::shop::update_added_shop_items(false);
+            tutorial_check();
+            randomizer::emblem::correct_god_bond_holders();
+            randomizer::job::adjust_missing_weapon_mask();
+            randomizer::item::adjust_non_unit_items_inventory();
+        }
     }
 }
 

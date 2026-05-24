@@ -196,7 +196,7 @@ pub fn update_added_shop_items(map_complete: bool) {
         }
     }
 }
-pub fn item_shop_dialog_on_yes(this: &ItemShopBuyRoot, _optional_method: OptionalMethod) -> BasicMenuResult {
+pub fn item_shop_dialog_on_yes(this: &ItemShopBuyRoot, _: OptionalMethod) -> BasicMenuResult {
     if let Some(item) = this.item_data.as_ref() {
         let hash = item.parent.hash;
         for x in 0..10 {
@@ -211,7 +211,7 @@ pub fn item_shop_dialog_on_yes(this: &ItemShopBuyRoot, _optional_method: Optiona
     }
     BasicMenuResult::close_decide()
 }
-pub fn weapon_shop_on_yes(this: &WeaponShopBuyRoot, _optional_method: OptionalMethod) -> BasicMenuResult {
+pub fn weapon_shop_on_yes(this: &WeaponShopBuyRoot, _: OptionalMethod) -> BasicMenuResult {
     if let Some(item) = this.item_data.as_ref() {
         let hash = item.parent.hash;
         for x in 0..10 {

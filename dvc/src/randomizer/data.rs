@@ -5,7 +5,7 @@ use std::{
 };
 use engage::{
     mess::Mess, gamevariable::GameVariableManager, random::Random,
-    unit::{UnitPool, Unit},
+    unit::Unit,
     gamedata::{
         item::ItemData, person::*, GodData, JobData, PersonData,
         ring::RingData, skill::SkillData, GamedataArray, Gamedata,
@@ -238,9 +238,6 @@ impl GameData {
     pub fn get_playable_emblem_hashes() -> Vec<i32> {
         Self::get().emblem_pool.emblem_list.iter().enumerate().filter(|x| x.0 < 20 || x.0 >= 24).map(|x| *x.1).collect()
     }
-    pub fn get_playable_god_list() -> Vec<&'static GodData> {
-        GameData::get_playable_emblem_hashes().iter().flat_map(|x| GodData::try_get_hash(*x)).collect()
-    }
     pub fn reset_interaction(&self) {
         InteractData::get_list_mut().unwrap().iter_mut().zip(self.interactions.iter()).for_each(|(interaction, data)|{ interaction.flag.value = *data; });
     }
@@ -322,13 +319,13 @@ impl RandomizedGameData {
             ItemEvolveData::get_list_mut().unwrap().iter_mut()
                 .flat_map(|v| v.iter_mut())
                 .zip(self.evolve.iter().flat_map(|&h| ItemData::try_get_hash(h)))
-                .for_each(|(data, item)|{ data.iid = item.iid; });
+                .for_each(|(data, item)|{ data.set_iid(item.iid); });
         }
         else {
             ItemEvolveData::get_list_mut().unwrap().iter_mut()
                 .flat_map(|v| v.iter_mut())
                 .zip(data.item_pool.evolve_data.iter().flat_map(|&h| ItemData::try_get_hash(h)))
-                .for_each(|(data, item)|{ data.iid = item.iid; });
+                .for_each(|(data, item)|{ data.set_iid(item.iid); });
         }
     }
     pub fn update_engage_atk_items(&self, data: &GameData) {
@@ -352,6 +349,7 @@ impl RandomizedGameData {
         data.update_bond_ring();
         grow::random_grow();
         RandomizerStatus::set_init(true);
+        println!("Randomized Data committed");
     }
     pub fn update_enemy_emblem(&self, data: &GameData) {
         if !DVCFlags::Initialized.get_value() && DVCVariables::is_changed_recruitment_order(true) {

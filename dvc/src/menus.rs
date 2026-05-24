@@ -58,12 +58,6 @@ pub fn menu_calls_install() {
     }
     let enter_chapter = get_nested_il2cpp_class!("App", "GmapMenuSequence", "GmapMenu", "EnterChapterItem");
     vtable_edit(enter_chapter, "BuildAttribute", crate::procs::enter_chapter_build_attribute as _);
-
-    vtable_edit( 
-        get_nested_il2cpp_class!("App", "GmapMenuSequence", "GmapMenu", "RankingItem"), 
-        "ACall", 
-        crate::procs::enter_chapter_build_attribute as _
-    );
     randomizer::item::shop::random_shop_install();
     vtable_edit(
         Il2CppClass::from_name("", "ConfigMenu").unwrap(), 

@@ -53,7 +53,6 @@ pub fn mid_swaps_init() -> HashMap<String, (i32, i32)> {
     vec.insert("MID_Hub_Next_Go".to_string(), (8, 0));  // Continious Mode
     vec.insert("MID_Hub_Next_Go1".to_string(), (8, 1));  // Continious Mode
     vec.insert("MPID_Il_E006".to_string(), (10, 0));
-    GameData::get_playable_god_list().iter().enumerate().for_each(|(index, god)|{ vec.insert(god.mid.to_string(), (11, index as i32)); });
     vec
 }
 pub fn initialize_mess_hashs() {

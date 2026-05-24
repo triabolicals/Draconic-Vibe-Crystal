@@ -1,17 +1,17 @@
 use unity::{prelude::*, engine::Sprite};
 use engage::{
     bit::BitField64Methods,
-    unit::UnitPool,
     gameuserdata::GameUserData,
     spriteatlasmanager::SpriteAtlasManager,
     gamedata::{Gamedata, GodData, PersonData},
     gameicon::GameIcon,
-    unit::{Unit, UnitStatusField},
-    uniticon::UnitIcon
+    unit::{Unit, UnitStatusField, UnitPool, Gender},
+    uniticon::UnitIcon,
 };
-use engage::unit::Gender;
-use crate::{enums::PIDS, ironman::vtable_edit, config::DVCVariables, randomizer::names::get_emblem_person};
-use crate::randomizer::data::{EmblemPool, GameData};
+use crate::{
+    enums::PIDS, ironman::vtable_edit, config::DVCVariables,
+    randomizer::{names::get_emblem_person, data::{EmblemPool, GameData}}
+};
 mod ring_select;
 pub mod telop;
 
@@ -57,7 +57,8 @@ pub fn unit_icon_set_icon(this: &UnitIcon, unit: Option<&Unit>, _: OptionalMetho
             if u.status.test(UnitStatusField::Engaging as i32) && u.god_unit.is_some_and(|v| v.data.unit_icon_id.is_some()) {
                 let god_icon = u.god_unit.unwrap().data.unit_icon_id.unwrap();
                 let sprite = format!("{}E_{}_NoWeapon", u.person.unit_icon_id.unwrap(), 1);
-                if GameIcon::try_get_unit_icon_index(sprite).is_some() { return call_original!(this, unit, None); } else {
+                if GameIcon::try_get_unit_icon_index(sprite).is_some() { return call_original!(this, unit, None); }
+                else {
                     let index = format!("{}_{}_NoWeapon", god_icon, god_icon);
                     this.try_set(index.into(), god_icon);
                     return;

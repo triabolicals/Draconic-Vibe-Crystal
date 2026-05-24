@@ -5,12 +5,15 @@ use engage::{
     menu::menus::accessory::change::AccessoryShopChangeRoot,
     sequence::mainsequence::MainSequence,
 };
+use engage::gameicon::{GameIcon, GameIconStaticFields};
 use crate::{
     menus, message, DVCVariables, config::menu::DVCConfigText,
     procs::{call_proc_original_method, replace_desc_void_function},
 };
 use outfit_core::UnitAssetMenuData;
 use unity::{prelude::OptionalMethod, il2cpp::object::Array};
+use unity::prelude::Il2CppClassData;
+use unity::system::InsertionBehavior;
 use crate::message::TextSwapper;
 use crate::randomizer::status::RandomizerStatus;
 
@@ -51,6 +54,16 @@ extern "C" fn main_sequence_post_initialize(proc: &mut ProcInst, _: OptionalMeth
     call_proc_original_method(proc, "PostInitialize");
     TextSwapper::change_char_puppet("HubCommon_P0");
     TextSwapper::change_char_puppet("HubCommon_P3");
+    let unit_index = &GameIcon::class().get_static_fields_mut::<GameIconStaticFields>().unit_icon_index.cache_table;
+    for key in ["102Louis_630LanceArmor_Lance", "153Chloe_646LancePegasus_Lance", "203Umber_637LanceKnight_Lance", "250Jade_631AxArmor_Ax"]{
+        let palette = key.split_once('_').unwrap().0;
+        let default_key = format!("{palette}_{palette}_NoWeapon");
+        if let Some(sprite) = GameIcon::try_get_unit_icon_index(key) {
+            if unit_index.get_item(default_key.as_str().into()).is_none() {
+                unit_index.try_insert(default_key.as_str().into(), sprite, InsertionBehavior::Overwrite);
+            }
+        }
+    }
 }
 extern "C" fn main_sequence_game_reset(main_sequence: &mut ProcInst, _optional_method: OptionalMethod) {
     if RandomizerStatus::get().enabled { crate::randomizer::reset_gamedata(); }

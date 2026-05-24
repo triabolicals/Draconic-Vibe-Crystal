@@ -6,7 +6,6 @@ use crate::{get_nested_il2cpp_class, ironman::vtable_edit, utils::get_nested_cla
 use super::*;
 
 pub fn sortie_deployment_menu_install() {
-
     vtable_edit(
         get_nested_il2cpp_class!("App", "SortieUnitSelect", "UnitMenuItem"),
         "BuildAttribute",

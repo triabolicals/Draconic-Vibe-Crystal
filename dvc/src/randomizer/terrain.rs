@@ -3,7 +3,8 @@ use engage::{
     force::ForceType,
     gamedata::{dispos::DisposData, terrain::TerrainData},
     map::{overlap::MapOverlap, terrain::MapTerrain},
-    map::situation::MapSituation
+    map::situation::MapSituation,
+    force::Force
 };
 use crate::utils::for_each_unit;
 
@@ -63,23 +64,21 @@ pub fn randomized_emblem_power_spots() {
                 if MapOverlap::can_create(None, x, z, energy) { pos_list.push( (x, z)); }
             }
         }
-        let mut n_add = 0;
-
-        if let Some(terrain) = DisposData::try_get_mut("Terrain") {
-            terrain.iter_mut().filter(|data| data.pid.str_contains("紋章氣"))
-                .for_each(|data|{
-                    if rng.get_value(2) < 1 { n_add += 1; }
-                    if let Some(tile)  = pos_list.get_remove(rng){
-                        if MapOverlap::set_by_terrain(tile.0, tile.1, energy, -1, ForceType::Empty) {
-                            data.flag.value = 0;
-                            data.set_pid(None);
-                        }
-                    }
-                }
-            );
-        }
-        else { n_add = 5; }
         if terrain_mode & 1 != 0 {
+            let mut n_add = 0;
+            if let Some(terrain) = DisposData::try_get_mut("Terrain") {
+                terrain.iter_mut().filter(|data| data.pid.str_contains("紋章氣"))
+                    .for_each(|data|{
+                        if rng.get_value(2) < 1 { n_add += 1; }
+                        if let Some(tile)  = pos_list.get_remove(rng){
+                            if MapOverlap::set_by_terrain(tile.0, tile.1, energy, -1, ForceType::Empty) {
+                                data.flag.value = 0;
+                                data.set_pid(None);
+                            }
+                        }
+                    });
+            }
+            else { n_add = 5; }
             while n_add > 0 {
                 if let Some(tile) = pos_list.get_remove(rng){
                     if MapOverlap::set_by_terrain(tile.0, tile.1, energy, -1, ForceType::Empty)  {  n_add -= 1; }
@@ -87,13 +86,19 @@ pub fn randomized_emblem_power_spots() {
             }
         }
         if terrain_mode & 2 != 0 {
+            let unit_pos =
+                Force::get(ForceType::Player).unwrap().iter().chain(Force::get(ForceType::Enemy).unwrap().iter())
+                    .map(|f| (f.x as i32, f.z as i32)).collect::<Vec<_>>();
             let total = (pos_list.len() >> 3) as i32;
             let mut count = 0;
             while count < total && !pos_list.is_empty() {
                 let idx = rng.get_value(15) as usize;
                 if idx > 9 { count += 1; }
-                else if let Some(tile) = pos_list.get_remove(rng) {
-                    if let Some(terrain) = TerrainData::get(TERRAIN_PERSIST[idx]) {
+                else if let Some(terrain) = TerrainData::get(TERRAIN_PERSIST[idx]) {
+                    let pos =
+                        if terrain.prohibition != 0 { pos_list.get_remove_filter(rng, |(x, z)| !unit_pos.contains(&(*x, *z))) }
+                        else { pos_list.get_remove(rng) };
+                    if let Some(tile) = pos {
                         if MapOverlap::set_by_terrain(tile.0, tile.1, terrain, -1, ForceType::Empty) {
                             count += 1;
                         }

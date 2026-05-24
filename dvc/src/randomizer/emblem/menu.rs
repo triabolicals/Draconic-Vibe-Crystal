@@ -81,10 +81,11 @@ fn reset_skill_inherit_menu_item_cost(menu_item: &mut SkillInheritanceMenuItem, 
 
     if let Some(skill) = menu_item.skill.as_ref() {
         if random_sp {
-            let skill_cost = skill.pad4;
+            let random_skill_pool = &RandomizedGameData::get_read().engage_skills;
+            let skill_cost = random_skill_pool.get_random_inherit_cost(skill);
             let mut sk = skill.low_skill;
             while let Some(low_skill) = sk.as_ref() {
-                let lower_cost = low_skill.pad4;
+                let lower_cost = random_skill_pool.get_random_inherit_cost(low_skill);
                 if lower_cost > 0 {
                     if unit.equip_skill_pool.iter().any(|e| e.get_index() == low_skill.parent.index) {
                         menu_item.skill_cost = skill_cost - lower_cost;
@@ -98,14 +99,15 @@ fn reset_skill_inherit_menu_item_cost(menu_item: &mut SkillInheritanceMenuItem, 
         else if let Some(original_skill) = SkillData::try_index_get(menu_item.original_skill_index) {
             if let Some(skill) = menu_item.skill.as_mut() {
                 if skill.parent.index == original_skill.parent.index { return; }
-                let skill_cost = if skill.inheritance_cost == 0 { original_skill.inheritance_cost as i32 } else { skill.inheritance_cost as i32 };
+                let cost = skill.get_inheritance_cost();
+                let skill_cost = if cost == 0 { original_skill.get_inheritance_cost() } else { cost } as i32;
                 let mut sk = skill.low_skill;
                 let mut original_sk = original_skill.low_skill;
                 while let Some((low, original_low)) = sk.as_ref().zip(original_sk.as_ref()) {
-                    let lower_cost = if low.inheritance_cost == 0 { original_low.inheritance_cost } else { low.inheritance_cost } as i32;
+                    let cost = low.get_inheritance_cost();
+                    let lower_cost = if cost == 0 { original_low.get_inheritance_cost() } else { cost } as i32;
                     if lower_cost > 0 {
                         if unit.equip_skill_pool.iter().any(|e| e.get_index() == low.parent.index){
-
                             menu_item.skill_cost = skill_cost - lower_cost;
                             return;
                         }

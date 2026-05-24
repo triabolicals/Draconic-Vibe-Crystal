@@ -3,7 +3,10 @@ use engage::{
     gamedata::{Gamedata, GodData, skill::SkillData}
 };
 use skyline::patching::Patch;
-use crate::{config::{DVCFlags, DVCVariables}, randomizer::data::{EngageAtk, GameData}, randomizer::Randomizer};
+use crate::{
+    config::{DVCFlags, DVCVariables},
+    randomizer::{data::{EngageAtk, GameData}, Randomizer, status::RandomizerStatus}
+};
 
 #[derive(Clone)]
 pub struct EngageAttackRandomizer {
@@ -21,7 +24,6 @@ impl EngageAttackRandomizer {
         let mut available_emblem_list: Vec<usize> = (0..emblem_list.len()).collect();
         let mut linked_engage_atk: Vec<i32> = engage_atks.iter().map(|x| x.0 ).collect();
         let astra_storm: Vec<_> = engage_atks.iter().filter(|s| SkillData::try_get_hash(s.0).is_some_and(|s| s.sid.str_contains("_リン"))).map(|x| x.0).collect();
-
         let n_emblems = available_emblem_list.len();
         available_emblem_list.remove(19);   // No Emblem Alear for Engage+ Links
         for x in 0..n_emblems {
@@ -61,21 +63,15 @@ impl EngageAttackRandomizer {
         }
     }
     pub fn commit(&self, data: &GameData) {
-        let emblem_list = GameData::get_playable_god_list();
-        if DVCFlags::EngageAttacks.get_value() {
-            let names: Vec<_> = emblem_list.iter().map(|g| g.gid).collect();
+        let on = DVCFlags::EngageAttacks.get_value();
+        if on {
             Patch::in_text(0x01c77620).bytes(&[0xc0, 0x03, 0x5f, 0xd6]).unwrap();
-            emblem_list.iter().zip(self.atks.iter()).for_each(|(x, y)| {
+            GameData::get_playable_emblem_hashes().iter().flat_map(|v| GodData::try_get_hash(*v)).zip(self.atks.iter()).for_each(|(x, y)| {
                 if let Some(engage_atk) = SkillData::try_get_hash(y.engage_atk) {
                     x.set_engage_attack(Some(engage_atk.sid));
-                    x.change_data.iter().for_each(|g| g.set_engage_attack(Some(engage_atk.sid)));
-                    if let Some(opp_god) = GodData::get_mut(x.gid.to_string().replace("GID_", "GID_相手")) {
-                        opp_god.set_engage_attack(Some(engage_atk.sid));
-                        opp_god.change_data.iter().for_each(|g| { g.set_engage_attack(Some(engage_atk.sid)); });
-                    }
+                    x.get_change_data().iter().for_each(|x| { x.set_engage_attack(Some(engage_atk.sid)); })
                 }
-                if let Some(linked_atk) = SkillData::try_get_hash(y.linked_engage_atk) { x.change_data.iter().for_each(|g| g.set_engage_attack_link(linked_atk.sid)); }
-                if y.linked_emblem >= 0 && y.linked_emblem < emblem_list.len() as i32 { x.change_data.iter().for_each(|g| { g.set_link_gid(names[y.linked_emblem as usize]); }); }
+                if let Some(linked_atk) = SkillData::try_get_hash(y.linked_engage_atk) { x.get_change_data().iter().for_each(|x| { x.set_engage_attack(Some(linked_atk.sid)); }) }
             });
             data.emblem_pool.emblem_persons.iter().filter(|x| x.engage_atk != 0).map(|p| (p.emblem_index, p.get_person(), p.is_paralogue() && p.is_custom()))
                 .for_each(|(i, p, custom)| {
@@ -94,16 +90,12 @@ impl EngageAttackRandomizer {
             data.emblem_pool.emblem_persons.iter().for_each(|p|{ p.reset_engage_skill(data);});
             data.emblem_pool.emblem_data.iter().for_each(|x|{
                 if let Some(god) = GodData::try_get_hash_mut(x.hash) {
-                    if let Some(engage_atk) = SkillData::try_get_hash(x.engage_atk) {
-                        god.change_data.iter().for_each(|g| g.set_engage_attack(Some(engage_atk.sid)));
-                        if let Some(opp_god) = GodData::get_mut( god.gid.to_string().replace("GID_", "GID_相手")) {
-                            opp_god.change_data.iter().for_each(|g|{ g.set_engage_attack(Some(engage_atk.sid)); });
-                        }
-                    }
-                    if let Some(linked_atk) = SkillData::try_get_hash(x.link_engage_atk) {
-                        god.change_data.iter().for_each(|g| g.set_engage_attack_link(linked_atk.sid));
-                    }
-                    god.change_data.iter_mut().for_each(|g|{ g.link_gid = x.link_gid.as_ref().map(|str| str.into()); });
+                    let linked_atk = SkillData::try_get_hash(x.link_engage_atk).map(|x| x.sid);
+                    let engage_atk = SkillData::try_get_hash(x.engage_atk).map(|x| x.sid);
+                    god.get_change_data().iter().for_each(|g|{
+                        g.set_engage_attack(engage_atk);
+                        g.set_engage_attack_link(linked_atk);
+                    });
                 }
             });
         }

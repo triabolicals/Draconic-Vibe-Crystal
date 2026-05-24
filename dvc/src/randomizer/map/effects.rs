@@ -1,33 +1,80 @@
+use std::collections::HashMap;
 use engage::{unit::UnitUtil, map::{effect::MapEffect, history::MapHistory}};
 use super::*;
 use EffectType::*;
+use crate::script::chapter::*;
 use crate::utils::min;
+
+
+pub static SCRIPT_ACTIONS: OnceLock<HashMap<&'static str, MethodInfo>> = OnceLock::new();
+pub const SCRIPT_FUNCTION_NAME: [(&str, u8); 13] = [
+    ("ShuffleEmblems", 6), ("EngagedAll", 6), ("HP100", 2), ("GainSP", 4), ("EnemyLevel", 3), ("EnemyActive", 7),
+    ("BondUp", 6), ("Vision", 7), ("ReviveDead", 7), ("StatUp!", 5), ("Gold", 10), ("SpawnAbsent", 7), ("RemoveStones", 7)
+];
+pub(crate) fn init_script_functions() -> HashMap<&'static str, MethodInfo> {
+    let mut map = HashMap::new();
+    let donor_method = Il2CppClass::from_name("App", "ScriptSystem").unwrap().get_method_from_name("Log", 1).unwrap();
+    add_method_info_to_map(&mut map, "ShuffleEmblems",  shuffle_emblems as _, donor_method);
+    add_method_info_to_map(&mut map,"EngagedAll", all_engage as _, donor_method);
+
+    add_method_info_to_map(&mut map,"HP100", set_hp_to_max as _, donor_method);
+    add_method_info_to_map(&mut map,"GainSP", unit_get_sp as _, donor_method);
+
+    add_method_info_to_map(&mut map,"RevivalStone", revival_stone as _, donor_method);
+    add_method_info_to_map(&mut map,"EnemyLevel", enemy_level_up as _, donor_method);
+    add_method_info_to_map(&mut map,"EnemyActive", enemy_all_active as _, donor_method);
+
+    add_method_info_to_map(&mut map,"BondUp", bond_up as _, donor_method);
+    add_method_info_to_map(&mut map,"Vision", vision as _, donor_method);
+    add_method_info_to_map(&mut map,"ReviveDead", revive_units as _, donor_method);
+
+    add_method_info_to_map(&mut map,"RandomSkill", skill_gain as _, donor_method);
+    add_method_info_to_map(&mut map,"StatUp!", stat_up_change as _, donor_method);
+    add_method_info_to_map(&mut map,"Gold", gold_gain as _, donor_method);
+
+    add_method_info_to_map(&mut map,"SpawnAbsent", spawn_absent_unit as _, donor_method);
+    add_method_info_to_map(&mut map,"RemoveStones", remove_stones as _, donor_method);
+    add_method_info_to_map(&mut map,"味方キャラを再配置", m026_phase_2_positions as _, donor_method);
+    add_method_info_to_map(&mut map,"ユニット会話_ソロ時", ring_talk_1 as _, donor_method);
+    add_method_info_to_map(&mut map,"ユニット会話_シンクロ中", ring_talk_2 as _, donor_method);
+    add_method_info_to_map(&mut map, "Dialog", ring_dialog_up_dialog as _, donor_method);
+
+
+    let function = Il2CppClass::from_name("App", "ScriptSystem").unwrap().get_method_from_name("MessIsExist", 1).unwrap();
+    add_method_info_to_map(&mut map,"PlayerGender", crate::script::dvc_alear_is_female as _, function);
+    add_method_info_to_map(&mut map,"IsAlearFemale", crate::script::is_alear_female as _, function);
+    map
+}
+fn add_method_info_to_map(map: &mut HashMap<&'static str, MethodInfo>, name: &'static str, method: *mut u8, donor_method: &MethodInfo) {
+    let mut copy = donor_method.clone();
+    copy.method_ptr = method;
+    map.insert(name, copy);
+}
 
 pub fn install_tilebolical_effects(script: &EventScript) {
     GameVariableManager::make_entry("TileSkills", 0);
-    script.register_function("PlayerGender", crate::script::dvc_alear_is_female);
-    script.register_function("IsAlearFemale", crate::script::is_alear_female);
-    register_action(script, "ShuffleEmblems", shuffle_emblems, Emblem);
-    register_action(script, "EngagedAll", all_engage, Emblem);
-
-    register_action(script, "HP100", set_hp_to_max, HP);
-    register_action(script, "GainSP", unit_get_sp, SP);
-
-    register_action(script, "RevivalStone", revival_stone, Other);
-    register_action(script, "EnemyLevel", enemy_level_up, Level);
-    register_action(script, "EnemyActive", enemy_all_active, Other);
-
-    register_action(script, "BondUp", bond_up, Emblem);
-    register_action(script, "Vision", vision, Other);
-    register_action(script, "ReviveDead", revive_units, Other);
-
-    register_action(script, "RandomSkill", skill_gain, Skill);
-    register_action(script, "StatUp!", stat_up_change, Stat);
-    register_action(script, "Gold", gold_gain, GoldItem);
-
-    register_action(script, "SpawnAbsent", spawn_absent_unit, SpawnUnit);
-    register_action(script, "RemoveStones", remove_stones, Other);
-
+    let script_functions = SCRIPT_ACTIONS.get_or_init(||init_script_functions());
+    for i in ["IsAlearFemale", "PlayerGender"] {
+        if let Some(method_info) = script_functions.get(i).map(|m| EventScriptFunctionArgs::new_from_method_info(m)) {
+            script.register_function2(i, method_info);
+        }
+    }
+    let chapter = DVCVariables::get_chapter_index();
+    if chapter == 26 {
+        let action_name = "味方キャラを再配置";
+        if let Some(method_info) = script_functions.get(action_name).map(|m| EventScriptActionArgs::new_from_method_info(m)) {
+            script.register_action2(action_name, method_info);
+        }
+    }
+    if chapter == 22 {
+        for action_name in ["ユニット会話_ソロ時", "ユニット会話_シンクロ中", "Dialog"]{
+            if let Some(method_info) = script_functions.get(action_name).map(|m| EventScriptActionArgs::new_from_method_info(m)) {
+                script.register_action2(action_name, method_info);
+            }
+        }
+    }
+    SCRIPT_FUNCTION_NAME.iter().for_each(|(name, _)|{ register_action(script, name); });
+    
     if let Some(cc) = Il2CppClass::from_name("App", "MapUnitCommandMenu")
         .unwrap().get_nested_types().iter().find(|cc| cc.get_name() == "VisitMenuItem")
     {
@@ -37,7 +84,6 @@ pub fn install_tilebolical_effects(script: &EventScript) {
         }
     }
 }
-
 fn nothing_message() { GameMessage::create_key_wait(ScriptUtil::get_sequence(), Mess::get("MTID_Nothing").to_string()); }
 fn nothing_message_with_name(mid: &str) {
     let message = format!("{}: {}", Mess::get(mid), Mess::get("MTID_Nothing"));

@@ -1,4 +1,5 @@
 use cobapi::{Event, SystemEvent};
+use engage::proc::ProcInst;
 use skyline::patching::Patch;
 pub use outfit_core::*;
 pub use config::DVCConfig;
@@ -27,7 +28,6 @@ pub const VERSION: &str = "2.16.0o";
 pub const VARIABLE_VERSION: i32 = 9;
 extern "C" fn event_install(event: &Event<SystemEvent>) {
     if let Event::Args(ev) = event {
-        println!("DVC EVENT");
         match ev {
             SystemEvent::ProcInstJump {proc, label } => {
                 println!("Proc: {}, Label: {}", proc.name.unwrap(), *label);
@@ -37,7 +37,6 @@ extern "C" fn event_install(event: &Event<SystemEvent>) {
                     events::MAINMENU_SEQUENCE => { events::main_menu_sequence_events(proc, proc_label);}
                     events::MAIN_SEQUENCE => { events::main_sequence_events(proc, proc_label); }
                     events::MAP_SEQUENCE => { events::map_sequence_events(proc, proc_label); }
-                    events::SORTIE_SEQUENCE => { events::sortie_sequence_events(proc, proc_label); }
                     events::PROC_SCENE => { events::proc_scene_event(proc, proc_label); }
                     _ => {}
                 }
@@ -63,7 +62,6 @@ pub fn main() {
     DVCConfig::get().save();
     cobapi::register_system_event_handler(event_install);
     cobapi::install_lua_command_registerer(randomizer::map::register_script_commands);
-    cobapi::install_lua_command_registerer(script::chapter::install_script_edits);
     Patch::in_text(0x02517830).bytes(&[0xa0, 0x02, 0x80, 0x52]).unwrap();
     Patch::in_text(0x0251a9c0).bytes(&[0x01, 0x00, 0x84, 0x52]).unwrap();
     Patch::in_text(0x024cba50).bytes(&[0x01, 0x00, 0x85, 0x52]).unwrap();

@@ -6,15 +6,6 @@ use engage::{
 use unity::{prelude::*, il2cpp::object::Array};
 use crate::{randomizer::Randomizer, config::DVCFlags, DVCVariables, enums::{MPIDS, PIDS, RINGS}};
 
-pub extern "C" fn install_script_edits(script: &EventScript) {
-    let chapter = DVCVariables::get_chapter_index();
-    if chapter == 26 { script.register_action("味方キャラを再配置", m026_phase_2_positions); }
-    if chapter == 22 {
-        script.register_action("ユニット会話_ソロ時", ring_talk_1);
-        script.register_action("ユニット会話_シンクロ中", ring_talk_2);
-        script.register_action("Dialog", ring_dialog_up_dialog);
-    }
-}
 pub extern "C" fn m026_phase_2_positions(_args: &Il2CppArray<&DynValue>, _method_info: OptionalMethod) {
     let map_image = get_instance::<MapImage>();
     let args = Array::<&DynValue>::new_from_element_class(DynValue::class(), 3).unwrap();
@@ -71,7 +62,7 @@ pub extern "C" fn m026_phase_2_positions(_args: &Il2CppArray<&DynValue>, _method
     }
 }
 
-extern "C" fn ring_talk_2(args: &Il2CppArray<&DynValue>, _method_info: OptionalMethod) {
+pub(crate) extern "C" fn ring_talk_2(args: &Il2CppArray<&DynValue>, _method_info: OptionalMethod) {
     if let Some(pid) = args.try_get_string(0) {
         let args = Array::<&DynValue>::new_from_element_class(DynValue::class(), 1).unwrap();
         args[0] = DynValue::new_string(pid);
@@ -100,7 +91,7 @@ extern "C" fn ring_talk_2(args: &Il2CppArray<&DynValue>, _method_info: OptionalM
     }
     GameVariableManager::set_number("TalkPID", 0);
 }
-extern "C" fn ring_talk_1(args: &Il2CppArray<&DynValue>, _method_info: OptionalMethod) {
+pub(crate) extern "C" fn ring_talk_1(args: &Il2CppArray<&DynValue>, _method_info: OptionalMethod) {
     if let Some(pid) = args.try_get_string(0) {
         let args = Array::<&DynValue>::new_from_element_class(DynValue::class(), 1).unwrap();
         args[0] = DynValue::new_string(pid);
@@ -126,7 +117,7 @@ extern "C" fn ring_talk_1(args: &Il2CppArray<&DynValue>, _method_info: OptionalM
     }
     GameVariableManager::set_number("TalkPID", 0);
 }
-extern "C" fn ring_dialog_up_dialog(args: &Il2CppArray<&DynValue>, _method_info: OptionalMethod) {
+pub(crate) extern "C" fn ring_dialog_up_dialog(args: &Il2CppArray<&DynValue>, _method_info: OptionalMethod) {
     let v = DVCFlags::GodNames.get_value();
     if DVCVariables::is_changed_recruitment_order(true) || v {
         if let Some(mid) = args.try_get_string(0)

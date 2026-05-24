@@ -9,7 +9,9 @@ use engage::{
     unit::Unit,
 };
 use std::sync::Mutex;
+use engage::map::inspectors::{EachInspector, Inspector, VisitInspector};
 use engage::menu::BasicMenuItem;
+use crate::randomizer::map::effects::{SCRIPT_ACTIONS, SCRIPT_FUNCTION_NAME};
 use crate::randomizer::status::RandomizerStatus;
 use crate::utils::for_each_unit;
 use super::*;
@@ -52,7 +54,6 @@ impl EffectType {
         }
     }
 }
-static SCRIPT_COMMANDS: Mutex<Vec<(String, EffectType)>> = Mutex::new(Vec::new());
 pub const EXTRA_SIDS: &[&str] = &["SID_手加減", "SID_不死身", "SID_異形兵", "SID_慈悲", "SID_チェインアタック許可", ];
 pub const SKILL_SIDS: &[&str] = &[
     "SID_慈悲",   // Enemy Only   2
@@ -62,67 +63,62 @@ pub const SKILL_SIDS: &[&str] = &[
     "SID_切り返し", "SID_血讐", "SID_契約", "SID_囮指名", "SID_七色の叫び", "SID_絆盾_気功",
 ];
 pub extern "C" fn register_script_commands(script: &EventScript) { effects::install_tilebolical_effects(script);  }
-fn register_action(script: &EventScript, name: &str, action: extern "C" fn(&Il2CppArray<&DynValue>, OptionalMethod), ty: EffectType) {
-    EventScript::register_action(script, name, action);
-    let lock = &mut SCRIPT_COMMANDS.lock().unwrap();
-    if lock.iter().find(|&x| x.0 == name).is_none() { lock.push((name.to_string(), ty)); }
+fn register_action(script: &EventScript, name: &str) {
+    if let Some(method_info) = SCRIPT_ACTIONS.get_or_init(|| effects::init_script_functions()).get(name) {
+        script.register_action2(name, EventScriptActionArgs::new_from_method_info(method_info));
+    }
 }
 
 pub fn tilabolical() {
     if !DVCFlags::Tile.get_value() { return; }
     if let Some(mut ran) = RANDOMIZED_DATA.get().and_then(|v| v.write().ok()) { ran.person_appearance.randomize(true); }
     let status = RandomizerStatus::get();
-    if GameUserData::get_sequence() == 3 || GameUserData::get_sequence() == 2 || GameUserData::get_sequence() == 7 {
-        if !GameVariableManager::exist("TileSkills") { GameVariableManager::make_entry("TileSkills", 0); }
-        if let Some(terrain) = MapTerrain::get_instance() {
-            status.map_tile = true;
-            let start_x = terrain.x;
-            let end_x = terrain.width;
-            let start_z = terrain.z;
-            let end_z = terrain.height;
-            let pillars = TerrainData::get("TID_ブロック").unwrap();
-            let rng = DVCVariables::init_tile_rng(false);
-            let array = Array::<&DynValue>::new_from_element_class(DynValue::class(), 3).unwrap();
-            for x in 0..3 { array[x] = DynValue::new_number(0.0); }
-            if let Ok(script_commands) = SCRIPT_COMMANDS.try_lock() {
-                let n_commands = script_commands.len();
-                let mut selection: Vec<_> = (0..n_commands).collect();
-                let skill_len = SKILL_SIDS.len();
-                let mut skill_count = 0;
-                let mut count = 0;
-                for z in start_z..end_z {
-                    for x in start_x..end_x {
-                        if rng.get_value(100) < 5 && can_add_inspector(x, z) && MapOverlap::can_create(None, x, z, pillars) && count < 32 {
-                            let index = (z as usize * 32) + x as usize;
-                            array[1].assign_number(x as f64);
-                            array[2].assign_number(z as f64);
-                            let slen = 3*selection.len() + skill_len;
-                            let i = rng.get_value(slen as i32) as usize;
-                            if i < skill_len && skill_count < skill_len {
-                                if let Some(func) = EventScript::get_func("RandomSkill"){
-                                    status.tilabolical[index] = EffectType::Skill as u8;
-                                    array[0] = func;
-                                    ScriptMap::event_entry_visit(array);
-                                    skill_count += 1;
-                                }
-                            }
-                            else {
-                                if let Some(s_index) = selection.get_remove(rng) {
-                                    let name = &script_commands[s_index];
-                                    if let Some(func) = EventScript::get_func(name.0.as_str()) {
-                                        let ty = name.1.to_u8();
-                                        status.tilabolical[index] = ty;
-                                        array[0] = func;
-                                        ScriptMap::event_entry_visit(array);
-                                    }
-                                }
-                            }
-                            count += 1;
+    let rng = DVCVariables::init_tile_rng(false);
+    if !GameVariableManager::exist("TileSkills") { GameVariableManager::make_entry("TileSkills", 0); }
+    if let Some(terrain) = MapTerrain::get_instance() {
+        status.map_tile = true;
+        let start_x = terrain.x;
+        let end_x = terrain.width;
+        let start_z = terrain.z;
+        let end_z = terrain.height;
+        let pillars = TerrainData::get("TID_ブロック").unwrap();
+        let n_commands = SCRIPT_FUNCTION_NAME.len() as i32;
+        let mut selection: Vec<_> = (0..n_commands).collect();
+        let skill_len = SKILL_SIDS.len();
+        let mut skill_count = 0;
+        let mut count = 0;
+        for z in start_z..end_z {
+            for x in start_x..end_x {
+                if rng.get_value(100) < 5 && can_add_inspector(x, z) && MapOverlap::can_create(None, x, z, pillars) && count < 32 {
+                    let index = (z as usize * 32) + x as usize;
+                    let slen = 3*selection.len() + skill_len;
+                    let i = rng.get_value(slen as i32) as usize;
+                    if i < skill_len && skill_count < skill_len {
+                        if EventScript::get_func("RandomSkill").is_some() {
+                            status.tilabolical[index] = EffectType::Skill as u8;
+                            add_visit_inspector(x, z, "RandomSkill");
+                            skill_count += 1;
                         }
                     }
+                    else {
+                        let i = rng.get_value(n_commands);
+                        if let Some((name, ty)) = SCRIPT_FUNCTION_NAME.get(i as usize) {
+                            if EventScript::get_func(name).is_some() {
+                                status.tilabolical[index] = *ty;
+                                add_visit_inspector(x, z, name);
+                            }
+                        }
+                    }
+                    count += 1;
                 }
             }
         }
+    }
+}
+pub fn add_visit_inspector(x: i32, z: i32, name: &str) {
+    if let Some(func) = EventScript::get_func(name) {
+        let visit = MapInspectors::try_create::<VisitInspector>(x, z, 1, 1);
+        visit.set_function(func);
     }
 }
 

@@ -177,10 +177,12 @@ pub fn adjust_unit_items(unit: &mut Unit) {
     }
     else if DVCVariables::UnitInventory.get_value() & 2 != 0 && DVCVariables::chapter_number_complete(true) > 10 {
         let rng = Random::get_system();
-        let playable_gods = GameData::get_playable_god_list();
+        let playable_gods = GameData::get_playable_emblem_hashes();
         unit.item_list.unit_items.iter().flat_map(|x| x.as_ref().filter(|x| x.is_weapon() && x.item.parent.index > 2 && rng.get_value(10) < 2 ))
             .for_each(|item| {
-                if let Some(god) = playable_gods.get_random_element(rng) { item.set_engrave(god); }
+                if let Some(god) = playable_gods.get_random_element(rng).and_then(|v| GodData::try_get_hash(*v)){
+                    item.set_engrave(god);
+                }
             });
     }
 }

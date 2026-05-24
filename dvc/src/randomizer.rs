@@ -53,19 +53,18 @@ pub fn tutorial_check() {
         GameVariableManager::set_bool("G_CC_エンチャント", true);
         GameVariableManager::set_bool("G_CC_マージカノン", true);
     }
-    GameVariableManager::find_starts_with("G_進化_").iter().for_each(|key| GameVariableManager::set_bool(key.to_string(), true));
+    GameVariableManager::find_starts_with("G_進化_").iter().for_each(|key| GameVariableManager::set_bool2(key, true));
     let list = GameVariableManager::find_starts_with("G_解説_");
     if !GameVariableManager::get_bool("G_解説_TUTID_クラスチェンジ") {
         for i in 0..list.len() {
             let string = list[i].to_string();
-            GameVariableManager::set_bool(&string, true);
+            GameVariableManager::set_bool2(list[i], true);
             if string == "G_解説_TUTID_クラスチェンジ" { return; }
         }
     }
 }
 /// SaveLoad Event Randomizing for Cobalt 1.21+
 pub fn save_file_load() {
-    tutorial_check();
     correct_god_bond_holders();
     let seed_key = DVCVariables::Seed.get_key();
     GameVariableManager::make_entry_norewind(DVCFlags::FlagSet1, 0);
@@ -73,8 +72,7 @@ pub fn save_file_load() {
     if !GameVariableManager::exist(seed_key) { GameVariableManager::make_entry_norewind(seed_key, 0); }
     if !DVCVariables::random_enabled() {  return;  }
     upgrade();
-    println!("[SaveLoad Event] Randomized Save File Seed {}", DVCVariables::get_seed());
-    person::change_lueur_for_recruitment(false);
+    println!("[SaveLoad Event] Save File Seed/Sequence {} / {}", DVCVariables::get_seed(), GameUserData::get_sequence());
     skill::learn::update_learn_skills();
     DVCFlags::Initialized.set_value(false);
     randomize_gamedata(false);
@@ -82,8 +80,8 @@ pub fn save_file_load() {
 
 /// Main Randomizing Event and after starting NG (include SaveLoad Event if not using Cobalt 1.21)
 pub fn randomize_gamedata(is_new_game: bool) {
+
     let status = RandomizerStatus::get();
-    status.init = true;
     status.enabled = true;
     job::single::single_class_exists();
     emblem::randomize_emblems();
@@ -91,15 +89,16 @@ pub fn randomize_gamedata(is_new_game: bool) {
     person::randomize_person();
     person::change_lueur_for_recruitment(is_new_game);
     crate::continuous::continuous_mode_data_edit();
-    if !DVCFlags::Initialized.get_value() || is_new_game {
+    if !RandomizerStatus::get().init || is_new_game {
         let data = GameData::get();
         let mut random = RandomizedGameData::get_write();
-        random.randomize(data);
+       random.randomize(data);
         random.commit(data);
+        status.init = true;
     }
     if DVCVariables::LiberationKind.get_value() > 0 { item::change_liberation_type(); }
     if DVCVariables::MisercodeKind.get_value() > 0 { item::change_misercode_type(); }
-    for x in 0..33 {
+    for x in 0..30 {
         if let Some(key) = DVCVariables::from(x).map(|v| v.get_key()) { DVCVariables::log_variable(key); }
     }
 }
@@ -153,6 +152,7 @@ pub fn reload<T: Gamedata>() {
 pub fn reset_gamedata() {
     let status = RandomizerStatus::get();
     if !status.enabled { return; }
+    println!("GAME RESET");
     reload::<ItemData>();
     ItemData::get_list_mut().unwrap().iter().for_each(|x| x.on_completed());
     reload::<InteractData>();
@@ -238,7 +238,7 @@ pub fn initialize_game_data() {
     emblem::god_unit_patches();
     DVC_BLACK_LIST.get_or_init(|| RwLock::new(DVCBlackLists::init()));
     RANDOMIZER_DATA.get_or_init(|| GameData::init());
-    let emblems = GameData::get_playable_god_list().len();
+    let emblems = GameData::get_playable_emblem_hashes().len();
     let playables = GameData::get().playables.len();
     RANDOMIZED_DATA.get_or_init(|| RwLock::new(RandomizedGameData::new(emblems, playables)));
     bgm::initalize_bgm_pool();

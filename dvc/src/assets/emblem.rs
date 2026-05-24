@@ -12,7 +12,6 @@ use crate::{
     }
 };
 
-
 const LUEUR_DEMO_PIDS: [&str; 5] = ["M024_リュール", "PID_青リュール_女性", "PID_青リュール_男性", "PID_デモ用_神竜王リュール_女性", "PID_デモ用_神竜王リュール_男性"];
 fn emblem_asset_rand(result: &mut AssetTableResult, mode: i32, god: &GodData, is_dark: bool) {
     let emblem_appearance = DVCVariables::EmblemAppearance.get_value();

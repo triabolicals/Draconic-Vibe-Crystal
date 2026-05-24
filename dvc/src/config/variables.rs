@@ -297,7 +297,13 @@ impl DVCVariables {
     }
     pub fn init_tile_rng(init: bool) -> &'static Random {
         let current = DVCVariables::TileRNG.get_value();
-        let seed = if init || current == 0  { Random::get_system().value() } else { current } as u32;
+        let seed = 
+            if init || current == 0  { 
+                let v = Random::get_system().value() ;
+                DVCVariables::TileRNG.init_var(v, true);
+                v
+            }
+            else { current } as u32;
         Random::new(seed)
     }
     pub fn get_seed() -> i32 {  DVCVariables::Seed.get_value() }

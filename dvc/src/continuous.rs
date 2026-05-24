@@ -15,9 +15,10 @@ pub mod sortie;
 pub fn continuous_mode_data_edit() {
     let c_mode = DVCVariables::Continuous.get_value();
     if c_mode == 2 || c_mode == 1 {
-        HubFacilityData::get_list_mut().unwrap().iter_mut()
-            .for_each(|item| { item.condition_cid = "CID_M004".into(); });
-
+        if let Some(m004) = ChapterData::try_get_hash(1988049409) {
+            HubFacilityData::get_list_mut().unwrap()
+                .iter_mut().for_each(|item| { item.condition_cid = m004.cid; });
+        }
         ChapterData::get_list_mut().unwrap().iter_mut()
             .for_each(|chapter|{ chapter.flag &= !114; });
     }
