@@ -551,11 +551,11 @@ fn change_eye_material(m: &Material2, is_dark: bool) {
     }
     else {
         m.set_color("_BaseColor", Color::new(0.759,0.7627, 1.0, 1.0));
-        m.set_color( "_BlackColor",Color::new(0.60156,0.58718,0.85849, 1.00000));
-        m.set_color( "_DecalColor1",Color::new(0.22837,0.17818,0.41509, 1.00000));
-        m.set_color( "_DecalColor2",Color::new(0.94510,0.78039,0.85440, 1.00000));
-        m.set_color( "_DecalColor3",Color::new(0.21692,0.20804,0.51887, 1.00000));
-        m.set_color( "_DecalColor4",Color::new(0.79806,0.79806,0.92453, 1.00000));
+        m.set_color( "_BlackColor",Color::new(0.60156,0.58718,0.85849, 1.0));
+        m.set_color( "_DecalColor1",Color::new(0.22837,0.17818,0.41509, 1.0));
+        m.set_color( "_DecalColor2",Color::new(0.94510,0.78039,0.85440, 1.0));
+        m.set_color( "_DecalColor3",Color::new(0.21692,0.20804,0.51887, 1.0));
+        m.set_color( "_DecalColor4",Color::new(0.79806,0.79806,0.92453, 1.0));
     }
     m.set_float( "_LightColorToWhite",0.8);
     m.set_float( "_LightShadowToWhite",0.8);
