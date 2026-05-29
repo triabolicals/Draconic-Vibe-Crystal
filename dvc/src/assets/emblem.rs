@@ -394,15 +394,6 @@ fn adjust_for_enemy_veyle(result: &mut AssetTableResult, veyle_index: usize, fem
         if evil {
             result.head_model = if female { "uHead_c052" } else { "uHead_c002" }.into();
             lueur_fell_child_hair(result);
-            let db = get_outfit_data();
-            if let Some(data) = db.dress.get_personal_dress_by_name("MPID_PastLueur", female) {
-                for x in 0..8 {
-                    let color = data.color[x];
-                    result.unity_colors[x].r = (color & 255) as f32 / 255.0;
-                    result.unity_colors[x].g = ((color >> 8) & 255) as f32 / 255.0;
-                    result.unity_colors[x].b = ((color >> 16) & 255) as f32 / 255.0;
-                }
-            }
         }
         if dark {
             if female { result.dress_model = "uBody_Drg0AF_c052".into(); }
