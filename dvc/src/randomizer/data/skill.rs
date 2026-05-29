@@ -11,8 +11,7 @@ use num_traits::FromPrimitive;
 use crate::{
     config::{DVCFlags, DVCVariables},
     randomizer::{
-        skill::ORIGINAL_HASHS,
-        get_dvc_black_list_read, Randomizer,
+        skill::ORIGINAL_HASHS, Randomizer,
         blacklist::DVCBlackLists, person::unit,
     },
 };
@@ -127,7 +126,7 @@ impl SkillPool {
                     if !engage_attacks.contains(&value) { engage_attacks.push(value); }
                 }
             });
-        let blacklist = get_dvc_black_list_read();
+        let blacklist = DVCBlackLists::get_read();
         let mut non_upgrades = vec![];
         let mut pool = vec![];
         let mut help = String::new();

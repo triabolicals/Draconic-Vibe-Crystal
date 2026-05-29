@@ -1,5 +1,4 @@
 use cobapi::{Event, SystemEvent};
-use engage::proc::ProcInst;
 use skyline::patching::Patch;
 pub use outfit_core::*;
 pub use config::DVCConfig;
@@ -24,9 +23,10 @@ mod procs;
 pub use config::variables::*;
 
 pub static mut CONFIG: DVCConfig = DVCConfig::default();
-pub const VERSION: &str = "2.16.0o";
+pub const VERSION: &str = "2.16.0p";
 pub const VARIABLE_VERSION: i32 = 9;
 extern "C" fn event_install(event: &Event<SystemEvent>) {
+    println!("DVC EVENT");
     if let Event::Args(ev) = event {
         match ev {
             SystemEvent::ProcInstJump {proc, label } => {

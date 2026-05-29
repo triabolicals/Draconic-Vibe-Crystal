@@ -43,8 +43,6 @@ use crate::VARIABLE_VERSION;
 pub static RANDOMIZER_DATA: OnceLock<GameData> = OnceLock::new();
 pub static DVC_BLACK_LIST: OnceLock<RwLock<DVCBlackLists>> = OnceLock::new();
 pub static RANDOMIZED_DATA: OnceLock<RwLock<RandomizedGameData>> = OnceLock::new();
-
-pub fn get_dvc_black_list_read() ->  RwLockReadGuard<'static, DVCBlackLists> { DVCBlackLists::get_read() }
 pub static mut STATUS: RandomizerStatus = RandomizerStatus::new();
 
 /// Tutorial clear and provide DLC seal usages
@@ -61,6 +59,10 @@ pub fn tutorial_check() {
             GameVariableManager::set_bool2(list[i], true);
             if string == "G_解説_TUTID_クラスチェンジ" { return; }
         }
+    }
+    #[cfg(feature = "debug")] {
+        GameVariableManager::set_number("G_GmapSpot_M021M022", 3);
+        GameVariableManager::set_bool("G_Cleared_M021", false);
     }
 }
 /// SaveLoad Event Randomizing for Cobalt 1.21+
@@ -80,7 +82,6 @@ pub fn save_file_load() {
 
 /// Main Randomizing Event and after starting NG (include SaveLoad Event if not using Cobalt 1.21)
 pub fn randomize_gamedata(is_new_game: bool) {
-
     let status = RandomizerStatus::get();
     status.enabled = true;
     job::single::single_class_exists();

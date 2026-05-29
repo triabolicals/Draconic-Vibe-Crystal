@@ -32,6 +32,10 @@ pub fn map_sequence_events(proc: &ProcInst, label: i32) {
             randomizer::in_map_randomize();
             if DVCVariables::UnitRecruitment.get_value() != 0 { crate::script::replace_lueur_chapter22(); }
         }
+        MapSequenceLabel::ResumeSortie => {
+            randomizer::terrain::fow::resume_fow();
+            randomizer::in_map_randomize();
+        }
         MapSequenceLabel::TurnHuman => {
             randomizer::terrain::terrain_spots();   // Random TerrainTiles
             unsafe { autosave_proc_inst(proc, 5, 0, None, None); }
@@ -114,7 +118,6 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
 pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
     if label == 0 {
         let sequence = GameUserData::get_sequence();
-
         crate::ironman::ironman_code_edits();
         randomizer::terrain::adjust_miasma_tiles();
         if sequence  == 3 || sequence == 2 {
@@ -122,7 +125,6 @@ pub fn proc_scene_event(_proc: &ProcInst, label: i32) {
             crate::script::adjust_person_map_inspectors();
         }
         else {
-            crate::continuous::do_continious_mode();
             randomizer::item::shop::update_added_shop_items(false);
             tutorial_check();
             randomizer::emblem::correct_god_bond_holders();

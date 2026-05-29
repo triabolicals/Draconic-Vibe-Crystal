@@ -4,7 +4,7 @@ use engage::{
     gamedata::{cook::CookData, *},
     hub::*,
 };
-use crate::{enums::*, utils::*, randomizer::{data::GameData, names::get_emblem_person, *}};
+use crate::{enums::*, randomizer::*};
 use std::{sync::OnceLock, collections::HashMap, };
 
 mod swap;
@@ -82,7 +82,7 @@ pub fn mess_add_tag_to_string(tag_group: u16, tag_id: u16, params: Option<&Array
 
 #[unity::hook("App", "Mess", "GetImpl")]
 pub fn mess_get_impl_hook(label: Option<&'static Il2CppString>, is_replaced: bool, method_info: OptionalMethod) -> &'static Il2CppString {
-    let mut result = call_original!(label, is_replaced, method_info);
+    let result = call_original!(label, is_replaced, method_info);
     if !RandomizerStatus::get().init || !DVCVariables::random_enabled() { return result; }
     if let Some(mess_il2cp) = label {
         if mess_il2cp.str_contains("MIID_PieceOfBond") { return call_original!(Some("MID_TUT_KR_KIZUNAPIECE_TITLE".into()), is_replaced, method_info);}

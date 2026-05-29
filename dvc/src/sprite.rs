@@ -90,7 +90,6 @@ pub fn try_get_sprite(this: &SpriteAtlasManager, name: &Il2CppString, method_inf
             ascii_name = get_gender_lueur_ascii(is_god, DVCVariables::is_lueur_female());
         }
         else if name_original.contains("PhantomW") { ascii_name = "Phantom".to_string(); }
-        // Switch the thumbs of Guest Nel (El) and Nil (Il)
         if GameUserData::is_evil_map() && DVCVariables::UnitRecruitment.get_value()  != 0 {
             let person_index = if ascii_name.contains("El") { 36 }
             else if ascii_name.contains("Il") { 37 }
@@ -105,10 +104,7 @@ pub fn try_get_sprite(this: &SpriteAtlasManager, name: &Il2CppString, method_inf
         }
         return call_original!(this, ascii_name.into(), method_info).or_else(|| call_original!(this, "Phantom".into(), method_info));
     }
-    if path.contains("Unit/UnitPall") {
-
-    }
-    else if path.contains("Unit/UnitIndexes") {
+    if path.contains("Unit/UnitIndexes") {
         let sprite = call_original!(this, name, None);
         if sprite.is_some() { return sprite; }
         let parts = name.to_string().split("_").map(|str| str.to_string()).collect::<Vec<String>>();

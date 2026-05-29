@@ -13,6 +13,7 @@ use crate::{
     config::DVCFlags, enums::*, utils::*, autolevel::*, DVCVariables,
     randomizer::job::reclass::ReclassType
 };
+use crate::randomizer::person::unit::{fixed_unit_weapon_mask, post_unit_creation_adjustment};
 use super::{data::GameData, menu::CUSTOM_RECRUITMENT_ORDER, Randomizer};
 
 pub mod ai;
@@ -166,20 +167,17 @@ pub fn change_lueur_for_recruitment(is_start: bool) {
             if let Some(lueur_unit) = UnitPool::get_from_pid(PIDS[0].into(), false) {
                 unit::change_unit_autolevel(lueur_unit, true);
                 crate::randomizer::job::reclass::unit_reclass(lueur_unit, ReclassType::get_from_settings(true));
-                unit::fixed_unit_weapon_mask(lueur_unit);
+                fixed_unit_weapon_mask(lueur_unit);
                 unit::adjust_unit_items(lueur_unit);
                 lueur_unit.transfer(ForceType::Lost, false);
                 get_lueur_name_gender(); // grab gender and name
                 DVCVariables::LueurGender.init_var(lueur_unit.edit.gender, true);
             }
             if let Some(unit) = UnitUtil::join_unit_person(new_hero) {
-                unit.edit.set_name(new_hero.get_name());
-                unit.edit.set_gender(new_hero.get_gender());
-                PROTAG_SKILLS.iter().for_each(|x|{ unit.private_skill.add_sid(x, SkillDataCategorys::Private, 0); });
+                post_unit_creation_adjustment(unit);
                 unit.transfer(ForceType::Absent, false);
             }
         }
-
         Patch::in_text(0x02d524e0).nop().unwrap();
         Patch::in_text(0x02d524e4).nop().unwrap();
 

@@ -88,11 +88,13 @@ pub fn unit_reclass(unit: &mut Unit, kind: ReclassType) -> bool {
         }
         ReclassType::Recruitment(random) => {
             if let Some(old_person) = switch_person_reverse(person){
+                println!("Recruitment for {} [from {}] CC", unit.person.get_name(), old_person.get_name());
                 level = old_person.get_level() as i32;
                 il = old_person.get_internal_level() as i32;
+                let tier =  ClassTier::from_job(old_person.get_job().unwrap());
                 if old_person.get_job().is_some_and(|v| v.is_high()) && il == 0 { il = 20; }
                 if random {
-                    let high_job = tier == ClassTier::Promoted || (level > 20 && il == 0);
+                    let high_job = tier == ClassTier::Promoted || level > 20;
                     let pool: Vec<_> = JobData::get_list().unwrap().iter()
                         .filter(|j| unit_random_can_reclass(j, female, high_job, true, false))
                         .collect();
@@ -198,6 +200,7 @@ fn recruitment_job_level_adjustment(unit: &mut Unit, old_person: &PersonData, ta
     match (old_tier, new_tier) {
         (ClassTier::Base, ClassTier::Promoted)|(ClassTier::Promoted, ClassTier::Base) => {
             if let Some(job) = GameData::get().job_db.get_reclass_job(unit, target, old_tier) {
+                println!("New Job for {}: {}", unit.get_name(), job.get_name());
                 unit.class_change(job);
                 unit.set_hp(unit.get_capability(0, true));
             }

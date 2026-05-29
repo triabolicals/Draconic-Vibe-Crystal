@@ -7,12 +7,7 @@ use engage::{
 };
 use crate::{
     config::DVCFlags,
-    randomizer::{
-        data::GameData,
-        item::unit_items::adjust_missing_weapons,
-        job::randomize_selected_weapon_mask,
-        Randomizer,
-    }
+    randomizer::{data::GameData, item::unit_items::adjust_missing_weapons, job::randomize_selected_weapon_mask, Randomizer}
 };
 use outfit_core::clamp_value;
 use unity::prelude::OptionalMethod;

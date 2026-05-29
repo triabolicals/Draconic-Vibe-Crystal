@@ -1,8 +1,7 @@
 use unity::prelude::*;
 use engage::{
-    unit::Unit, force::*, gamedata::*,
-    gameuserdata::*, map::situation::MapSituation,
-    random::Random, util::get_instance
+    unit::Unit, force::*, gameuserdata::*,
+    map::situation::MapSituation, random::Random, util::get_instance
 };
 use crate::{config::DVCFlags, DVCVariables, randomizer, utils::*, randomizer::item::unit_items::adjust_missing_weapons, randomizer::person::unit::fixed_unit_weapon_mask};
 

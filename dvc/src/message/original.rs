@@ -1,4 +1,4 @@
-use engage::{gamedata::{Gamedata, GodData}, language::*, mess::{Mess, MessStaticFields}, };
+use engage::{gamedata::{Gamedata, GodData}, language::*, mess::{Mess, MessStaticFields}};
 use unity::prelude::*;
 use crate::{message::swap::copy_from_u16_ptr, enums::{EMBLEM_GIDS, MPIDS}};
 use crate::randomizer::data::GameData;
@@ -118,7 +118,7 @@ impl MessageList {
                 .flat_map(|gid| GodData::get(gid))
                 .map(|gd| MessDataString::from(Mess::get(gd.mid)))
                 .collect();
-        let mut rings: Vec<MessDataString> =
+        let rings: Vec<MessDataString> =
             GameData::get_playable_emblem_hashes().
                 iter()
                 .flat_map(|v| GodData::try_get_hash(*v))
