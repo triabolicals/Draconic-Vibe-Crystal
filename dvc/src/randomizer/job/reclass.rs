@@ -177,20 +177,27 @@ pub fn unit_reclass(unit: &mut Unit, kind: ReclassType) -> bool {
 fn update_weapon_apt(unit: &mut Unit, init: bool) {
     let mut mask = 0;
     if init {
+        let rng = Random::get_game();
         if DVCFlags::RandomStartingApt.get_value() {
-            let rng = Random::get_game();
             unit.original_aptitude.value = 0;
-            let mut mask = 1 << (rng.get_value(9)+ 1 );
-            if rng.get_value(3) == 0 {
-                mask |= 1 << (rng.get_value(9)+ 1 );
-            }
-            unit.original_aptitude.value = mask;
+            mask = 1 << (rng.get_value(9)+ 1 );
+            if rng.get_value(3) == 0 { mask |= 1 << (rng.get_value(9)+ 1 ); }
         }
+        else if unit.job.parent.hash != unit.person.get_job().map(|v| v.parent.hash).unwrap_or(0){
+            let mut kinds = vec![];
+            kinds.extend(unit.job.weapons.iter().enumerate().filter(|(_, v)| **v >= 1).map(|(i, _)| i));
+            if unit.job.has_high_jobs() {
+                unit.job.get_high_jobs().iter()
+                    .for_each(|j|{ kinds.extend(j.weapons.iter().enumerate().filter(|(_, v)| **v >= 1).map(|(i, _)| i)); });
+            }
+            if let Some(k) = kinds.get_random_element(rng) { mask = 1 << k; }
+        }
+        else { mask = unit.person.sub_aptitude.value; }
+        unit.original_aptitude.value = mask;
     }
-    for x in 1..9 {
-        if unit.job.weapons[x] == 1 { mask |= 1 << x; }
-    }
-    unit.aptitude.value = unit.selected_weapon_mask.value | unit.original_aptitude.value | mask;
+    else { mask = unit.original_aptitude.value; }
+    for x in 1..9 { if unit.job.weapons[x] == 1 { mask |= 1 << x; } }
+    unit.aptitude.value = unit.selected_weapon_mask.value | mask;
 }
 fn recruitment_job_level_adjustment(unit: &mut Unit, old_person: &PersonData, target: &JobData, random: bool) {
     let old_level = old_person.get_level() as i32;
