@@ -5,9 +5,8 @@ use engage::{
 };
 use crate::{
     DVCVariables, VERSION, randomizer::data::GameData,
-    menus::ingame::draconic_vibe_name, enums::{MPIDS, RINGS}
+    menus::ingame::draconic_vibe_name, enums::MPIDS
 };
-use crate::randomizer::data::EmblemPool;
 
 pub static CONFIG_TEXT: OnceLock<DVCConfigText> = OnceLock::new();
 pub static NONE: &'static str = "---";

@@ -19,10 +19,10 @@ use crate::{
 use crate::assets::dress::M002_LUMERA;
 use crate::randomizer::item::{MISERCODE, OBSCURITE};
 use super::{*, ai};
-
+const LUEUR: i32 = 276380359;
 const VANDRE: i32 = 152765422;
 const CLANNE: i32 = 1875144918;
-const FRAMME: i32 = 654010808;
+const FRAMME: i32 = 1654010808;
 const YUNAKA: i32 = 1172357650;
 const SEADALL: i32 = -266109647;
 const VEYLE: i32 = 356559395;
@@ -60,10 +60,12 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     let sequence = GameUserData::get_sequence();
     if !DVCVariables::is_main_chapter_complete(2) && changed_recruit_order {
         let old_person = switch_person_reverse(this.person).unwrap_or(this.get_person());
-        if old_person.parent.index < 5 && old_person.parent.index > 0 {
+        if old_person.parent.index < 5 && old_person.parent.index > 0 { // Lueur 1, 2, 3, 4
             change_unit_autolevel(this, true);
             this.item_list.put_off_all_item();
             if random_class { job::reclass::unit_reclass(this, reclass_mode);  }
+            if adjust_items {  adjust_unit_items(this);  }
+            if random_inventory { unit_items::adjust_missing_weapons(this); }
             post_unit_creation_adjustment(this);
             return;
         }
@@ -241,7 +243,7 @@ pub fn change_unit_autolevel(unit: &mut Unit, reverse: bool) {
     fixed_unit_weapon_mask(unit);   // fixed weapon mask due to class changes  // Random map order level adjustment
 }
 
-fn calculate_new_offset(original: &PersonData, new: &PersonData) -> [i8; 11] {
+pub(crate) fn calculate_new_offset(original: &PersonData, new: &PersonData) -> [i8; 11] {
     let original_job = original.get_job().unwrap();
     let new_job = new.get_job().unwrap();
     let mut out: [i8; 11] = [0; 11];
@@ -302,7 +304,7 @@ pub fn has_sid(this: &Unit, sid: &str) -> bool {
 }
 
 pub fn reload_all_actors() {
-    for_each_unit(15, |unit|{
+    for_each_unit(7, |unit|{
         unit.reload_actor();
         unit.auto_equip();
     });
@@ -460,6 +462,20 @@ pub fn post_unit_creation_adjustment(unit: &mut Unit) {
     else if let Some(old_person) = switch_person_reverse(unit.person) {
         let person_hash = old_person.parent.hash;
         match person_hash{
+            LUEUR => {
+                unit.item_list.put_off_all_item();
+                job::reclass::unit_reclass(unit, ReclassType::get_from_settings(true));
+                let bases = calculate_new_offset(old_person, unit.get_person());
+                for x in 0..11 {  unit.set_base_capability(x as i32, bases[x] as i32);  }
+                unit.set_sp( old_person.get_sp() );
+                fixed_unit_weapon_mask(unit);
+                unit.edit.set_name(unit.person.get_name());
+                unit.edit.set_gender(unit.person.get_gender());
+                PROTAG_SKILLS.iter().for_each(|x|{ unit.private_skill.add_sid(x, SkillDataCategorys::Private, 0); });
+                adjust_unit_items(unit);
+                if DVCVariables::UnitInventory.get_value() & 1 != 0 { unit_items::adjust_missing_weapons(unit); }
+                unit.item_list.add_iid_no_duplicate("IID_傷薬");
+            }
             CLANNE|FRAMME => {
                 if DVCVariables::get_chapter_index() == 1 {
                     unit.item_list.put_off_all_item();
@@ -468,12 +484,8 @@ pub fn post_unit_creation_adjustment(unit: &mut Unit) {
                 else { adjust_unit_items(unit); }
             }
             YUNAKA => { unit.item_list.add_iid_no_duplicate("IID_リライブ"); }
-            NEL => {
-
-            }
-            RAFALE => {
-
-            }
+            NEL => {}
+            RAFALE => {}
             SEADALL => {
                 if DVCVariables::is_random_map() {
                     unit.extra_hp_stock_count = 1;
@@ -526,7 +538,5 @@ pub fn post_unit_creation_adjustment(unit: &mut Unit) {
     auto_level_unit_for_random_map(unit, false);
     unit.set_hp(unit.get_capability(0, true));
     let sequence = GameUserData::get_sequence();
-    if sequence == 2 || sequence == 3 {
-        ai::adjust_unitai(unit);
-    }
+    if sequence == 2 || sequence == 3 { ai::adjust_unitai(unit); }
 }
