@@ -277,6 +277,22 @@ pub fn commit_for_unit_dress(
     }
     if mode == 2 {
         if DVCVariables::BodyScaling.get_value() != 0 {  random_body_scale(result, Some(unit.grow_seed), false); }
+        let hash = condition_unit.person.parent.hash;
+        if hash == 1097589289 {
+            if result.head_model.str_contains("551") { result.head_model = "uHead_c556".into(); }
+            else {
+                let head = result.head_model.to_string() + "b";
+                if get_outfit_data().try_get_asset_hash(head.as_str()).is_some() { result.head_model = head.into(); }
+            }
+        }
+        if hash == 1187540167 || hash == -728744546 {
+            result.commit_accessory(new_asset_table_accessory("uAcc_head_Dress556", "c_head_loc"));
+            result.replace(mode);
+        }
+        else if hash == -2009102214 {
+            result.commit_accessory(new_asset_table_accessory("uAcc_head_Dress556b", "c_head_loc"));
+            result.replace(mode);
+        }
         if condition_unit.person.get_job().map(|j| j.parent.hash).unwrap_or(condition_unit.job.parent.hash) == LUEUR_CLASS[2] { lueur_fell_child_hair(result); }
     }
     if DVCVariables::BodyScaling.get_value() != 0 && mode == 2 { random_body_scale(result, Some(unit.grow_seed), false); }
