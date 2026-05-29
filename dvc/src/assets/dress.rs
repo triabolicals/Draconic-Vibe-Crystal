@@ -491,15 +491,20 @@ pub fn modify_colors(this: &mut CharacterAppearance, go: &GameObject, _: Optiona
                 let r = rgb[0] as f32 / 255.0;
                 let g = rgb[1] as f32 / 255.0;
                 let b = rgb[2] as f32 / 255.0;
-                if let Some(m) = get_mt_eye(go) { m.set_color(EYE_COLORS[x], Color::new(r, g, b, 1.0)); }
+                if let Some(m) = get_material_from_object(go, "MtEye") { m.set_color(EYE_COLORS[x], Color::new(r, g, b, 1.0)); }
             }
         }
     }
 }
-fn get_mt_eye(go: &GameObject) -> Option<&'static &'static Material2> {
-    go.get_component_in_children::<SkinnedMeshRenderer>(true).iter()
-        .flat_map(|smr| Ut::get_instance_materials2(smr).iter())
-        .find(|v| v.get_name().to_string().starts_with("MtEye"))
+fn get_material_from_object(go: &GameObject, name: &str) -> Option<&'static &'static Material2> {
+    go.get_component_in_children::<Renderer>(true).iter()
+        .flat_map(|smr| Ut::get_instance_materials(smr).iter())
+        .find(|v| v.get_name().to_string().starts_with(name))
+        .or_else(||
+            go.get_component_in_children::<SkinnedMeshRenderer>(true).iter()
+                .flat_map(|smr| Ut::get_instance_materials2(smr).iter())
+                .find(|v| v.get_name().to_string().starts_with(name))
+        )
 }
 const EVIL_PERSONS: [i32; 6] = [-392216545, 1208025613, -728744546, 1187540167, 1097589289, -1514923380];
 const EYE_COLORS: [&str; 6] = ["_BaseColor", "_BlackColor", "_DecalColor1", "_DecalColor2", "_DecalColor3", "_DecalColor4"];

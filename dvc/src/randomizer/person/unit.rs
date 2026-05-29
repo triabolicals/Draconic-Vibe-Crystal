@@ -294,14 +294,6 @@ pub fn has_skill(this: &Unit, skill: &SkillData) -> bool {
         this.private_skill.find_sid(skill.sid).is_some()|
         this.equip_skill.find_sid(skill.sid).is_some()
 }
-pub fn has_sid(this: &Unit, sid: &str) -> bool {
-    if let Some(learn) = this.learned_job_skill {
-        if sid == learn.sid.to_string() { return true; }
-    }
-   this.mask_skill.unwrap().find_sid(sid).is_some() |
-       this.private_skill.find_sid(sid).is_some() |
-       this.equip_skill.find_sid(sid).is_some()
-}
 
 pub fn reload_all_actors() {
     for_each_unit(7, |unit|{
@@ -497,22 +489,22 @@ pub fn post_unit_creation_adjustment(unit: &mut Unit) {
     }
     else if unit.person.parent.hash == M002_LUMERA && DVCVariables::EnemyJobGauge.get_value() >= 10 {
         let mut stats: [i32; 11] = [0; 11];
-        for x in 0..11 { stats[x] = unit.job.base[x] as i32; }
-        if let Some(unit) = UnitPool::get_hero(false){
+        for x in 0..11 { stats[x] = unit.get_capability(x as i32, true); }
+        if let Some(hero_unit) = UnitPool::get_hero(false){
             let kind = change_liberation_type();
-            if unit.job.has_high_jobs() {
-                if let Some(new_job) = unit.job.get_high_jobs().iter().find(|job| job.weapons[kind as usize] >= 1) {
-                    unit.set_job(&new_job);
-                    randomize_selected_weapon_mask(unit, Some(kind));
-                }
-                else {
-                    unit.set_job(&unit.job);
-                    unit.selected_weapon_mask.value = unit.selected_weapon_mask.value;
-                }
+            if hero_unit.job.has_high_jobs() {
+                let high_jobs = hero_unit.job.get_high_jobs();
+                if let Some(new_job) = high_jobs.iter().find(|job| job.weapons[kind as usize] >= 1)
+                    .or_else(|| high_jobs.iter().next() ) { unit.set_job(&new_job); }
+                randomize_selected_weapon_mask(unit, Some(kind));
             }
             else {
-                unit.set_job(&unit.job);
-                unit.selected_weapon_mask.value = unit.selected_weapon_mask.value;
+                if hero_unit.job.is_low() {
+                    unit.set_level(unit.get_level() + unit.get_internal_level());
+                    unit.set_internal_level(0);
+                }
+                unit.set_job(&hero_unit.job);
+                unit.selected_weapon_mask.value = hero_unit.selected_weapon_mask.value;
             }
             if is_magic_class(unit.job) {
                 let base = unit.base_capability[1];
@@ -532,9 +524,7 @@ pub fn post_unit_creation_adjustment(unit: &mut Unit) {
     unit_items::remove_duplicates(unit.item_list);
     set_unit_edit_name(unit);
     unit.auto_equip();
-    if unit.person.asset_force == 0 && unit.person.parent.hash != ILLUSORY_DOUBLE {
-        grow::adaptive_growths(unit, true);
-    }
+    if unit.person.asset_force == 0 && unit.person.parent.hash != ILLUSORY_DOUBLE { grow::adaptive_growths(unit, true); }
     auto_level_unit_for_random_map(unit, false);
     unit.set_hp(unit.get_capability(0, true));
     let sequence = GameUserData::get_sequence();
