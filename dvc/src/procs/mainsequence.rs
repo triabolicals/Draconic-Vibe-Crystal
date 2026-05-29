@@ -1,28 +1,28 @@
 use engage::{
     gamedata::{ChapterData, Gamedata},
-    gameuserdata::GameUserData, gamevariable::GameVariableManager,
+    gameuserdata::GameUserData,
+    gamevariable::GameVariableManager,
     proc::{desc::ProcDesc, Bindable, ProcInst, ProcVoidMethod},
     menu::menus::accessory::change::AccessoryShopChangeRoot,
     sequence::mainsequence::MainSequence,
+    gameicon::{GameIcon, GameIconStaticFields}
 };
-use engage::gameicon::{GameIcon, GameIconStaticFields};
-use crate::{
-    menus, message, DVCVariables, config::menu::DVCConfigText,
+use crate::{menus, message, DVCVariables, config::menu::DVCConfigText,
     procs::{call_proc_original_method, replace_desc_void_function},
+    message::TextSwapper, randomizer::status::RandomizerStatus
 };
 use outfit_core::UnitAssetMenuData;
-use unity::{prelude::OptionalMethod, il2cpp::object::Array};
-use unity::prelude::Il2CppClassData;
-use unity::system::InsertionBehavior;
-use crate::message::TextSwapper;
-use crate::randomizer::status::RandomizerStatus;
+use unity::{
+    prelude::{OptionalMethod, Il2CppClassData},
+    il2cpp::object::Array,
+};
 
 pub fn main_sequence_desc_edit(descs: &mut Array<&mut ProcDesc>) {
     descs[18] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_initialize));
 
     replace_desc_void_function(descs, "LoadResource", main_sequence_load_resource as _);
     descs[32] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_post_initialize));
-    // descs[30] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_load_resource));
+    descs[30] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_load_resource));
     descs[43] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_game_reset));
     descs[101] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_try_jump_to_next_chapter));
     descs[116] = ProcDesc::call(ProcVoidMethod::new(None, main_sequence_jump_to_continue_map));
@@ -59,8 +59,8 @@ extern "C" fn main_sequence_post_initialize(proc: &mut ProcInst, _: OptionalMeth
         let palette = key.split_once('_').unwrap().0;
         let default_key = format!("{palette}_{palette}_NoWeapon");
         if let Some(sprite) = GameIcon::try_get_unit_icon_index(key) {
-            if unit_index.get_item(default_key.as_str().into()).is_none() {
-                unit_index.try_insert(default_key.as_str().into(), sprite, InsertionBehavior::Overwrite);
+            if GameIcon::try_get_unit_icon_index(default_key.as_str()).is_none() {
+                unit_index.add(default_key.as_str().into(), sprite);
             }
         }
     }
