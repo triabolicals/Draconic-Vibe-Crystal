@@ -1,10 +1,6 @@
 use std::collections::HashSet;
 use bitflags::Flags;
-use engage::{
-    unit::Gender::{Female, Male},
-    unityengine::{GameObject, Material2, Renderer, UnityObject, UnityRenderer},
-    ut::Ut
-};
+use engage::{unit::Gender::{Female, Male}, unityengine::*, ut::Ut};
 use outfit_core::{
     get_outfit_data, AssetConditions, AssetFlags, PersonalDressData, UnitAssetMenuData,
 };
@@ -459,6 +455,68 @@ pub fn modify_colors(this: &mut CharacterAppearance, go: &GameObject, _: Optiona
             if name.starts_with("MtDress") { change_dress_material(m, dark); }
         });
     }
+    if EVIL_PERSONS.contains(&this.person_hash) {
+        let red_hair = this.person_hash == 1097589289;
+        go.get_component_in_children::<SkinnedMeshRenderer>(true).iter().for_each(|r| {
+            Ut::get_instance_materials2(r).iter().for_each(|m| { evil_color(m, red_hair); });
+        });
+        go.get_component_in_children::<Renderer>(true).iter().for_each(|r| {
+            Ut::get_instance_materials(r).iter().for_each(|m| { evil_color(m, red_hair); });
+        });
+        this.instanced_materials.iter().for_each(|m| { evil_color(m, red_hair); });
+    }
+    else {
+        let data = UnitAssetMenuData::get();
+        let mut rgb: Option<[u8; 3]> = None;
+        for x in 0..6 {
+            rgb = None;
+            let j = 8 + x;
+            let i = 4*j;
+            if data.is_preview {
+                if data.preview.color_preview[i+3] == 1 {
+                    rgb = Some([data.preview.color_preview[i], data.preview.color_preview[i+1], data.preview.color_preview[i+2]]);
+                }
+                else if data.preview.preview_data.colors[j].values[3] != 0 {
+                    rgb = Some([data.preview.preview_data.colors[j].values[0], data.preview.preview_data.colors[j].values[1], data.preview.preview_data.colors[j].values[2]]);
+                }
+            }
+            else if let Some(data) = UnitAssetMenuData::get_by_person_data(this.person_hash, false) {
+                if let Some(profile) = data.profile.get(data.profile_index(false) as usize) {
+                    if profile.colors[j].values[3] != 0 {
+                        rgb = Some([profile.colors[j].values[0], profile.colors[j].values[1], profile.colors[j].values[2]]);
+                    }
+                }
+            }
+            if let Some(rgb) = rgb {
+                let r = rgb[0] as f32 / 255.0;
+                let g = rgb[1] as f32 / 255.0;
+                let b = rgb[2] as f32 / 255.0;
+                if let Some(m) = get_mt_eye(go) { m.set_color(EYE_COLORS[x], Color::new(r, g, b, 1.0)); }
+            }
+        }
+    }
+}
+fn get_mt_eye(go: &GameObject) -> Option<&'static &'static Material2> {
+    go.get_component_in_children::<SkinnedMeshRenderer>(true).iter()
+        .flat_map(|smr| Ut::get_instance_materials2(smr).iter())
+        .find(|v| v.get_name().to_string().starts_with("MtEye"))
+}
+const EVIL_PERSONS: [i32; 6] = [-392216545, 1208025613, -728744546, 1187540167, 1097589289, -1514923380];
+const EYE_COLORS: [&str; 6] = ["_BaseColor", "_BlackColor", "_DecalColor1", "_DecalColor2", "_DecalColor3", "_DecalColor4"];
+fn evil_color(m: &Material2, hair: bool) {
+    let name = m.get_name().to_string();
+    if hair && name.starts_with("MtHair") {
+        m.set_color( "_BaseColor",Color::new(0.6698,0.123,0.1492, 1.0));
+        m.set_color( "_GradationColor",Color::new(0.4245,0.05807,0.05807, 1.0));
+    }
+    if name.contains("MtEye") {
+        m.set_color("_BaseColor", Color::new(0.905, 0.0, 0.0, 1.0));
+        m.set_color("_BlackColor", Color::new(1.0, 1.0, 1.0, 1.0));
+        m.set_color("_DecalColor1", Color::new(0.028, 0.00734, 0.00734, 1.0));
+        m.set_color("_DecalColor2", Color::new(0.972549, 0.4823, 0.4823, 1.0));
+        m.set_color("_DecalColor3", Color::new(0.1698, 0.012, 0.012, 1.0));
+        m.set_color("_DecalColor4", Color::new(0.905, 0.158, 0.158, 1.0));
+    }
 }
 fn change_hair_material(m: &Material2, is_dark: bool) {
     if is_dark {
@@ -525,18 +583,18 @@ fn change_skin_material(m: &Material2, is_dark: bool) {
 }
 fn change_dress_material(m: &Material2, is_dark: bool) {
     if is_dark {
-        m.set_color( "_EmissionColor",Color::new(0.14151,0.01669,0.01669, 1.00000));
-        m.set_color( "_EngageEmissionColor",Color::new(0.31400,0.31400,0.47000, 1.00000));
-        m.set_color( "_OutlineColor",Color::new(1.00000,0.09804,0.09804, 1.00000));
-        m.set_color( "_RimLightColorLight",Color::new(0.71698,0.09131,0.09131, 1.00000));
-        m.set_color( "_RimLightColorShadow",Color::new(0.71765,0.09412,0.09412, 1.00000));
+        m.set_color( "_EmissionColor",Color::new(0.14151,0.01669,0.01669, 1.0));
+        m.set_color( "_EngageEmissionColor",Color::new(0.31400,0.31400,0.47000, 1.0));
+        m.set_color( "_OutlineColor",Color::new(1.00000,0.09804,0.09804, 1.0));
+        m.set_color( "_RimLightColorLight",Color::new(0.71698,0.09131,0.09131, 1.0));
+        m.set_color( "_RimLightColorShadow",Color::new(0.71765,0.09412,0.09412, 1.0));
     }
     else {
-        m.set_color( "_EmissionColor",Color::new(0.17255,0.16863,0.30980, 1.00000));
-        m.set_color( "_EngageEmissionColor",Color::new(0.31400,0.31400,0.47000, 1.00000));
-        m.set_color( "_OutlineColor",Color::new(0.65098,0.71373,0.92549, 1.00000));
-        m.set_color( "_RimLightColorLight",Color::new(0.21226,0.87956,1.00000, 1.00000));
-        m.set_color( "_RimLightColorShadow",Color::new(0.10279,0.57460,0.66038, 1.00000));
+        m.set_color( "_EmissionColor",Color::new(0.17255,0.16863,0.30980, 1.0));
+        m.set_color( "_EngageEmissionColor",Color::new(0.31400,0.31400,0.47000, 1.0));
+        m.set_color( "_OutlineColor",Color::new(0.65098,0.71373,0.92549, 1.0));
+        m.set_color( "_RimLightColorLight",Color::new(0.21226,0.87956,1.0, 1.0));
+        m.set_color( "_RimLightColorShadow",Color::new(0.10279,0.57460,0.66038, 1.0));
     }
     m.set_float( "_S_Key_RimLight",1.00);
     m.set_float( "_S_Key_BumpAttenuation",1.00);
