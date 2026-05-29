@@ -64,15 +64,7 @@ impl DVCConfigMenuItem {
                 item.gauge_ratio = v as f32 / 100.0;
                 item.dvc_value = v;
             }
-            DVCMenuItemKind::Flag(flag) => {
-                let v = flag.get_value() as i32;
-                /*
-                if !flag.need_confirm_to_change() && v != 0 {
-                    item.is_command = true;
-                }
-                */
-                item.dvc_value = v;
-            }
+            DVCMenuItemKind::Flag(flag) => { item.dvc_value =  flag.get_value() as i32; }
             DVCMenuItemKind::Command(_) => { item.is_command = true; }
             DVCMenuItemKind::SingleJob => {
                 let current = DVCVariables::SingleJob.get_value();

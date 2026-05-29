@@ -238,8 +238,7 @@ pub fn item_refine_data_try_get(item: Option<&'static ItemData>, method_info: Op
                 let new_item = RandomizedGameData::get_read().refine
                     .get(item.parent.index as usize)
                     .and_then(|v| ItemData::try_get_hash(*v));
-
-                return call_original!(new_item, method_info);
+                if new_item.is_some() { return call_original!(new_item, method_info); }
             }
         }
     }

@@ -279,6 +279,7 @@ impl RandomizedGameData {
     pub fn randomize(&mut self, data: &GameData) {
         let mut refine_set = data.item_pool.refine_iid.clone();
         refine_set.extend(data.item_pool.refine_iid.iter());
+        refine_set.extend(data.item_pool.refine_iid.iter());
         self.refine.iter_mut().for_each(|v|{ *v = 0; });
 
         let rng = get_rng();

@@ -174,7 +174,7 @@ impl DVCVariables {
                 _ => {
                     let idx = *self as i32;
                     if idx < 100 { value = clamp_value(value, 0, self.get_max()); }
-                    Self::set_by_variable(self.get_key(), value);
+                    self.init_var(value, true);
                 }
             }
         }

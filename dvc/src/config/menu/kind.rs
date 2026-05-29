@@ -196,6 +196,7 @@ pub fn change_variable(menu_item: &mut DVCConfigMenuItem, _optional_method: Opti
     match menu_item.menu_item_kind {
         DVCMenuItemKind::Variable(variables) => {
             variables.set_value(menu_item.dvc_value);
+            println!("Setting {} to {} [V: {}]", variables.get_key(), menu_item.dvc_value, variables.get_value());
             menu_item.is_command = false;
         }
         DVCMenuItemKind::Flag(flags) => {
