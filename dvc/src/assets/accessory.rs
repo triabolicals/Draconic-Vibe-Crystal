@@ -36,5 +36,5 @@ pub fn change_accessory(list: &mut AssetTableAccessoryList, model: &str, locator
     if let Some(acc) = list.list.iter_mut().find(|f| f.locator.is_some_and(|m|m.str_contains(locator))) {
         acc.model = Some(model.into());
     }
-    else { add_accessory_to_list(list, model, locator); }
+    add_accessory_to_list(list, model, locator);
 }
