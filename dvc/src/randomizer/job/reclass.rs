@@ -185,14 +185,14 @@ fn update_weapon_apt(unit: &mut Unit, init: bool) {
         }
         else if unit.job.parent.hash != unit.person.get_job().map(|v| v.parent.hash).unwrap_or(0){
             let mut kinds = vec![];
-            kinds.extend(unit.job.weapons.iter().enumerate().filter(|(_, v)| **v >= 1).map(|(i, _)| i));
+            kinds.extend(unit.job.weapons.iter().enumerate().filter(|(i, v)| **v >= 1 && *i < 9).map(|(i, _)| i));
             if unit.job.has_high_jobs() {
                 unit.job.get_high_jobs().iter()
-                    .for_each(|j|{ kinds.extend(j.weapons.iter().enumerate().filter(|(_, v)| **v >= 1).map(|(i, _)| i)); });
+                    .for_each(|j|{ kinds.extend(j.weapons.iter().enumerate().filter(|(i, v)| **v >= 1 && *i < 9).map(|(i, _)| i)); });
             }
             if let Some(k) = kinds.get_random_element(rng) { mask = 1 << k; }
         }
-        else { mask = unit.person.sub_aptitude.value; }
+        if mask == 0 { mask = unit.person.sub_aptitude.value; }
         unit.original_aptitude.value = mask;
     }
     else { mask = unit.original_aptitude.value; }
