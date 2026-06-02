@@ -2,18 +2,16 @@ use super::*;
 use engage::{
     force::ForceType,
     gamedata::{dispos::DisposData, terrain::TerrainData},
-    map::{overlap::MapOverlap, terrain::MapTerrain},
-    map::situation::MapSituation,
-    force::Force
+    map::{overlap::MapOverlap, terrain::MapTerrain, situation::MapSituation},
 };
 use crate::utils::for_each_unit;
 
 pub mod fow;
 
 const TERRAIN_PERSIST: [&str; 10] = [
-        "TID_霧_永続", "TID_炎上_永続", "TID_アロマ_永続", "TID_ブロック_永続", "TID_水溜まり_永続",
-        "TID_土柱_永続", "TID_氷床_永続", "TID_流砂", "TID_ツタ_永続", "TID_煙_G004",
-    ];
+    "TID_霧_永続", "TID_炎上_永続", "TID_アロマ_永続", "TID_ブロック_永続", "TID_水溜まり_永続",
+    "TID_土柱_永続", "TID_氷床_永続", "TID_流砂", "TID_ツタ_永続", "TID_煙_G004",
+];
 pub fn adjust_miasma_tiles() {
     let count = DVCVariables::chapter_number_complete(false);
     ["TID_瘴気_永続", "TID_瘴気の領域", "TID_瘴気"]
@@ -55,7 +53,7 @@ pub fn randomized_emblem_power_spots() {
         let rng = Random::get_system();
         let deployment: Vec<_> =
             DisposData::get_list().unwrap().iter()
-                .flat_map(|v| v.iter()).filter(|v| v.get_terrain().is_none() )
+                .flat_map(|v| v.iter()).filter(|v| v.get_person().is_some() || v.flag.value & 896 != 0)
                 .map(|d| (d.dispos_x as i32, d.dispos_y as i32)).collect();
 
         for z in start_z..end_z {
@@ -86,24 +84,16 @@ pub fn randomized_emblem_power_spots() {
             }
         }
         if terrain_mode & 2 != 0 {
-            let unit_pos =
-                Force::get(ForceType::Player).unwrap().iter().chain(Force::get(ForceType::Enemy).unwrap().iter())
-                    .map(|f| (f.x as i32, f.z as i32)).collect::<Vec<_>>();
-            let total = (pos_list.len() >> 3) as i32;
+            let total = (pos_list.len() >> 2) as i32;
             let mut count = 0;
             while count < total && !pos_list.is_empty() {
-                let idx = rng.get_value(15) as usize;
-                if idx > 9 { count += 1; }
-                else if let Some(terrain) = TerrainData::get(TERRAIN_PERSIST[idx]) {
-                    let pos =
-                        if terrain.prohibition != 0 { pos_list.get_remove_filter(rng, |(x, z)| !unit_pos.contains(&(*x, *z))) }
-                        else { pos_list.get_remove(rng) };
-                    if let Some(tile) = pos {
-                        if MapOverlap::set_by_terrain(tile.0, tile.1, terrain, -1, ForceType::Empty) {
-                            count += 1;
-                        }
+                let idx = rng.get_value(14) as usize;
+                if idx < 9 {
+                    if let Some((terrain, tile)) = TerrainData::get(TERRAIN_PERSIST[idx]).zip(pos_list.get_remove(rng)) {
+                        MapOverlap::set_by_terrain(tile.0, tile.1, terrain, -1, ForceType::Empty);
                     }
                 }
+                count += 1;
             }
         }
     }
@@ -113,9 +103,10 @@ pub fn terrain_spots() {
     let value = DVCVariables::TerrainEffect.get_value();
     if value & 1 == 0 { return; }
     let rng = Random::get_system();
-    let rate = MapSituation::get_instance().turn * 2;
+    let turn = MapSituation::get_instance().turn;
+    if turn < 5 || turn % 3 == 0 { return; }
     for_each_unit(7, |unit|{
-        if rng.get_value(100) < rate {
+        if rng.get_value(100) < 4 {
             MapOverlap::set(unit.x as i32, unit.z as i32, "TID_紋章氣".into(), -1, ForceType::Empty);
         }
     });
