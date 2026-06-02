@@ -5,17 +5,7 @@ use engage::{
     proc::{ProcInst, ProcVoidMethod, desc::ProcDesc},
     sequence::mapsequence::MapSequence,
 };
-use crate::{
-    config::DVCFlags, procs, randomizer::{
-        self,
-        map::shuffle::shuffle_deployment,
-        person::unit
-    }, DVCVariables,
-    message::{TextSwapper, MESSAGE_SWAPPER},
-    deployment::fulldeploy,
-    script::adjust_person_map_inspectors,
-    utils::remove_equip_emblems
-};
+use crate::{config::DVCFlags, procs, randomizer::{self, map::shuffle::shuffle_deployment, person::unit}, DVCVariables, message::{TextSwapper, MESSAGE_SWAPPER}, deployment::fulldeploy, script::adjust_person_map_inspectors, utils::remove_equip_emblems, continuous};
 use std::sync::RwLock;
 use unity::{il2cpp::object::Array, prelude::OptionalMethod};
 
@@ -32,6 +22,7 @@ extern "C" fn map_sequence_setup_chapter(map_sequence: &mut MapSequence, _option
     map_sequence.setup_chapter();
     let swap = MESSAGE_SWAPPER.get_or_init(||RwLock::new(TextSwapper::init()));
     if let Ok(mut lock) = swap.try_write() { lock.get_chapter_talk(); }
+    continuous::random::continous_rand_emblem_adjustment();
 }
 
 pub extern "C" fn map_sequence_dispos_event(this: &mut MapSequence, _method_info: OptionalMethod) {

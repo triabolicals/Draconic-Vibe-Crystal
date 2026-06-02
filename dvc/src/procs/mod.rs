@@ -65,7 +65,6 @@ pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
             ironman::map_save_menu_edits();
             ironman::ironman_code_edits();
             randomizer::bgm::randomize_bgm_map();
-            continuous::random::continous_rand_emblem_adjustment();
         }
         EVENT_DEMO_SEQUENCE => { eventdemo::event_demo_function_edit(); }
         HUB_MENU_SEQUENCE => {
