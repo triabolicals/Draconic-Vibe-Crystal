@@ -60,10 +60,6 @@ pub fn tutorial_check() {
             if string == "G_解説_TUTID_クラスチェンジ" { return; }
         }
     }
-    #[cfg(feature = "debug")] {
-        GameVariableManager::set_number("G_GmapSpot_M021M022", 3);
-        GameVariableManager::set_bool("G_Cleared_M021", false);
-    }
 }
 /// SaveLoad Event Randomizing for Cobalt 1.21+
 pub fn save_file_load() {

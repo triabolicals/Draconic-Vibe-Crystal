@@ -59,7 +59,7 @@ fn set_motion(this: &EventDemoSequence, cmd_info: &mut CmdInfo, _: OptionalMetho
         }
         if DVCFlags::CutsceneFacial.get_value() {
             let facial = rng.get_value(18);
-            cmd_info.args[1] = outfit_core::FACIAL_STATES[facial as usize].into();
+            cmd_info.args[1] = outfit_core::FACIAL_STATES[facial as usize].0.into();
         }
     }
     this.func_character_play_motion(cmd_info)
@@ -75,37 +75,3 @@ fn sound_event(this: &EventDemoSequence, cmd_info: &mut CmdInfo, _: OptionalMeth
     }
     this.func_sound_event(cmd_info)
 }
-/*
-fn set_character_animator(
-    this: &EventDemoSequence,
-    cmd_info: &mut CmdInfo,
-    _optional_method: OptionalMethod) -> EventDemoSequenceEventCmdResult
-{
-    if cmd_info.args.len() >= 2 {
-        /*
-        if let Some(gender) = cmd_info.args.get(0).filter(|x| !x.is_null())
-            .and_then(|pid| this.get_character(pid, false))
-            .and_then(|character| character.get_builder().appearance.assets[1].name)
-            .map(|dress| get_outfit_data().get_dress_gender(dress))
-        {
-            */
-        if !cmd_info.args[1].is_null() {
-            let full = cmd_info.args[1].to_string();
-            if let Some(aoc) = full.split("/").last() {
-                let result = AssetTableResult::get_for_demo(cmd_info.args[0], false, false);
-                if full.contains("Demo") && result.demo_anims.is_some() {
-                    cmd_info.args[1] = full.replace(&aoc, &result.demo_anims.map(|v| v.to_string()).unwrap()).into();
-                }
-                else if full.contains("Info") && result.info_anims.is_some() {
-                    cmd_info.args[1] = full.replace(&aoc, &result.info_anims.map(|v| v.to_string()).unwrap()).into();
-                }
-                else if full.contains("Talk") && result.talk_anims.is_some() {
-                    cmd_info.args[1] = full.replace(&aoc, &result.talk_anims.map(|v| v.to_string()).unwrap()).into();
-                }
-                println!("new {}", cmd_info.args[1]);
-            }
-        }
-    }
-    this.func_character_set_animator(cmd_info)
-}
- */

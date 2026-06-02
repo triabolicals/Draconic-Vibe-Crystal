@@ -23,7 +23,7 @@ mod procs;
 pub use config::variables::*;
 
 pub static mut CONFIG: DVCConfig = DVCConfig::default();
-pub const VERSION: &str = "2.16.0p";
+pub const VERSION: &str = "2.16.0q";
 pub const VARIABLE_VERSION: i32 = 9;
 extern "C" fn event_install(event: &Event<SystemEvent>) {
     println!("DVC EVENT");
@@ -73,7 +73,6 @@ pub fn main() {
         message::mess_get_impl_hook,
         sprite::try_get_sprite,
         sprite::unit_icon_set_icon,
-        assets::dress::modify_colors,
         randomizer::item::calc_reward,
         randomizer::person::unit_pool_get_from_person,
         assets::dvc_create_break_effect_hook,

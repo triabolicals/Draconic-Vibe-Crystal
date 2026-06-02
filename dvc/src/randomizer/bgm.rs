@@ -61,9 +61,7 @@ pub fn set_random_bgm_phase(){
 }
 
 pub fn randomize_bgm_map() {
-    if GameUserData::get_sequence() == 0 { return; }
-    if GameUserData::is_encount_map() { return; }
-    if !DVCFlags::BGM.get_value() { return; }
+    if GameUserData::get_sequence() == 0 || GameUserData::is_encount_map() || !DVCFlags::BGM.get_value() { return; }
     get_current_chapter_chapter_bgm();
     set_random_bgm_phase();
     get_random_special(true);
@@ -85,7 +83,11 @@ pub fn reset_bgm() {
     GameVariableManager::set_string("CBGM2",  GameVariableManager::get_string("OBGM2"));
     GameVariableManager::set_string("CBGM3",  GameVariableManager::get_string("OBGM3"));
     GameVariableManager::set_string("CBGM4",  GameVariableManager::get_string("OBGM4"));
-    GameSound::field_bgm_set_phase_bgm2(GameVariableManager::get_string("OBGM1"), GameVariableManager::get_string("OBGM2"), GameVariableManager::get_string("OBGM3"));
+    GameSound::field_bgm_set_phase_bgm2(
+        GameVariableManager::get_string("OBGM1"),
+        GameVariableManager::get_string("OBGM2"),
+        GameVariableManager::get_string("OBGM3")
+    );
 }
 pub fn change_bgm() {
     if GameUserData::is_encount_map() || GameUserData::get_sequence() == 0 { return; }
