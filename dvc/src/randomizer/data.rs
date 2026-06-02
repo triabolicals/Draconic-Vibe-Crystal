@@ -392,31 +392,14 @@ impl RandomizedGameData {
                     if enemy.emblem_index >= 12 { enemy.emblem_index }
                     else { DVCVariables::get_dvc_emblem_index(enemy.emblem_index as i32, false) };
 
-                let syncs_old = &data.emblem_pool.emblem_data[enemy.emblem_index].syncs;
-                let syncs_new = &data.emblem_pool.emblem_data[if enemy.emblem_index == 12 { 12 } else { randomized_index} ].syncs;
-                let weapons = &data.emblem_pool.emblem_data[randomized_index].level_data[0].style_items;
-                let new_engage = data.emblem_pool.emblem_data[randomized_index].get_engage_skill().map(|s| s.parent.index).unwrap_or(0);
-                if let Some(level_data) = enemy_god.get_level_data() {
-                    level_data.iter_mut().for_each(|level|{
-                        level.synchro_skills.list.iter_mut().for_each(|sk|{
-                            let skill = sk.get_skill().unwrap();
-                            let level = get_skill_level(skill);
-                            let hash = DARK_EMBLEM_SKILLS.iter().find(|s| s.0 == skill.parent.hash).map(|s| s.1).or_else(|| Some(skill.parent.hash)).unwrap();
-                            let lowest = get_lowest_priority(SkillData::try_get_hash_mut(hash).unwrap());
-                            if let Some(s) = syncs_old.iter().zip(syncs_new.iter()).find(|(old, new)| **old == lowest.parent.hash) {
-                                let new_skill = SkillData::try_get_hash_mut(*s.1).unwrap();
-                                let mut new_index = new_skill.parent.index;
-                                for _ in 0..level {
-                                    if let Some(higher) = SkillData::try_index_get(new_index).and_then(|s| s.high_skill) {
-                                        new_index = higher.parent.index;
-                                    }
-                                }
-                                sk.set_index(self.engage_skills.get_sync_replacement_index(new_index));
-                            }
-                        });
-                        level.engaged_skills.list
-                            .iter_mut()
-                            .for_each(|sk| {
+                if enemy.emblem_index != randomized_index {
+                    let syncs_old = &data.emblem_pool.emblem_data[enemy.emblem_index].syncs;
+                    let syncs_new = &data.emblem_pool.emblem_data[if enemy.emblem_index == 12 { 12 } else { randomized_index }].syncs;
+                    let weapons = &data.emblem_pool.emblem_data[randomized_index].level_data[0].style_items;
+                    let new_engage = data.emblem_pool.emblem_data[randomized_index].get_engage_skill().map(|s| s.parent.index).unwrap_or(0);
+                    if let Some(level_data) = enemy_god.get_level_data() {
+                        level_data.iter_mut().for_each(|level| {
+                            level.synchro_skills.list.iter_mut().for_each(|sk| {
                                 let skill = sk.get_skill().unwrap();
                                 let level = get_skill_level(skill);
                                 let hash = DARK_EMBLEM_SKILLS.iter().find(|s| s.0 == skill.parent.hash).map(|s| s.1).or_else(|| Some(skill.parent.hash)).unwrap();
@@ -430,33 +413,50 @@ impl RandomizedGameData {
                                         }
                                     }
                                     sk.set_index(self.engage_skills.get_sync_replacement_index(new_index));
-                                } 
+                                }
                             });
-                        if let Some(s) = level.engage_skills.list.iter_mut().find(|skill| !skill.is_hidden()){
-                            if DVCVariables::EmblemEngageSkill.get_value() != 0 { s.set_index(self.engage_skills.get_engage_skill_index(new_engage)); }
-                            else { s.set_index(new_engage); }
-                        }
-                        else { level.engage_skills.clear(); }
-                        if DVCFlags::EngageWeapons.get_value() {
-                            level.style_items.iter_mut().flat_map(|x| x.iter_mut())
-                                .for_each(|x1| {
-                                    let hash = x1.parent.hash;
-                                    *x1 = self.engage_weapons.get_replacement(hash);
-                                });
-                        }
-                        else if DVCVariables::is_changed_recruitment_order(true) && randomized_index != enemy.emblem_index {
-                            let weap = ["IID_ベレト_ルーン", "IID_ベレト_ヴァジュラ", "IID_ベレト_天帝の覇剣", "IID_チキ_つめ", "IID_チキ_しっぽ", "IID_チキ_ブレス"];
-                            level.style_items.iter_mut().enumerate().for_each(|(style_index, style_items)|{
-                                style_items.iter_mut().enumerate().for_each(|(item_pos, item)| {
-                                    if randomized_index == 9 { if let Some(v) = ItemData::get_mut(weap[item_pos]) { *item = v; } }
-                                    else if randomized_index == 13 { if let Some(v) = ItemData::get_mut(weap[3+item_pos]) { *item = v; } }
-                                    else if let Some(v) = weapons.get(style_index * 3 + item_pos).and_then(|v| ItemData::try_get_hash_mut(*v)){
-                                        *item = v;
+                            level.engaged_skills.list
+                                .iter_mut()
+                                .for_each(|sk| {
+                                    let skill = sk.get_skill().unwrap();
+                                    let level = get_skill_level(skill);
+                                    let hash = DARK_EMBLEM_SKILLS.iter().find(|s| s.0 == skill.parent.hash).map(|s| s.1).or_else(|| Some(skill.parent.hash)).unwrap();
+                                    let lowest = get_lowest_priority(SkillData::try_get_hash_mut(hash).unwrap());
+                                    if let Some(s) = syncs_old.iter().zip(syncs_new.iter()).find(|(old, new)| **old == lowest.parent.hash) {
+                                        let new_skill = SkillData::try_get_hash_mut(*s.1).unwrap();
+                                        let mut new_index = new_skill.parent.index;
+                                        for _ in 0..level {
+                                            if let Some(higher) = SkillData::try_index_get(new_index).and_then(|s| s.high_skill) {
+                                                new_index = higher.parent.index;
+                                            }
+                                        }
+                                        sk.set_index(self.engage_skills.get_sync_replacement_index(new_index));
                                     }
-                               });
-                            })
-                        }
-                    });
+                                });
+                            if let Some(s) = level.engage_skills.list.iter_mut().find(|skill| !skill.is_hidden()) {
+                                if DVCVariables::EmblemEngageSkill.get_value() != 0 { s.set_index(self.engage_skills.get_engage_skill_index(new_engage)); } else { s.set_index(new_engage); }
+                            } else { level.engage_skills.clear(); }
+                            if DVCFlags::EngageWeapons.get_value() {
+                                level.style_items.iter_mut().flat_map(|x| x.iter_mut())
+                                    .for_each(|x1| {
+                                        let hash = x1.parent.hash;
+                                        *x1 = self.engage_weapons.get_replacement(hash);
+                                    });
+                            }
+                            else if DVCVariables::is_changed_recruitment_order(true) && randomized_index != enemy.emblem_index {
+                                let weap = ["IID_ベレト_ルーン", "IID_ベレト_ヴァジュラ", "IID_ベレト_天帝の覇剣", "IID_チキ_つめ", "IID_チキ_しっぽ", "IID_チキ_ブレス"];
+                                level.style_items.iter_mut().enumerate().for_each(|(style_index, style_items)| {
+                                    style_items.iter_mut().enumerate().for_each(|(item_pos, item)| {
+                                        if randomized_index == 9 { if let Some(v) = ItemData::get_mut(weap[item_pos]) { *item = v; } }
+                                        else if randomized_index == 13 { if let Some(v) = ItemData::get_mut(weap[3 + item_pos]) { *item = v; } }
+                                        else if let Some(v) = weapons.get(style_index * 3 + item_pos).and_then(|v| ItemData::try_get_hash_mut(*v)) {
+                                            *item = v;
+                                        }
+                                    });
+                                })
+                            }
+                        });
+                    }
                 }
             });
     }
