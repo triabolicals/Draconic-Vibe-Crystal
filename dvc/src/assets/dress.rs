@@ -1,9 +1,7 @@
 use std::collections::HashSet;
 use bitflags::Flags;
-use engage::{unit::Gender::{Female, Male}, unityengine::*, ut::Ut};
-use outfit_core::{
-    get_outfit_data, AssetConditions, AssetFlags, PersonalDressData, UnitAssetMenuData,
-};
+use engage::{unit::Gender::{Female, Male}, unityengine::*};
+use outfit_core::{get_outfit_data, AssetConditions, AssetFlags, PersonalDressData, UnitAssetMenuData};
 use crate::{
     config::DVCFlags,
     utils::create_rng,
@@ -18,6 +16,9 @@ use transform::{has_enemy_tiki};
 use super::*;
 
 pub const M002_LUMERA: i32 = 258677212;
+pub const RED_EYES: [i32; 7] = [ -1514923380, 1187540167, 1208025613, -392216545, -728744546, 1097589289, -1226236894];
+pub const BLACK: [i32; 6] = [1187540167, 1187535337, -2009102214, -728744546, 1097589289, -1226236894];
+
 fn is_preview_unit(unit: &Unit) -> bool { unit.force.is_some_and(|x| (1 << x.force_type) & 25 != 0) && unit.status.value & 35184372088832 == 0 }
 
 fn tiki_engage(result: &mut AssetTableResult, condition_unit: &Unit, mode: i32, equipped: Option<&ItemData>, condition: &mut AssetConditions) -> bool {
@@ -271,28 +272,65 @@ pub fn commit_for_unit_dress(
             }
         }
     }
-    if mode == 2 {
-        if DVCVariables::BodyScaling.get_value() != 0 {  random_body_scale(result, Some(unit.grow_seed), false); }
-        let hash = condition_unit.person.parent.hash;
-        if hash == 1097589289 {
-            if result.head_model.str_contains("551") { result.head_model = "uHead_c556".into(); }
-            else {
-                let head = result.head_model.to_string() + "b";
-                if get_outfit_data().try_get_asset_hash(head.as_str()).is_some() { result.head_model = head.into(); }
-            }
-        }
-        if hash == 1187540167 || hash == -728744546 {
-            result.commit_accessory(new_asset_table_accessory("uAcc_head_Dress556", "c_head_loc"));
-            result.replace(mode);
-        }
-        else if hash == -2009102214 {
-            result.commit_accessory(new_asset_table_accessory("uAcc_head_Dress556b", "c_head_loc"));
-            result.replace(mode);
-        }
-        if condition_unit.person.get_job().map(|j| j.parent.hash).unwrap_or(condition_unit.job.parent.hash) == LUEUR_CLASS[2] { lueur_fell_child_hair(result); }
+    enemy_veyle_lueur(result, condition_unit.person, mode);
+    if condition_unit.person.parent.hash != 1097589289 && condition_unit.person.get_job().map(|j| j.parent.hash).unwrap_or(condition_unit.job.parent.hash) == LUEUR_CLASS[2] {
+        lueur_fell_child_hair(result);
     }
     if DVCVariables::BodyScaling.get_value() != 0 && mode == 2 { random_body_scale(result, Some(unit.grow_seed), false); }
     conditionss
+}
+pub fn enemy_veyle_lueur(result: &mut AssetTableResult, person: &PersonData, mode: i32) {
+    let hash = person.parent.hash;
+    if let Some(pos) = BLACK.iter().position(|&x| x == hash) {
+        match pos {
+            0..4 => {
+                if mode == 2 {
+                    let mut head_acc = "uAcc_head_Dress556".to_string();
+                    if pos == 2 { head_acc += "b"; }
+                    result.commit_accessory(new_asset_table_accessory(head_acc.as_str(), "c_head_loc"));
+                }
+                if DVCVariables::get_dvc_recruitment_index(32) == 0 {
+                    let mut body = if mode == 2 { "uBody_Drg0A" } else { "oBody_Drg0A" }.to_string();
+                    body += if DVCVariables::is_lueur_female() { "F_c052" } else { "M_c002" };
+                    if mode == 2 { result.dress_model = body.into(); } else { result.body_model = body.into(); }
+                }
+            }
+            4 => {
+                lueur_fell_child_hair(result);
+                if DVCVariables::get_dvc_recruitment_index(0) == 32 {
+                    if mode == 2 {
+                        result.head_model = "uHead_c556".into();
+                        result.dress_model = "uBody_Sdp0AF_c556".into();
+                    }
+                    else {
+                        result.hair_model = "oHair_h556".into();
+                        result.dress_model = "oBody_Sdp0AF_c556".into();
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    if (hash == -1402039598 ||  hash == -1226236894) && mode == 2 {
+        let veyle_replacement = DVCVariables::get_dvc_recruitment_index(32);
+        let is_hooded = hash == -1402039598;
+        if veyle_replacement != 32 {
+            if (veyle_replacement == 0 && DVCVariables::is_lueur_female()) || DVCVariables::get_dvc_person_data(32, false).is_some_and(|v| v.get_dress_gender() == Female) {
+                if is_hooded {
+                    result.head_model = "uHead_c557".into();
+                    result.dress_model = "uBody_Sdp0AF_c557".into();
+                }
+                else { result.dress_model = "uBody_Sdp0AF_c559".into(); }
+            }
+            else if is_hooded { result.dress_model = "uBody_Dct0AM_c400".into(); }
+            if is_hooded {
+                result.hair_model = "uHair_null".into();
+                add_accessory_to_list(result.accessory_list, "null", "c_head_loc");
+                add_accessory_to_list(result.accessory_list, "null", "c_spine1_jnt");
+                add_accessory_to_list(result.accessory_list, "null", "c_spine2_jnt");
+            }
+        }
+    }
 }
 pub fn change_result_colors_by_unit(unit: &Unit, result: &mut AssetTableResult) {
     let value = if unit.person.get_asset_force() == 0 {
@@ -382,20 +420,6 @@ pub(crate) fn random_body_scale(result: &mut AssetTableResult, hash: Option<i32>
         }
     }
 }
-pub fn replace_with_engage_hair(result: &mut AssetTableResult, mode: i32) {
-    if !result.hair_model.is_null() && !result.hair_model.contains("null") {
-        if let Some(engaged) = get_outfit_data().hashes.get_engaged_hair(result.hair_model) { result.hair_model = engaged; }
-    }
-    else {
-        if let Some(acc) = result.accessory_list.list.iter().find(|x| x.model.is_some_and(|m| m.str_contains("Hair"))) {
-            let locator = acc.locator.unwrap().to_string();
-            if let Some(hair) = get_outfit_data().hashes.get_engaged_hair(acc.model.unwrap()) {
-                change_accessory(result.accessory_list, hair.to_string().as_str(), locator.as_str());
-            }
-        }
-    }
-    result.replace(mode);
-}
 pub fn lueur_fell_child_hair(result: &mut AssetTableResult) {
     result.unity_colors[0].r = 0.631372549;
     result.unity_colors[0].g = 0.1647058824;
@@ -403,7 +427,6 @@ pub fn lueur_fell_child_hair(result: &mut AssetTableResult) {
     result.unity_colors[1].r = 0.631372549;
     result.unity_colors[1].g = 0.1647058824;
     result.unity_colors[1].b = 0.1882352941;
-    replace_with_engage_hair(result, 2);
 }
 pub fn lueur_god_hair(result: &mut AssetTableResult) {
     result.unity_colors[0].r = 0.3326362;
@@ -412,214 +435,9 @@ pub fn lueur_god_hair(result: &mut AssetTableResult) {
     result.unity_colors[1].r = 0.51775545;
     result.unity_colors[1].g = 0.51775545;
     result.unity_colors[1].b = 0.6132076;
-    replace_with_engage_hair(result, 2);
 }
 fn get_random_value_from_set(v: &HashSet<i32>, random: &Random) -> i32 {
     let len = v.len();
     let idx = random.get_value(len as i32) as usize;
     *v.iter().nth(idx).unwrap()
-}
-
-#[unity::hook("Combat", "CharacterAppearance", "ModifyColors")]
-pub fn modify_colors(this: &mut CharacterAppearance, go: &GameObject, _: OptionalMethod) {
-    let mut emblem_type = 0;
-    if this.hair_color.r >= 2.0 && this.hair_color.r < 3.0 {
-        emblem_type = 1;
-        this.hair_color.r -= 2.0;
-    }
-    else if this.hair_color.r >= 3.0 && this.hair_color.r < 4.0 {
-        emblem_type = 2;
-        this.hair_color.r -= 3.0;
-    }
-    call_original!(this, go, None);
-    if emblem_type > 0 {
-        let dark = emblem_type == 2;
-        go.get_component_in_children::<Renderer>(true).iter().for_each(|r| {
-            Ut::get_instance_materials(r).iter().for_each(|m| {
-                let name = m.get_name().to_string();
-                if name.starts_with("MtHair") {
-                    if name.contains("Brow") { change_brow_color(m, dark); } else { change_hair_material(m, dark); }
-                }
-                if name.starts_with("MtSkin") { change_skin_material(m, dark); }
-                if name.starts_with("MtEye") { change_eye_material(m, dark); }
-                if name.starts_with("MtDress") { change_dress_material(m, dark); }
-            });
-        });
-        this.instanced_materials.iter().for_each(|m|{
-            let name = m.get_name().to_string();
-            if name.starts_with("MtHair") {
-                if name.contains("Brow") { change_brow_color(m, dark); } else { change_hair_material(m, dark); }
-            }
-            if name.starts_with("MtSkin") { change_skin_material(m, dark); }
-            if name.starts_with("MtEye") { change_eye_material(m, dark); }
-            if name.starts_with("MtDress") { change_dress_material(m, dark); }
-        });
-    }
-    if EVIL_PERSONS.contains(&this.person_hash) {
-        let red_hair = this.person_hash == 1097589289;
-        go.get_component_in_children::<SkinnedMeshRenderer>(true).iter().for_each(|r| {
-            Ut::get_instance_materials2(r).iter().for_each(|m| { evil_color(m, red_hair); });
-        });
-        go.get_component_in_children::<Renderer>(true).iter().for_each(|r| {
-            Ut::get_instance_materials(r).iter().for_each(|m| { evil_color(m, red_hair); });
-        });
-        this.instanced_materials.iter().for_each(|m| { evil_color(m, red_hair); });
-    }
-    else {
-        let data = UnitAssetMenuData::get();
-        let mut rgb: Option<[u8; 3]> = None;
-        for x in 0..6 {
-            rgb = None;
-            let j = 8 + x;
-            let i = 4*j;
-            if data.is_preview {
-                if data.preview.color_preview[i+3] == 1 {
-                    rgb = Some([data.preview.color_preview[i], data.preview.color_preview[i+1], data.preview.color_preview[i+2]]);
-                }
-                else if data.preview.preview_data.colors[j].values[3] != 0 {
-                    rgb = Some([data.preview.preview_data.colors[j].values[0], data.preview.preview_data.colors[j].values[1], data.preview.preview_data.colors[j].values[2]]);
-                }
-            }
-            else if let Some(data) = UnitAssetMenuData::get_by_person_data(this.person_hash, false) {
-                if let Some(profile) = data.profile.get(data.profile_index(false) as usize) {
-                    if profile.colors[j].values[3] != 0 {
-                        rgb = Some([profile.colors[j].values[0], profile.colors[j].values[1], profile.colors[j].values[2]]);
-                    }
-                }
-            }
-            if let Some(rgb) = rgb {
-                let r = rgb[0] as f32 / 255.0;
-                let g = rgb[1] as f32 / 255.0;
-                let b = rgb[2] as f32 / 255.0;
-                if let Some(m) = get_material_from_object(go, "MtEye") { m.set_color(EYE_COLORS[x], Color::new(r, g, b, 1.0)); }
-            }
-        }
-    }
-}
-fn get_material_from_object(go: &GameObject, name: &str) -> Option<&'static &'static Material2> {
-    go.get_component_in_children::<Renderer>(true).iter()
-        .flat_map(|smr| Ut::get_instance_materials(smr).iter())
-        .find(|v| v.get_name().to_string().starts_with(name))
-        .or_else(||
-            go.get_component_in_children::<SkinnedMeshRenderer>(true).iter()
-                .flat_map(|smr| Ut::get_instance_materials2(smr).iter())
-                .find(|v| v.get_name().to_string().starts_with(name))
-        )
-}
-const EVIL_PERSONS: [i32; 6] = [-392216545, 1208025613, -728744546, 1187540167, 1097589289, -1514923380];
-const EYE_COLORS: [&str; 6] = ["_BaseColor", "_BlackColor", "_DecalColor1", "_DecalColor2", "_DecalColor3", "_DecalColor4"];
-fn evil_color(m: &Material2, hair: bool) {
-    let name = m.get_name().to_string();
-    if hair && name.starts_with("MtHair") {
-        m.set_color( "_BaseColor",Color::new(0.6698,0.123,0.1492, 1.0));
-        m.set_color( "_GradationColor",Color::new(0.4245,0.05807,0.05807, 1.0));
-    }
-    if name.contains("MtEye") {
-        m.set_color("_BaseColor", Color::new(0.905, 0.0, 0.0, 1.0));
-        m.set_color("_BlackColor", Color::new(1.0, 1.0, 1.0, 1.0));
-        m.set_color("_DecalColor1", Color::new(0.028, 0.00734, 0.00734, 1.0));
-        m.set_color("_DecalColor2", Color::new(0.972549, 0.4823, 0.4823, 1.0));
-        m.set_color("_DecalColor3", Color::new(0.1698, 0.012, 0.012, 1.0));
-        m.set_color("_DecalColor4", Color::new(0.905, 0.158, 0.158, 1.0));
-    }
-}
-fn change_hair_material(m: &Material2, is_dark: bool) {
-    if is_dark {
-        m.set_color( "_BaseColor",Color::new(0.84906,0.49261,0.49261, 1.0));
-        m.set_color( "_OutlineColor",Color::new(1.0, 0.09803919,0.09803919, 1.0));
-        m.set_color( "_EmissionColor",Color::new(0.5294118,	0.011764706,	0.011764706, 1.0));
-        m.set_color( "_RimLightColorLight",Color::new(1.00000,1.00000,1.00000, 1.00000));
-        m.set_color( "_RimLightColorShadow",Color::new(0.85098,0.49412,0.49412, 1.00000));
-    }
-    else {
-        m.set_color( "_EmissionColor",Color::new(0.24968153,0.246974,0.4716981, 1.0));
-        m.set_color( "_OutlineColor",Color::new(0.6509804,0.71288776,0.9254902, 1.0));
-        m.set_color( "_RimLightColorLight",Color::new(0.21176471,0.8784314,1.0, 1.0));
-        m.set_color( "_RimLightColorShadow",Color::new(0.21176471,0.8784314,1.0, 1.0));
-    }
-    m.set_float( "_LightColorToWhite",0.8);
-    m.set_float( "_LightShadowToWhite",0.8);
-    m.set_float( "_Preset",2.0);
-    m.set_float( "_S_Key_RimLight",0.0);
-    m.set_float( "_RimLightBlend",if is_dark { 0.3 } else { 0.5});
-    m.set_float( "_RimLightScale",0.5);
-    m.set_float( "_OutlineScale",3.50);
-}
-fn change_eye_material(m: &Material2, is_dark: bool) {
-    if is_dark {
-        m.set_color( "_BaseColor",Color::new(0.9150943,0.18560876,0.18560876, 1.0));
-        m.set_color( "_BlackColor",Color::new(1.0,1.0,1.0, 1.0));
-        m.set_color( "_DecalColor1",Color::new(0.4716981,0.0022249965,0.0022249965, 1.0));
-        m.set_color( "_DecalColor2",Color::new(0.9528302,0.62473303,0.62473303, 1.0));
-        m.set_color( "_DecalColor3",Color::new(0.2830189,0.05473478,0.05473478, 1.0));
-        m.set_color( "_DecalColor4",Color::new(1.0,0.7028302,0.7028302, 1.0));
-    }
-    else {
-        m.set_color("_BaseColor", Color::new(0.759,0.7627, 1.0, 1.0));
-        m.set_color( "_BlackColor",Color::new(0.60156,0.58718,0.85849, 1.0));
-        m.set_color( "_DecalColor1",Color::new(0.22837,0.17818,0.41509, 1.0));
-        m.set_color( "_DecalColor2",Color::new(0.94510,0.78039,0.85440, 1.0));
-        m.set_color( "_DecalColor3",Color::new(0.21692,0.20804,0.51887, 1.0));
-        m.set_color( "_DecalColor4",Color::new(0.79806,0.79806,0.92453, 1.0));
-    }
-    m.set_float( "_LightColorToWhite",0.8);
-    m.set_float( "_LightShadowToWhite",0.8);
-}
-fn change_skin_material(m: &Material2, is_dark: bool) {
-    if is_dark {
-        m.set_color( "_EmissionColor",Color::new(0.14151,0.13150,0.13150, 1.00000));
-        m.set_color( "_EngageEmissionColor",Color::new(0.31400,0.31400,0.47000, 1.00000));
-        m.set_color( "_OutlineColor",Color::new(1.00000,0.09804,0.09804, 1.00000));
-        m.set_color( "_RimLightColorLight",Color::new(0.93333,0.60392,0.60392, 1.00000));
-        m.set_color( "_RimLightColorShadow",Color::new(0.79216,0.45882,0.00000, 1.00000));
-    }
-    else {
-        m.set_color( "_EmissionColor",Color::new(0.52830,0.29156,0.44192, 1.00000));
-        m.set_color( "_EngageEmissionColor",Color::new(0.31400,0.31400,0.47000, 1.00000));
-        m.set_color( "_OutlineColor",Color::new(0.43137,0.43529,0.81961, 1.00000));
-        m.set_color( "_RimLightColorLight",Color::new(0.21176,0.87843,1.00000, 1.00000));
-        m.set_color( "_RimLightColorShadow",Color::new(0.15686,0.71765,0.81961, 1.00000));
-        m.set_color( "_ToonShadowColor",Color::new(0.95283,0.92137,0.92137, 1.00000));
-    }
-    m.set_float( "_Preset",5.00);
-    m.set_float( "_OutlineScale",3.50);
-    m.set_float( "_LightColorToWhite",if is_dark { 0.60 } else { 0.80 });
-    m.set_float( "_LightShadowToWhite",0.80);
-}
-fn change_dress_material(m: &Material2, is_dark: bool) {
-    if is_dark {
-        m.set_color( "_EmissionColor",Color::new(0.14151,0.01669,0.01669, 1.0));
-        m.set_color( "_EngageEmissionColor",Color::new(0.31400,0.31400,0.47000, 1.0));
-        m.set_color( "_OutlineColor",Color::new(1.00000,0.09804,0.09804, 1.0));
-        m.set_color( "_RimLightColorLight",Color::new(0.71698,0.09131,0.09131, 1.0));
-        m.set_color( "_RimLightColorShadow",Color::new(0.71765,0.09412,0.09412, 1.0));
-    }
-    else {
-        m.set_color( "_EmissionColor",Color::new(0.17255,0.16863,0.30980, 1.0));
-        m.set_color( "_EngageEmissionColor",Color::new(0.31400,0.31400,0.47000, 1.0));
-        m.set_color( "_OutlineColor",Color::new(0.65098,0.71373,0.92549, 1.0));
-        m.set_color( "_RimLightColorLight",Color::new(0.21226,0.87956,1.0, 1.0));
-        m.set_color( "_RimLightColorShadow",Color::new(0.10279,0.57460,0.66038, 1.0));
-    }
-    m.set_float( "_S_Key_RimLight",1.00);
-    m.set_float( "_S_Key_BumpAttenuation",1.00);
-    m.set_float( "_LightColorToWhite",0.80);
-    m.set_float( "_LightShadowToWhite",0.80);
-    m.set_float( "_Preset",5.00);
-    m.set_float( "_OutlineScale",4.00);
-    m.set_float( "_RimLightBlend",if is_dark { 0.65 } else { 0.45});
-    m.set_float( "_RimLightScale",1.00);
-}
-fn change_brow_color(m: &Material2, is_dark: bool) {
-    m.set_color("_EngageEmissionColor", Color::new(0.31400, 0.31400, 0.47000, 1.00000));
-    if is_dark {
-        m.set_color("_EmissionColor", Color::new(0.21698, 0.00000, 0.00000, 1.00000));
-        m.set_color("_ShadowAddColor", Color::new(0.40566, 0.02105, 0.02105, 1.00000));
-        m.set_color("_ShadowColor", Color::new(0.74528, 0.74528, 0.74528, 1.00000));
-    }
-    else {
-        m.set_color( "_EmissionColor",Color::new(0.06243,0.06243,0.21698, 1.00000));
-        m.set_color( "_ShadowAddColor",Color::new(0.50943,0.16581,0.16581, 1.00000));
-        m.set_color( "_ShadowColor",Color::new(0.46226,0.37286,0.37286, 1.00000));
-    }
 }

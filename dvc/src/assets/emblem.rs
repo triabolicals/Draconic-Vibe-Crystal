@@ -252,21 +252,18 @@ pub fn asset_table_robin_hook(
     method_info: OptionalMethod) -> &'static mut AssetTableResult 
 {
     let pid = person.pid.to_string();
-    if let Some(pos) = crate::talk::VEYRE.iter().position(|&x| pid.ends_with(&x)){
+    if crate::talk::VEYRE.iter().position(|&x| pid.ends_with(&x)).is_some() {
         let idx = DVCVariables::get_dvc_recruitment_index(32);
         if idx != 32 && idx >= 0 {
-            if idx == 0 {
-                let pid = if DVCVariables::is_lueur_female() { "PID_青リュール_女性" } else { "PID_青リュール_男性" };
-                let result = call_original!(this, mode, PersonData::get_mut(pid).unwrap(), conditions, method_info);
-                adjust_for_enemy_veyle(result, pos, DVCVariables::is_lueur_female(), true);
+            if let Some(r_person) = DVCVariables::get_dvc_person_data(32, false) {
+                let result =
+                    if person.parent.index == 1 {
+                        let pid = if DVCVariables::is_lueur_female() { "PID_青リュール_女性" } else { "PID_青リュール_男性" };
+                        call_original!(this, mode, PersonData::get_mut(pid).unwrap(), conditions, method_info)
+                    }
+                    else { call_original!(this, mode, r_person, conditions, method_info) };
+                enemy_veyle_lueur(result, person, mode);
                 return result;
-            }
-            else {
-                if let Some(person) = DVCVariables::get_dvc_person_data(32, false) {
-                    let result = call_original!(this, mode, person, conditions, method_info);
-                    adjust_for_enemy_veyle(result, pos, person.get_dress_gender() == Gender::Female, false);
-                    return result;
-                }
             }
         }
     }
@@ -351,53 +348,5 @@ pub fn get_random_engage_voice() -> &'static str {
         39 => { "DLC_45"}
         40 => { "DLC_46"}
         _ =>  { &MPIDS[index][5..] }
-    }
-}
-fn adjust_for_enemy_veyle(result: &mut AssetTableResult, veyle_index: usize, female: bool, lueur: bool){
-    let mut dark = false;
-    let mut evil = false;
-    match veyle_index {
-        0 => { // Hood but Head Visible
-            if female { result.dress_model = "uBody_Sdp0AF_c559".into(); }
-            evil = true;
-        }
-        1 => {
-            dark = true;
-            add_accessory_to_list(result.accessory_list, "c_head_loc", "uAcc_head_Dress556b");
-        }
-        2 => {
-            if female {
-                result.dress_model = "uBody_Sdp0AF_c559".into();
-                result.hair_model = "uHair_null".into();
-                result.head_model = "uHead_c557".into();
-            }
-            else {
-                result.dress_model = "uBody_Dct0AM_c711".into();
-                result.head_model = "null".into();
-                result.hair_model = "null".into();
-            }
-            add_accessory_to_list(result.accessory_list, "null", "c_head_loc");
-            add_accessory_to_list(result.accessory_list, "null", "c_spine1_jnt");
-            add_accessory_to_list(result.accessory_list, "null", "c_spine2_jnt");
-        }
-        4 => {
-            evil = true;
-        }
-        5|6|7 => {
-            dark = true;
-            evil = veyle_index != 6;
-            add_accessory_to_list(result.accessory_list, "c_head_loc", "uAcc_head_Dress556");
-        }
-        _ => {}
-    }
-    if lueur {
-        if evil {
-            result.head_model = if female { "uHead_c052" } else { "uHead_c002" }.into();
-            lueur_fell_child_hair(result);
-        }
-        if dark {
-            if female { result.dress_model = "uBody_Drg0AF_c052".into(); }
-            else { result.dress_model = "uBody_Drg0AM_c002".into(); }
-        }
     }
 }

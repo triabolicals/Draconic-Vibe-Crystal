@@ -26,6 +26,7 @@ pub mod transform;
 pub mod dress;
 pub mod gmap;
 pub(crate) mod engage_attack;
+pub(crate) mod color;
 
 #[unity::class("Combat", "AnimSetDB")]
 pub struct AnimSetDB{

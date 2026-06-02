@@ -105,6 +105,8 @@ pub fn title_loop_events(_proc: &ProcInst, label: i32) {
                     crate::assets::asset_table_result_setup_hook,
                     crate::assets::emblem::asset_table_result_god_setup,
                     crate::assets::emblem::asset_table_robin_hook,
+                    crate::assets::color::combat_character_play_facial,
+                    crate::assets::color::modify_colors,
                 );
             }
             else { outfit_core::reset_faces(true); }
