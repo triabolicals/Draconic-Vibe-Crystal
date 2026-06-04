@@ -86,15 +86,13 @@ fn set_string_value(item: &mut DVCConfigMenuItem, value: &Il2CppString, _: Optio
     if v.len() == 0 { return; }
     let seed = if let Ok(seed) = v.parse::<u32>() { seed } else { engage::ut::Ut::hash_fnv_1_string(value) as u32 };
     if seed == 0 || seed == DVCVariables::Seed.get_value() as u32 { return; }
-    if !DVCVariables::is_main_menu() {
-        item.dvc_value = seed as i32;
-        let message =
-            if DVCVariables::Seed.get_value() == 0 { format!("Set Randomizer Seed to:\n{}?", seed) }
-            else { format!("Change save file seed to:\n{}?", seed) };
-
-        let action = Action::new_method_mut(Some(item), set_seed_yes);
-        BasicDialog2::create_confirm_cancel_bind(item.menu, message, Some(action));
-    }
+    item.dvc_value = seed as i32;
+    let message =
+        if DVCVariables::Seed.get_value() == 0 || DVCVariables::is_main_menu() { format!("Set Randomizer Seed to:\n{}?", seed) }
+        else { format!("Change save file seed to:\n{}?", seed) };
+    
+    let action = Action::new_method_mut(Some(item), set_seed_yes);
+    BasicDialog2::create_confirm_cancel_bind(item.menu, message, Some(action));
 }
 fn set_seed_yes(item: &mut DVCConfigMenuItem, _: OptionalMethod) {
     let not_random = DVCVariables::Seed.get_value() == 0;
@@ -122,7 +120,10 @@ fn update_seed(new_seed: u32) {
         rando.randomize(data);
         rando.commit(data);
     }
-    else { DVCVariables::Seed.set_value(new_seed as i32); }
+    else { 
+        DVCVariables::Seed.set_value(new_seed as i32); 
+        DVCConfig::get().seed = new_seed;
+    }
 }
 fn re_rand_job(item: &mut DVCConfigMenuItem, _: OptionalMethod) {
     let units = crate::randomizer::job::rerandomize_jobs();
