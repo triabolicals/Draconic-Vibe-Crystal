@@ -172,7 +172,7 @@ fn emblem_change_eye_material(m: &Material2, is_dark: bool) {
     let mut color = [1.0f32; 4];
     let start = if is_dark { 18 } else { 36 };
     for x in 0..6 {
-        for i in 0..3 { color[i] = EYE_MATERIAL_COLORS[(start + x) * 3 + i] as f32 / 255.0; }
+        for i in 0..3 { color[i] = EYE_MATERIAL_COLORS[start + x * 3 + i] as f32 / 255.0; }
         m.set_color(MATERIAL_EYE_COLORS[x], Color::new(color[0], color[1], color[2], color[3]));
     }
     m.set_float( "_LightColorToWhite",0.8);
@@ -196,7 +196,7 @@ fn emblem_change_dress_material(m: &Material2, is_dark: bool) {
     let start = if is_dark { 0 } else { 15 };
     let mut color = [1.0f32; 4];
     for x in 0..5 {
-        for i in 0..3 { color[i] = DRESS_MATERIAL_COLORS[(start + x) * 3 + i] as f32 / 255.0; }
+        for i in 0..3 { color[i] = DRESS_MATERIAL_COLORS[start + x * 3 + i] as f32 / 255.0; }
         m.set_color(dress_color[x], Color::new(color[0], color[1], color[2], color[3]));
     }
     m.set_float( "_S_Key_RimLight",1.00);
