@@ -165,7 +165,7 @@ pub fn assign_selected_weapon_mask_by_apt(unit: &mut Unit, with_kind: Option<i32
             if count == n_selects { break; }
             if let Some(kind) = possible_kinds.iter().find(|v| (apt & (1 << *v) != 0) && (new_mask & (1 << *v) == 0)) {
                 new_mask |= 1 << *kind;
-                println!("Adding Kind: {} to {}", *kind, unit.get_name());
+                // println!("Adding Kind: {} to {}", *kind, unit.get_name());
                 count += 1;
             }
         }

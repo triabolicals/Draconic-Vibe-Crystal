@@ -1,16 +1,5 @@
 use super::*;
 
-fn interaction_setting_text(choice: i32) -> &'static str {
-    match choice {
-        2 => { "Reverse" },
-        3 => { "Self-Interact"},
-        1 => { "Random"},
-        4 => { "Fates"},
-        5 => { "None"},
-        6 => { "All"},
-        _ => { "Default"},
-    }
-}
 pub fn change_interaction_data(choice: i32, loaded: bool) {
     if loaded && choice == 0 { return; }
     let interact_data = InteractData::get_list_mut().unwrap();

@@ -58,7 +58,7 @@ fn set_motion(this: &EventDemoSequence, cmd_info: &mut CmdInfo, _: OptionalMetho
             cmd_info.args[2] = outfit_core::BODY_EXPRESS[select as usize].into();
         }
         if DVCFlags::CutsceneFacial.get_value() {
-            let facial = rng.get_value(18);
+            let facial = rng.get_value(13);
             cmd_info.args[1] = outfit_core::FACIAL_STATES[facial as usize].0.into();
         }
     }
