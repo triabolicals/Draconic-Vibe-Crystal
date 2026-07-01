@@ -56,9 +56,9 @@ Player Class Mode|d|r|Opps! all|Lockout|Lockout (Random)
 Playable units will start in their default classes.|Playable units will start in random class.|Playable units are restricted to a single class line.|Units must be in different classes.|Lockout with random starting classes.
 Gift Item Setting|d|r|Rare
 Gift items are not changed.|Gift items are randomized without rare items.|Gift items are randomized with rare items.
-Exploration Items Exclusion|n|Gift|Food
+Exploration Items Exclusion|n|Gift|Food|Gift+Food
 Exclude food/gifts when randomizing exploration items.
-Starting Inventory|o|Player|Enemy
+Starting Inventory|o|Player|Enemy|All Units
 Randomizes the starting inventories for units.
 Personal Growth Randomization|o|Restricted|Unrestricted
 Randomizes unit personal growth rates with total restrictions.
@@ -72,7 +72,7 @@ Unit Deployment|d|r|Lowest Rating|Free|Expanded|Highest Rating|Male|Female
 Default unit selection behavior.|Deployed units are randomly selected.|Lowest rated units are deployed.|No forced deployment (Exception Chapter 22).|Extra deployment slots are added if possible.|Highest rated units are deployed|Only male units can be selected|Only female units can be selected.
 Emblem Deployment|d|r|s|n
 Default emblem selection behavior.|Emblems are randomly selected and assigned.|Equipped emblems will be shuffled among deployed units.|Emblems will not be selectable or equipped by deployed units.
-Generic Unit Appearance|o|Appearance|Color
+Generic Unit Appearance|o|Appearance|Color|Appearance+Color
 Randomly sets generic unit's appearance/color.
 Var26
 -

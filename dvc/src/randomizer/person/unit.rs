@@ -57,10 +57,9 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
     let adjust_items = changed_recruit_order || random_class;
 
     ai::adjust_person_unit_ai(this);
-    let sequence = GameUserData::get_sequence();
     if !DVCVariables::is_main_chapter_complete(2) && changed_recruit_order {
         let old_person = switch_person_reverse(this.person).unwrap_or(this.get_person());
-        if old_person.parent.index < 5 && old_person.parent.index > 0 { // Lueur 1, 2, 3, 4
+        if is_player_unit(old_person){
             change_unit_autolevel(this, true);
             this.item_list.put_off_all_item();
             if random_class { job::reclass::unit_reclass(this, reclass_mode);  }
@@ -97,12 +96,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
         return;
     }
     if changed_recruit_order {
-        if ( sequence == 4 || sequence == 5 ) ||
-            (sequence == 3 && ( GameVariableManager::get_bool("MapRecruit") || ( DVCVariables::UnitDeployment.get_value() != 3 && !lueur_on_map() ) ) )
-        {
-            change_unit_autolevel(this, true);
-        }
-        else if switch_person(this.person).is_none_or(|v| v.parent.hash == this.person.parent.hash){
+        if switch_person(this.person).is_none_or(|v| v.parent.hash == this.person.parent.hash){
             if random_class {
                 job::reclass::unit_reclass(this, reclass_mode);
                 fixed_unit_weapon_mask(this);
@@ -112,7 +106,7 @@ pub fn unit_create_impl_2_hook(this: &mut Unit, method_info: OptionalMethod){
             post_unit_creation_adjustment(this);
             return;
         }
-        else { change_unit_autolevel(this, false);  }
+        else { change_unit_autolevel(this, true);  }
     }
     if random_class {  job::reclass::unit_reclass(this, reclass_mode);  }
     if adjust_items { adjust_unit_items(this); }

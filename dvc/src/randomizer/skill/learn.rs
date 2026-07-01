@@ -16,14 +16,12 @@ pub fn update_learn_skills() {
     for ff in force_type { Force::get(ff).unwrap().iter().for_each(|unit| unit_update_learn_skill(unit) ); }
 }
 
-pub fn unit_update_learn_skill(unit: &Unit) { 
-    if unit.learned_job_skill.is_some() && unit.job.learn_skill.is_some() {
+pub fn unit_update_learn_skill(unit: &Unit) {
+    if (unit.learned_job_skill.is_some() || (unit.level as i32 >= unit.job.get_learn_job_skill_level())) && unit.job.learn_skill.is_some() {
         unit.set_learned_job_skill(None);
-        if (unit.level >= 5 && unit.job.is_high()) || (unit.level >= 25 && unit.job.max_level == 40) {
-            if let Some(skill) = unit_learn_job_skill_hook(unit, unit.job, None) {
-                if DVCFlags::EquipLearnSkills.get_value() { unit.add_to_equip_skill_pool(skill); }
-                unit.set_learned_job_skill(Some(skill));
-            }
+        if let Some(skill) = unit_learn_job_skill_hook(unit, unit.job, None) {
+            if DVCFlags::EquipLearnSkills.get_value() { unit.add_to_equip_skill_pool(skill); }
+            unit.set_learned_job_skill(Some(skill));
         }
     }
     else { unit.try_learn_job_skill(); }

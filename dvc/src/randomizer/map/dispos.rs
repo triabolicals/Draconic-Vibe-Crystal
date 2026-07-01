@@ -6,6 +6,8 @@ use crate::{
     config::DVCVariables, enums::{EMBLEM_GIDS, EMBLEM_PARA},
     randomizer::data::EmblemPool, utils::{can_rand, clamp_value},
 };
+use crate::enums::PIDS;
+
 // Recommended Level, Emblem Level, Lowest Generic Level, Special Enemy Level
 pub const PARALOGUE_LEVELS: [u8; 48] = [
     34, 40, 15, 20,
@@ -25,12 +27,12 @@ pub fn change_map_dispos() {
     if !can_rand() { return; }
     if let Some(dispos) =  DisposData::get_list_mut().as_mut() {
         let chapter_idx = DVCVariables::get_chapter_index();
-        let lythos_crew = chapter_idx < 4;
         dispos.iter_mut().flat_map(|array| array.iter_mut()).for_each(|dispos| {
             if DVCVariables::UnitRecruitment.get_value() != 0 {
-                if let Some(lythos_person) = dispos.get_person().filter(|p| p.parent.index > 0 && p.parent.index < 5 ) {
-                    if lythos_person.parent.index == 1 || lythos_crew {
-                        dispos.set_pid(Some(DVCVariables::get_dvc_person(lythos_person.parent.index - 1, false)));
+                if let Some(person) = dispos.get_person() {
+                    let pid = person.pid.to_string();
+                    if let Some(pos) = PIDS.iter().position(|&p| p == pid){
+                        dispos.set_pid(Some(DVCVariables::get_dvc_person(pos as i32, false)));
                     }
                 }
             }

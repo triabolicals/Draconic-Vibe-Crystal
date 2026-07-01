@@ -41,7 +41,7 @@ impl ReclassType {
     }
 }
 fn unit_random_can_reclass(job: &JobData, is_female: bool, high_class: bool, player: bool, emblem: bool) -> bool {
-    if !DVCFlags::CustomClass.get_value() { if !JOB_HASH.iter().any(|&hash| hash == job.parent.hash ) { return false;} }
+    if !DVCFlags::CustomClass.get_value() && !JOB_HASH.contains(&job.parent.hash) { return false }
     let hash = job.parent.hash;
     if hash == VILLAGER || ((hash == ENCHANTER || hash == MAGE_CANNON) && !dlc_check()) { false }
     else {
@@ -207,7 +207,6 @@ fn recruitment_job_level_adjustment(unit: &mut Unit, old_person: &PersonData, ta
     match (old_tier, new_tier) {
         (ClassTier::Base, ClassTier::Promoted)|(ClassTier::Promoted, ClassTier::Base) => {
             if let Some(job) = GameData::get().job_db.get_reclass_job(unit, target, old_tier) {
-                println!("New Job for {}: {}", unit.get_name(), job.get_name());
                 unit.class_change(job);
                 unit.set_hp(unit.get_capability(0, true));
             }

@@ -84,6 +84,12 @@ pub fn do_transformation(this: &mut CombatRecord, calc_side: BattleSideType) {
                     if g_unit.data.gid.to_string().contains("M002") {
                         conditions[0] = "チキ".into();
                         result = AssetTableResult::get_from_pid(2, "PID_G001_チキ_竜化", conditions);
+                        let item_hash = this.game_status[side].weapon.as_ref().map(|v| v.item.parent.hash).unwrap_or(0);
+                        if let Some(body_anim) = get_outfit_data().item.iter().find(|v| v.hash == item_hash).and_then(|v| AssetTable::try_index_get(v.entry))
+                            .and_then(|e| e.body_anim.filter(|v| v.to_string().contains("AT-")))
+                        {
+                            result.body_anims.add(body_anim);
+                        }
                         result.sound.voice = Some("Lumiere".into());
                     }
                     else {
@@ -105,6 +111,12 @@ pub fn do_transformation(this: &mut CombatRecord, calc_side: BattleSideType) {
             let conditions = Array::new_from_element_class(Il2CppString::class(), 1).unwrap();
             conditions[0] = "EID_チキ".into();
             let result = AssetTableResult::get_from_pid(2, "PID_G001_チキ_竜化", conditions);
+            let item_hash = this.game_status[side].weapon.as_ref().map(|v| v.item.parent.hash).unwrap_or(0);
+            if let Some(body_anim) = get_outfit_data().item.iter().find(|v| v.hash == item_hash).and_then(|v| AssetTable::try_index_get(v.entry))
+                .and_then(|e| e.body_anim.filter(|v| v.to_string().contains("AT-")))
+            {
+                result.body_anims.add(body_anim);
+            }
             this.combat_style |= 1 << 22;
             this.dragonize[side].import(side as i32, calculator, calc_side, distance);
             this.game_status[side].appearance = CharacterAppearance::create_from_result(result, distance);
