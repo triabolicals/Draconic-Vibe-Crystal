@@ -82,9 +82,12 @@ pub fn class_change_job_menu_item_on_select(this: &mut ClassChangeJobMenuItem, _
     this.on_select();
     let old_unit = ClassChangeJobMenu::get_selected_unit_copy();
     this.pad = old_unit.person.parent.hash;
-    old_unit.class_change(this.job_data.job);
+    //old_unit.class_change(this.job_data.job);
+    /*
     UnitInfo::set_unit(UnitInfoSide::Left, None, false, false, false, None);
     UnitInfo::set_unit(UnitInfoSide::Left, Some(old_unit), false, false, false, None);
+     */
+    outfit_core::room::job_change_unit_info(old_unit, this.job_data.job);
     if !can_rand() { return; }
     let data = &this.job_data;
     let menu_content = unsafe { std::mem::transmute::<&BasicMenuContent, &ClassChangeJobMenuContent>(this.menu.menu_content) };

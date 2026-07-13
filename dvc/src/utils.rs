@@ -59,7 +59,6 @@ pub fn get_random_and_remove<T: Clone>(vec: &mut Vec<T>, rng: &Random) -> Option
 
 pub fn get_rng() -> &'static Random { Random::new(DVCVariables::Seed.get_value() as u32) }
 
-
 pub fn is_tile_good(tid: &Il2CppString) -> bool { TerrainData::get(&tid.to_string()).is_some_and(|f| f.prohibition == 0) }
 pub fn tid_can_fly(tid: &Il2CppString) -> bool{ TerrainData::get(&tid.to_string()).is_some_and(|t|{ t.prohibition == 2 }) }
 pub fn can_rand() -> bool { DVCVariables::Seed.get_value() != 0 }

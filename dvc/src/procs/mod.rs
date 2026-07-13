@@ -88,6 +88,7 @@ pub fn proc_bind_desc_edit(proc: &mut ProcInst) {
     }
 }
 pub fn call_proc_original_method(proc: &ProcInst, method_name: &str) {
+    crate::menus::menu_calls_install();
     if let Some(method) = proc.klass.get_method_from_name(method_name, 0).ok() {
         let method_call = unsafe { std::mem::transmute::<_, fn(&ProcInst, &MethodInfo)>(method.method_ptr) };
         method_call(proc, method);

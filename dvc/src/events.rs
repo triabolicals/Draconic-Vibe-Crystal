@@ -14,6 +14,7 @@ use crate::{
     config::DVCVariables,
     randomizer::{self, status::RandomizerStatus, tutorial_check}, DVCConfig,
 };
+use crate::ironman::vtable_edit;
 
 pub const TITLE_SEQUENCE: i32 = -988690862;
 pub const MAIN_SEQUENCE: i32 = -339912801;

@@ -121,14 +121,7 @@ pub fn asset_table_result_god_setup(
             if let Some(appearance) = UnitPool::get_hero(false).and_then(|unit| db.dress.get_personal_dress(unit)){
                 appearance.apply_appearance(result, mode, false, None, &db.hashes, true);
             }
-            if is_darkness {
-                lueur_fell_child_hair(result);
-                result.unity_colors[0].r += 3.0;
-            }
-            else {
-                lueur_god_hair(result);
-                result.unity_colors[0].r += 2.0;
-            }
+            if is_darkness { lueur_fell_child_hair(result); } else { lueur_god_hair(result); }
             result.body_anims.clear();
             if person.get_dress_gender() == Gender::Female {
                 if mode == 2 {
@@ -222,10 +215,7 @@ pub fn asset_table_result_god_setup(
                 if new_emblem < 12 || new_emblem >= 19 || is_m002 { replace_god }
                 else { GodData::get(&format!("GID_E006_敵{}", EMBLEM_ASSET[new_emblem])).unwrap() };
             let result = call_original!(this, mode, Some(emblem), !is_m002, conditions, method_info);
-            if new_emblem >= 19 && !is_m002 { result.unity_colors[0].r += 3.0; }
-            if !is_m002 {
-                change_accessory(result.accessory_list, "uAcc_Eff_EmblemAura-02-00", "c_trans");
-            }
+            if !is_m002 { change_accessory(result.accessory_list, "uAcc_Eff_EmblemAura-02-00", "c_trans"); }
             return result;
         }
     }

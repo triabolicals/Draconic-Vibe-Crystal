@@ -275,8 +275,8 @@ impl EmblemSkillRandomizer {
             chaos_random_pool.extend(chaos_pool.iter().filter(|s| s.indexes.len() > 2)
                 .flat_map(|s| s.indexes.first()).map(|x| *x));
         }
+        chaos_random_pool.shuffle(rng, 2*emblem_count as i32);
         self.chaos_inherit = inherit_skills.iter().zip(chaos_random_pool.iter()).map(|(x, y)| (*x, *y)).collect();
-        chaos_random_pool.shuffle(rng, emblem_count as i32);
 
         // Random Inherit
         for diff in 0..6 {

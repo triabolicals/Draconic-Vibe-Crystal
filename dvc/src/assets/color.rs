@@ -1,12 +1,17 @@
 use engage::{
+    god::*,
     combat::{Character, CharacterAppearance},
     unityengine::{GameObject, Material2, Renderer, SkinnedMeshRenderer, UnityComponent, UnityObject, UnityRenderer, UnityTransform},
     ut::Ut
 };
+use engage::gamedata::{Gamedata, GodData};
 use outfit_core::UnitAssetMenuData;
 use unity::{engine::Color, prelude::OptionalMethod};
 use crate::assets::dress::{BLACK, RED_EYES};
+use crate::config::DVCFlags;
 use crate::DVCVariables;
+use crate::randomizer::data::EmblemPool;
+
 const MATERIAL_EYE_COLORS: [&str; 6] = ["_BaseColor", "_BlackColor", "_DecalColor1", "_DecalColor2", "_DecalColor3", "_DecalColor4"];
 pub const EYE_MATERIAL_COLORS: [u8; 54] = [
     231, 0,	0, 255, 255, 255, 7, 2, 2, 248, 123, 123, 43, 3, 3, 231, 40, 40,    // Red
@@ -18,10 +23,11 @@ const DRESS_MATERIAL_COLORS: [u8; 30] = [
     36, 4, 	4, 80, 	80, 120, 255, 25, 25, 183, 23, 23, 183, 24, 24, //  Dark
     44, 43, 79, 80, 80, 120, 166, 182, 236, 54, 224, 255, 26, 147, 168, //God
 ];
-const BROW_COLOR: [u8; 21] = [
-    80, 80, 120,    // Emission
-    55, 0, 	0, 103, 5, 	5, 190, 190, 190,   // Dark
-    16, 16, 55, 130, 42, 42, 118, 95, 95,   // God
+const BROW_COLOR: [u8; 18] = [
+    64, 68, 101, 103, 5, 5,
+    16, 16, 55, 55, 0, 0,
+    80, 80, 120,
+    190, 190, 190,
 ];
 
 const EMBLEM_SKIN_COLOR: [u8; 30] = [
@@ -31,25 +37,22 @@ const EMBLEM_SKIN_COLOR: [u8; 30] = [
 
 #[unity::hook("Combat", "CharacterAppearance", "ModifyColors")]
 pub fn modify_colors(this: &mut CharacterAppearance, go: &GameObject, _: OptionalMethod) {
-    let mut emblem_type = 0;
-    if this.hair_color.r >= 2.0 && this.hair_color.r < 3.0 {
-        emblem_type = 1;
-        this.hair_color.r -= 2.0;
-    }
-    else if this.hair_color.r >= 3.0 && this.hair_color.r < 4.0 {
-        emblem_type = 2;
-        this.hair_color.r -= 3.0;
-    }
     outfit_core::get_head_hair_colors(go);
-    call_original!(this, go, None);
-    if emblem_type > 0 {
-        let dark = emblem_type == 2;
-        go.get_components_in_children::<Renderer>(true).iter().for_each(|r| {
-            Ut::get_instance_materials(r).iter().for_each(|m|{ emblem_material_edit(m, dark); });
-        });
-        this.instanced_materials.iter().for_each(|m|{ emblem_material_edit(m, dark); });
-    }
 
+    call_original!(this, go, None);
+    if let Some(god) = GodData::try_get_hash(this.person_hash) {
+        let enemy = god.force_type == 1 && !god.gid.str_contains("相手");
+        let dark = GodPool::try_get(god, true).is_some_and(|v| v.darkness) || (god.force_type == 1 && !god.gid.str_contains("相手"));
+        let hero = god.flag.value & -2147483648 != 0;
+        let names = DVCFlags::GodNames.get_value() && (!EmblemPool::is_custom(god) || enemy);
+        let hair = hero || names || dark;
+        if hero || names || dark {
+            go.get_components_in_children::<Renderer>(true).iter().for_each(|r| {
+                Ut::get_instance_materials(r).iter().for_each(|m|{ emblem_material_edit(m, dark, hair); });
+            });
+            this.instanced_materials.iter().for_each(|m|{ emblem_material_edit(m, dark, hair); });
+        }
+    }
     if let Some(pos) = BLACK.iter().position(|h| *h == this.person_hash) {
         if pos == 4 {
             let replacement = DVCVariables::get_dvc_recruitment_index(0);
@@ -104,9 +107,9 @@ pub fn combat_character_play_facial(this: &Character, state_hash: i32, transitio
     call_original!(this, state_hash, transition, optional_method);
 }
 
-fn emblem_material_edit(m: &Material2, dark: bool) {
+fn emblem_material_edit(m: &Material2, dark: bool, hair: bool) {
     let name = m.get_name().to_string();
-    if name.starts_with("MtHair") {
+    if name.starts_with("MtHair") && hair {
         if name.contains("Brow") { change_brow_color(m, dark); }
         else { change_hair_material(m, dark); }
     }
@@ -183,7 +186,7 @@ fn emblem_change_skin_material(m: &Material2, is_dark: bool) {
     let colors = ["_EmissionColor", "_EngageEmissionColor", "_OutlineColor", "_RimLightColorLight", "_RimLightColorShadow"];
     let start = if is_dark { 0 } else { 5 };
     for x in 0..5 {
-        for i in 0..3 { color[x] = EMBLEM_SKIN_COLOR[(start + x)*3 + i] as f32 / 255.0; }
+        for i in 0..3 { color[i] = EMBLEM_SKIN_COLOR[(start + x)*3 + i] as f32 / 255.0; }
         m.set_color(colors[x], Color::new(color[0], color[1], color[2], color[3]));
     }
     m.set_float( "_Preset",5.00);
@@ -210,11 +213,14 @@ fn emblem_change_dress_material(m: &Material2, is_dark: bool) {
 }
 fn change_brow_color(m: &Material2, is_dark: bool) {
     let mut color = [1.0f32; 4];
-    let brows = ["_EngageEmissionColor", "_EmissionColor", "_ShadowAddColor", "_ShadowColor"];
-    for x1 in 0..4 {
-        let mut x = x1;
-        if x > 0 && !is_dark { x = x1 + 3; }
-        for i in 0..3 { color[i] = DRESS_MATERIAL_COLORS[x * 3 + i] as f32 / 255.0; }
-        m.set_color(brows[x], Color::new(color[0], color[1], color[2], color[3]));
-    }
+    m.set_color("_BaseColor", Color{r: 1.0, g: 1.0, b: 1.0, a: 1.0});
+    ["_ShadowAddColor", "_EmissionColor"].iter().enumerate().for_each(|(i, c)| {
+        let ii = 6*i + if is_dark { 3 } else { 0 };
+        for x in 0..3 { color[x] = BROW_COLOR[ii+x] as f32 / 255.0; }
+        m.set_color(*c, Color{r: color[0], g: color[1], b: color[2], a: 1.0});
+    });
+    ["_EngageEmissionColor", "_ShadowColor"].iter().enumerate().for_each(|(i, c)| {
+        for x in 0..3 { color[x] = BROW_COLOR[12+3*i+x] as f32 / 255.0; }
+        m.set_color(*c, Color{r: color[0], g: color[1], b: color[2], a: 1.0});
+    });
 }
