@@ -1,6 +1,11 @@
-use engage::app::{GodData, IBitField32Methods, IGodDataMethods, ISkillData, ISkillDataMethods, IStructData_1Methods, IWeaponLevels};
 use std::sync::RwLock;
-use engage::{app::{mainsequence::*, spriteatlasmanager_2::*, FaceThumbnail, GameIcon}, system::collections::generic::{IDictionary_2Methods, InsertionBehavior}};
+use engage::{
+    app::{
+        IChapterDataMethods,
+        mainsequence::*, spriteatlasmanager_2::*, FaceThumbnail, GameIcon
+    },
+    system::collections::generic::{IDictionary_2Methods, InsertionBehavior}
+};
 use unity::{Cast, OptionalMethod};
 use crate::{
     dvc::{
@@ -23,6 +28,7 @@ pub fn main_sequence_descs_edit(proc: ProcInst){
         descs.set(31, Proc::call_2(ProcVoidMethod::from_fn(proc, main_sequence_post_load_resource).unwrap()));
         descs.set(32, Proc::call_2(ProcVoidMethod::from_fn(proc, main_sequence_post_initialize).unwrap()));
         descs.set(43, Proc::call_2(ProcVoidMethod::from_fn(proc, main_sequence_game_reset).unwrap()));
+        descs.set(116, Proc::call_2(ProcVoidMethod::from_fn(proc, main_sequence_try_jump_continue_map).unwrap()));
     }
 }
 
@@ -81,4 +87,25 @@ extern "C" fn main_sequence_game_reset(main_sequence: MainSequence, _: OptionalM
     PersonPool::reset_reliance_data();
     main_sequence.game_reset();
     DVC::get().reset();
+}
+extern "C" fn main_sequence_try_jump_continue_map(main_sequence: MainSequence, _: OptionalMethod) {
+    let user_data = DVCVariables::user_data();
+    let chapter = user_data.get_chapter();
+    if !chapter.is_null() && chapter.get_flag().value & 512 == 0 {
+        if DVCVariables::is_random_map() && chapter.get_flag().value & 8 == 0 {
+            if let Some(next) = DVCVariables::get_next_chapter().or_else(|| dvc::continuous::set_next_chapter(user_data.get_chapter())){
+                user_data.set_chapter(next);
+                main_sequence.jump(5);
+                return;
+            }
+        }
+        if DVCVariable::Continuous.get_setting_value() == 1 && chapter.get_flag().value & 16 != 0 {
+            if let Some(next) = to_opt(user_data.get_next_chapter()) {
+                user_data.set_chapter(next);
+                main_sequence.jump(5);
+                return;
+            }
+        }
+    }
+    main_sequence.try_jump_to_continue_map();
 }
