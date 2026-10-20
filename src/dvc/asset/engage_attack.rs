@@ -74,31 +74,21 @@ pub fn combat_record_post_process(this: CombatRecord, method_info: OptionalMetho
                 gs.get(2 + is_enemy).set_appearance(CharacterAppearance::create_from_result(result, 1));
             }
             20 => {
-                if emblem_idx == 12 || emblem_idx == 20 || emblem_idx == 21 {
-                    [12, 20, 21, 9].into_iter().enumerate()
-                        .map(|(i, v)| (i, AssetTable_Result::get_from_god_2(AssetTable_Modes::combat(), GodData::get(EMBLEM_GIDS[v].into()), dark, CharacterAppearance::conditions())))
-                        .for_each(|(i, result)| {
-                            result.get_body_anims().clear();
-                            result.set_body_anim(THREE_HOUSE_ACTS[i]);
-                            result.get_body_anims().add(THREE_HOUSE_ACTS[i].into());
-                            AnimData::remove(result, true, false);
-                            result.set_right_hand(THREE_HOUSES_RIGHT[i]);
-                            result.set_left_hand(if i == 2 { "uWep_Bw14-Bw" } else { "null" });
-                            gs.get(6 + i*2 + is_enemy).set_appearance(CharacterAppearance::create_from_result(result, 1));
-                        });
-                }
-                else {
-                    for i in 0..4 {
-                        if let Some(result) = engage_atk_source.get_god_partner_result(unit, i == 1) {
-                            result.get_body_anims().clear();
-                            result.set_body_anim(THREE_HOUSE_ACTS[i]);
-                            result.get_body_anims().add(THREE_HOUSE_ACTS[i].into());
-                            AnimData::remove(result, true, false);
-                            result.set_right_hand(THREE_HOUSES_RIGHT[i]);
-                            result.set_left_hand(if i == 2 { "uWep_Bw14-Bw" } else { "null" });
-                            gs.get(6 + i*2 + is_enemy).set_appearance(CharacterAppearance::create_from_result(result, 1));
-                        }
-                    }
+                let is_3h = emblem_idx == 12 || emblem_idx == 20 || emblem_idx == 21;
+                let emblem_index = [9, 12, 20, 21];
+                for i in 0..4 {
+                    let emblem = emblem_index[i] as usize;
+                    let result =
+                    if is_3h { AssetTable_Result::get_from_god_2(AssetTable_Modes::combat(), GodData::get(EMBLEM_GIDS[emblem].into()), dark, CharacterAppearance::conditions()) }
+                    else if let Some(r) = engage_atk_source.get_god_partner_result(unit, i == 1) { r}
+                    else { AssetTable_Result::get_from_god_2(AssetTable_Modes::combat(), GodData::get(EMBLEM_GIDS[emblem].into()), dark, CharacterAppearance::conditions()) };
+                    result.get_body_anims().clear();
+                    result.set_body_anim(THREE_HOUSE_ACTS[i]);
+                    result.get_body_anims().add(THREE_HOUSE_ACTS[i].into());
+                    AnimData::remove(result, true, false);
+                    result.set_right_hand(THREE_HOUSES_RIGHT[i]);
+                    result.set_left_hand(if i == 3 { "uWep_Bw14-Bw" } else { "null" });
+                    gs.get(6 + i*2 + is_enemy).set_appearance(CharacterAppearance::create_from_result(result, 1));
                 }
             }
             _ => { return; }
@@ -109,9 +99,7 @@ pub fn combat_record_post_process(this: CombatRecord, method_info: OptionalMetho
         if !this.get_game_status().get(1).get_unit().is_null()  { do_transformation(this, BattleSide_Type::defense()); }
         this.get_game_status_chain_atk().iter().filter(|x| !x.get_unit().is_null() && !x.get_weapon().is_null())
             .for_each(|gs|{ if let Some(result) = get_transformation2(gs.get_unit(), gs.get_weapon()){ gs.set_appearance(CharacterAppearance::create_from_result(result, 1)); } });
-        println!("CombatRecord Style Before: {}", this.get_combat_style().value);
         call_original!(this, method_info);
-        println!("CombatRecord Style After: {}", this.get_combat_style().value);
     }
 }
 fn adjust_emblem_zone(this: CharacterGameStatus) {
@@ -215,18 +203,18 @@ impl EngageAttackType {
         result.set_ride_model(Il2CppString::null());
         result.set_ride_dress_model(Il2CppString::null());
         for i in 1..5 { result.commit_8(new_accessory(format!("reserve{}_loc", i), "null")); }
-        if !unit.get_engage_attack().is_null() {
-            println!("Engage Attack: {}", Mess::get(unit.get_engage_attack().get_name()));
-        }
-        println!("Three Stars: {} / {} ",condition_flags.flags.contains(AssetFlags::FiveStar), condition_flags.flags.contains(AssetFlags::ThreeStar));
-        if condition_flags.flags.contains(AssetFlags::FiveStar) || condition_flags.flags.contains(AssetFlags::ThreeStar) || self == EngageAttackType::Veronica {
+        if !unit.get_engage_attack().is_null() { println!("{} Engage Attack: {}", unit.get_name(), Mess::get(unit.get_engage_attack().get_name())); }
+        // println!("Three Stars: {} / {} ",condition_flags.flags.contains(AssetFlags::FiveStar), condition_flags.flags.contains(AssetFlags::ThreeStar));
+        let person_hash = unit.get_person().hash();
+        let is_emblem_boss_veronica = person_hash == 1991382218 || person_hash == 1842858182;
+        let is_summon_stars = condition_flags.flags.contains(AssetFlags::FiveStar) || condition_flags.flags.contains(AssetFlags::ThreeStar);
+        if is_summon_stars && (is_emblem_boss_veronica || self == EngageAttackType::Veronica){
             let model = "uAcc_Event_SummonStone".to_string() + if condition_flags.flags.contains(AssetFlags::FiveStar) { "B" } else { "A" };
-            let body_anim = "Ver".to_string() +   if condition_flags.flags.contains(AssetFlags::FiveStar) { "2A" } else { "1A" } + gen_str + "-Mg1_c000_N";
+            let body_anim = "Ver".to_string() + if condition_flags.flags.contains(AssetFlags::FiveStar) { "2A" } else { "1A" } + gen_str + "-Mg1_c000_N";
             result.get_body_anims().add(body_anim.into());
             result.commit_8(new_accessory("reserve4_loc", model));
             return;
         }
-
         match self {
             Self::None => { return }
             EngageAttackType::Override => {
@@ -266,6 +254,8 @@ impl EngageAttackType {
             _ => {}
         }
         db.anims.set_engage_atk_anim(result, gender, unit);
+        result.replace(AssetTable_Modes::combat());
+        print_asset_table_result(result, 2);
     }
 }
 pub fn lueur_engage_atk(result: AssetTable_Result, unit: Unit, conditions: &AssetConditions) {
