@@ -14,6 +14,7 @@ use engage::{
     prelude::List_1, GameVariableManager, List_1Ext, Mess,
     system::{collections::generic::IList_1Methods, IDelegate, Object}
 };
+use engage::app::GameParam;
 use outfit_core::Randomizer;
 use unity::{Array, Cast, FromIlInstance, IlNull, OptionalMethod};
 use crate::{DVCFlags, DVCVariables, gamedata::RandomizedGameData};
@@ -266,7 +267,12 @@ pub fn can_buy(item_data: ItemData) -> bool {
 pub fn buy_random_item(item_data: ItemData) {
     let count = item_data.get_inventory();
     let user_data = DVCVariables::user_data();
-    let gold = max(user_data.get_gold() - item_data.get_price(), 0);
+    let mut price = item_data.get_price();
+    if ShopCore::is_price_down() {
+        let factor = 1.0 - GameParam::get_float("シルバーカード割引率");
+        price = ( price as f32 * factor) as i32;
+    }
+    let gold = max(user_data.get_gold() - price, 0);
     match item_data.get_kind().value {
         18 => { user_data.set_gold(user_data.get_gold() + item_data.get_price()); }
         17 => { user_data.set_piece_of_bond(user_data.get_piece_of_bond() + item_data.get_price()); },
