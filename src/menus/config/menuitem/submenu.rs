@@ -160,7 +160,7 @@ impl DVCMenu {
                 ].to_vec()
             }
             DVCMenu::Other => {
-                [Flag(Ironman), Variable(Continuous), Flag(ContinuousExp), Flag(ContinuousModeItems), Flag(MaxStatCaps)].to_vec()
+                [Flag(Ironman), Variable(Continuous), Flag(ContinuousExp), Flag(ContinuousModeItems), Flag(MaxStatCaps), Flag(ExerciseStat)].to_vec()
             },
             DVCMenu::Cutscene => {
                 [Flag(Supports), Flag(CutsceneBGM), Flag(CutsceneFacial), Flag(CutsceneMotion), Flag(CutsceneBackground)].to_vec()

@@ -21,3 +21,4 @@ pub mod hubmenu;
 pub mod hubplaytalk;
 pub mod die;
 mod itemuse;
+pub mod muscle;

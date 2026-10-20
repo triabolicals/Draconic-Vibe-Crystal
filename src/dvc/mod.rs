@@ -267,6 +267,7 @@ impl DVC {
         sequences::levelup::vtable_build_common_reward();
         unit::ai::ai_think_method_edit();
         sequences::gmap::vtable_gmap_enter_chapter_item();
+        sequences::muscle::exercise_prize_method_edits();
         let data = RANDOMIZER_DATA.get_or_init(|| GameData::init());
         RANDOMIZED_DATA.get_or_init(|| RwLock::new(RandomizedGameData::new(data.person_pool.playable.len())));
         asset::other::OtherAssetData::init();
@@ -517,6 +518,9 @@ impl DVC {
             _ => {
                 let name = proc.get_name().to_rust_string();
                 if name.contains("ProcBond") { asset::facethumb::telop_proc_edit(proc); }
+                else if name == "QuickExercise" {
+                    proc.m_descs().set(1, Proc::call_2(ProcVoidMethod::from_fn(proc, sequences::muscle::hub_quick_exercise_get_prize_bonus).unwrap()));
+                }
                 else if name.contains("RefineShopRefineTargetMenu") { randomizer::shop::edit_refine_evolve_items(proc); }
                 else if name.contains("DragonRideSequence") {
                     Self::get().hero_appearance = Some(HeroAppearanceMode::Normal);

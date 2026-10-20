@@ -143,7 +143,7 @@ Well Item Randomization|Randomizes items obtain from the well.|rn
 Weapon Stats Randomization|Randomizes weapon stats. Variance increase with rank.|rn
 Support Randomization|Support characters will be casted in random scenes.|rn
 Additional Weapon Effects|Non-Engaged weapons gains one additional random effect.
-F46
+Exercise Stat Boosts|Randomizes stat boost with a 25% chance for second boost.|rn
 F47
 F48
 F49
