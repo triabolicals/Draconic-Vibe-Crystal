@@ -46,8 +46,15 @@ pub fn adjust_player_unit_level_scale(unit: Unit, target_level: i32) {
 }
 pub fn adjust_player_level_recruitment(unit: Unit, lvl: i32, il: i32) {
     if unit.get_job().is_high() {
-        unit.set_level(lvl);
-        unit.set_internal_level(il);
+        let total = lvl + il;
+        if lvl > 20 && (il == 0 || total > 20) {
+            unit.set_level(total - 20);
+            unit.set_internal_level(20);
+        }
+        else {
+            unit.set_level(lvl);
+            unit.set_internal_level(il);
+        }
     }
     else {
         let max_lvl = unit.get_job().get_max_level() as i32;
