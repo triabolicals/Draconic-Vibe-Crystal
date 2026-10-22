@@ -260,7 +260,7 @@ impl DVC {
         asset::facethumb::override_facethumb_menu_item_build();
         deployment::sortie_deployment_menu_install();
         randomizer::reclass::class_change_vtable_edit();
-        randomizer::inherit::skill_inheritance_vtable_edit();
+        randomizer::rings::ring_skill_inheritance_vtable_edits();
         randomizer::hub::hub_method_edits();
         continuous::continuous_mode_vtable_edit();
         talk::talk_tag_vtable_edit();
@@ -448,9 +448,7 @@ impl DVC {
             -1301819996 => {    // FishingSequence
                 Self::get().hero_appearance = Some(HeroAppearanceMode::Normal);
                 let count = proc.m_descs().iter().count();
-                println!("FishingSequence Descs Length: {}", count);
                 let i = if count == 16 { 14 } else { 11 };
-
                 proc.m_descs().set(i, Proc::call_2(ProcVoidMethod::from_fn(proc, sequences::hub::fishing_exit).unwrap()));
             }
             -141149838 => { Self::get().hero_appearance = Some(HeroAppearanceMode::Training); }

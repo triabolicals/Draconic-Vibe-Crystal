@@ -35,7 +35,7 @@ pub fn main() {
         dvc::mess::god_unit_get_name,
         dvc::randomizer::shop::item_buy_item_create_menu_item,
         dvc::randomizer::shop::weapon_buy_item_create_menu_item,
-        dvc::randomizer::inherit::skill_inheritance_menu_create_menu_item_list,
+        dvc::randomizer::rings::skill_inheritance_menu_create_menu_item_list,
         dvc::randomizer::godbond::god_bond_holder_get,
         dvc::asset::sprite::unit_icon_set_god_icon,
         dvc::asset::sprite::unit_icon_set_icon,
@@ -45,7 +45,7 @@ pub fn main() {
         dvc::talk::talk_tag_parser_parse,
         dvc::mess::add_tag_string,
         dvc::randomizer::hub::hub_access_data_confirm_content,
-        dvc::randomizer::inherit::ring_list_skill_menu_create_menu_items,
+        dvc::randomizer::rings::ring_list_skill_menu_create_menu_items,
         dvc::randomizer::reclass::class_change_job_menu_set_unit_info_all,
     );
     println!("Draconic Vibe Crystal v{}", VERSION);

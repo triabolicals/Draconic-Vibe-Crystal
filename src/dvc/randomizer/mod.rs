@@ -3,7 +3,7 @@ pub mod map;
 pub mod shop;
 pub mod godbond;
 pub mod item;
-pub mod inherit;
+pub mod rings;
 pub mod reclass;
 pub mod bgm;
 pub mod hub;
