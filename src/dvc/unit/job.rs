@@ -109,7 +109,7 @@ pub fn unit_reclass(unit: Unit, kind: ReclassType) -> bool {
                     tier = ClassTier::from_job(old_job);
                 }
             }
-            let is_base = tier == ClassTier::Base || level > 20 || (get_scaling_level().is_some_and(|v| v < 16) && recruitment);
+            let is_base = tier == ClassTier::Base || (tier == ClassTier::Special && level <= 20) || (get_scaling_level().is_some_and(|v| v < 16) && recruitment);
             if let Some(job) = DVCVariables::get_single_class(is_base, female){
                 unit.class_change(job, ItemData::null());
                 reclass_level_adjustment(unit, level, il, tier);
@@ -122,7 +122,7 @@ pub fn unit_reclass(unit: Unit, kind: ReclassType) -> bool {
         }
         ReclassType::GenderSingle(recruitment) => {
             let gender = unit.get_dress_gender();
-            let is_base = tier == ClassTier::Base || level > 20 || (get_scaling_level().is_some_and(|v| v < 16) && recruitment);
+            let is_base = tier == ClassTier::Base || (tier == ClassTier::Special && level <= 20)  || (get_scaling_level().is_some_and(|v| v < 16) && recruitment);
             if let Some(job) = DVCVariables::get_single_class_gender(is_base, gender){
                 unit.class_change(job, ItemData::null());
                 reclass_level_adjustment(unit, level, il, tier);
@@ -250,10 +250,7 @@ fn reclass_level_adjustment(unit: Unit, target_level: i32, target_il: i32, from:
                 if total_level > job_max_level { set_level = clamp_value(total_level - job_max_level, 1, job_max_level); }
             }
             (ClassTier::Special, ClassTier::Promoted) => {
-                set_level =
-                    if total_level > (job_max_level + 5) { clamp_value(total_level - job_max_level, 1, job_max_level) } 
-                    else if total_level > (job_max_level - 5) { clamp_value(total_level - job_max_level - 5, 1, job_max_level) } 
-                    else if total_level > 20 { clamp_value(total_level - 20, 1, job_max_level) } else { total_level }
+                set_level = if total_level >= job_max_level { total_level - job_max_level } else { total_level };
             }
             (ClassTier::Promoted|ClassTier::Base, ClassTier::Special) => { set_level = clamp_value(total_level, 1, job_max_level); }
             _ => {}
