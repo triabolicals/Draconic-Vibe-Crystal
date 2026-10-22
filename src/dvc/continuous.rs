@@ -142,7 +142,7 @@ pub fn pre_map_emblem_adjustment() {
         21 => escape_or_create(0, true),
         22 => {
             escape_or_create(0, false);
-            for x in 1..12 { escape_or_create(x, false); }
+            for x in 1..12 { escape_or_create(x, true); }
         }
         33..45 => {
             if let Some(v) = EmblemPool::get_god_unlocked_from_paralogue(chapter_index){
