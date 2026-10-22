@@ -1,6 +1,7 @@
 use super::*;
 use engage::{
     app::{
+        ringselectmenu::*,
         ringlistskillmenu::*,
         skillinheritancemenu::*, skillinheritancemenuitemcontent::*, skillinheritancemenuitem::*,
         gamecolor::*, basicmenuitem::*,
@@ -14,9 +15,10 @@ use engage::{
 };
 use crate::{dvc::sync::EmblemSkillRandomizer, utils::override_vtable};
 
-pub fn skill_inheritance_vtable_edit() {
+pub fn ring_skill_inheritance_vtable_edits() {
     override_vtable("App", "SkillInheritanceMenuItemContent", "Build", skill_inheritance_menu_item_content_build as _);
     override_vtable("App", "RingListSkillMenu.MenuItem_WeaponTalent", "BuildAttribute", weapon_talent_build_attribute as _);
+    override_vtable("App", "RingSelectMenu.RingMenuItem", "BuildAttribute", ring_select_menu_item_build_attr as _);
 }
 
 #[unity::hook("App", "RingListSkillMenu", "CreateGodGrowthMenuItem")]
@@ -74,13 +76,13 @@ pub fn skill_inheritance_menu_create_menu_item_list(god: GodData, method_info: O
     let ran_data = RandomizedGameData::get_read();
     let mode = DVCVariable::EmblemInherit.get_value();
     let random_sp = DVCFlags::RandomSP.get_value();
-    menu.iter().for_each(|x| { if let Some(skill) = utils::to_opt(x.get_skill()) { set_original_skill_hash(x, skill); } });
-    if let Some(unit) = utils::to_opt(SkillInheritanceMenu::get_m_unit()){
+    menu.iter().for_each(|x| { if let Some(skill) = to_opt(x.get_skill()) { set_original_skill_hash(x, skill); } });
+    if let Some(unit) = to_opt(SkillInheritanceMenu::get_m_unit()){
         if mode == 3 {
             let data = GameData::get();
             let unit_inherit_map = EmblemSkillRandomizer::generate_unit_inherit(&data, unit);
             menu.iter().for_each(|x| {
-                if let Some(skill) = utils::to_opt(get_original_skill(x)){
+                if let Some(skill) = to_opt(get_original_skill(x)){
                     let index = skill.index();
                     if let Some(new_skill) = unit_inherit_map.get(&index).map(|&i| SkillData::try_get_2(i)){
                         x.set_skill(new_skill);
@@ -91,7 +93,7 @@ pub fn skill_inheritance_menu_create_menu_item_list(god: GodData, method_info: O
         }
         else {
             menu.iter().for_each(|x| {
-                if let Some(skill) = utils::to_opt(get_original_skill(x)){
+                if let Some(skill) = to_opt(get_original_skill(x)){
                     if let Some(new_skill) = ran_data.engage_skills.get_inherit(skill){
                         x.set_skill(new_skill);
                         reset_skill_inherit_menu_item_cost(x, unit, random_sp, &ran_data.engage_skills);
@@ -185,6 +187,22 @@ fn reset_skill_inherit_menu_item_cost(menu_item: SkillInheritanceMenuItem, unit:
         }
     }
 }
-
+// BuildAttribute Edit for disabling Hero / Marth Replacement in Chapter 22
+fn ring_select_menu_item_build_attr(ring: RingSelectMenu_RingMenuItem, _: OptionalMethod) -> BasicMenuItem_Attribute {
+    let original_result = unsafe { RingSelectMenu_RingMenuItem::build_attribute(ring) };
+    if let Some(menu) = ring.m_menu().try_cast::<RingSelectMenu>() {
+        let unit = menu.get_unit();
+        let god = ring.get_god();
+        if DVCVariables::get_chapter_index() == 22 {
+            if !unit.is_null() && unit.is_hero() { BasicMenuItem_Attribute::disable() }
+            else if !god.is_null() {
+                if DVCVariable::EmblemRecruitment.get_value() == 0 { original_result }
+                else if EmblemPool::get_replacement_index(god.m_data().get_main_data(), true).is_some_and(|v| v == 0) { BasicMenuItem_Attribute::disable() }
+                else { BasicMenuItem_Attribute::enable() }
+            } else { original_result }
+        }
+        else { original_result }
+    } else { original_result }
+}
 fn set_skill_hash(menu_item: SkillInheritanceMenuItem, hash: i32) { unity::field_set_value_at_offset(menu_item, 0x64, hash); }
 fn get_skill_hash(menu_item: SkillInheritanceMenuItem) -> i32 { unity::field_get_value_at_offset(menu_item, 0x64) }
