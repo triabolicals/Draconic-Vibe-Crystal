@@ -18,7 +18,6 @@ mod job;
 
 use super::*;
 pub use {submenu::DVCMenu, order::RecruitmentOrder, command::DVCCommand, job::DVCJobItem};
-#[cfg(feature = "debug")] pub use debug::DVCDebug;
 use crate::dvc::DVC;
 
 const KINDS: [&str; 8] = ["Sword", "Lance", "Axe", "Bow", "Dagger", "Magic", "Fist", "Special"];
@@ -42,8 +41,6 @@ pub enum DVCMenuItemKind {
     Command(DVCCommand),
     Order(RecruitmentOrder),
     Job(DVCJobItem),
-    #[cfg(feature = "debug")] Debug(DVCDebug),
-
 }
 
 impl DVCMenuItemKind {
@@ -70,7 +67,6 @@ impl DVCMenuItemKind {
             4 => DVCCommand::from(v).map(|cmd| Self::Command(cmd)),
             5 => RecruitmentOrder::from(v).map(|order| Self::Order(order)),
             6 => DVCJobItem::from(v).map(|job| Self::Job(job)),
-            #[cfg(feature = "debug")] 7 => DVCDebug::from(v).map(|debug| Self::Debug(debug)),
             _ => None,
         }
     }
@@ -95,7 +91,6 @@ impl DVCBasicMenuItem {
             DVCMenuItemKind::Flag(flag) => flag.build_attribute(),
             DVCMenuItemKind::Order(order) => order.build_attribute(self),
             DVCMenuItemKind::Job(job) => job.build_attribute(),
-            #[cfg(feature = "debug")] DVCMenuItemKind::Debug(debug) => debug.build_attribute(),
         }
     }
     #[override_virtual(name="OnSelect")]
@@ -134,7 +129,6 @@ impl DVCBasicMenuItem {
                 }
                 else { BasicMenu_Result::pass() }
             }
-            #[cfg(feature = "debug")] DVCMenuItemKind::Debug(debug) => { debug.a_call(self) }
             _ => { BasicMenu_Result::pass() }
         }
     }
@@ -182,7 +176,6 @@ impl DVCBasicMenuItem {
         let kind = self.get_menu_item_type();
         let menu = self.get_dvc_menu();
         match kind {
-            #[cfg(feature = "debug")] DVCMenuItemKind::Debug(debug) => { debug.custom_call(self) }
             DVCMenuItemKind::Variable(var) => {
                 if let Some(increase) = Self::get_change(true) {
                     let current = self.value();
@@ -197,7 +190,7 @@ impl DVCBasicMenuItem {
                             return BasicMenu_Result::pass();
                         }
                         else {
-                            let new = current + if increase { 1 } else { 5 } % 6;
+                            let new = (current + if increase { 1 } else { 5 }) % 6;
                             menu.set_current_value(var, new);
                             self.set_value(new);
                             let initial = DVCVariable::ClassMode.get_setting_value();
@@ -309,34 +302,12 @@ impl DVCBasicMenuItem {
                 item.set_value(v);
                 item.set_m_is_command_icon(false);
             }
-            #[cfg(feature = "debug")] DVCMenuItemKind::Debug(debug) => {
-                item.set_m_is_command_icon(true);
-                if debug == DVCDebug::AverageLevel {
-                    item.set_m_is_arrow(true);
-                    item.set_value(DVCVariable::AverageLevel.get_setting_value());
-                }
-                else if debug == DVCDebug::ChangeChapterState {
-                    item.set_value(4);
-                    item.set_m_is_arrow(true);
-                }
-                else { item.set_m_is_arrow(false); }
-            }
             _ => {}
         }
         CONFIG_TEXT.get_or_init(|| DVCConfigText::init()).set_text(item);
         item
     }
     pub fn as_basic_menu_item(self) -> BasicMenuItem { unsafe { self.cast() } }
-}
-
-#[unity::callback]
-fn oops_all_change(menu_item: DVCBasicMenuItem, _: OptionalMethod) {
-    let increase = menu_item.value2();
-    menu_item.set_value(if increase != 0 { 0 } else { 1 });
-    DVCVariable::ClassMode.set_value(menu_item.value());
-    DVCFlags::SingleJobEnabled.set_value(false);
-    menu_item.update_text();
-    menu_item.get_dvc_menu().rebuild();
 }
 #[skyline::from_offset(0x2466570)]
 fn basic_menu_item_on_select(this: DVCBasicMenuItem, optional_method: OptionalMethod);

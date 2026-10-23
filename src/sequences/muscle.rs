@@ -8,7 +8,7 @@ use engage::{
     },
     app::{IUnit, IUnitEnhanceFactorsMethods}
 };
-use engage::app::{Force, Force_Type, IMuscleExercisePrizeDataMethods, IRandom_2Methods, IStructData_1Methods, IUnitEnhanceFactors, Random_2};
+use engage::app::{Force, Force_Type, IMuscleExercisePrizeDataMethods, IRandom_2Methods, IStructData_1Methods, Random_2};
 use outfit_core::Randomizer;
 
 const STAT: [&'static str; 6] = ["HP", "力", "技", "HP", "Str", "Tec"];
@@ -22,7 +22,6 @@ pub fn exercise_prize_method_edits() {
         let class_data = Class::lookup(namespace.as_str(), class.as_str());
         if let Some(method) = class_data.raw_mut().get_method_from_name("GetPrizeBonus", 0){
             method.method_ptr = get_stat_boost_muscle as _;
-            println!("GetPrizeBonus for {}.{} edited", namespace, class);
         }
     });
 }

@@ -1,13 +1,9 @@
-use engage::app::{
-    BasicMenu_Result,
-    IBitField32, IForceMethods, IJobDataMethods, IUnit,
-    Mess_IconCategory, SoftwareKeyboard, SoftwareKeyboard_Preset, Unit,
-};
+use engage::app::{BasicMenu_Result, IBitField32, IForceMethods, IJobDataMethods, IUnit, Mess_IconCategory, SoftwareKeyboard, SoftwareKeyboard_Preset, Unit};
 use crate::{
     dvc::unit,
     utils::to_opt
 };
-use crate::dvc::autolevel::{try_autoscale_unit, try_change_unit_tier_for_scale};
+use crate::dvc::autolevel::try_autoscale_unit;
 use super::*;
 const WEP_KEY: [&str; 4] = ["Sword", "Lance", "Ax", "Bow"];
 #[repr(C)]
@@ -16,7 +12,6 @@ pub enum DVCCommand {
     SetSeed,
     ReRandJob,
     Menu,
-    #[cfg(feature = "debug")] Output,
 }
 impl DVCCommand {
     pub fn from(i: i32) -> Option<Self> {
@@ -24,7 +19,6 @@ impl DVCCommand {
             0 => Some(DVCCommand::SetSeed),
             1 => Some(DVCCommand::ReRandJob),
             2 => Some(DVCCommand::Menu),
-            #[cfg(feature = "debug")] 3 => Some(DVCCommand::Output),
             _ => None,
         }
     }
@@ -56,35 +50,6 @@ impl DVCCommand {
                 DVCSettingMenu::create_bind(menu_item.get_menu());
                 return BasicMenu_Result::se_cursor();
             }
-            #[cfg(feature = "debug")]DVCCommand::Output => {}
-            /*
-
-            DVCCommand::QuickStart => {
-                if let Some(main_menu) = to_opt(MainMenuSequence::get_instance()) {
-                    main_menu.set_m_difficulty(Difficulty::lunatic());
-                    main_menu.set_m_grow_mode(GrowMode::random());
-                    main_menu.set_m_game_mode(GameMode::classic());
-                    if Random_2::get_system().get_value() & 1 == 0  { main_menu.set_m_player_gender(Gender::female()); }
-                    else { main_menu.set_m_player_gender(Gender::male()); }
-                    main_menu.set_m_is_network_service(false);
-                    main_menu.set_m_is_continue_enable(false);
-                    let descs = main_menu.m_descs();
-                    descs.set(78, Fade::black_out(0.05, Fade_Layer::current()));
-                    main_menu.set_m_desc_index(77);
-                    return BasicMenu_Result::close_cancel();
-                }
-                else { return BasicMenu_Result::se_miss() }
-            }
-            DVCCommand::ClearMap => { GameVariableManager::set_bool("勝利", true); }
-            DVCCommand::Credits => {
-                for i in 0..41 {
-                    UnitUtil::join_unit(PIDS[i]);
-                }
-                for i in 1..23 {
-                    GameVariableManager::set_bool(format!("G_Cleared_M{:03}", i), true);
-                }
-            }
-             */
         }
         BasicMenu_Result::se_cursor()
     }
@@ -111,13 +76,6 @@ impl DVCCommand {
                     if DVCConfig::get().randomized { BasicMenuItem_Attribute::enable() } else { BasicMenuItem_Attribute::hide() }
                 }
                 else if DVCFlags::RandomEnable.get_value() { BasicMenuItem_Attribute::enable() }
-                else { BasicMenuItem_Attribute::hide() }
-            }
-            #[cfg(feature = "debug")]
-            Self::Output => {
-                if !DVCVariables::is_main_menu() && DVCFlags::RandomEnable.get_value() && !UnitPool::get_hero(false).is_null() {
-                    BasicMenuItem_Attribute::enable()
-                }
                 else { BasicMenuItem_Attribute::hide() }
             }
             _ => { BasicMenuItem_Attribute::enable() }

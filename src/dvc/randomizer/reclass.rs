@@ -199,7 +199,7 @@ pub fn no_reclass_build_attr(this: ClassChangeJobMenu_ClassChangeJobMenuItem, _:
 
     let mut attribute;
     match DVCVariable::Reclassing.get_value() {
-        1 => {
+        1 => {  // Random
             let relational = JobDataBase::get_all_relational(current_job);
             let hash = item_job.hash();
             return
@@ -213,14 +213,14 @@ pub fn no_reclass_build_attr(this: ClassChangeJobMenu_ClassChangeJobMenuItem, _:
                 else { BasicMenuItem_Attribute::hide() }
             };
         }
-        2 => {
+        2 => {  // None
             if single_class_can_build_attribute(current_job, item_job) {
                 data.set_is_default_job(true);
                 attribute = BasicMenuItem_Attribute { value: (mask_condition && item_condition) as i32 };
             }
             else { attribute = BasicMenuItem_Attribute::hide(); }
         }
-        3 => {
+        3 => {  // Set
             let hash = item_job.hash();
             attribute =
                 if DVC::get().set_reclass.contains(&hash) {

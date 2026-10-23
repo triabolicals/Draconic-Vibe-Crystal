@@ -42,11 +42,11 @@ extern "C" fn map_sequence_setup_chapter(map_sequence: MapSequence, _: OptionalM
     let user_data = DVCVariables::user_data();
     let chapter = user_data.get_chapter();
     let status = user_data.m_status().m_value();
-    if !DVCConfig::new().debug || DVCVariable::AverageLevel.get_value() == 0 {
+    let resume = map_sequence.get_is_resume();
+    if DVCVariable::AverageLevel.get_value() == 0 || (!resume && !DVCConfig::new().debug) {
         DVCVariable::AverageLevel.init_var(get_difficulty_adjusted_average_level(), true);
     }
     if chapter.get_hold_level() > 0 {
-        let resume = map_sequence.get_is_resume();
         user_data.setup_for_chapter(resume);
         if GameVariableManager::get_bool(chapter.get_cleared_flag_name()) { user_data.m_status().set_m_value(status|0x3000); }
         else { user_data.m_status().set_m_value(status|0x1000); }
@@ -64,14 +64,14 @@ extern "C" fn map_sequence_setup_chapter(map_sequence: MapSequence, _: OptionalM
         let mess = chapter.get_mess();
         if !mess.is_null() { mess::edit_msgfile_for_chapter(mess); }
         let cid = chapter.get_cid().to_rust_string();
+        if cid.contains("M003") { dvc::unit::item::change_liberation_type(); }
         if cid.contains("G00") {
             GameVariableManager::set_bool("G_拠点_神竜導入イベント再生済み", true);
             if let Some(edelgard) = EmblemPool::get_replacement_god_3(12, false){
                 GodPool::create(edelgard);
             }
         }
-        if cid.contains("M003") { dvc::unit::item::change_liberation_type(); }
-        dvc::continuous::pre_map_emblem_adjustment();
+        if !resume { dvc::continuous::pre_map_emblem_adjustment(); }
     }
 
 }

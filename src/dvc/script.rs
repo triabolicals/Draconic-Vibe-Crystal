@@ -66,7 +66,6 @@ pub fn script_get_string(dyn_value: DynValue,  method_info: OptionalMethod) -> I
     let kengen = str1.contains("Kengen");
     let is_pid = str1.starts_with("PID_");
     let is_gid = str1.starts_with("GID_");
-    println!("Is GID: {} ({})", is_gid, str1);
     if kengen || is_gid {
         if DVCVariable::EmblemRecruitment.get_value() == 0 || str1 == EMBLEM_GIDS[19] { result }
         else if kengen {

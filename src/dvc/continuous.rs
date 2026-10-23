@@ -1,8 +1,5 @@
 use super::*;
-use engage::{
-    app::{Random_2, BasicMenuItem, BasicMenu_Result, ProcInst, BasicMenuItem_Attribute},
-    List_1Ext,
-};
+use engage::app::{Random_2, BasicMenuItem, BasicMenu_Result, ProcInst, BasicMenuItem_Attribute};
 mod sequence;
 
 use outfit_core::Randomizer;
@@ -18,12 +15,9 @@ const UNESCAPE: [i32; 6] = [21, 17, 20, 19, 19, 17];
 const JOIN: [i32; 19] = [1, 3, 4, 6, 8, 8, 11, 11, 13, 14, 15, 16, 57, 51, 52, 53, 54, 55, 56];
 pub fn continuous_mode_vtable_edit() {
     override_vtable("App", "SortieTopMenu.BackMenuItem", "GetMapAttribute", sortie_back_map_attribute as _);
-    /*
     ["Back", "Friend", "God", "Inventory", "PositionChange", "ResetMap", "SaveMap", "SaveMenu", "SelectionUnit", "Shop", "Start", "System"].iter().for_each(|v| {
-        let class = format!("App.SortieTopMenu.{}MenuItem", v);
-        override_vtable("App", class.as_str(), "BCall", sortie_sequence_b_call as _);
+        override_vtable("App", format!("SortieTopMenu.{}MenuItem", v).as_str(), "BCall", sortie_sequence_b_call as _);
     });
-     */
 }
 
 pub fn post_chapter_continuous_mode(proc: ProcInst) {
@@ -142,7 +136,9 @@ pub fn pre_map_emblem_adjustment() {
         21 => escape_or_create(0, true),
         22 => {
             escape_or_create(0, false);
-            for x in 1..12 { escape_or_create(x, true); }
+            if DVCVariables::get_sequence() != 3 {
+                for x in 1..12 { escape_or_create(x, true); }
+            }
         }
         33..45 => {
             if let Some(v) = EmblemPool::get_god_unlocked_from_paralogue(chapter_index){
@@ -185,13 +181,11 @@ fn sortie_back_map_attribute(this: BasicMenuItem, optional_method: OptionalMetho
     if mode == 1 || mode == 2 { BasicMenuItem_Attribute::hide() }
     else { unsafe { sortie_back_original_map_attribute(this, optional_method) } }
 }
-/*
 fn sortie_sequence_b_call(this: BasicMenuItem, optional_method: OptionalMethod) -> BasicMenu_Result {
     let mode = DVCVariable::Continuous.get_value();
     if mode == 1 || mode == 2 { BasicMenu_Result::se_miss() }
     else { unsafe { sortie_original_b_call(this, optional_method) } }
 }
- */
 #[skyline::from_offset(0x1d78d40)]
 fn sortie_original_b_call(this: BasicMenuItem, optional_method: OptionalMethod) -> BasicMenu_Result;
 #[skyline::from_offset(0x01d76320)]
