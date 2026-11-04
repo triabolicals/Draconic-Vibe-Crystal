@@ -127,6 +127,7 @@ fn adjust_emblem_zone(this: CharacterGameStatus) {
 
 
 #[derive(Clone, Copy, PartialOrd, PartialEq)]
+#[allow(unused)]
 pub enum EngageAttackType {
     None,
     Normal,
@@ -280,6 +281,7 @@ pub fn lueur_engage_atk(result: AssetTable_Result, unit: Unit, conditions: &Asse
    // }
 }
 #[derive(Copy, Clone)]
+#[allow(unused)]
 enum EngageAttackSource {
     None,
     GodUnit,
@@ -295,7 +297,7 @@ impl EngageAttackSource {
             let engage_atk = unit.get_engage_attack();
             if engage_atk.is_null() { EngageAttackSource::None }
             else if to_opt(god_unit.get_link_god_unit())
-                .and_then(|linked_god_unit| to_opt(god_unit.get_parent()))
+                .and_then(|linked_god_unit| to_opt(linked_god_unit.get_parent()))
                 .is_some_and(|unit_b| GodUnit::is_around(unit, unit_b))
             {
                 EngageAttackSource::GodUnit

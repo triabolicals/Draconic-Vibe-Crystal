@@ -216,8 +216,56 @@ impl RecruitmentRandomizer {
             });
         }
     }
+    pub fn correct_emblem_order() {
+        let mode = DVCVariable::EmblemRecruitment.get_setting_value();
+        if mode == 1 || mode == 3 {
+            let mut gids = EmblemPool::get_recruitment_gids();
+            let mut available = gids.clone();
+            let mut gids_to_assign = vec![];
+            if !DVCVariables::has_dlc() {
+                available.drain(12..19);
+                gids.drain(12..19).for_each(|dlc|{
+                    let key1 = format!("G_R_{}", dlc);
+                    let key2 = format!("G_R2_{}", dlc);
+                    DVCVariables::set_variable_key_string(key1, dlc.as_str());
+                    DVCVariables::set_variable_key_string(key2, dlc.as_str());
+                });
+            }
+            let rng = DVCVariables::get_rng();
+            gids.iter().for_each(|gid|{
+                let key1 = format!("G_R_{}", gid);
+                if GameVariableManager::is_exist(key1.as_str()) {
+                    let gid2 = GameVariableManager::get_string(key1.as_str()).to_rust_string();
+                    if let Some(pos) = available.iter().position(|x| *x == gid2){
+                        DVCVariables::set_variable_key_string(format!("G_R2_{}", gid2), gid.as_str());
+                        available.remove(pos);
+                    }
+                    else { gids_to_assign.push(gid.clone()); }
+                }
+                else { gids_to_assign.push(gid.clone()); }
+            });
+            gids_to_assign.into_iter().for_each(|gid| {
+                if let Some(gid2) = available.get_remove(rng) {
+                    let key1 = format!("G_R_{}", gid);
+                    let key2 = format!("G_R2_{}", gid2);
+                    DVCVariables::set_variable_key_string(key1, gid2.as_str());
+                    DVCVariables::set_variable_key_string(key2, gid.as_str());
+                }
+            })
+        }
+        else {
+            DVCVariables::create_recruitment_variables(true);
+            if mode != 2 { return; }
+            let gids =  EmblemPool::get_recruitment_gids();
+            for i in 0..12 {
+                let key1 = format!("G_R_{}", gids[i]);
+                let key2 = format!("G_R2_{}", gids[11-i]);
+                DVCVariables::set_variable_key_string(key1, gids[11-i].as_str());
+                DVCVariables::set_variable_key_string(key2, gids[i].as_str());
+            }
+        }
+    }
     pub fn setup_emblem_recruitment_order() {
-        let rng = DVCVariables::get_rng();
         DVCVariables::create_recruitment_variables(true);
         let no_dlc = DVCVariables::has_dlc() || DVCConfig::get().dlc & 2 != 0;
         if !DVCFlags::RandomEnable.get_value()  {
@@ -225,6 +273,7 @@ impl RecruitmentRandomizer {
             else { DVCVariable::EmblemRecruitment.set_value(0); }
         }
         let emblem_recruitment = DVCVariable::EmblemRecruitment.get_value();
+        let rng = DVCVariables::get_rng();
         match emblem_recruitment {
             1 => {
                 let custom_emblems = DVCFlags::CustomEmblemsRecruit.get_value();
@@ -232,7 +281,7 @@ impl RecruitmentRandomizer {
                 let mut available =  gids.clone();
                 if gids.len() > 19 && !custom_emblems { available.drain(19..); }
                 if !no_dlc { available.drain(12..19); }
-                gids.iter().enumerate().for_each(|(i, gid)|{
+                gids.iter().for_each(|gid|{
                    if let Some(gid2) = available.get_remove(rng) {
                        let key1 = format!("G_R_{}", gid);
                        let key2 = format!("G_R2_{}", gid2);
@@ -253,13 +302,38 @@ impl RecruitmentRandomizer {
             3 => {  // Custom
                 let order = DVCConfig::get().get_custom_recruitment(true);
                 let gids = EmblemPool::get_recruitment_gids();
+                let mut available =  gids.clone();
+                let mut left_over = gids.clone();
                 let list_size = gids.len();
-                order.iter().for_each(|&x| {
+                order.iter().for_each(|&x|{
                     let idx = x.0 as usize;
                     let new_idx = x.1 as usize;
                     if idx < list_size && new_idx < list_size {
-                        DVCVariables::set_variable_key_string(format!("G_R_{}", gids[idx]), gids[new_idx].as_str());
-                        DVCVariables::set_variable_key_string(format!("G_R2_{}", gids[new_idx]), gids[idx].as_str());
+                        let gid1 = &gids[idx];
+                        let gid2 = &gids[new_idx];
+                        if let Some((pos_1, pos_2)) = left_over.iter().position(|x| x == gid1).zip(available.iter().position(|x| x == gid2)){
+                            let key1 = format!("G_R_{}", gid1);
+                            let key2 = format!("G_R2_{}", gid2);
+                            DVCVariables::set_variable_key_string(key1, gid2.as_str());
+                            DVCVariables::set_variable_key_string(key2, gid1.as_str());
+                            left_over.remove(pos_1);
+                            available.remove(pos_2);
+                        }
+                    }
+                });
+                left_over.into_iter().for_each(|gid|{
+                    if let Some(pos) = available.iter().position(|x| *x == gid){
+                        let key1 = format!("G_R_{}", gid);
+                        let key2 = format!("G_R2_{}", gid);
+                        DVCVariables::set_variable_key_string(key1, gid.as_str());
+                        DVCVariables::set_variable_key_string(key2, gid.as_str());
+                        available.remove(pos);
+                    }
+                    else if let Some(gid2) = available.get_remove(rng){
+                        let key1 = format!("G_R_{}", gid);
+                        let key2 = format!("G_R2_{}", gid2);
+                        DVCVariables::set_variable_key_string(key1, gid2.as_str());
+                        DVCVariables::set_variable_key_string(key2, gid.as_str());
                     }
                 });
             },
