@@ -1,7 +1,7 @@
 use super::*;
 use engage::{
     app::{
-        CommonRewardSequence, ICapabilityBase_1Methods, IProcInstMethods, 
+        CommonRewardSequence, IProcInstMethods,
         Proc, ProcBoolMethod, ProcInst, ProcVoidMethod, UnitRecord_Kinds
     },
     ForceExt,
@@ -18,7 +18,6 @@ use crate::{
         }
     },
     utils::to_opt,
-    DVCVariable::UnitDeployment
 };
 use unity::{Array, IlNull};
 

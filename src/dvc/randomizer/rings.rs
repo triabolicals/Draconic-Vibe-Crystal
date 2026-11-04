@@ -190,19 +190,21 @@ fn reset_skill_inherit_menu_item_cost(menu_item: SkillInheritanceMenuItem, unit:
 // BuildAttribute Edit for disabling Hero / Marth Replacement in Chapter 22
 fn ring_select_menu_item_build_attr(ring: RingSelectMenu_RingMenuItem, _: OptionalMethod) -> BasicMenuItem_Attribute {
     let original_result = unsafe { RingSelectMenu_RingMenuItem::build_attribute(ring) };
-    if let Some(menu) = ring.m_menu().try_cast::<RingSelectMenu>() {
-        let unit = menu.get_unit();
-        let god = ring.get_god();
-        if DVCVariables::get_chapter_index() == 22 {
-            if !unit.is_null() && unit.is_hero() { BasicMenuItem_Attribute::disable() }
-            else if !god.is_null() {
-                if DVCVariable::EmblemRecruitment.get_value() == 0 { original_result }
-                else if EmblemPool::get_replacement_index(god.m_data().get_main_data(), true).is_some_and(|v| v == 0) { BasicMenuItem_Attribute::disable() }
-                else { BasicMenuItem_Attribute::enable() }
-            } else { original_result }
+    if !ring.m_menu().is_null() {
+        if let Some(menu) = ring.m_menu().try_cast::<RingSelectMenu>() {
+            let unit = menu.get_unit();
+            let god = ring.get_god();
+            if DVCVariables::get_chapter_index() == 22 {
+                if !unit.is_null() && unit.is_hero() { return BasicMenuItem_Attribute::disable(); }
+                else if !god.is_null() {
+                    return if DVCVariable::EmblemRecruitment.get_value() == 0 { original_result }
+                    else if EmblemPool::get_replacement_index(god.m_data().get_main_data(), true).is_some_and(|v| v == 0) { BasicMenuItem_Attribute::disable() }
+                    else { BasicMenuItem_Attribute::enable() };
+                }
+            }
         }
-        else { original_result }
-    } else { original_result }
+    }
+    original_result
 }
 fn set_skill_hash(menu_item: SkillInheritanceMenuItem, hash: i32) { unity::field_set_value_at_offset(menu_item, 0x64, hash); }
 fn get_skill_hash(menu_item: SkillInheritanceMenuItem) -> i32 { unity::field_get_value_at_offset(menu_item, 0x64) }

@@ -2,14 +2,13 @@ use std::collections::HashMap;
 use engage::{
     app::{
         IGodDataMethods,
-        DisposData,
-        IDisposDataMethods,
+        disposdata::*,
+        IJobDataMethods,
         IStructDataArray_1Methods,
         IPersonDataMethods
     },
     List_1Ext,
 };
-use engage::app::{IJobData, IJobDataMethods};
 use unity::Cast;
 use crate::{gamedata::{EmblemPool, PersonPool}, utils::{il2str, to_opt}, DVCVariable, DVCVariables};
 use crate::enums::EMBLEM_GIDS;

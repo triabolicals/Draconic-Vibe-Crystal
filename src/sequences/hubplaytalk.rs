@@ -1,16 +1,15 @@
-use engage::app::IBasicMenuItemMethods;
 use super::*;
 use engage::{
+    system::Action,
     app::{
-        hubaccess::*, hubaccessdata::*, hubplaytalk::*,
-        GameMessage, GameSound, GodData, GodPool,
-        IUnitMethods, IGodDataMethods, IGodUnit, IStructData_1Methods,
-        Mess, PersonData, UnitUtil
-    },
-    system::Action
+        IBasicMenuItemMethods, IUnitMethods, IStructData_1Methods, IHubDisposDataMethods,
+        hubaccess::*, hubaccessdata::*, hubplaytalk::*, hubplaytalkafter::*,
+        goddata::*, godunit::*,
+        GameMessage, GameSound, GodPool, Mess, PersonData, UnitUtil,
+        basicmenu::*,
+        assettable::prelude::IList_1Methods
+    }
 };
-use engage::app::{HubPlayTalkAfter, HubPlayTalkAfter_SelectListMenu, IBasicMenu, IBasicMenuMethods, IHubDisposDataMethods, IHubPlayTalkAfterMethods, IMapSortiePositionMethods};
-use engage::app::assettable::prelude::IList_1Methods;
 use crate::dvc::autolevel::try_autoscale_unit;
 use crate::menus::UnitRecruitMenuItem;
 
@@ -21,7 +20,7 @@ pub extern "C" fn hub_play_talk_after_create_select(this: HubPlayTalkAfter, _: O
         if let Some(menu) = this.get_child().try_cast::<HubPlayTalkAfter_SelectListMenu>(){
             unsafe {
                 let item = UnitRecruitMenuItem::instantiate().unwrap();
-                item.ctor();
+                IBasicMenuItemMethods::ctor(item);
                 menu.m_full_menu_item_list().add(item.cast());
             }
             // proc.set_m_desc_index(0);

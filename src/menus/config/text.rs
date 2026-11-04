@@ -3,7 +3,7 @@ use engage::{
     app::{Mess_IconCategory, IJobDataMethods, IStructBase, Language},
     Mess,
 };
-use crate::{get_chapter_from_idx, VERSION};
+use crate::VERSION;
 use super::*;
 
 pub static CONFIG_TEXT: OnceLock<DVCConfigText> = OnceLock::new();
@@ -245,12 +245,6 @@ impl DVCConfigText {
                         item.set_m_command_text("View".into());
                         item.set_m_help_text("View Draconic Vibe Crystal settings".into());
                         item.set_m_title_text(format!("Draconic Vibe Crystal v{}", VERSION).into());
-                    }
-                    #[cfg(feature = "debug")]
-                    DVCCommand::Output => {
-                        item.set_m_command_text("Create".into());
-                        item.set_m_title_text("DVC Output File".into());
-                        item.set_m_help_text("Save file containing DVC Randomization results.".into());
                     }
                     DVCCommand::SetSeed => {
                         let v = if DVCVariables::is_main_menu() { DVCConfig::get().seed } else { DVCVariable::Seed.get_setting_value() as u32 };

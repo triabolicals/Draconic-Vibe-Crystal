@@ -433,17 +433,17 @@ impl DVCVariables {
     }
     pub fn create_recruitment_variables(emblem: bool) {
         if emblem {
-            for i in 0..19 {
-                let gid = format!("GID_{}", EmblemPool::GIDS[i as usize]);
-                let key = format!("G_R_{}", gid);
-                GameVariableManager::make_entry_str(key.as_str(), gid.as_str());
-                GameVariableManager::make_entry_str(format!("G_R2_GID_{}", EmblemPool::GIDS[i as usize]), gid.as_str());
-            }
+            EmblemPool::get_recruitment_gids().into_iter().for_each(|name| {
+                let key1 = format!("G_R_{}", name);
+                let key2 = format!("G_R2_{}", name);
+                DVCVariables::set_variable_key_string(key1, name.as_str());
+                DVCVariables::set_variable_key_string(key2, name.as_str());
+            });
         }
         else {
             for i in 0..41 {
-                GameVariableManager::make_entry_str(format!("G_R_{}",PIDS[i as usize]), PIDS[i as usize]);
-                GameVariableManager::make_entry_str(format!("G_R2_{}",PIDS[i as usize]), PIDS[i as usize]);
+                DVCVariables::set_variable_key_string(format!("G_R_{}",PIDS[i as usize]), PIDS[i as usize]);
+                DVCVariables::set_variable_key_string(format!("G_R2_{}",PIDS[i as usize]), PIDS[i as usize]);
             }
         }
     }

@@ -12,8 +12,7 @@ use engage::{
 mod order;
 mod submenu;
 mod command;
-mod output;
-#[cfg(feature = "debug")] mod debug;
+// mod output;
 mod job;
 
 use super::*;
@@ -22,7 +21,7 @@ use crate::dvc::DVC;
 
 const KINDS: [&str; 8] = ["Sword", "Lance", "Axe", "Bow", "Dagger", "Magic", "Fist", "Special"];
 
-use crate::gamedata::{GameData, ENCHANTER, LUEUR_CLASS, MAGE_CANNON, MONSTER_CLASS};
+use crate::gamedata::{GameData, ENCHANTER, LUEUR_CLASS, MAGE_CANNON};
 
 #[unity::inject(namespace="DVC", name="DVCBasicMenuItem", parent=ConfigBasicMenuItem)]
 pub struct DVCBasicMenuItem {

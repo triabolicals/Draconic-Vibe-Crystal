@@ -138,7 +138,7 @@ pub fn do_transformation(this: CombatRecord, calc_side: BattleSide_Type) {
                         set_transform_appearance(this, unit, calculator, side, calc_side, distance);
                         let result = AssetTable_Result::get_for_talk_2(unit);
                         let colors = [result.get_mask_color100(), result.get_mask_color075(), result.get_mask_color050(), result.get_mask_color025()];
-                        let sound = il2str(result.get_sound().voice_id);
+                        let sound = utils::il2str(result.get_sound().voice_id);
                         result.clear();
                         let conditions = AssetTable::s_condition_flags();
                         if !god_unit.is_null() {
@@ -173,7 +173,7 @@ pub fn do_transformation(this: CombatRecord, calc_side: BattleSide_Type) {
                     else if let Some(transform) = get_transformation2(unit, gs.get_weapon()){
                         transform.set_pid(unit.get_pid().to_rust_string());
                         remove_acc_for_transform(transform);
-                        if let Some(dress) = il2str(transform.get_dress_model()){
+                        if let Some(dress) = utils::il2str(transform.get_dress_model()){
                             if dress.contains("uBody_Sdk1AT") || dress.contains("uBody_Sds1AT") { transform.set_scale_all(0.07); }
                             else if dress.contains("uBody_Sds0AT") { transform.set_scale_all(0.4); }
                             else if dress.contains("AT") && !dress.contains("Tik") { transform.set_scale_all(0.7); }

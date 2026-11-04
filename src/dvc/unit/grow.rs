@@ -1,5 +1,5 @@
 use super::*;
-use engage::app::{CapabilityDefinition, Difficulty, ICapabilityBase_1Methods, IGameUserDataMethods, UnitUtil};
+use engage::app::{ICapabilityBase_1Methods, IGameUserDataMethods, UnitUtil};
 use crate::{
     gamedata::ClassTier,
     dvc::randomizer::map::dispos::PARALOGUE_LEVELS,
@@ -139,16 +139,6 @@ pub fn enemy_player_character_replacement(this: Unit) {
             adjust_unit_items(this);
         }
     }
-}
-pub fn test_enemy_scaling(person_data: PersonData, diff: i32) {
-    DVCVariables::user_data().set_difficulty(Difficulty{value: diff});
-    let unit = Unit::new(true);
-    unit.set_person(person_data);
-    unit.set_m_job(person_data.get_job());
-    let target = person_data.get_level() as i32 + if person_data.get_job().is_high() { 20 } else { 0 };
-    enemy_unit_stat_scaling(unit, target, None);
-    println!("Stats for Level: {} {} in {}", target, unit.get_name(), Mess::get(unit.get_job().get_name()));
-    for i in 0..9 { println!("{}: {}", CapabilityDefinition::get_name(i), unit.get_capability(i, false)); }
 }
 pub fn enemy_unit_stat_scaling(unit: Unit, target_level: i32, level_offset: Option<i32>) {
     let mut grow: [i32; 10] = [0; 10];

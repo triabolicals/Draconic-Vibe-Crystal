@@ -54,9 +54,7 @@ impl DVCJobItem {
                 else { current_index -= 1; }
             }
             if current_index == 0 { return 0; }
-            else if let Some(job) = to_opt(JobData::try_get_2(current_index)).filter(|v|
-                (v.is_high() || (v.is_low() && !v.has_high_jobs())))
-            {
+            else if let Some(job) = to_opt(JobData::try_get_2(current_index)).filter(|v| v.is_high() || (v.is_low() && !v.has_high_jobs())) {
                 let h = job.hash();
                 let flag = job.get_flag().m_value();
                 if DLC_CLASSES.contains(&h) && !DVCVariables::has_dlc() { continue; }

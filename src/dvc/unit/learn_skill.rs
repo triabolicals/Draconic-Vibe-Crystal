@@ -16,7 +16,7 @@ pub fn update_learn_skill(unit: Unit) {
     }
 }
 pub fn get_job_learn_skill_level(unit: Unit, job: JobData) -> i32 {
-    let max_level = (job.get_max_level() as i32);
+    let max_level = job.get_max_level() as i32;
     let mode = DVCVariable::RandomLearnLevel.get_value();
     match DVCVariable::RandomLearnLevel.get_value() {
         1|2 => {

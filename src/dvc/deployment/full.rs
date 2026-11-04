@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use super::*;
 use engage::{
-    app::{disposdata::*, terraindata_2::*, IBitField32, IMapTerrain, IStructDataArray_1Methods, MapSetting},
+    app::{terraindata_2::*, IBitField32, IMapTerrain, IStructDataArray_1Methods, MapSetting},
     system::collections::generic::IList_1Methods,
     List_1Ext,
 };

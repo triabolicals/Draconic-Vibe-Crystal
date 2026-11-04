@@ -58,7 +58,6 @@ impl RecruitmentOrder {
                         }
                     }
                 }
-                _ => {}
             }
         }
         else {
@@ -86,7 +85,6 @@ impl RecruitmentOrder {
                         else { EmblemPool::get_playable_name(replacement_index as i32) }
                     );
                 }
-                _ => {}
             }
         }
         item.update_text();

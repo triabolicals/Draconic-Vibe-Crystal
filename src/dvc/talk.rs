@@ -26,7 +26,7 @@ pub mod tag;
 mod addletter;
 pub mod window;
 mod name;
-pub static mut MID_BUFFER: [u16; 512] = [0; 512];
+#[allow(static_mut_refs)] pub static mut MID_BUFFER: [u16; 512] = [0; 512];
 
 pub fn talk_tag_vtable_edit() {
     override_vtable("App.Talk3D", "TalkTagAnimation", "Initialize", talk_tag_anim as _);
@@ -86,6 +86,7 @@ fn edit_talk_gender(talk_ptr: TalkPtr) {
     }
 }
 #[unity::hook("App.Talk3D", "TalkTagParser", "Parse")]
+#[allow(static_mut_refs)]
 pub fn talk_tag_parser_parse(this: TalkTagParser, talk_ptr: TalkPtr, method_info: MethodInfo) -> TalkTag{
     edit_talk_gender(talk_ptr);
     let char = talk_ptr.read_char();

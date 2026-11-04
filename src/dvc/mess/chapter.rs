@@ -42,7 +42,7 @@ impl ReplacementMessData {
             argument_mess: Vec::new(), missing_pt_data: Vec::new(),
             chapter_lines: Vec::new(), other: Vec::new(), random_data: Vec::new(), pt_indexes: Vec::new() }
     }
-    pub fn get() -> &'static mut Self { unsafe { &mut TMP_REPLACE } }
+    #[allow(static_mut_refs)] pub fn get() -> &'static mut Self { unsafe { &mut TMP_REPLACE } }
     pub fn clear() { Self::get().chapter_lines.clear(); }
     pub fn add(str: Vec<u16>, chapter: bool) {
         if chapter { Self::get().chapter_lines.push(str); }

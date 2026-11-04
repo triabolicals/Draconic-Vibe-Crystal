@@ -1,17 +1,16 @@
+use super::*;
 use std::collections::HashSet;
-use engage::{app::{IBitField32, IJobDataMethods, IPersonDataMethods, IStructBase, IStructData_1Methods, IUnit, IUnitMethods, ItemData, JobData, PersonData, Random_2, Unit, UnitPool}, GameVariableManager, List_1Ext, Mess};
+use engage::{
+    app::{
+        IBitField32, IStructBase, IStructData_1Methods,
+        ItemData, Random_2, UnitPool
+    },
+    GameVariableManager, List_1Ext
+};
+
 use outfit_core::Randomizer;
 use unity::{Cast, IlNull};
-use crate::{dvc::{
-    unit::{
-        assign_selected_weapon_mask_by_apt,
-        randomize_selected_weapon_mask,
-        learn_skill::update_learn_skill,
-        weapon_mask
-    }
-}, DVCVariables, gamedata::{ClassTier, ReclassType, JobDataBase, PersonPool, GameData}, utils::{clamp_value, to_opt}, DVCFlags, DVCVariable, gamedata};
-use crate::dvc::DVC;
-use crate::dvc::unit::grow::get_scaling_level;
+
 use crate::gamedata::GrowthData;
 
 // Get New Class, does not adjust level to scaling level.
@@ -39,7 +38,7 @@ pub fn unit_reclass(unit: Unit, kind: ReclassType) -> bool {
             if let Some(idx) = PersonPool::get_person_index(unit.get_person().hash()).filter(|&i| i < 41){
                 GrowthData::set_temp_key(unit.get_person(), DVC::get().unit_job[idx as usize]);
                 if let Some(job) = GrowthData::get_starting_class(unit){
-                    if let Some(level) = get_scaling_level() { tier = if level < 16 { ClassTier::Base } else { ClassTier::Promoted } }
+                    if let Some(level) = grow::get_scaling_level() { tier = if level < 16 { ClassTier::Base } else { ClassTier::Promoted } }
                     else if let Some(old_person) = PersonPool::get_replacement_2(unit.get_person(), true){
                         let old_job = old_person.get_job();
                         tier = ClassTier::from_job(old_job);
@@ -53,9 +52,9 @@ pub fn unit_reclass(unit: Unit, kind: ReclassType) -> bool {
                         unit.class_change(cc, ItemData::null());
                         reclass_level_adjustment(unit, level, il, tier);
                         assign_selected_weapon_mask_by_apt(unit, None);
-                        weapon_mask::update_weapon_apt(unit, initial_apt);
+                        update_weapon_apt(unit, initial_apt);
                         unit.set_hp(unit.get_capability(0, true));
-                        update_learn_skill(unit);
+                        learn_skill::update_learn_skill(unit);
                     }
                     GrowthData::set_starting_class(unit);
                     GrowthData::adaptive_grow(unit.get_person());
@@ -69,7 +68,7 @@ pub fn unit_reclass(unit: Unit, kind: ReclassType) -> bool {
         }
         ReclassType::Enemy => {
             let leader = unit.has_private_skill("SID_リーダー");
-            let slvl = get_scaling_level().map(|v| if leader { v + 3} else { v });
+            let slvl = grow::get_scaling_level().map(|v| if leader { v + 3} else { v });
             let high_job = (current_job.is_high() && (leader || slvl.is_none_or(|v| v > 20))) || (current_job.get_max_level() > 20 && (slvl.unwrap_or(level) > 20));
             let pool: Vec<_> = JobData::get_list().iter()
                 .filter(|j| JobDataBase::can_unit_reclass(*j, female, high_job, false, false))
@@ -87,7 +86,7 @@ pub fn unit_reclass(unit: Unit, kind: ReclassType) -> bool {
                 let tier =  ClassTier::from_job(old_job);
                 let mut class_job = unit.get_person().get_job();
                 if random {
-                    let high_job = get_scaling_level().is_none_or(|v| v > 15) && (tier == ClassTier::Promoted || level > 20);
+                    let high_job = grow::get_scaling_level().is_none_or(|v| v > 15) && (tier == ClassTier::Promoted || level > 20);
                     let pool: Vec<_> = JobData::get_list().iter()
                         .filter(|j| JobDataBase::can_unit_reclass(*j, female, high_job, true, false))
                         .collect();
@@ -109,7 +108,7 @@ pub fn unit_reclass(unit: Unit, kind: ReclassType) -> bool {
                     tier = ClassTier::from_job(old_job);
                 }
             }
-            let is_base = tier == ClassTier::Base || (tier == ClassTier::Special && level <= 20) || (get_scaling_level().is_some_and(|v| v < 16) && recruitment);
+            let is_base = tier == ClassTier::Base || (tier == ClassTier::Special && level <= 20) || (grow::get_scaling_level().is_some_and(|v| v < 16) && recruitment);
             if let Some(job) = DVCVariables::get_single_class(is_base, female){
                 unit.class_change(job, ItemData::null());
                 reclass_level_adjustment(unit, level, il, tier);
@@ -122,7 +121,7 @@ pub fn unit_reclass(unit: Unit, kind: ReclassType) -> bool {
         }
         ReclassType::GenderSingle(recruitment) => {
             let gender = unit.get_dress_gender();
-            let is_base = tier == ClassTier::Base || (tier == ClassTier::Special && level <= 20)  || (get_scaling_level().is_some_and(|v| v < 16) && recruitment);
+            let is_base = tier == ClassTier::Base || (tier == ClassTier::Special && level <= 20)  || (grow::get_scaling_level().is_some_and(|v| v < 16) && recruitment);
             if let Some(job) = DVCVariables::get_single_class_gender(is_base, gender){
                 unit.class_change(job, ItemData::null());
                 reclass_level_adjustment(unit, level, il, tier);
@@ -137,7 +136,7 @@ pub fn unit_reclass(unit: Unit, kind: ReclassType) -> bool {
         ReclassType::PlayerLockout(recruitment, random) => {
             let playable = get_current_player_unit_classes();
             let mut selected_job = 0;
-            let scaled_base_class = get_scaling_level().is_some_and(|v| v < 16) && recruitment;
+            let scaled_base_class = grow::get_scaling_level().is_some_and(|v| v < 16) && recruitment;
             if recruitment {
                 if let Some(old_person) = PersonPool::get_replacement_2(unit.get_person(), true){
                     level = old_person.get_level() as i32;
@@ -179,10 +178,10 @@ pub fn unit_reclass(unit: Unit, kind: ReclassType) -> bool {
             }
         }
     }
-    assign_selected_weapon_mask_by_apt(unit, None);
+    weapon_mask::assign_selected_weapon_mask_by_apt(unit, None);
     weapon_mask::update_weapon_apt(unit, initial_apt);
     unit.set_hp(unit.get_capability(0, true));
-    update_learn_skill(unit);
+    learn_skill::update_learn_skill(unit);
     unit.get_job().hash() != old_class
 }
 pub fn get_lookout_unit_reclass() -> Vec<i32> {

@@ -1,4 +1,3 @@
-
 use engage::{
     app::{
         eventdemosequence::*, gamesound::*, IRandom_2Methods,
@@ -28,7 +27,7 @@ use crate::{
 
 // const CREATE_CHARACTER: &'static str = "キャラ配置";
 const SET_BACKGROUND: &'static str = "背景";
-const SET_SCENE_CAMERA: &'static str = "シーンカメラ";
+// const SET_SCENE_CAMERA: &'static str = "シーンカメラ";
 const SOUND_EVENT: &'static str = "サウンドイベント";
 const CHARACTER_SET_ANIMATOR: &'static str = "キャラアニメーター切替";
 const PLAY_CHARACTER_MOTION: &'static str = "キャラモーション再生";
@@ -175,6 +174,7 @@ fn set_character_animator(this: EventDemoSequence, cmd_info: EventDemoSequence_C
     this.func_character_set_animator(cmd_info)
 }
 #[unity::callback]
+#[allow(unused)]
 extern "C" fn jump_to_number(this: EventDemoSequence, cmd_info: EventDemoSequence_CmdInfo, method_info: OptionalMethod) -> EventDemoSequence_EventCmdResult {
     let arg = cmd_info.get_args().get(0);
     let arg_str = arg.to_rust_string();

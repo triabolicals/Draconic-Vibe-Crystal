@@ -1,7 +1,6 @@
-use bitflags::Flags;
 use unity::system::string::IIl2CppStringMethods;
 use engage::app::UnitUtil;
-use crate::dvc::asset::{engage_attack::EngageAttackType, transform::{is_dragonstone}};
+use crate::dvc::asset::{engage_attack::EngageAttackType, transform::is_dragonstone};
 use super::*;
 fn tiki_engage(result: AssetTable_Result, condition_unit: Unit, mode: i32, equipped: ItemData, condition: &mut AssetConditions) -> bool {
     if transform::is_tiki_engage(condition_unit) {
@@ -71,7 +70,7 @@ fn mode_1_transformation(result: AssetTable_Result, condition_unit: Unit, equipp
             println!("Transform Mode 1 for {}", condition_unit.get_name());
             print_asset_table_result(result, 1);
         }
-        if let Some(body) = il2str(result.get_body_model()) {
+        if let Some(body) = utils::il2str(result.get_body_model()) {
             if body.contains("Mrp") { result.set_map_scale_all(1.0); }
             else if body.contains("1AT") && !body.contains("Tik") {
                 result.set_map_scale_all(0.25);
@@ -233,7 +232,7 @@ pub fn commit_for_unit_dress(
             return conditionss;
         }
         else { result.commit_2(mode1, condition_unit.get_person(), condition_unit.get_job(), equipped); }
-        if il2str(result.get_dress_model()).is_some_and(|v| v.contains("AT_c")) || il2str(result.get_body_model()).is_some_and(|v| v.contains("AT_c")) { return conditionss; }
+        if utils::il2str(result.get_dress_model()).is_some_and(|v| v.contains("AT_c")) || utils::il2str(result.get_body_model()).is_some_and(|v| v.contains("AT_c")) { return conditionss; }
         let asset_force = unit.get_person().get_asset_force().value;
         if asset_force != 0 {
             let generic_mode = DVCVariable::GenericAppearance.get_value();

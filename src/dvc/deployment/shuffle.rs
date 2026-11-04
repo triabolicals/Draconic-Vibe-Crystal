@@ -12,7 +12,7 @@ use engage::{
 use outfit_core::Randomizer;
 use unity::Cast;
 use crate::{config::DVCFlags, DVCVariables};
-use crate::utils::to_opt;
+use crate::utils::{il2str, to_opt};
 #[allow(unused)]
 pub struct MapRect {
     pub x1: i8,
@@ -53,15 +53,6 @@ impl MapTileData {
         }
         else { false }
     }
-    /*
-    pub fn get_area(&self, pos_x: i8, pos_z: i8) -> i8 {
-        if self.areas.is_empty() { return 0; }
-        if let Some(pos) = self.areas.iter().position(|x| pos_x > x.x1 && pos_x < x.x2 && pos_z > x.z1 && pos_z < x.z2) {
-            pos as i8 + 1
-        }
-        else { 0 }
-    }
-     */
     pub fn exclude(&self, pos_x: i8, pos_y: i8) -> bool { self.exclude_tile.contains(&(pos_x, pos_y)) }
 }
 
@@ -116,36 +107,36 @@ pub fn shuffle_deployment() {
             }
         });
     }
-    // Ally Position are ignored
+    let is_mob = dispos.base().iter().flat_map(|group| group.base().base().iter()).any(|x| il2str(x.get_pid()).is_some_and(|v| v == "PID_ダミー"));
     dispos.base().iter().flat_map(|group| group.base().base().iter())
-        .filter(|x| x.get_force() == 2 && !x.get_person().is_null())
+        .filter(|x| x.get_force() > 0 && il2str(x.get_pid()).is_some_and(|v| v != "PID_ダミー" && v.starts_with("PID_")))
         .for_each(|v|{
-            for dx in -3..3 {
-                let x = dx + v.get_dispos_x();
-                if x <= 0 || x >= 32 { continue; }
-                for dz in -3..3 {
-                    let z = dz + v.get_dispos_y();
-                    if z <= 0 || z >= 32 { continue; }
-                    occupied.insert((x as i32, z as i32));
+            let pos_x = v.get_dispos_x() as i32;
+            let pos_z = v.get_dispos_y() as i32;
+            if v.get_force() == 2 {     // Ally Position are ignored
+                for dx in -3..3 {
+                    let x = dx + v.get_dispos_x();
+                    if x <= 0 || x >= 32 { continue; }
+                    for dz in -3..3 {
+                        let z = dz + v.get_dispos_y();
+                        if z <= 0 || z >= 32 { continue; }
+                        occupied.insert((x as i32, z as i32));
+                    }
                 }
             }
-        });
-        dispos.base().iter().flat_map(|group| group.base().base().iter())
-            .filter(|x| x.get_force() == 1 && !to_opt(x.get_person()).is_some_and(|x| x.get_bmap_size() == 1))
-            .for_each(|data|{
-                let pos_x = data.get_dispos_x() as i32;
-                let pos_z = data.get_dispos_y() as i32;
-                let bmap_size =  data.get_person().get_bmap_size() as i32;
-                if bmap_size > 1 {
-                    for dx in -2..bmap_size+1 {
+            else if let Some(person) = to_opt(v.get_person()){  // Ignore any large enemies
+                let size = person.get_bmap_size() as i32;
+                if size > 1 {
+                    for dx in -2..size+1 {
                         if (pos_x + dx) <= 0 { continue; }
-                        for dz in -2..bmap_size+1 {
+                        for dz in -2..size+1 {
                             if (pos_z + dz) <= 0 { continue; }
                             occupied.insert((pos_x+dx, pos_z+dz));
                         }
                     }
                 }
-            });
+            }
+        });
 
     let mut positions: HashMap<(i8, i8), u8> = HashMap::new();
     for z in start_z..end_z {
@@ -173,7 +164,7 @@ pub fn shuffle_deployment() {
                     })
             )
             .for_each(|p|{ boss_positions.push(( p.0.0, p.0.1, *p.1)); });
-        boss_distance -= 2;
+        boss_distance -= 1;
     }
     let difficulty_flag = 1 << DVCVariables::user_data().get_difficulty(false).value;
     dispos.base().iter().flat_map(|group| group.base().base().iter())
@@ -211,8 +202,14 @@ pub fn shuffle_deployment() {
                 data.set_direction(DisposData_Directions{value: rng.get_value_2(8)});
             }
             let x = data.get_dispos_x();
-            let y = data.get_dispos_y();
-            positions.remove(&(x, y));
+            let z = data.get_dispos_y();
+            positions.remove(&(x, z));
+            if is_mob { // Ensure that 2x2 mob units can exist if the game uses them
+                positions.remove(&(x-1, z));
+                positions.remove(&(x+1, z));
+                positions.remove(&(x, z-1));
+                positions.remove(&(x, z+1));
+            }
         });
 }
 

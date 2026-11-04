@@ -3,7 +3,7 @@ pub use engage::{
     system::collections::generic::IList_1Methods,
     app::{
         structdictionary_1::*, structtemplate_1::*,
-        structdataarraylist_1::*, structdata_1::*, structbase::*,
+        structdata_1::*, structbase::*,
         goddata::*, unit::*, persondata::*, itemdata::*, random_2::*, skilldata::*, skillarray::*,
         jobdata::*, chapterdata::*, musicdata::*, interactdata::*, godgrowthdata::*, cookdata::*,
         ringdata::*, bitfield32::*, force::*, unitpool::*, godpool::*, godunit::*,
@@ -17,7 +17,11 @@ use std::{
     io::{Cursor, Read}
 };
 use super::*;
-
+use crate::{
+    config::{DVCVariable, DVCFlags, DVCVariables},
+    utils::to_opt, dvc, utils::{il2str}
+};
+use crate::dvc::sync::EmblemSkillPool;
 mod skill;
 mod emblem;
 mod person;
@@ -35,11 +39,7 @@ pub use {
 use outfit_core::Randomizer;
 pub static RANDOMIZER_DATA: OnceLock<GameData> = OnceLock::new();
 pub static RANDOMIZED_DATA: OnceLock<RwLock<RandomizedGameData>> = OnceLock::new();
-use crate::{
-    config::{DVCVariable, DVCFlags, DVCVariables},
-    utils::to_opt, dvc, utils::{il2str}
-};
-use crate::dvc::sync::EmblemSkillPool;
+
 
 pub struct GameData {
     pub bond_ring: Vec<BondRingData>,
@@ -85,8 +85,6 @@ impl GameData {
     }
     pub fn get() -> &'static Self { RANDOMIZER_DATA.get_or_init(||Self::init()) }
     pub fn get_item_pool() -> &'static ItemPool { &Self::get().item_pool }
-    // pub fn get_random_skill(diff: i32, rng: Random_2) -> SkillData { Self::get().skill_pool.get_random_skill(diff, rng) }
-    // pub fn get_random_skill_job(diff: i32, rng: Random_2, unit: Unit) -> Option<SkillData> { Self::get().skill_pool.get_random_skill_job(diff, rng, unit) }
     pub fn get_random_skill_dispos(diff: i32, rng: Random_2) -> SkillData { Self::get().skill_pool.get_random_skill_dispos(diff, rng) }
     pub fn get_random_item(ty: RandomItemReplacementType, with_rare: bool) -> Il2CppString { RANDOMIZER_DATA.get().unwrap().item_pool.random_item(ty, with_rare) }
     pub fn get_weapon_db() -> &'static WeaponDatabase { &Self::get().item_pool.weapon_db }

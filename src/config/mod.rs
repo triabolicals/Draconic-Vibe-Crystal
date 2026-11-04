@@ -90,7 +90,7 @@ pub struct DVCConfig {
 }
 
 impl DVCConfig {
-    pub fn get() -> &'static mut Self { unsafe { &mut CONFIG } }
+    #[allow(static_mut_refs)] pub fn get() -> &'static mut Self { unsafe { &mut CONFIG } }
     pub fn new() -> Self {
         #[cfg(feature = "debug")] println!("Creating dvc.toml");
         if let Ok(content) = std::fs::read_to_string("sd:/engage/config/dvc.toml") {

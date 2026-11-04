@@ -8,7 +8,7 @@ use engage::{
     List_1Ext,
     moon_sharp::interpreter::{dynvalue::*, script::*,  ITableMethods},
 };
-use crate::{DVCVariable, DVCVariables, gamedata::PersonPool, utils::il2str};
+use crate::{DVCVariable, DVCVariables, gamedata::PersonPool};
 use unity::{Cast, OptionalMethod, system::string::IIl2CppStringMethods};
 
 fn person_index_convert(person_index: i32) -> Option<i32> {
@@ -38,7 +38,7 @@ fn adjust_inspector(inspector: MapInspector, free_deploy: bool) {
     let chapter_index = DVCVariables::get_chapter_index();
     if !inspector.get_function().is_null() {
         let func_name = ScriptUtil::get_func_name(inspector.get_function());
-        if let Some(r) = il2str(func_name){
+        //if let Some(r) = il2str(func_name){
             let hash =  func_name.get_hash_code();
             /*
             println!("Function Name: {} [{}], Kind: {} ({})", r,  hash, inspector.get_class().raw().get_name(), kind.value);
@@ -55,7 +55,7 @@ fn adjust_inspector(inspector: MapInspector, free_deploy: bool) {
                 if !func.is_null() { inspector.set_condition(func); }
                 return;
             }
-        }
+        // }
     }
     if free_deploy {
         if kind == MapInspector_Kind::escape() {

@@ -13,8 +13,11 @@ use crate::{
     gamedata::{EmblemPool, PersonPool},
     utils::to_opt,
     dvc::{
-        asset::dress::{change_color_by_rng},
-        asset::emblem::{ENGAGE_F, ENGAGE_M},
+        asset::{
+            dress::change_color_by_rng,
+            emblem::{ENGAGE_F, ENGAGE_M},
+            engage_attack::EngageAttackType,
+        },
         HeroAppearanceMode,
         DVC
     }
@@ -31,10 +34,7 @@ pub mod gmapunit;
 pub mod engage_attack;
 pub mod weapon;
 pub mod other;
-
 pub use other::SEARCH_LIST;
-use crate::dvc::asset::engage_attack::EngageAttackType;
-use crate::dvc::asset::transform::{is_dragonstone, is_tiki_dragonstone};
 
 #[skyline::hook(offset=0x01bb4180)]
 pub fn asset_table_setup_person(
@@ -222,7 +222,7 @@ pub fn appearance_create_from_result_2(this: AssetTable_Result, map_distance: i3
                         let female = this.get_dress_model().to_rust_string().contains("F_c");
                         if !anim_set.is_null() {
                             if god.get_flag().m_value() & 32 != 0 {
-                                if anim_set.engage3().is_null() || il2str(anim_set.engage3().get_name()).is_none_or(|v| v.contains("Tsf")){
+                                if anim_set.engage3().is_null() || utils::il2str(anim_set.engage3().get_name()).is_none_or(|v| v.contains("Tsf")){
                                     let rng = Random_2::get_system();
                                     let set = if female { ENGAGE_F[rng.get_value_2(6) as usize] } else { ENGAGE_M[rng.get_value_2(6) as usize ] };
                                     let anim = format!("uAnim_{}", set);
@@ -232,7 +232,7 @@ pub fn appearance_create_from_result_2(this: AssetTable_Result, map_distance: i3
                                 }
                             }
                             else if god.get_flag().m_value() & 32 == 0 {
-                                if anim_set.engage1().is_null() || il2str(anim_set.engage1().get_name()).is_none_or(|v| v.contains("Tsf")){
+                                if anim_set.engage1().is_null() || utils::il2str(anim_set.engage1().get_name()).is_none_or(|v| v.contains("Tsf")){
                                     let rng = Random_2::get_system();
                                     let set = if female { ENGAGE_F[rng.get_value_2(6) as usize] } else { ENGAGE_M[rng.get_value_2(6) as usize ] };
                                     let anim = format!("uAnim_{}", set);
@@ -278,23 +278,23 @@ pub(crate) fn random_body_scale(result: AssetTable_Result, hash: Option<i32>, _i
 }
 pub fn print_asset_table_result(result: AssetTable_Result, mode: i32) {
     // #[cfg(feature="debug")] {
-        let jid = il2str(result.get_jid()).map(|v| engage::app::Mess::get_game_data_name(v).to_rust_string()).unwrap_or("---".to_string());
-        if let Some(pid) = il2str(result.get_pid()) { println!("Asset Table Result PID: {} / {} [Mode: {}]", engage::app::Mess::get_game_data_name(pid), jid, mode); }
-        if let Some(ride) = il2str(result.get_ride_model()) { println!("Ride Model: {}", ride); }
+        let jid = utils::il2str(result.get_jid()).map(|v| engage::app::Mess::get_game_data_name(v).to_rust_string()).unwrap_or("---".to_string());
+        if let Some(pid) = utils::il2str(result.get_pid()) { println!("Asset Table Result PID: {} / {} [Mode: {}]", engage::app::Mess::get_game_data_name(pid), jid, mode); }
+        if let Some(ride) = utils::il2str(result.get_ride_model()) { println!("Ride Model: {}", ride); }
         if mode == 2 {
-            if let Some(dress) = il2str(result.get_dress_model()) { println!("Dress Model: {}/ {}", dress, il2str(result.get_ride_dress_model()).unwrap_or("---".to_string())); }
+            if let Some(dress) = utils::il2str(result.get_dress_model()) { println!("Dress Model: {}/ {}", dress, utils::il2str(result.get_ride_dress_model()).unwrap_or("---".to_string())); }
         }
         println!("Body/Head/Hair: {} / {} / {}",
-            il2str(result.get_body_model()).unwrap_or("--".to_string()),
-            il2str(result.get_head_model()).unwrap_or("--".to_string()),
-            il2str(result.get_hair_model()).unwrap_or("---".to_string())
+                 utils::il2str(result.get_body_model()).unwrap_or("--".to_string()),
+                 utils::il2str(result.get_head_model()).unwrap_or("--".to_string()),
+                 utils::il2str(result.get_hair_model()).unwrap_or("---".to_string())
         );
         if mode != 2 {
-            if let Some(body) = il2str(result.get_body_anim()) { println!("Body Anim: {} / {}", body, il2str(result.get_ride_anim()).unwrap_or("---".to_string())); }
+            if let Some(body) = utils::il2str(result.get_body_anim()) { println!("Body Anim: {} / {}", body, utils::il2str(result.get_ride_anim()).unwrap_or("---".to_string())); }
         } else {
-            if let Some(body) = il2str(result.get_body_anim()) { println!("Body Anim: {}", body); }
+            if let Some(body) = utils::il2str(result.get_body_anim()) { println!("Body Anim: {}", body); }
         }
-        println!("Hands: R: {}/ L: {}",  il2str(result.get_right_hand()).unwrap_or("--".to_string()), il2str(result.get_left_hand()).unwrap_or("--".to_string()));
+        println!("Hands: R: {}/ L: {}",  utils::il2str(result.get_right_hand()).unwrap_or("--".to_string()), utils::il2str(result.get_left_hand()).unwrap_or("--".to_string()));
         let mut acc = String::new();
         result.get_accessories().base().iter().filter(|v| !v.is_null())
             .filter(|v| !v.get_locator().is_null() && !v.get_model().is_null())

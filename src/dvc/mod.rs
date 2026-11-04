@@ -8,7 +8,6 @@ use std::sync::RwLock;
 use cobapi::{Event, SystemEvent};
 use engage::{
     app::{
-        HubPlayTalkAfter_SelectListMenu, IBasicMenuItemMethods,
         procinst::*, unitedit::*, proc::*, spriteatlasmanager_2::*,
         ChapterData, IStructData_1Methods, IBasicMenu, IBasicMenuMethods, ISingletonPool_2,
         ProcVoidMethod, GodPool,
@@ -19,7 +18,7 @@ use engage::{
     unity_engine::{GameObject, IComponentMethods, IGameObjectMethods, IObject_2Methods, IRectTransformMethods, RectTransform},
     system::collections::generic::{IDictionary_2Methods, InsertionBehavior},
 };
-use engage::app::{HubPlayTalkAfter, IHubAccessMethods, IHubDisposDataMethods, IHubPlayTalkMethods, IMapSequence, MapSequence};
+use engage::app::{HubPlayTalkAfter, IMapSequence, MapSequence};
 use outfit_core::{UnitAssetData, UnitAssetMenuData};
 use skyline::install_hooks;
 use unity::{Cast, OptionalMethod};
@@ -36,9 +35,8 @@ use crate::{
         unit::set_unit_lil
     },
     sequences,
-    utils::override_vtable,
-    menus::{DVCSettingMenu, UnitRecruitMenuItem},
-    utils::to_opt
+    utils::*,
+    menus::DVCSettingMenu,
 };
 
 pub mod deployment;
@@ -59,10 +57,7 @@ pub use blacklist::*;
 pub static mut STATUS: DVC = DVC::new();
 
 #[derive(PartialEq, Clone, Copy)]
-pub enum HeroAppearanceMode {
-    Normal,
-    Training,
-}
+pub enum HeroAppearanceMode { Normal, Training, }
 
 pub struct DVC {
     pub alear_person_set: bool,
@@ -194,7 +189,7 @@ impl DVC {
             }
         }
     }
-    pub fn get() -> &'static mut Self { unsafe { &mut STATUS } }
+    #[allow(static_mut_refs)] pub fn get() -> &'static mut Self { unsafe { &mut STATUS } }
     pub fn reset(&mut self) {
         self.alear_person_set = false;
         self.well_randomized = false;
@@ -230,23 +225,21 @@ impl DVC {
         if let Event::Args(ev) = event {
             match ev {
                 SystemEvent::ProcInstJump {proc, label } => {
-                 //   if Self::get().print_events { println!("[Proc Jump]: {} [{}], Desc: {}/{}, Label: {}", proc.get_name(), proc.get_hash_code(),  proc.get_desc_index(), proc.m_descs().len(),  *label); }
-                    println!("[Proc Jump]: {} [{}], Desc: {}/{}, Label: {}", proc.get_name(), proc.get_hash_code(),  proc.get_desc_index(), proc.m_descs().len(),  *label);
+                    if Self::get().print_events { println!("[Proc Jump]: {} [{}], Desc: {}/{}, Label: {}", proc.get_name(), proc.get_hash_code(),  proc.get_desc_index(), proc.m_descs().len(),  *label); }
                     Self::on_proc_jump(*proc, *label);
                 }
                 SystemEvent::ProcInstBind { proc, parent: _} => {
                     let proc = proc.borrow();
-                    //if Self::get().print_events {
+                    if Self::get().print_events {
                         let desc = proc.get_desc_index();
                         let hash = proc.get_hash_code();
                         let descs = proc.m_descs();
-                        //
-                   // }
-                    println!("[Proc Bind]: {} ({}), Desc: {}/{} Parent: {}", (*proc).get_name(), hash, desc , descs.len(), (*proc).get_super().get_name());
+                        println!("[Proc Bind]: {} ({}), Desc: {}/{} Parent: {}", (*proc).get_name(), hash, desc , descs.len(), (*proc).get_super().get_name());
+                    }
                     Self::on_proc_bind(*proc);
                 }
                 SystemEvent::SaveLoaded {ty, slot_id} => {
-                   // if Self::get().print_events { println!("[SaveLoaded Event] Type: {}, Slot: {}", *ty, *slot_id); }
+                    if Self::get().print_events { println!("[SaveLoaded Event] Type: {}, Slot: {}", *ty, *slot_id); }
                     if *ty > 1 { DVC::get().on_save_load(); }
                 }
                 _ => {}
@@ -343,6 +336,7 @@ impl DVC {
             UnitReliance::reset();
         }
         else {
+            RecruitmentRandomizer::correct_emblem_order();
             RecruitmentRandomizer::setup_hero(false);
             RecruitmentRandomizer::setup_hub();
         }
@@ -408,7 +402,6 @@ impl DVC {
             Self::MAP_SEQUENCE => {
                 match label {
                     3|4 => { randomizer::map::fow::update_fog(); }
-                    // 12 => {} // Turn Hunam
                     16 => { randomizer::map::fow::update_fog(); }  // Turn End
                     17 => { // Complete
                         let con = DVCVariable::Continuous.get_value();
@@ -424,9 +417,7 @@ impl DVC {
                         if con != 1 && con != 2 && DVCFlags::PostChapterAutolevel.get_value() {
                             autolevel::auto_level_units_bind(proc, false);
                         }
-                        if let Some(map) = proc.try_cast::<MapSequence>() {
-                            map.set_m_is_completed(true);
-                        }
+                        if let Some(map) = proc.try_cast::<MapSequence>() { map.set_m_is_completed(true); }
                     }
                     _ => {}
                 }

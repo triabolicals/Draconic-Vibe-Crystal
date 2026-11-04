@@ -34,7 +34,7 @@ impl AppearanceManager {
             summon_count: 0,
         }
     }
-    pub fn get() -> &'static mut AppearanceManager { unsafe { &mut APPEARANCE } }
+    #[allow(static_mut_refs)] pub fn get() -> &'static mut AppearanceManager { unsafe { &mut APPEARANCE } }
     pub fn randomize_summons(&mut self) {
         let rng = Random_2::get_system();
         let mut female: [bool; 100] = [false; 100];

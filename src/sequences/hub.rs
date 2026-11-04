@@ -48,8 +48,8 @@ extern "C" fn hub_prepare_event(hub: HubSequence, _: OptionalMethod) {
     hub.prepare_event();
     dvc::randomizer::hub::hub_item_randomization();
 }
-extern "C" fn load_hub_script(hub_sequence: HubSequence, _: OptionalMethod) {
-    hub_sequence.load_script();
+extern "C" fn load_hub_script(hub: HubSequence, _: OptionalMethod) {
+    hub.load_script();
     let sequence = DVCVariables::get_sequence();
     if sequence == 5 {
         let chapter = DVCVariables::user_data().get_chapter();
@@ -134,17 +134,17 @@ extern "C" fn hub_sequence_patch_3_gift_event(proc: HubSequence, _optional_metho
     try_gift_event(proc, flag.into(), reward.into(), message.into());
 }
 
-fn try_gift_event(hub: HubSequence, flagname: Il2CppString, reward: Il2CppString, message_id: Il2CppString) {
+fn try_gift_event(hub: HubSequence, flag_name: Il2CppString, reward: Il2CppString, message_id: Il2CppString) {
     if !DVCVariables::is_main_chapter_complete(4) || !GameData::get_item_pool().has_reward { return; }
     let mode = DVCVariable::Continuous.get_value();
     let sequence = DVCVariables::get_sequence();
     if ((mode == 1 || mode == 2) && sequence == 5) || sequence == 4 {
-        if !GameVariableManager::is_exist(flagname) || GameVariableManager::get_number(flagname) == 0 {
-            GameVariableManager::make_entry(flagname, 1);
+        if !GameVariableManager::is_exist(flag_name) || GameVariableManager::get_number(flag_name) == 0 {
+            GameVariableManager::make_entry(flag_name, 1);
             let mode = DVCVariable::RandomGifts.get_value();
             if mode == 0 { hub.gift_get(reward, message_id); }
             else { random_gifts(hub, reward, message_id, mode == 2); }
-            GameVariableManager::set_number(flagname, 1);
+            GameVariableManager::set_number(flag_name, 1);
         }
     }
 }
@@ -233,22 +233,16 @@ fn adjust_reward_item(list: List_1::<ItemData>, rare: bool) -> (HashMap<i32, i32
     });
     (item_list, current_gold, bond)
 }
-
-pub extern "C" fn muscle_exit(this: ProcInst, optional_method: OptionalMethod){ DVC::get().hero_appearance = None; }
-pub extern "C" fn fishing_exit(this: ProcInst, optional_method: OptionalMethod) {
+pub extern "C" fn muscle_exit(_: ProcInst, _: OptionalMethod){ DVC::get().hero_appearance = None; }
+pub extern "C" fn fishing_exit(_: ProcInst, _: OptionalMethod) {
     DVC::get().hero_appearance = None;
-    println!("FishingSequence Exit");
     let hub_sequence = HubSequence::get_instance();
-    if !hub_sequence.is_null() {
-        println!("Disable Fishing Group");
-        hub_sequence.disable_fishing_group();
-    }
+    if !hub_sequence.is_null() { hub_sequence.disable_fishing_group(); }
 }
 pub extern "C" fn dragon_ride_exit(this: ProcInst, optional_method: OptionalMethod) {
     DVC::get().hero_appearance = None;
     unsafe { dragon_ride_exit_original(this, optional_method); }
 }
-
 #[skyline::from_offset(0x27ab200)]
 fn item_data_get_name(this: ItemData, optional_method: OptionalMethod) -> Il2CppString;
 #[skyline::from_offset(0x2ad4570)]
