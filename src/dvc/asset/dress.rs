@@ -66,10 +66,6 @@ fn mode_1_transformation(result: AssetTable_Result, condition_unit: Unit, equipp
         else {
             result.setup_5(AssetTable_Modes::onmap(), PersonData::get("PID_エル_竜化".into()), condition_unit.get_job(), ItemData::null(), conditions);
         }
-        #[cfg(feature = "debug")] {
-            println!("Transform Mode 1 for {}", condition_unit.get_name());
-            print_asset_table_result(result, 1);
-        }
         if let Some(body) = utils::il2str(result.get_body_model()) {
             if body.contains("Mrp") { result.set_map_scale_all(1.0); }
             else if body.contains("1AT") && !body.contains("Tik") {
@@ -94,15 +90,19 @@ pub fn commit_for_unit_dress(
 ) -> AssetConditions
 {
     let mode1 = AssetTable_Modes{value: mode};
-    let condition_unit = if !UnitUtil::get_vision_owner(unit).is_null() { UnitUtil::get_vision_owner(unit) } else { unit };
+    let vision = unit.check_status(Unit_Status::vision());
+    let vision_owner = UnitUtil::get_vision_owner(unit);
+    let condition_unit = if vision && !vision_owner.is_null(){ vision_owner  } else { unit };
     let mut conditionss = AssetConditions::new(condition_unit, mode, equipped);
+    let person_hash = condition_unit.get_person().hash();
+    conditionss.flags.set(AssetFlags::Vision, vision);
     if conditionss.flags.contains(AssetFlags::ThreeStar) || conditionss.flags.contains(AssetFlags::FiveStar) {
         if !to_opt(condition_unit.get_engage_attack()).is_some_and(|v| v.get_sid().contains("ヴェロニカ")) && !condition_unit.get_pid().contains("ヴェロニカ") {
             conditionss.flags.set(AssetFlags::ThreeStar, false);
             conditionss.flags.set(AssetFlags::FiveStar, false);
         }
     }
-    if let Some(emblem) = PersonPool::M022_EMBLEMS.iter().position(|v| *v == unit.get_person().hash()) {
+    if let Some(emblem) = PersonPool::M022_EMBLEMS.iter().position(|v| *v == person_hash) {
         if let Some(replacement) = EmblemPool::get_replacement_god_3(emblem as i32 + 1, false) {
             emblem::asset_table_result_god_setup(result, mode, replacement, true, con, None);
             result.set_pid(replacement.get_gid());
@@ -110,8 +110,8 @@ pub fn commit_for_unit_dress(
             return conditionss;
         }
     }
-    else if let Some(god) = EmblemPool::get_paralogue_custom_emblem(unit.get_person()) {
-        conditionss.flags.set_gender(unit.get_dress_gender());
+    else if let Some(god) = EmblemPool::get_paralogue_custom_emblem(condition_unit.get_person()) {
+        conditionss.flags.set_gender(condition_unit.get_dress_gender());
         emblem::asset_table_result_god_setup(result, mode, god, false, con, None);
         if !equipped.is_null() {
             AssetFlags::set_condition_key(equipped.get_iid(), true);
@@ -136,14 +136,11 @@ pub fn commit_for_unit_dress(
             result.setup_5(mode1, PersonData::get("PID_S004_リン".into()), JobData::get("JID_紋章士_リン".into()), equipped, con);
         }
         else {
-            result.commit_2(mode1, unit.get_person(), unit.get_job(), equipped);
+            result.commit_2(mode1, condition_unit.get_person(), condition_unit.get_job(), equipped);
             result.replace(mode1);
         }
         return conditionss;
     }
-    let condition_unit =
-        if conditionss.flags.contains(AssetFlags::Vision) && !UnitUtil::get_vision_owner(unit).is_null(){ UnitUtil::get_vision_owner(unit) }
-        else { unit  };
     AppearanceManager::swap_asset_condition_enemy_player_unit(condition_unit, &mut conditionss);
     if condition_unit.get_job().hash() == LUEUR_CLASS[2] { AssetFlags::set_condition_key(condition_unit.get_job().get_jid(), false); }
     if tiki_engage(result, condition_unit, mode, equipped, &mut conditionss) {
@@ -192,7 +189,7 @@ pub fn commit_for_unit_dress(
         }
         result.commit_2(mode1, condition_unit.get_person(), condition_unit.get_job(), equipped);
         if profile_flag & 8 == 0 {
-            let job_hash = GameVariableManager::get_number(GrowthData::get_starting_class_key(unit.get_person()));
+            let job_hash = GameVariableManager::get_number(GrowthData::get_starting_class_key(condition_unit.get_person()));
             if job_hash == condition_unit.get_job().hash() && conditionss.random_dress.is_off() && !engaged && !conditionss.flags.contains(AssetFlags::CausalClothes){
                 if let Some(dress) = db.dress.get_personal_dress(condition_unit) {
                     dress.apply(result, mode, false, db.anims.get_mount_type(unit, unit.get_dress_gender()), &db.hashes);
@@ -206,7 +203,7 @@ pub fn commit_for_unit_dress(
         conditionss.profile_flag = profile_flag;
     }
     else {
-        if condition_unit.get_person().hash() == PersonPool::M002_LUMERA && condition_unit.is_engaging_2() {
+        if person_hash == PersonPool::M002_LUMERA && condition_unit.is_engaging_2() {
             if let Some(sigurd_replacement) = EmblemPool::get_replacement_god_3(1, false){
                 let conditions = AssetTable::s_condition_flags();
                 conditions.clear();
@@ -268,7 +265,7 @@ pub fn commit_for_unit_dress(
     if conditionss.flags.contains(AssetFlags::CombatTranforming) { AnimData::remove(result, true, true); }
     if DVCFlags::RandomUnitInfo.get_value() {
         let gender = db.get_dress_gender(result.get_dress_model());
-        let hash = if conditionss.flags.is_generic() { condition_unit.m_ident() } else { condition_unit.get_person().hash() };
+        let hash = if conditionss.flags.is_generic() { condition_unit.m_ident() } else { person_hash };
         if gender.value != 0 {
             let rng = DVCVariables::create_hash_rng(hash, condition_unit.is_engaging_2() as i32 + 1);
             if let Some(info) = db.hashes.random_aoc(gender.value == 2, rng) { result.set_m_info_anim(info.as_str().into()); }
