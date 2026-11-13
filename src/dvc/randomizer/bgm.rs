@@ -1,9 +1,10 @@
+use engage::unity_engine::IObject_2Methods;
 use engage::{
     app::{
         IFieldBgmManager, ISingletonMonoBehaviour_1Methods,
         unitmodel::*, gamesound::*,
-        mapsequencebattleaction::*, mapsequencebattle::*, mapsituation::*,
-        procinst::*, sortiesequence::*, battlecalculator::*, soundmanager::*,
+        mapsequencebattleaction::*, mapsequencebattle::*, mapsituation::*, 
+        sortiesequence::*, battlecalculator::*, soundmanager::*,
         IBattleInfoSide, ICommonBattleSequence_1, IUnitItem,
         Proc, ProcVoidMethod,Force_Type,
         FieldBgmManager_ProcChangeBgm, MapHistory,

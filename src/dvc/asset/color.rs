@@ -1,14 +1,18 @@
-use std::{io::{Read, Seek}, sync::OnceLock};
-use super::*;
 use engage::{
+    unity_engine::IGameObjectMethods,
     app::{UnitPool, Ut, GodPool},
     combat::ICharacterAssetForm,
     unity_engine::{material::*, Color, renderer::*, IObject_2Methods},
     List_1Ext,
+    unity_engine::GameObject
 };
+use std::{io::{Read, Seek}, sync::OnceLock};
+use super::*;
 use outfit_core::UnitAssetMenuData;
 use crate::{DVCFlags, DVCVariables, gamedata::{EmblemPool, PersonPool}};
+
 pub static PRESET_MATERIAL_DATA: OnceLock<Vec<PresetMaterialData>> = OnceLock::new();
+
 pub struct PresetMaterialData {
     pub kind: u8,
     pub colors: [Color; 7],

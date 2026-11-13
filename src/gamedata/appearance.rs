@@ -5,7 +5,7 @@ use engage::{
 use outfit_core::*;
 use super::*;
 
-use crate::dvc::asset::{new_accessory, print_asset_table_result};
+use crate::dvc::asset::new_accessory;
 use crate::enums::EMBLEM_GIDS;
 
 pub static mut APPEARANCE: AppearanceManager = AppearanceManager::init();

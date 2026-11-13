@@ -142,6 +142,14 @@ impl DVCSettingMenu {
     }
 }
 impl DVCSettingMenu {
+    pub fn add_setting_menu_item(proc: ProcInst) {
+        if let Some(proc) = proc.try_cast::<BasicMenu>() {
+            proc.m_full_menu_item_list().add(Self::create_settings_menu_item().into());
+            proc.set_m_desc_index(0);
+            proc.set_m_show_row_num(9);
+            proc.rebuild();
+        }
+    }
     pub fn create_settings_menu_item() -> DVCBasicMenuItem {
         DVCBasicMenuItem::from_type(DVCMenuItemKind::Command(DVCCommand::Menu), 0)
     }

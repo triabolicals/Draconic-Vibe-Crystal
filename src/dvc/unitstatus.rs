@@ -1,14 +1,10 @@
 use engage::{
     system::collections::generic::IList_1Methods,
     app::{
-        IStructDataArray_1Methods,
-        GameSound,
-        IStructBase, IUnitInfoParamManager,
-        Pad, UnitInfoParamManager,
-        unit::*, unitstatus::*, unitstatussetter::*, singletonclass_1::*,
-        BattleInfo_Flags,
+        IStructDataArray_1Methods, IStructBase,
         ICapabilityBase_1Methods, IJobDataMethods, IPersonDataMethods,
-        keyhelpdata::*,
+        GameSound, Pad, BattleInfo_Flags,
+        unit::*, unitstatus::*, unitstatussetter::*, keyhelpdata::*,
     },
     unity_engine::{animator::*, gameobject::*, component::*},
     List_1Ext,
@@ -18,8 +14,7 @@ use engage::{
     tm_pro::{ITMP_TextMethods, TextMeshProUGUI},
     unity_engine::ITransformMethods,
 };
-use unity::{Cast, Class, IlNull, OptionalMethod};
-use unity::il2cpp::Il2CppClass;
+use unity::{il2cpp::Il2CppClass, Cast, Class, IlNull, OptionalMethod};
 use crate::utils::to_opt;
 
 pub fn add_unit_status_key_help_data() {
@@ -34,6 +29,7 @@ pub fn add_unit_status_key_help_data() {
         }
     });
 }
+// Structure for lambda 'UnitStatusSetter.<>c__DisplayClass74_0'
 #[repr(C)]
 pub struct UnitStatusSetter74 {
     pub klass: &'static Il2CppClass,

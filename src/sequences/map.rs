@@ -19,6 +19,7 @@ use super::*;
 
 pub fn map_sequence_desc_edit(proc: ProcInst) {
     let descs = proc.m_descs();
+    AppearanceManager::get().randomize_summons();
     if let Some(proc) = proc.try_cast() {
         if DVCFlags::Ironman.get_value() { MapHistory::rewind_disable(); } else { MapHistory::rewind_enable(); }
         descs.set(4, Proc::call_2(ProcVoidMethod::from_fn(proc, map_sequence_setup_chapter).unwrap()));
@@ -31,6 +32,26 @@ pub fn map_sequence_desc_edit(proc: ProcInst) {
         // 204 TryEnding
         descs.set(207, Proc::call_2(ProcVoidMethod::from_fn(proc, map_sequence_unload_script).unwrap()));
         descs.set(209, Proc::call_2(ProcVoidMethod::from_fn(proc, try_restart_map_result).unwrap()));
+    }
+}
+pub fn map_sequence_completed_jump_event(proc: ProcInst, label: i32) {
+    match label {
+        3|4|16 => randomizer::map::fow::update_fog(),
+        17 => {
+            let con = DVCVariable::Continuous.get_value();
+            if con == 2 || con == 1 {
+                let user_data = DVCVariables::user_data();
+                let chapter = user_data.get_chapter();
+                if let Some(chapter) = dvc::continuous::set_next_chapter(chapter){
+                    DVCVariables::set_next_chapter(chapter);
+                }
+            }
+            DVC::get().on_map_complete();
+            dvc::continuous::post_chapter_continuous_mode(ProcInst::from(proc));
+            if con != 1 && con != 2 && DVCFlags::PostChapterAutolevel.get_value() { autolevel::auto_level_units_bind(proc, false); }
+            if let Some(proc) = proc.try_cast::<MapSequence>() { proc.set_m_is_completed(true); }
+        }
+        _ => {}
     }
 }
 extern "C" fn map_sequence_unload_script(map_sequence: MapSequence, _: OptionalMethod) {

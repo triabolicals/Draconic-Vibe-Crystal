@@ -13,7 +13,20 @@ use engage::{
 use crate::dvc::autolevel::try_autoscale_unit;
 use crate::menus::UnitRecruitMenuItem;
 
-pub extern "C" fn hub_play_talk_after_create_select(this: HubPlayTalkAfter, _: OptionalMethod) {
+pub fn hub_play_talk_descs_edit(proc: ProcInst) {
+    if DVCVariables::get_sequence() == 5 {
+        if let Some(talk) = proc.try_cast::<HubPlayTalk>() {
+            let descs = talk.m_descs();
+            descs.set(7, Proc::call_2(ProcVoidMethod::from_fn(talk.into(), hub_play_talk_exec_talk_after).unwrap()));
+        }
+    }
+}
+pub fn hub_play_talk_after_descs_edit(proc: ProcInst) {
+    if let Some(hub_play_talk_after) = proc.try_cast::<HubPlayTalkAfter>() {
+        proc.m_descs().set(5, Proc::call_2(ProcVoidMethod::from_fn(hub_play_talk_after, hub_play_talk_after_create_select).unwrap()))
+    }
+}
+extern "C" fn hub_play_talk_after_create_select(this: HubPlayTalkAfter, _: OptionalMethod) {
     this.create_bind_select_menu();
     let access = this.get_access();
     if access.get_dispos_data().get_script_name().is_null() {
@@ -30,7 +43,7 @@ pub extern "C" fn hub_play_talk_after_create_select(this: HubPlayTalkAfter, _: O
         }
     }
 }
-pub extern "C" fn hub_play_talk_exec_talk_after(this: HubPlayTalk, _: OptionalMethod) {
+extern "C" fn hub_play_talk_exec_talk_after(this: HubPlayTalk, _: OptionalMethod) {
     let access = this.get_access().m_access_data();
     if unity::field_get_value_at_offset::<bool>(access, 0x2e){
         if access.get_is_god() {

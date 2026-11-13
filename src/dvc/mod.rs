@@ -8,17 +8,12 @@ use std::sync::RwLock;
 use cobapi::{Event, SystemEvent};
 use engage::{
     app::{
-        procinst::*, unitedit::*, proc::*, spriteatlasmanager_2::*,
-        ChapterData, IStructData_1Methods, IBasicMenu, IBasicMenuMethods, ISingletonPool_2,
-        ProcVoidMethod, GodPool,
-        Stream_2, UnitPool, FaceThumbnail, HubPlayTalk, UnitReliance
+        procinst::*, unitedit::*, spriteatlasmanager_2::*,
+        ChapterData, IStructData_1Methods, ISingletonPool_2,
+        GodPool, UnitPool, FaceThumbnail, UnitReliance
     },
-    ProcVoidMethodExt,
-    combat::Kaneko,
-    unity_engine::{GameObject, IComponentMethods, IGameObjectMethods, IObject_2Methods, IRectTransformMethods, RectTransform},
     system::collections::generic::{IDictionary_2Methods, InsertionBehavior},
 };
-use engage::app::{HubPlayTalkAfter, IMapSequence, MapSequence};
 use outfit_core::{UnitAssetData, UnitAssetMenuData};
 use skyline::install_hooks;
 use unity::{Cast, OptionalMethod};
@@ -36,7 +31,6 @@ use crate::{
     },
     sequences,
     utils::*,
-    menus::DVCSettingMenu,
 };
 
 pub mod deployment;
@@ -81,34 +75,6 @@ pub struct DVC {
 }
 #[allow(unused)]
 impl DVC {
-    const DIE_EVENT: i32 = 1559281067;
-    const CONFIG_MENU: i32 = -1028322135;
-    const MAIN_SEQUENCE: i32 = -339912801;
-    const TITLE_SEQUENCE: i32 = -988690862;
-    const MAINMENU_SEQUENCE: i32 = -1912552174;
-    const SORTIE_SEQUENCE: i32 = -1624221522;
-    const MAP_SEQUENCE: i32 = 1650205480;
-    const HUB_SEQUENCE: i32 = 570083351;
-    const GMAP_SEQUENCE: i32 = 971901799;
-    const MAP_HUMAN_SEQUENCE: i32 = 1525873615;
-    const MAP_SEQUENCE_BATTLE: i32 = -1562529994;
-    const MAP_ENGAGE_SUMMON: i32 = 31745184;
-    const MAP_SEQUENCE_BATTLE_ACTION: i32 = 123970300;
-    const GAME_SAVE_DATA_PROC_READ: i32 = -1512678141;
-    const WELL_SEQUENCE: i32 = -651818312;
-    const COMBAT_COMBAT_SEQUENCE: i32 = -1353170183;
-    const COMBAT_ENGAGE_SEQUENCE: i32 = -283318138;
-    const UNIT_SELECT_SUB_MENU: i32 = -845322556;
-    const LATER_TALK: i32 = 1918405982;
-    const EVENT_DEMO: i32 = -2147118281;
-    const HUB_MENU_SEQUENCE: i32 = 1811932770;
-    const LEVEL_UP: i32 = 1959640519;
-    const HUB_MENU_SUB_SYSTEM_MENU: i32 = -334095976;
-    const SORTIE_TOP_MENU_SUB_SYSTEM_MENU: i32 = -614519810;
-    const MAP_SYSTEM_MENU: i32 = -1831912859;
-    const HUB_PLAY_TALK: i32 = 183720196;
-    const COMMON_REWARD_MENU: i32 = -1755657852;
-    const MUSCLE_START: i32 = 1877583707;
     pub const fn new() -> Self {
         DVC{
             alear_person_set: false,
@@ -247,7 +213,6 @@ impl DVC {
         }
     }
     pub fn initialize(&mut self) {
-        #[cfg(feature = "debug")]{ self.print_events = true; }
         script::script_vtable_override();
         ironman::iron_man_vtable_edit();
         asset::facethumb::override_facethumb_menu_item_build();
@@ -359,168 +324,6 @@ impl DVC {
         }
         GameVariableManager::set_bool("G_解説_TUTID_クラスチェンジ", true);
     }
-    pub fn on_proc_jump(proc: ProcInst, label: i32){
-        let hash_code = proc.get_hash_code();
-        match hash_code {
-            Self::MAINMENU_SEQUENCE => {
-                if label == 6 {
-                    DVC::get().init = false;
-                    DVCSettingMenu::create_bind(proc);
-                }
-                else if label == 28 {
-                    DVCConfig::get().save();
-                    Self::get().on_new_game_start();
-                }
-            }
-            Self::MAIN_SEQUENCE => {
-                match label {
-                    2|14 => { Self::get().reset(); }
-                    16 => {}
-                    _ => {}
-                }
-            }
-            Self::TITLE_SEQUENCE => {
-                UnitAssetMenuData::get().is_loaded = false;
-                UnitAssetMenuData::get().data.clear();
-                if label == 0 {
-                    Self::get().enabled = false;
-                    if !UnitAssetMenuData::get().init {
-                        outfit_core::install_outfit_plugin(true);
-                        Patch::in_text(0x01bb272c).nop().unwrap();
-                        install_hooks!(
-                            asset::asset_table_result_setup_hook,
-                            asset::emblem::asset_table_result_god_setup,
-                            asset::asset_table_setup_person,
-                            asset::color::combat_character_play_facial,
-                            mess::unit_get_name,
-                        );
-                        override_vtable("App", "GameUserData", "OnDeserialize", game_user_data_on_deserialize as _);
-                    }
-                }
-                else {}
-            }
-            Self::MAP_SEQUENCE => {
-                match label {
-                    3|4 => { randomizer::map::fow::update_fog(); }
-                    16 => { randomizer::map::fow::update_fog(); }  // Turn End
-                    17 => { // Complete
-                        let con = DVCVariable::Continuous.get_value();
-                        if con == 2 || con == 1 {
-                            let user_data = DVCVariables::user_data();
-                            let chapter = user_data.get_chapter();
-                            if let Some(chapter) = continuous::set_next_chapter(chapter){
-                                DVCVariables::set_next_chapter(chapter);
-                            }
-                        }
-                        Self::get().on_map_complete();
-                        continuous::post_chapter_continuous_mode(proc);
-                        if con != 1 && con != 2 && DVCFlags::PostChapterAutolevel.get_value() {
-                            autolevel::auto_level_units_bind(proc, false);
-                        }
-                        if let Some(map) = proc.try_cast::<MapSequence>() { map.set_m_is_completed(true); }
-                    }
-                    _ => {}
-                }
-            }
-            _ => {}
-        }
-    }
-    pub fn on_proc_bind(proc: ProcInst) {
-        let hash_code = proc.get_hash_code();
-        match hash_code {
-            Self::DIE_EVENT => { sequences::die::die_event_edit(proc); }
-            -100577619 => { proc.m_descs().set(37, Proc::call_2(ProcVoidMethod::from_fn(proc, sequences::hub::muscle_exit).unwrap())); } // MuscleStart
-            Self::MUSCLE_START => { Self::get().hero_appearance = Some(HeroAppearanceMode::Training); } // MuscleExerice
-            966197538 => {
-                if let Some(hub_play_talk_after) = proc.try_cast::<HubPlayTalkAfter>() {
-                    proc.m_descs().set(5, Proc::call_2(ProcVoidMethod::from_fn(hub_play_talk_after, sequences::hubplaytalk::hub_play_talk_after_create_select).unwrap()))
-                }
-            }
-            -1301819996 => {    // FishingSequence
-                Self::get().hero_appearance = Some(HeroAppearanceMode::Normal);
-                let count = proc.m_descs().iter().count();
-                let i = if count == 16 { 14 } else { 11 };
-                proc.m_descs().set(i, Proc::call_2(ProcVoidMethod::from_fn(proc, sequences::hub::fishing_exit).unwrap()));
-            }
-            -141149838 => { Self::get().hero_appearance = Some(HeroAppearanceMode::Training); }
-            -366846237 => { sequences::hub::hub_cooking_sequence_edit(proc); }
-            -590766076|Self::HUB_PLAY_TALK => {
-                if DVCVariables::get_sequence() == 5 {
-                    if let Some(talk) = proc.try_cast::<HubPlayTalk>() {
-                        let descs = talk.m_descs();
-                        descs.set(7, Proc::call_2(ProcVoidMethod::from_fn(talk.into(), sequences::hubplaytalk::hub_play_talk_exec_talk_after).unwrap()));
-                    }
-                }
-            },
-            Self::MAIN_SEQUENCE => sequences::main::main_sequence_descs_edit(proc),
-            Self::WELL_SEQUENCE => sequences::hub::well_sequence_desc_edit(proc),
-            Self::HUB_SEQUENCE => {
-                let dvc = Self::get();
-                dvc.kizuna_person_hashes.clear();
-                sequences::hub::hub_sequence_desc_edit(proc);
-            },
-            Self::HUB_MENU_SEQUENCE => { sequences::hubmenu::hub_menu_sequence_proc_edit(proc); }
-            Self::GMAP_SEQUENCE => sequences::gmap::gmap_desc_edit(proc),
-            Self::MAP_SEQUENCE => {
-                AppearanceManager::get().randomize_summons();
-                sequences::map::map_sequence_desc_edit(proc)
-            },
-            -1643925050 => { if DVCVariables::is_continuous() { proc.jump(4); } }
-            Self::EVENT_DEMO => sequences::eventdemo::event_demo_proc_edit(proc),
-            Self::SORTIE_SEQUENCE|Self::MAP_SEQUENCE_BATTLE|Self::MAP_SEQUENCE_BATTLE_ACTION|Self::COMBAT_COMBAT_SEQUENCE => randomizer::bgm::proc_descs_bgm_edit(proc),
-            Self::CONFIG_MENU => {
-                if let Some(proc) = proc.try_cast::<engage::app::BasicMenu>() {
-                    proc.m_full_menu_item_list().add(DVCSettingMenu::create_settings_menu_item().into());
-                    proc.set_m_desc_index(0);
-                    proc.set_m_show_row_num(9);
-                    proc.rebuild();
-                }
-            }
-            Self::COMMON_REWARD_MENU => {
-                if let Some(root) = to_opt(GameObject::find("WdwEXP")){
-                    if let Some(rect) = to_opt(root.get_component_in_children_3::<RectTransform>()) {
-                        let mut size = rect.get_size_delta();
-                        size.x += 100.0;
-                        rect.set_size_delta(size);
-                        for i in 0..12 {
-                            if let Some(transform) = to_opt(Kaneko::find_in_children(rect, format!("Exp{}", i))){
-                                let go = transform.get_game_object();
-                                go.get_components_in_children_3::<RectTransform>(true).iter().for_each(|rect|{
-                                    let name = rect.get_name().to_rust_string();
-                                    if name == "Max" || name == "ExpValue" {
-                                        let mut anchored_pos = rect.get_anchored_position();
-                                        anchored_pos.x += 50.0;
-                                        rect.set_anchored_position(anchored_pos);
-                                    }
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-            -1403413982 => { Self::get().kizuna_person_hashes.clear(); }
-            Self::MAP_ENGAGE_SUMMON => sequences::summon::map_engage_summon_edit(proc),
-            Self::UNIT_SELECT_SUB_MENU => {}
-            Self::LEVEL_UP => sequences::levelup::level_up_sequence_edit(proc),
-            Self::LATER_TALK => sequences::latertalk::later_talk_edit(proc),
-            Self::GAME_SAVE_DATA_PROC_READ => {}
-            _ => {
-                let name = proc.get_name().to_rust_string();
-                if name.contains("ProcBond") { asset::facethumb::telop_proc_edit(proc); }
-                else if name == "QuickExercise" {
-                    proc.m_descs().set(1, Proc::call_2(ProcVoidMethod::from_fn(proc, sequences::muscle::hub_quick_exercise_get_prize_bonus).unwrap()));
-                }
-                else if name.contains("RefineShopRefineTargetMenu") { randomizer::shop::edit_refine_evolve_items(proc); }
-                else if name.contains("DragonRideSequence") {
-                    Self::get().hero_appearance = Some(HeroAppearanceMode::Normal);
-                    proc.m_descs().set(42, Proc::call_2(ProcVoidMethod::from_fn(proc, sequences::hub::dragon_ride_exit).unwrap()));
-                }
-            }
-        }
-    }
-}
-fn game_user_data_on_deserialize(this: GameUserData, stream: Stream_2, version: i32, _: OptionalMethod){
-    unsafe { GameUserData::on_deserialize(this, stream, version) };
-    outfit_core::deserialize_outfit_data(stream, version);
-    PersonPool::setup_reliance_data();
+    pub fn on_proc_jump(proc: ProcInst, label: i32){ sequences::proc_inst_jump_event(proc, label); }
+    pub fn on_proc_bind(proc: ProcInst) { sequences::proc_inst_bind_event(DVC::get(), proc); }
 }

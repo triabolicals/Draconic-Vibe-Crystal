@@ -1,5 +1,12 @@
+use engage::{
+    unity_engine::IObject_2Methods,
+    app::{Random_2, BasicMenuItem, BasicMenu_Result, ProcInst, BasicMenuItem_Attribute},
+    combat::Kaneko,
+    unity_engine::{GameObject, IGameObjectMethods, IRectTransformMethods, RectTransform}
+};
+use outfit_core::IComponentMethods;
 use super::*;
-use engage::app::{Random_2, BasicMenuItem, BasicMenu_Result, ProcInst, BasicMenuItem_Attribute};
+
 mod sequence;
 
 use outfit_core::Randomizer;
@@ -18,6 +25,29 @@ pub fn continuous_mode_vtable_edit() {
     ["Back", "Friend", "God", "Inventory", "PositionChange", "ResetMap", "SaveMap", "SaveMenu", "SelectionUnit", "Shop", "Start", "System"].iter().for_each(|v| {
         override_vtable("App", format!("SortieTopMenu.{}MenuItem", v).as_str(), "BCall", sortie_sequence_b_call as _);
     });
+}
+
+pub fn adjust_exp_game_object(){
+    if let Some(root) = to_opt(GameObject::find("WdwEXP")){
+        if let Some(rect) = to_opt(root.get_component_in_children_3::<RectTransform>()) {
+            let mut size = rect.get_size_delta();
+            size.x += 100.0;
+            rect.set_size_delta(size);
+            for i in 0..12 {
+                if let Some(transform) = to_opt(Kaneko::find_in_children(rect, format!("Exp{}", i))){
+                    let go = transform.get_game_object();
+                    go.get_components_in_children_3::<RectTransform>(true).iter().for_each(|rect|{
+                        let name = rect.get_name().to_rust_string();
+                        if name == "Max" || name == "ExpValue" {
+                            let mut anchored_pos = rect.get_anchored_position();
+                            anchored_pos.x += 50.0;
+                            rect.set_anchored_position(anchored_pos);
+                        }
+                    });
+                }
+            }
+        }
+    }
 }
 
 pub fn post_chapter_continuous_mode(proc: ProcInst) {
