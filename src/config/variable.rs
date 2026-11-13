@@ -285,20 +285,25 @@ impl DVCVariable {
             else if index < 35 || (index >= 35 && DVCFlags::BondRing.get_setting_value()) { BasicMenuItem_Attribute::enable() }
             else { BasicMenuItem_Attribute::hide() }
         }
-        else if self.is_bypass_disable() { BasicMenuItem_Attribute::enable() }
-        else if Self::ClassMode.get_setting_value() == 6 { BasicMenuItem_Attribute::hide() }
         else {
-            let attr = if DVCFlags::RandomEnable.get_value() { BasicMenuItem_Attribute::enable() } else { BasicMenuItem_Attribute::disable() };
-            if index >= 35 {
-                if DVCFlags::BondRing.get_setting_value() { attr }
-                else { BasicMenuItem_Attribute::hide() }
+            let sequence = DVCVariables::get_sequence();
+            if (sequence == 2 || sequence == 3) && (*self == DVCVariable::EmblemDeployment || *self == DVCVariable::UnitDeployment || *self == DVCVariable::EnemyEmblemGauge) { BasicMenuItem_Attribute::disable() }
+            else if self.is_bypass_disable() { BasicMenuItem_Attribute::enable() }
+            else if Self::ClassMode.get_setting_value() == 6 { BasicMenuItem_Attribute::hide() }
+            else {
+                let attr = if DVCFlags::RandomEnable.get_value() { BasicMenuItem_Attribute::enable() } else { BasicMenuItem_Attribute::disable() };
+                if index >= 35 {
+                    if DVCFlags::BondRing.get_setting_value() { attr }
+                    else { BasicMenuItem_Attribute::hide() }
+                }
+                else if *self == DVCVariable::ExplorationItem {
+                    if DVCFlags::RandomExplorationItems.get_setting_value() { attr }
+                    else { BasicMenuItem_Attribute::hide()  }
+                }
+                else { attr }
             }
-            else if *self == DVCVariable::ExplorationItem {
-                if DVCFlags::RandomExplorationItems.get_setting_value() { attr }
-                else { BasicMenuItem_Attribute::hide()  }
-            }
-            else { attr }
         }
+
     }
     pub fn get_max(&self) -> i32 {
         match self {
