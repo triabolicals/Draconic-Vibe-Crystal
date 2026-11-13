@@ -16,7 +16,7 @@ pub fn sortie_deployment_menu_install() {
 }
 
 pub fn sortie_menu_god_menu_map_attr(_: BasicMenuItem, _: OptionalMethod) -> BasicMenuItem_Attribute {
-    let v = DVCVariable::EmblemDeployment.get_value();
+    let v = DVCVariable::EmblemDeployment.get_setting_value();
     if v == 1 || v == 3 { BasicMenuItem_Attribute::hide() }
     else if UnitPool::get_count(9u32) == 0 { BasicMenuItem_Attribute::disable() }
     else { BasicMenuItem_Attribute::enable()  }
@@ -25,7 +25,7 @@ pub fn sortie_menu_god_menu_map_attr(_: BasicMenuItem, _: OptionalMethod) -> Bas
 pub fn sortie_menu_selection_unit_map_attr(_: BasicMenuItem, _: OptionalMethod) -> BasicMenuItem_Attribute {
     if UnitPool::get_count(9u32) == 0 { BasicMenuItem_Attribute::disable() }
     else {
-        let unit_deployment_mode = DVCVariable::UnitDeployment.get_value();
+        let unit_deployment_mode = DVCVariable::UnitDeployment.get_setting_value();
         match unit_deployment_mode {
             1|2|5 => BasicMenuItem_Attribute::hide(),
             3|6|7 => BasicMenuItem_Attribute::enable(),
