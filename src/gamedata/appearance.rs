@@ -194,7 +194,7 @@ impl AppearanceManager {
         let m = Self::get();
         let db = get_outfit_data();
         if idx == 19 {
-            if let Some(hero) = PersonPool::get_replacement(0, false, false) {
+            if let Some(hero) = PersonPool::get_replacement(0, false, true) {
                 Self::get_appearance_person(hero, None)
             }
             else {
@@ -265,10 +265,16 @@ impl AppearanceManager {
         if let Some(app) = EmblemPool::get_appearance_index(god_data.hash()).and_then(|v|Self::get_appearance_emblem_2(v, dark)) {
             if app.flags.contains(PersonalDressDataFlags::FromPerson) && app.flags.contains(PersonalDressDataFlags::HasJob){
                 if let Some(person) = to_opt(PersonData::try_get_from_hash(app.hash)){
-                    let item_kind = person.get_job().get_equipable_weapon_kinds().get(0);
-                    let item = GameData::get_item_pool().weapon_db.get_random_weapon(None, item_kind.value, 1, true).unwrap_or(ItemData::null());
+                    let equippables = person.get_job().get_equipable_weapon_kinds();
+                    let item =
+                        if equippables.len() == 0 { ItemData::null() }
+                        else {
+                            let item_kind = equippables.get(0);
+                            GameData::get_item_pool().weapon_db.get_random_weapon(None, item_kind.value, 1, true).unwrap_or(ItemData::null())
+                        };
+                    
                     result.setup_5(AssetTable_Modes{value: mode}, person, person.get_job(), item, CharacterAppearance::conditions());
-                    print_asset_table_result(result, 10 + mode);
+                    // print_asset_table_result(result, 10 + mode);
                     replaced = true;
                 }
             }

@@ -15,7 +15,6 @@ use crate::{
     dvc::{
         asset::{
             dress::change_color_by_rng,
-            emblem::{ENGAGE_F, ENGAGE_M},
             engage_attack::EngageAttackType,
         },
         HeroAppearanceMode,
@@ -122,22 +121,35 @@ pub fn asset_table_result_setup_hook(
     conditions: Array<Il2CppString>,
     method_info: OptionalMethod) -> AssetTable_Result
 {
+    if unit.is_null() || unit.get_person().is_null() {
+        println!("AssetTable.Result$$Setup No Unit/Person [Mode: {}]", mode);
+        let result: AssetTable_Result = call_original!(this, mode, unit, equipped, conditions, method_info);
+        result.commit(AssetTable_Modes{value: mode % 10});
+        result.replace(AssetTable_Modes{value: mode % 10});
+        return result;
+    }
+    else {
+        println!("AssetTable.Result$$Setup for {} [Mode: {}]", unit.get_name(), mode);
+    }
     if let Some(app) = DVC::get().hero_appearance {
-        if unit.get_person().index() == 1 {
-            let hero = UnitPool::get_hero(false);
-            if !hero.is_null() && hero.get_person().hash() != PersonPool::LUEUR {
-                let result: AssetTable_Result = call_original!(this, mode, hero, equipped, conditions, method_info);
-                if app == HeroAppearanceMode::Training {
-                    AssetFlags::set_condition_key("AID_鍛錬着", true);
-                }
-                result.commit(AssetTable_Modes::combat());
-                result.replace(AssetTable_Modes::combat());
-                if hero.is_female() { result.set_m_hub_anim("AOC_Hub_c051".into()); }
-                else { result.set_m_hub_anim("AOC_Hub_c001".into()); }
+        if DVCVariables::get_sequence() == 4 {
+            if unit.get_person().index() == 1 {
+                let hero = UnitPool::get_hero(false);
                 DVC::get().hero_appearance = None;
-                return result;
+                if !hero.is_null() && hero.get_person().hash() != PersonPool::LUEUR {
+                    let result: AssetTable_Result = call_original!(this, mode, hero, equipped, conditions, method_info);
+                    if app == HeroAppearanceMode::Training {
+                        AssetFlags::set_condition_key("AID_鍛錬着", true);
+                    }
+                    result.commit(AssetTable_Modes::combat());
+                    result.replace(AssetTable_Modes::combat());
+                    if hero.is_female() { result.set_m_hub_anim("AOC_Hub_c051".into()); }
+                    else { result.set_m_hub_anim("AOC_Hub_c001".into()); }
+                    return result;
+                }
             }
         }
+        else { DVC::get().hero_appearance = None; }
     }
     if mode == 3 && unit.get_person().hash() == PersonPool::LUEUR {
         let result: AssetTable_Result = call_original!(this, mode, unit, equipped, conditions, method_info);
@@ -215,34 +227,27 @@ pub fn appearance_create_from_result_2(this: AssetTable_Result, map_distance: i3
                 let god = GodData::get(this.get_pid());
                 if !god.is_null() {
                     unity::field_set_value_at_offset::<i32>(appearance, 0xd4, god.hash());
-                    if AssetFlags::get_condition_index("エンゲージ開始")
-                        .map(|v| AssetTable::s_condition_flags().test(v)).unwrap_or(false)
-                    {
                         let anim_set = appearance.get_anim_set();
                         let female = this.get_dress_model().to_rust_string().contains("F_c");
                         if !anim_set.is_null() {
+                            let set = emblem::get_random_engaging(female);
+                            let anim = format!("uAnim_{}", set);
                             if god.get_flag().m_value() & 32 != 0 {
                                 if anim_set.engage3().is_null() || utils::il2str(anim_set.engage3().get_name()).is_none_or(|v| v.contains("Tsf")){
-                                    let rng = Random_2::get_system();
-                                    let set = if female { ENGAGE_F[rng.get_value_2(6) as usize] } else { ENGAGE_M[rng.get_value_2(6) as usize ] };
-                                    let anim = format!("uAnim_{}", set);
                                     let asset = AnimAsset::new_2(anim.into());
                                     asset.set_hash(0x143dd064);
                                     anim_set.set_engage3(asset);
                                 }
                             }
-                            else if god.get_flag().m_value() & 32 == 0 {
+                            else {
                                 if anim_set.engage1().is_null() || utils::il2str(anim_set.engage1().get_name()).is_none_or(|v| v.contains("Tsf")){
-                                    let rng = Random_2::get_system();
-                                    let set = if female { ENGAGE_F[rng.get_value_2(6) as usize] } else { ENGAGE_M[rng.get_value_2(6) as usize ] };
-                                    let anim = format!("uAnim_{}", set);
                                     let asset = AnimAsset::new_2(anim.into());
                                     asset.set_hash(-0x5cc4eb8);
                                     anim_set.set_engage1(asset);
                                 }
                             }
                         }
-                    }
+                    // }
                 }
             }
         }
@@ -277,6 +282,7 @@ pub(crate) fn random_body_scale(result: AssetTable_Result, hash: Option<i32>, _i
     }
 }
 pub fn print_asset_table_result(result: AssetTable_Result, mode: i32) {
+    if !DVC::get().print_events { return; }
     // #[cfg(feature="debug")] {
         let jid = utils::il2str(result.get_jid()).map(|v| engage::app::Mess::get_game_data_name(v).to_rust_string()).unwrap_or("---".to_string());
         if let Some(pid) = utils::il2str(result.get_pid()) { println!("Asset Table Result PID: {} / {} [Mode: {}]", engage::app::Mess::get_game_data_name(pid), jid, mode); }
