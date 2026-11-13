@@ -194,7 +194,7 @@ fn ring_select_menu_item_build_attr(ring: RingSelectMenu_RingMenuItem, _: Option
         if let Some(menu) = ring.m_menu().try_cast::<RingSelectMenu>() {
             let unit = menu.get_unit();
             let god = ring.get_god();
-            if DVCVariables::get_chapter_index() == 22 {
+            if DVCVariables::get_chapter_index() == 22 && DVCVariables::get_sequence() == 2 {
                 if !unit.is_null() && unit.is_hero() { return BasicMenuItem_Attribute::disable(); }
                 else if !god.is_null() {
                     return if DVCVariable::EmblemRecruitment.get_value() == 0 { original_result }
