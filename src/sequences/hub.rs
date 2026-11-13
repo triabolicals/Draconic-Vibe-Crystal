@@ -136,6 +136,7 @@ extern "C" fn hub_sequence_patch_3_gift_event(proc: HubSequence, _optional_metho
 
 fn try_gift_event(hub: HubSequence, flag_name: Il2CppString, reward: Il2CppString, message_id: Il2CppString) {
     if !DVCVariables::is_main_chapter_complete(4) || !GameData::get_item_pool().has_reward { return; }
+    if GameVariableManager::get_number(flag_name) != 0 { return; }
     let mode = DVCVariable::Continuous.get_value();
     let sequence = DVCVariables::get_sequence();
     if ((mode == 1 || mode == 2) && sequence == 5) || sequence == 4 {
