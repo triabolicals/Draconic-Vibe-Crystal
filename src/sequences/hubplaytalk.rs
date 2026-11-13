@@ -17,18 +17,18 @@ pub extern "C" fn hub_play_talk_after_create_select(this: HubPlayTalkAfter, _: O
     this.create_bind_select_menu();
     let access = this.get_access();
     if access.get_dispos_data().get_script_name().is_null() {
-        if let Some(menu) = this.get_child().try_cast::<HubPlayTalkAfter_SelectListMenu>(){
-            unsafe {
-                let item = UnitRecruitMenuItem::instantiate().unwrap();
-                IBasicMenuItemMethods::ctor(item);
-                menu.m_full_menu_item_list().add(item.cast());
+        if !this.get_child().is_null() {
+            if let Some(menu) = this.get_child().try_cast::<HubPlayTalkAfter_SelectListMenu>(){
+                unsafe {
+                    let item = UnitRecruitMenuItem::instantiate().unwrap();
+                    IBasicMenuItemMethods::ctor(item);
+                    menu.m_full_menu_item_list().add(item.cast());
+                }
+                menu.set_m_show_row_num(menu.m_full_menu_item_list().get_count());
+                menu.rebuild();
             }
-            // proc.set_m_desc_index(0);
-            menu.set_m_show_row_num(menu.m_full_menu_item_list().get_count());
-            menu.rebuild();
         }
     }
-
 }
 pub extern "C" fn hub_play_talk_exec_talk_after(this: HubPlayTalk, _: OptionalMethod) {
     let access = this.get_access().m_access_data();
