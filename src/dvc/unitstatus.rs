@@ -19,6 +19,7 @@ use engage::{
     unity_engine::ITransformMethods,
 };
 use unity::{Cast, Class, IlNull, OptionalMethod};
+use unity::il2cpp::Il2CppClass;
 use crate::utils::to_opt;
 
 pub fn add_unit_status_key_help_data() {
@@ -33,7 +34,27 @@ pub fn add_unit_status_key_help_data() {
         }
     });
 }
+#[repr(C)]
+pub struct UnitStatusSetter74 {
+    pub klass: &'static Il2CppClass,
+    monitor: *const u8,
+    pub status_setter: UnitStatusSetter,
+    pub unit: Unit,
+}
+
+fn set_data(this: &mut UnitStatusSetter74, _f: i64, _: OptionalMethod) {
+    this.status_setter.set_data_impl(this.unit);
+    adjust_titles(this.status_setter, 0, false);
+}
+
 pub fn unit_status_tick_method_edit() {
+    if let Some(class) = Class::try_lookup("App", "UnitStatusSetter.<>c__DisplayClass74_0").ok()
+        .map(|v| v.raw_mut())
+    {
+        if let Some(method) = class.get_method_from_name("<SetData>b__0", 1) { method.method_ptr = set_data as _; }
+        else { println!("Cannot Find <SetData>b__0"); }
+    }
+    else { println!("Cannot Find UnitStatusSetter.<>c__DisplayClass74_0"); }
     if let Some(method) = Class::lookup("App", "UnitStatus").raw_mut().get_method_from_name("Tick", 0) {
         method.method_ptr = unit_status_tick as _;
     }
@@ -43,14 +64,8 @@ pub fn toggle_parameter_change(setter: UnitStatusSetter, unit: Unit, increase: b
     let new = (if increase { v + 1 } else { v + 2 }) % 3;
     change_parameter_mode(setter, unit, new, false);
 }
-pub fn change_parameter_mode(setter: UnitStatusSetter, unit: Unit, state: u8, job: bool){
+fn adjust_titles(setter: UnitStatusSetter, state: u8, job: bool){
     let param_root = setter.get_transform();
-    let unit_index = unit.get_person().index() as i16;
-    if !job {
-        if (get_unit_status_mode(setter) == state) && (get_unit_status_person_index(setter) == unit_index) { return; }
-    }
-    set_unit_status_person_index(setter, unit_index);
-    set_unit_status_mode(setter, state);
     if let Some(parameter) = to_opt(Kaneko::find_in_children(param_root, "Parameter2")){
         let text = parameter.get_child(0).get_game_object().get_component_in_children_3::<TextMeshProUGUI>();
         if !text.is_null(){
@@ -78,6 +93,15 @@ pub fn change_parameter_mode(setter: UnitStatusSetter, unit: Unit, state: u8, jo
         hp_slash.get_game_object().set_active(state == 0);
     }
     setter.m_now_hp().get_game_object().set_active(state == 0);
+}
+pub fn change_parameter_mode(setter: UnitStatusSetter, unit: Unit, state: u8, job: bool){
+    let unit_index = unit.get_person().index() as i16;
+    if !job {
+        if (get_unit_status_mode(setter) == state) && (get_unit_status_person_index(setter) == unit_index) { return; }
+    }
+    adjust_titles(setter, state, false);
+    set_unit_status_person_index(setter, unit_index);
+    set_unit_status_mode(setter, state);
     match state {
         1 => {
             let mut total = 0;
@@ -135,24 +159,20 @@ pub extern "C" fn unit_status_tick(_this: UnitStatus, _: OptionalMethod) {
         }
         if !animator.get_bool("isOpening") { return; }
         let status = go.get_component::<UnitStatusSetter>();
-        let param = UnitInfoParamManager::get_instance();
-        if param.is_null() || status.is_null() || param.m_calc_unit().is_null() { return; }
-        let unit = param.m_calc_unit();
-        if unit.is_null() || unit.get_person().is_null() { return; }
-        let current_person = status.m_prev_unit().get_person().index() as i16;
-        if current_person != get_unit_status_person_index(status){
-            if !status.m_prev_unit().is_null() { change_parameter_mode(status, status.m_prev_unit(), 0, false); }
-            else { change_parameter_mode(status, unit, 0, false); }
-            set_unit_status_person_index(status, current_person);
+        let prev_unit = status.m_prev_unit();
+        if status.is_null() || prev_unit.is_null() { return; }
+        if prev_unit.get_person().is_null() { return; }
+        let index = prev_unit.get_person().index() as i16;
+        if get_unit_status_person_index(status) != (index) {
+            change_parameter_mode(status, prev_unit, 0, false);
+            set_unit_status_person_index(status, index);
+            return;
         }
-        else {
-            let left = Pad::is_trigger(NpadButton::zl());
-            let right = Pad::is_trigger(NpadButton::zr());
-            if left || right {
-                if !status.m_prev_unit().is_null() { toggle_parameter_change(status, status.m_prev_unit(), right); }
-                else { toggle_parameter_change(status, unit, right); }
-                GameSound::post_event("Decide", Character::null());
-            }
+        let left = Pad::is_trigger(NpadButton::zl());
+        let right = Pad::is_trigger(NpadButton::zr());
+        if left || right {
+            toggle_parameter_change(status, prev_unit, right);
+            GameSound::post_event("Decide", Character::null());
         }
     }
 }
