@@ -4,9 +4,20 @@ use crate::{
     utils::il2str
 };
 
-pub const ENGAGE_M: [&'static str; 6] = ["Ike0AM-Sw1_c534_Engage1", "Lei0AM-Sw1_c532_Engage1 ", "Mar0AM-Sw1_c530_Engage1", "Roy0AM-Sw1_c533_Engage1", "Byl0AM-Sw1_c535_Engage1", "Sig0BM-Sw1_c531_Engage1"];
-pub const ENGAGE_F: [&'static str; 6] = ["Luc0AF-Sw1_c584_Engage1", "Lyn0AF-Bw1_c581_Engage1", "Mic0AF-Mg1_c583_Engage1", "Cel0AF-Mg1_c580_Engage1", "Cor0AF-Sw1_c585_Engage1", "Eir0AF-Sw1_c582_Engage1"];
-
+const ENGAGE_M: [&'static str; 11] = [
+    "Tsf0AM-No1_c000_Engage2", "Eph0AM-Lc1_c536_Engage1", "Ike0AM-Sw1_c534_Engage1", "Mar0AM-Sw1_c530_Engage1", "Roy0AM-Sw1_c533_Engage1", "Byl0AM-Sw1_c535_Engage1", "Hec0AM-Ax1_c510_Engage3",
+    "Sor0AM-Mg1_c511_Engage3", "Chr0AM-Sw1_c512_Engage3", "Cla0AM-Bw1_c515_Engage3", "Dim0AM-Lc1_c514_Engage3",
+];
+const ENGAGE_F: [&'static str; 10] = [
+    "Tsf0AF-No1_c000_Engage2", "Luc0AF-Sw1_c584_Engage1", "Lyn0AF-Bw1_c581_Engage1", "Mic0AF-Mg1_c583_Engage1", "Cel0AF-Mg1_c580_Engage1", "Cor0AF-Sw1_c585_Engage1", "Eir0AF-Sw1_c582_Engage1",
+    "Ede0AF-Ax1_c563_Engage3", "Ver0AF-Mg1_c562_Engage3", "Tik0AF-Mg1_c560_Engage3"
+];
+pub fn get_random_engaging(female: bool) -> &'static str {
+    let rng = Random_2::get_system();
+    let len = if female { ENGAGE_F.len() } else { ENGAGE_M.len() } as i32;
+    let index = rng.get_value_2(len) as usize;
+    if female { ENGAGE_F[index] } else { ENGAGE_M[index] }
+}
 fn add_emblem_aura(result: AssetTable_Result, darkness: bool, combat: bool) {
     let aura_suffix =
         if darkness { if AssetTable::s_condition_flags().m_bits().get(get_condition_index("暴走").unwrap_or(0)) { "9-00" } else { "2-00" } }
@@ -40,8 +51,10 @@ pub fn asset_table_result_god_setup(
         if names {
             let result = call_original!(this, mode, god_data, is_darkness, conditions, method_info);
             let mut body_anims = vec![];
+            print_asset_table_result(result, mode);
             for i in 0..4 { body_anims.push(get_result_anim(result, i).map(|v| v.to_rust_string())); }
-            if !AppearanceManager::set_rand_emblem_appearance(god_data, result, mode, is_darkness) {
+            let appearance = AppearanceManager::set_rand_emblem_appearance(god_data, result, mode, is_darkness);
+            if !appearance {
                 for i in 0..4 {
                     if let Some(body_anim) = body_anims[i].as_ref() { set_result_anim(result, i, body_anim.as_str()); }
                 }
@@ -50,6 +63,7 @@ pub fn asset_table_result_god_setup(
             if AssetFlags::get_condition_index("エンゲージ開始").map(|v| AssetTable::s_condition_flags().test(v)).unwrap_or(false){
                 AnimData::remove(result, true, true);
             }
+            result.set_pid(god_data.get_gid());
             result
         }
         else if gid.contains("リュール") {
