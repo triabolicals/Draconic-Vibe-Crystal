@@ -209,6 +209,10 @@ impl DVCBasicMenuItem {
                 else { BasicMenu_Result::pass() }
             }
             DVCMenuItemKind::Gauge(gauge) => {
+                if self.m_attribute() == BasicMenuItem_Attribute::disable() {
+                    let sequence = DVCVariables::get_sequence();
+                    if sequence == 2 || sequence == 3 { return BasicMenu_Result::pass(); }
+                }
                 if let Some(increase) = Self::get_change(true){
                     let v = self.value();
                     let v2 = gauge.increment(v, increase);
