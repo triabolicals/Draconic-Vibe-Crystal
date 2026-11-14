@@ -114,14 +114,13 @@ pub fn do_transformation(this: CombatRecord, calc_side: BattleSide_Type) {
     if !gs.appearance().is_null(){
         if !gs.appearance().assets().is_null() { if gs.appearance().get_race().value != 1 { return; } }
     }
+    if style & 0xD000000 != 0 { return; }
     if person.get_pid().to_rust_string().contains("チキ") { return; }
     let state = AssetTable_ConditionFlags::get_state(unit);
     let dragon = state.value & CombatStyle::dragon_change().value != 0;
     let god_unit = unit.get_god_unit();
     match state.value {
-        2 => { 
-            if god_unit.is_null() { return; }
-        }
+        2 => { if god_unit.is_null() { return; } }
         0|1 => {
             let item = gs.get_weapon();
             if item.is_null() { return; }
@@ -174,9 +173,9 @@ pub fn do_transformation(this: CombatRecord, calc_side: BattleSide_Type) {
                         transform.set_pid(unit.get_pid().to_rust_string());
                         remove_acc_for_transform(transform);
                         if let Some(dress) = utils::il2str(transform.get_dress_model()){
-                            if dress.contains("uBody_Sdk1AT") || dress.contains("uBody_Sds1AT") { transform.set_scale_all(0.07); }
-                            else if dress.contains("uBody_Sds0AT") { transform.set_scale_all(0.4); }
-                            else if dress.contains("AT") && !dress.contains("Tik") { transform.set_scale_all(0.7); }
+                            if dress.contains("uBody_Sdk1AT") || dress.contains("uBody_Sds1AT") { transform.set_scale_all(0.07_f32); }
+                            else if dress.contains("uBody_Sds0AT") { transform.set_scale_all(0.4_f32); }
+                            else if dress.contains("AT") && !dress.contains("Tik") { transform.set_scale_all(0.7_f32); }
                         }
                         style |= 1 << 22;
                         set_transform_appearance(this, unit, calculator, side, calc_side, distance);
