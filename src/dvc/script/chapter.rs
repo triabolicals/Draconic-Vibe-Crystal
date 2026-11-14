@@ -1,15 +1,12 @@
-use engage::{
-    app::{
-        mapimage::*, unit::*, persondata::*, goddata::*, eventscript::*, skilldata::*, random_2::*,
-        GameMessage, AIValue_Order, GodData, UnitPool, Force_Type,
-        ScriptMap, ScriptSystem, ScriptUnit, ScriptUtil, MapHistory,
-        IStructData_1Methods, IMapImageUnitMethods, ISkillArrayMethods,
-        IUnitAIMethods, ISingletonClass_1Methods,
-    },
-    EventScriptExt,
-    moon_sharp::interpreter::dynvalue::*,
-    DynValueArgs, Mess, GameVariableManager,
-};
+use engage::app::IMapOverlap_DataMethods;
+use engage::{app::{
+    mapimage::*, unit::*, persondata::*, goddata::*, eventscript::*, skilldata::*, random_2::*,
+    GameMessage, AIValue_Order, GodData, UnitPool, Force_Type,
+    ScriptMap, ScriptSystem, ScriptUnit, ScriptUtil, MapHistory,
+    IStructData_1Methods, IMapImageUnitMethods, ISkillArrayMethods,
+    IUnitAIMethods, ISingletonClass_1Methods,
+}, EventScriptExt, moon_sharp::interpreter::dynvalue::*, DynValueArgs, Mess, GameVariableManager, ForceExt};
+use engage::app::{Force, MapOverlap};
 use outfit_core::Randomizer;
 use unity::{Array, Cast, ClassIdentity, Il2CppString, OptionalMethod};
 use crate::{DVCVariables, utils::il2str, DVCFlags, enums::{PIDS, MPIDS, RINGS}, utils::to_opt, gamedata::EmblemPool, DVCVariable};
@@ -77,7 +74,8 @@ pub extern "C" fn install_chapter_script_functions(script: EventScript) {
             // 炎上配置
         }
         26 => {
-            if DVCVariable::UnitDeployment.get_value() == 4 { script.register_action("味方キャラを再配置", m026_phase_2_positions); }
+            script.register_action("味方キャラを再配置", m026_phase_2_positions);
+            if DVCVariable::TerrainEffect.get_value() != 0 { script.register_action("指定PID以外の敵が消える", m026_delete_enemy_units); }
         }
         61 => { script.register_action("ボス移動開始", e001_engage_atk); }
         _ => {}
@@ -140,18 +138,17 @@ extern "C" fn dialog(arg: Array<DynValue>, _: OptionalMethod) {
     if DVCFlags::Ironman.get_value() && il2str(ScriptUtil::try_get_string(arg, 0, Il2CppString::null())).is_some_and(|c| c.contains("TIMECRYSTAL")) {
         return;
     }
-    else if DVCVariables::get_chapter_index() == 22 && il2str(arg.try_get_string(0)).is_some_and(|v| v.contains("MID_TUT_NAVI_M022_GET")){
-        if let Some(mid) = il2str(arg.try_get_string(0)).filter(|v| v.contains("MID_TUT_NAVI_M022_GET")){
-            if let Some(pos) = RINGS.iter().position(|&r| mid.contains(r)){
-                let original_ring_name = Mess::get(format!("MGID_Ring_{}", RINGS[pos])).to_rust_string();
-                let original_message = Mess::get(mid).to_rust_string();
-                if let Some(replacement) = EmblemPool::get_replacement_god_3(pos as i32, false) {
-                    let new_ring_name = Mess::get(replacement.get_ringname()).to_rust_string();
-                    let new_message = original_message.replace(original_ring_name.as_str(), new_ring_name.as_str());
-                    GameMessage::create_key_wait(ScriptUtil::get_sequence(), new_message.as_str());
-                    ScriptUtil::r#yield();
-                    return;
-                }
+    else if DVCVariables::get_chapter_index() == 22 && il2str(arg.try_get_string(0)).is_some_and(|v| v.contains("MID_TUT_NAVI_M022_GET_")) {
+        let mid = arg.try_get_string(0).to_rust_string();
+        let original_message = Mess::get(mid.as_str()).to_rust_string();
+        if let Some(pos) = RINGS.iter().position(|&r| mid.contains(r)) {
+            let original_ring_name = Mess::get(format!("MGID_Ring_{}", RINGS[pos])).to_rust_string();
+            if let Some(replacement) = EmblemPool::get_replacement_god_3(pos as i32, false) {
+                let new_ring_name = Mess::get(replacement.get_ringname()).to_rust_string();
+                let new_message = original_message.replace(original_ring_name.as_str(), new_ring_name.as_str());
+                GameMessage::create_key_wait(ScriptUtil::get_sequence(), new_message.as_str());
+                ScriptUtil::r#yield();
+                return;
             }
         }
     }
@@ -185,15 +182,44 @@ extern "C" fn m004_time_crystal(_args: Array<DynValue>, _: OptionalMethod) {
     args.set(0, DynValue::new_string("MID_EV8"));
     ScriptSystem::talk(args);
 }
-
+// 指定PID以外の敵が消える
+extern "C" fn m026_delete_enemy_units(args: Array<DynValue>, _: OptionalMethod) {
+    let pid = args.try_get_string(0).to_rust_string();
+    let enemy =
+    Force::get(Force_Type::enemy()).iter().map(|u| u.get_pid().to_rust_string())
+        .collect::<Vec<_>>();
+    let args: Array<DynValue> = Array::<DynValue>::new(DynValue::class().raw(), 1).unwrap();
+    enemy.iter().for_each(|e| {
+        if *e != pid {
+            args.set(0, DynValue::new_string(e.as_str()));
+            ScriptUnit::unit_delete(args);
+        }
+    });
+    if DVCVariable::TerrainEffect.get_setting_value() != 0 {
+        let count = MapOverlap::get_count();
+        if count > 0 {
+            MapHistory::overlap_begin();
+            let pos: Vec<_> =
+                (0..count).into_iter()
+                    .map(|i| MapOverlap::get_data(i) )
+                    .map(|v| (v.get_x(), v.get_z()))
+                    .collect();
+            pos.into_iter().for_each(|(x, z)| {
+                MapHistory::overlap(x, z, Il2CppString::null());
+                MapOverlap::remove(x, z);
+            });
+            MapHistory::overlap_end();
+        }
+    }
+}
 pub extern "C" fn m026_phase_2_positions(_args: Array<DynValue>, _method_info: OptionalMethod) {
     let map_image = MapImage::get_instance();
     let args: Array<DynValue> = Array::<DynValue>::new(DynValue::class().raw(), 3).unwrap();
     for x in 0..3 { args.set(x, DynValue::new_number(0.0)); }
     if DVCFlags::RandomDeploySpot.get_value() {
         let mut possible_pos = vec![];
-        for z in 0..31 {
-            for x in 0..31 {
+        for z in 1..29 {
+            for x in 1..29 {
                 if z >= 13 && z < 18 && x >= 13 && x < 18 { continue; } // Big Dragon Position
                 if map_image.m_unit().get_unit(x, z).is_null() {
                     args.get(0).assign_number(x as f64);
@@ -228,11 +254,13 @@ pub extern "C" fn m026_phase_2_positions(_args: Array<DynValue>, _method_info: O
         ].iter();
         for z in 17..23 {
             for x in 1..29 {
-                if let Some((unit, pos)) = to_opt(map_image.m_unit().get_unit(x, z)).zip(pos_list.next()) {
-                    args.set(0, DynValue::new_string(unit.get_pid()));
-                    args.get(1).assign_number(pos.0 as f64);
-                    args.get(2).assign_number(pos.1 as f64);
-                    ScriptUnit::unit_set_pos(args);
+                if let Some(unit) = to_opt(map_image.m_unit().get_unit(x, z)){
+                    if let Some(pos) = pos_list.next(){
+                        args.set(0, DynValue::new_string(unit.get_pid()));
+                        args.get(1).assign_number(pos.0 as f64);
+                        args.get(2).assign_number(pos.1 as f64);
+                        ScriptUnit::unit_set_pos(args);
+                    }
                 }
             }
         }

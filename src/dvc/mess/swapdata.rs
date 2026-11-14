@@ -380,7 +380,7 @@ fn replace_mess_char(
 ) {
     let dictionary = Mess::s_mess_data_dictionary();
     let mut replace: Vec<(Il2CppString, IntPtr)> = vec![];
-    dictionary.iter().filter(|(key, _)| il2str(*key).is_some_and(|v| v.starts_with(mess_key_prefix)))
+    dictionary.iter().filter(|(key, _)| il2str(*key).is_some_and(|v| v.starts_with(mess_key_prefix) && !v.contains("M024") ))
         .for_each(|(key, _)| {
             let str_ptr = Mess::get_int_ptr(key).as_ptr();
             let mut str = copy_from_u16_ptr(str_ptr);

@@ -3,7 +3,7 @@ use crate::dvc::DVC;
 use crate::DVCConfig;
 use crate::menus::DVCSettingMenu;
 
-pub fn main_sequence_event_jump(main: ProcInst, label: i32) {
+pub fn main_menu_jump_event(main: ProcInst, label: i32) {
     if label == 6 {
         DVC::get().init = false;
         DVCSettingMenu::create_bind(main);

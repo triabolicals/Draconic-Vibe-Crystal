@@ -64,7 +64,7 @@ pub fn proc_inst_jump_event(proc: ProcInst, label: i32) {
     match hash_code {
         MAIN_SEQUENCE => if label == 2 || label == 14 { DVC::get().reset(); },
         MAP_SEQUENCE => map::map_sequence_completed_jump_event(proc, label),
-        MAINMENU_SEQUENCE => mainmenu::main_sequence_event_jump(proc, label),
+        MAINMENU_SEQUENCE => mainmenu::main_menu_jump_event(proc, label),
         TITLE_SEQUENCE => title::title_sequence_event_jump(label),
         _ => {}
     }

@@ -51,7 +51,6 @@ pub fn asset_table_result_god_setup(
         if names {
             let result = call_original!(this, mode, god_data, is_darkness, conditions, method_info);
             let mut body_anims = vec![];
-            print_asset_table_result(result, mode);
             for i in 0..4 { body_anims.push(get_result_anim(result, i).map(|v| v.to_rust_string())); }
             let appearance = AppearanceManager::set_rand_emblem_appearance(god_data, result, mode, is_darkness);
             if !appearance {
@@ -59,9 +58,11 @@ pub fn asset_table_result_god_setup(
                     if let Some(body_anim) = body_anims[i].as_ref() { set_result_anim(result, i, body_anim.as_str()); }
                 }
             }
-            else { add_emblem_aura(result, is_darkness, mode != 1); }
-            if AssetFlags::get_condition_index("エンゲージ開始").map(|v| AssetTable::s_condition_flags().test(v)).unwrap_or(false){
-                AnimData::remove(result, true, true);
+            else {
+                add_emblem_aura(result, is_darkness, mode != 1);
+                if conditions.iter().any(|v| v.to_rust_string() == "エンゲージ開始"){
+                    AnimData::remove(result, true, true); 
+                }
             }
             result.set_pid(god_data.get_gid());
             result

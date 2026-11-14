@@ -312,8 +312,7 @@ impl DVCVariable {
             Self::UnitDeployment => 8,
             Self::InteractSetting => 7,
             Self::ClassMode => 6 + DVCVariables::is_main_menu() as i32,
-            Self::PersonalGrowthMode => 6,
-            Self::Continuous|Self::FogOfWar|Self::EngraveLevel => 5,
+            Self::Continuous|Self::FogOfWar|Self::EngraveLevel|Self::PersonalGrowthMode  => 5,
             Self::UnitRecruitment => { 4 + (PersonPool::get().playable.len() > 41) as i32 }
             Self::Reclassing => 4,
             Self::EmblemInherit|Self::EmblemRecruitment|Self::EmblemDeployment|Self::TerrainEffect|Self::ExplorationItem|Self::UnitInventory|Self::EmblemAppearance|Self::GenericAppearance => 4,
